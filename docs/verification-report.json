@@ -1,0 +1,12 @@
+{
+  "schema": "cordis-verus.verification/v3",
+  "status": "not_run",
+  "reason": "No successful complete release-quality run exists for this source checkpoint. See development-report.json for separate development checks and status.md for limitations.",
+  "previousFullRun": {
+    "snapshotProofCount": 1927,
+    "status": "failed",
+    "control": "mixed-removal-ignores-retention",
+    "reason": "Timeout; incomplete negative verification is not accepted evidence."
+  },
+  "sha256": {}
+}

@@ -1,0 +1,28 @@
+name: Bug report
+description: A reproducible runtime, build, or documentation issue
+body:
+  - type: markdown
+    attributes:
+      value: For vulnerabilities, read SECURITY.md before sharing sensitive details. Chinese and English reports are welcome.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+      description: Include lifecycle phase, plugin dependencies, and cleanup ordering when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: A small self-contained test or example is best. Remove secrets and private paths.
+      render: rust
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and revision
+      description: OS/architecture, commit, rustc -Vv, and the relevant command output.
+    validations:
+      required: true

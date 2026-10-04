@@ -1,0 +1,4117 @@
+{
+  "schema": "cordis-verus.paper-obligations/v1",
+  "paper": {
+    "arxiv": "2608.25512v1",
+    "pdfSha256": "390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0"
+  },
+  "completionTarget": "Original paper v1, all numbered definitions and claims, plus executable refinement. A corrected subtheory is not this target.",
+  "items": [
+    {
+      "id": 1,
+      "kind": "Definition",
+      "title": "Twisted composition",
+      "status": "formalized",
+      "scope": "Pointwise functions; reverse inverse composition.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "compose"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "track_monoid"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "kind": "Definition",
+      "title": "Effect context",
+      "status": "formalized",
+      "scope": "Generic state and recovery map.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "Tracked"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "kind": "Definition",
+      "title": "Tracking",
+      "status": "formalized",
+      "scope": "Generic forward and inverse maps.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "track"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "kind": "Theorem",
+      "title": "Tracking projection",
+      "status": "proved",
+      "scope": "Exact forward projection.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "track_projection"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "kind": "Theorem",
+      "title": "Tracking monoid homomorphism",
+      "status": "proved",
+      "scope": "Identity and twisted composition pointwise.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "track_monoid"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "kind": "Definition",
+      "title": "Recovery",
+      "status": "formalized",
+      "scope": "Value recovery and identity accumulator.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "recover"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "kind": "Theorem",
+      "title": "Tracking preserves recovery",
+      "status": "proved",
+      "scope": "Uses the inverse witness only at the actual input.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "tracking_preserves_recovery"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "kind": "Definition",
+      "title": "Witnessed effect",
+      "status": "formalized",
+      "scope": "State-dependent inverse; no uniform inverse premise.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "witnessed"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "kind": "Definition",
+      "title": "Effect composition",
+      "status": "formalized",
+      "scope": "Inverses evaluated at their actual yield contexts.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "diamond"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "kind": "Theorem",
+      "title": "Effect monoid",
+      "status": "proved",
+      "scope": "Pointwise monoid laws and uniform embedding.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "effect_monoid"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "uniform_homomorphism"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "kind": "Theorem",
+      "title": "Witness composition",
+      "status": "proved",
+      "scope": "Actual-yield witnesses compose.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "witness_composition"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "uniform_witness"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "kind": "Definition",
+      "title": "Effect lifting",
+      "status": "formalized",
+      "scope": "Lift to tracked contexts.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "effect"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "kind": "Theorem",
+      "title": "Lift preserves composition",
+      "status": "proved",
+      "scope": "Both returned directions compared pointwise.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "effect_homomorphism"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "kind": "Theorem",
+      "title": "Lifted forward projection",
+      "status": "proved",
+      "scope": "Includes independence of the previous accumulator.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "effect_projection"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "kind": "Theorem",
+      "title": "Lifted recovery",
+      "status": "proved",
+      "scope": "Context recovery and the universal-accumulator iff condition.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "lifted_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "full_accumulator_recovery_iff"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "kind": "Theorem",
+      "title": "Finite local temporal composability",
+      "status": "proved",
+      "scope": "Every chosen partial reverse run recovers the corresponding forward prefix and preserves the original recovery target; actual state-dependent witnesses.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "local_temporal_sequence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "dynamic_sequence_sound"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "kind": "Definition",
+      "title": "Witnessed iterators",
+      "status": "formalized",
+      "scope": "Arbitrary-index iterator family with least recursive membership, greatest observational witness closure, exact-equality specialization and witnessed constructor correspondence; no shared finite height.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/history.rs",
+          "symbol": "IteratorStep"
+        },
+        {
+          "file": "crates/cordis-kernel/src/quotient.rs",
+          "symbol": "IteratorFamily"
+        },
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "inductive_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "paper_witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "exact_witness_family"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "paper_witnessed_least"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "kind": "Definition",
+      "title": "Iterator lifting",
+      "status": "formalized",
+      "scope": "Least recursive membership implies termination for each input without a common rank. Whole effectiter is chosen from a finite completion, independent of that choice, and satisfies the printed recursive equation. Nonterminating coinductive families have only prefix semantics.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "advance"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "StageProtocol"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "inductive_termination"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "whole_effectiter"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "completed_effect_unique"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "whole_effectiter_equation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "no_common_height"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "kind": "Definition",
+      "title": "Dependent coeffect context",
+      "status": "formalized",
+      "scope": "Finite dependent partial maps via per-key value predicates and bijective fiber codecs; typed access/provision and a heterogeneous bool/int instance, embedded into the mediated grammar.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "typed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "codec_bijection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "typed_mediated_operation"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "kind": "Definition",
+      "title": "Get and set",
+      "status": "formalized",
+      "scope": "Partial get and fresh-key set with the actual returned partial restriction inverse; absent-key revoke is undefined.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "get"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "provide"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "provision_witness"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "kind": "Definition",
+      "title": "Coeffect specification",
+      "status": "formalized",
+      "scope": "Key-set requirement represented by subset/domain predicates.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "related_satisfaction"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "kind": "Definition",
+      "title": "Coeffect satisfaction",
+      "status": "formalized",
+      "scope": "Definedness is domain inclusion, independent of payload value.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "related_satisfaction"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "kind": "Definition",
+      "title": "Effect realizations",
+      "status": "formalized",
+      "scope": "Both Definition 23 realizations are formalized in a generic location-based heap: aliases read the same in-place cell and recovery invokes the actual returned inverse; a fresh derived scope preserves existing cells, returns identity, and recovers by discarding the child and selecting the retained parent. The two current-context forward observations and immediate recovered endpoints agree; their heap observations and inverse functions need not. Later private child edits are discarded. This mathematical realization is not a proof of arbitrary Rust aliasing, nested shared references, callbacks/futures or the recursive context of Definition 28.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "derive_scope"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "discard_scope"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "derived_realization"
+        },
+        {
+          "file": "crates/cordis-kernel/src/effect_realization.rs",
+          "symbol": "in_place_realizes"
+        },
+        {
+          "file": "crates/cordis-kernel/src/effect_realization.rs",
+          "symbol": "derived_realizes"
+        },
+        {
+          "file": "crates/cordis-kernel/src/effect_realization.rs",
+          "symbol": "same_denotation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/effect_realization.rs",
+          "symbol": "derived_discard_after_edit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/effect_realization.rs",
+          "symbol": "nontrivial_alias_example"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "kind": "Definition",
+      "title": "Isolated coeffect context",
+      "status": "formalized",
+      "scope": "Isolation realm IMap with an injective default embedding; finite dependent storage, aliasing and host key/realm Port encoding.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "Isolated"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "unisolated_realms"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "host_port_resolution"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "kind": "Definition",
+      "title": "Get, set and isolate",
+      "status": "formalized",
+      "scope": "Exact partial get/set/revoke along current realm resolution, actual yielded inverse, unconditional derived isolate overwrite and disjoint recovery.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "isolate"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "isolated_provide"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "isolated_witness"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "kind": "Definition",
+      "title": "Interception context",
+      "status": "formalized",
+      "scope": "Key-specific metadata validity and monoids, total context-carried metadata and finite typed provider/specification maps.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "Metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "Intercepted"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "interception_typed"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "kind": "Definition",
+      "title": "Get, set and intercept",
+      "status": "formalized",
+      "scope": "Typed interception, component metadata on the left and context metadata on the right, monoid action, actual provision inverse and declaration access.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "intercepted_get"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "intercept_monoid_action"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "intercepted_witness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "intercepted_declaration"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "kind": "Definition",
+      "title": "Combined recursive context",
+      "status": "partial",
+      "scope": "Finite static layers remain a restricted model. A diagonal proof rules out an inhabited nontrivial set context containing all of its own endomorphisms with the printed product projections; two distinct coeffects already force the contradiction. This obstruction concerns the unrestricted set/function reading, not a restricted function or domain-theoretic model. The singleton projection model is not a least fixed point.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "FiniteLayer"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "finite_layer_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/contexts.rs",
+          "symbol": "derived_realization"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recursive_context.rs",
+          "symbol": "unrestricted_accumulator_obstruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recursive_context.rs",
+          "symbol": "nontrivial_coeffect_obstruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recursive_context.rs",
+          "symbol": "singleton_model"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "kind": "Definition",
+      "title": "Operations and outcomes",
+      "status": "formalized",
+      "scope": "Curried operation with actual raw outcome, strict partial precondition and inverse. The observational primitive contract requires respect and recovery only up to equivalence at the actual input; exact recovery implies this contract, and a canonicalizing partial inverse separates the two.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "ValueYield"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "Operation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "operation_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_grammar.rs",
+          "symbol": "operation_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_grammar.rs",
+          "symbol": "exact_theory"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_examples.rs",
+          "symbol": "actual_observational_recovery"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "kind": "Definition",
+      "title": "Context-mediated iterator grammar",
+      "status": "formalized",
+      "scope": "Finite contexts with dependent value, per-operation argument and outcome fibers, typed codecs, arbitrary continuation indices and least membership over only valid outcome inhabitants; unit, partial operation and provision retain their actual inverses.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "Node"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "constructor_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "Library"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "Node"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "member_unfolding"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "transport_exact"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "heterogeneous_grammar"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "kind": "Definition",
+      "title": "Observation tests",
+      "status": "formalized",
+      "scope": "All finite words record definedness and forward/inverse outcomes.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "test"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "indistinguishable"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "kind": "Lemma",
+      "title": "Coarsest observational equivalence",
+      "status": "proved",
+      "scope": "Arbitrary finite tests; every respecting equivalence is included.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "observational_equivalence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "operations_respect_observations"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "coarsest_observational_relation"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "kind": "Definition",
+      "title": "Context equivalence",
+      "status": "formalized",
+      "scope": "Same restricted domain and keywise equivalence.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "context_equal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "context_equivalence"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "kind": "Definition",
+      "title": "Lifting relations",
+      "status": "formalized",
+      "scope": "Maps by related inputs; iterators by greatest bisimulation.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "related_maps"
+        },
+        {
+          "file": "crates/cordis-kernel/src/quotient.rs",
+          "symbol": "iterator_related"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "kind": "Lemma",
+      "title": "Partial equivalence of maps and iterators",
+      "status": "proved",
+      "scope": "Symmetry/transitivity/self-respect; arbitrary infinite continuation, no finite-rank premise.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "map_partial_equivalence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/quotient.rs",
+          "symbol": "iterator_partial_equivalence"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "kind": "Definition",
+      "title": "Observational effect witness",
+      "status": "formalized",
+      "scope": "Self-respect plus actual-yield observational recovery.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "witnessed_effect"
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "kind": "Definition",
+      "title": "Observational iterator witness",
+      "status": "formalized",
+      "scope": "Arbitrary-index least recursive membership combined with greatest observational witness closure; unfolding, witnessed continuation, observational transfer and constructor correspondence.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/quotient.rs",
+          "symbol": "bisimulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "witnessed_unfolding"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "paper_witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "witnessed_transfer"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "paper_witnessed_unfolding"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "paper_witnessed_least"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "kind": "Lemma",
+      "title": "Transport of effect laws to observations",
+      "status": "proved",
+      "scope": "All Section 3.1 equations transported under equivalence and constituent respect, including the universal-accumulator iff, every reverse prefix and whole dynamic iterator. Reachable accumulators respect observations; only the respecting-accumulator domain is used for lifted reflexivity.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "witnessed_effect_composition"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "observational_tracking"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observation.rs",
+          "symbol": "observational_sequence_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "prefix_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "observational_revert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "effectiter_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "iterator_temporal_soundness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "effect_related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "twisted_monoid"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "tracking_monoid"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "tracking_trace_soundness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "effect_monoid"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "uniform_homomorphism"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "witnessed_submonoid"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "effect_homomorphism"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "effect_projection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "lifted_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "full_accumulator_recovery_iff"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "lifted_witness_iff"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "local_temporal_sequence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "whole_iterator_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_algebra.rs",
+          "symbol": "whole_effectiter_related"
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "kind": "Lemma",
+      "title": "Context-mediated admissibility",
+      "status": "proved",
+      "scope": "Dependent value/argument/outcome grammar on finite contexts derives least witnessed partial iterators and greatest observational continuation closure at any covering key set. Actual partial inverses need only recover up to observation and preserve typed fibers; raw outcomes and failure domains remain exact. The earlier exact-witness theory is a specialization.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "restricted_admissibility"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mediated.rs",
+          "symbol": "yielded_inverse_respects"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "grammar_witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "codec_operation_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "grammar_inductive"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterators.rs",
+          "symbol": "grammar_paper_witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "stage_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "grammar_inductive"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "grammar_paper_witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "transport_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "inverse_preserves_typing"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "strict_domains"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_grammar.rs",
+          "symbol": "heterogeneous_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_grammar.rs",
+          "symbol": "stage_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_grammar.rs",
+          "symbol": "grammar_paper_witnessed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_grammar.rs",
+          "symbol": "grammar_observational_step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_grammar.rs",
+          "symbol": "stage_inverse_typed"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "kind": "Definition",
+      "title": "Reachable iterators and monoids",
+      "status": "formalized",
+      "scope": "Least continuation-closed set; arbitrary finite generator words.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/monoid.rs",
+          "symbol": "reach"
+        },
+        {
+          "file": "crates/cordis-kernel/src/monoid.rs",
+          "symbol": "reach_least_closed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/monoid.rs",
+          "symbol": "generated"
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "kind": "Lemma",
+      "title": "Generator closure laws",
+      "status": "proved",
+      "scope": "Generator commutation lifts to arbitrary finite words; the whole composed-effect monoid is included in the generated union.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/monoid.rs",
+          "symbol": "generator_commutation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/monoid.rs",
+          "symbol": "composed_monoid"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "kind": "Definition",
+      "title": "Iterator independence",
+      "status": "formalized",
+      "scope": "Arbitrary iterator families, least continuation reachability, all generated forward/inverse transformations, bidirectional yield stability with inverse maps compared observationally and continuations by greatest bisimulation. Generator criterion is equivalent to the full definition for respectful families; an infinite example has unequal raw continuation indices but equivalent behavior.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/history.rs",
+          "symbol": "independent_stages"
+        },
+        {
+          "file": "crates/cordis-kernel/src/monoid.rs",
+          "symbol": "generator_stability"
+        },
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "independent"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_independence.rs",
+          "symbol": "independent"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_independence.rs",
+          "symbol": "pairwise"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_independence.rs",
+          "symbol": "generator_criterion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_independence.rs",
+          "symbol": "actual_exchange"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_independence.rs",
+          "symbol": "quotient_continuation_example"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "kind": "Theorem",
+      "title": "Recovery in any inverse permutation",
+      "status": "proved",
+      "scope": "Definition 36 observational witnesses and Definition 42 independence imply recovery by every permutation of the actual dynamically yielded inverses. Respecting maps induce literal maps on equivalence classes; quotient permutation equality and actual local reverse witnesses then yield observational recovery. No uniform inverse or equality of hidden state representatives is required. A nonliteral example restores every observation while inverse orders leave different hidden values. The earlier exact-equality theorem remains a specialization.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/permutation.rs",
+          "symbol": "arbitrary_inverse_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_permutation.rs",
+          "symbol": "arbitrary_inverse_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_permutation.rs",
+          "symbol": "permutation_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_permutation.rs",
+          "symbol": "nonliteral_example"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "kind": "Definition",
+      "title": "Operation independence",
+      "status": "formalized",
+      "scope": "Partial value/context generator commutation and actual inverse/raw outcome stability; lifted to arbitrary generated words. Arguments are represented by the allowed family of instantiated operations.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "value_independent"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "stable"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "stable_word"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "kind": "Theorem",
+      "title": "Distinct-key independence",
+      "status": "proved",
+      "scope": "Distinct-key operation lifts commute for all forward/actual inverse generators, including their partial domains; raw outcomes and yielded inverses remain stable. Generated commutation extends to finite words.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "distinct_nodes"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "generated_commutation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "stable_word"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "kind": "Definition",
+      "title": "Witnessed coeffect",
+      "status": "formalized",
+      "scope": "Per-key witness quantifies over allowed operation pairs, including self-pairs, and retains raw outcome equality before continuation selection.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "witnessed_keys"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "value_independent"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "discarded_outcome_is_not_independence"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "kind": "Theorem",
+      "title": "Interface compatibility implies independence",
+      "status": "partial",
+      "scope": "The actual least dependent finite-context grammar now derives full strict partial iterator independence for arbitrary unrelated I/J index types and distinct left/right operation, argument and outcome carriers. A single-stage projection erases only its continuation for key algebra; the real raw outcome restores the original arbitrary-I next, without encoding indices into nat. Actual reachable stages remain least members, actual generator sets agree exactly with the generic family, and every generated monoid pair commutes while successful foreign application preserves inverse domains and greatest-related continuations. Premises are observational primitive theory, provision/interface separation and shared-key scalar value_independent. The nonempty shared-key +5/+7 example has predicate/set-valued continuation indices and int/bool outcomes. Two valid disjoint provision grammars still refute transporting guarded strict independence to unguarded total Definition 42 through a failure sink. The original total-domain interpretation remains open.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "reachable_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "grammar_monoids_commute"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "grammar_yields_stable"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "actual_exchange"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_bridge.rs",
+          "symbol": "grammar_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_bridge.rs",
+          "symbol": "encoded_commutation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_bridge.rs",
+          "symbol": "encoded_yields_on_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_bridge.rs",
+          "symbol": "provisions_refute_totalization"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "interpreter"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "reachable_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "grammar_generators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "grammar_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence_example.rs",
+          "symbol": "arbitrary_index_example"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "kind": "Definition",
+      "title": "Components",
+      "status": "formalized",
+      "scope": "Conditional definition over a supplied G/K/V/I, coeffect projection, total iterator family and accurate installation-event interpretation. The component record contains dependencies, provisions and root. Equation42 membership is the least paper_witnessed iterator predicate, including full-carrier respect, actual returned-inverse recovery and recursive membership at d union p. The printed installation bound is separately conjoined; a local provenance premise derives the weaker net-new-domain bound. An arbitrary empty event set is not accepted as actual runtime provenance. A nonempty total integer example increments its observed value and returns the real subtraction inverse. This formalizes the original conditional component definition, not existence of recursive Gamma or membership of every strict mixed/fresh program. The latter retain explicit partial domains, blueprint/grammar typing, fresh allocation and authentic driver histories; their full-Gamma witness bridge remains open in 56/57 and integration obligations.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "ProgramEpisode"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "Model"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_syntax.rs",
+          "symbol": "member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "component_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "configuration_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "execution_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "program_natural"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "pending_domain_gap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "domain_respect_failure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admitted_landing_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_components.rs",
+          "symbol": "component_core"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_components.rs",
+          "symbol": "component"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_components.rs",
+          "symbol": "component_induction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_components.rs",
+          "symbol": "installations_imply_binding_bound"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_components.rs",
+          "symbol": "counter_is_component"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "kind": "Definition",
+      "title": "Fibers",
+      "status": "formalized",
+      "scope": "Parent, flags, lifecycle, declarations, effects, iterators, tables and accumulators.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "Fiber"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "State"
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "kind": "Definition",
+      "title": "Registry and publication",
+      "status": "formalized",
+      "scope": "Actual partial tables publish only from Active fibers.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "publishes"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "shaped"
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "kind": "Definition",
+      "title": "All-fiber key-restricted projection",
+      "status": "formalized",
+      "scope": "All registered fiber tables restricted to a key set, including Inactive/Loading tables. Unique owner, empty-entry and phase-edit invariance, plus actual full-state primitive lifts.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/projection.rs",
+          "symbol": "project"
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "kind": "Definition",
+      "title": "Child creation inverse",
+      "status": "formalized",
+      "scope": "Conditional primitive definition over a supplied G, registry interpretation and local image-closed insertion/retirement editors. The input is the original full-carrier, least witnessed Component predicate, with an explicit all-input dependent-value projection gate. Actual fresh O-Insert records parent, complete component, empty table and Inactive phase; its chosen name is delivered to the real body continuation. The inverse captures exactly that name and performs the actual registered-only O-Retire, framing every other registry field and background. No surjectivity onto arbitrary function-valued registries is assumed. A concrete nonempty parent/child representation satisfies the editor laws and full Unit component gate. Immediate table recovery retains the retired empty child, not literal registry equality. Missing-child retirement stays None; future retention, recursive Gamma existence and Lemma57 total-context membership are separate obligations. Existing Child/Mixed/Fresh drivers implement captured retirement with authentic journals and a live-reference removal guard, which remains an explicit correction to unrestricted O-Remove.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "remove_unreferenced"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retention_protocol_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retired_child_removal_still_needs_retention"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "refines_retention"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "remove"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "land_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "journal_child_domains"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "unload_retires"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_examples.rs",
+          "symbol": "retained_inactive_child_cannot_be_removed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "fresh_choice"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "history_forward"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "restore_forward"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "atomic_program_natural"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "configuration_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "execution_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "program_natural"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "pending_domain_gap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "domain_respect_failure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admitted_landing_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "typed_instantiate"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "editor_laws"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "dependent_typed_instantiation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "captured_retirement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "small_editors_satisfy_laws"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "nonempty_typed_instantiation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_typed_context.rs",
+          "symbol": "projection_typed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_typed_context.rs",
+          "symbol": "typed_access"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_typed_context.rs",
+          "symbol": "heterogeneous_component"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "kind": "Definition",
+      "title": "Target and quiescence",
+      "status": "formalized",
+      "scope": "Target uses actual table domains and provider identities.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "target"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "quiet"
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "kind": "Definition",
+      "title": "Reliance",
+      "status": "formalized",
+      "scope": "Installed consumers retain committed provider identities.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "relied"
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "kind": "Definition",
+      "title": "Confinement",
+      "status": "partial",
+      "scope": "The complete Writes predicate preserves non-table metadata but permits a foreign dependency binding to appear or disappear inside the declared key set; foreign-domain equality is not added. The source-indexed printed Reads comparison and a separate symmetric presence-aware comparison are encoded. Bidirectional source agreement equals the symmetric view; a nonempty registered example separates the one-direction reading. Generic total-map confinement quantifies every input, and effect confinement quantifies all reachable iterator stages and every actual returned inverse. The stronger implementation frame implies Writes; it does not alone imply Reads. The original missing-foreign-name interpretation and a genuine Definition52 interpretation of the Child exception still need to be fixed, so this item remains partial. The generic predicates neither construct recursive Gamma nor turn strict failure into a total transition.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "confined_write"
+        },
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "forward_map"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "run_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "undo_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "run_projects"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "inverse_projects"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "run_projects"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_syntax.rs",
+          "symbol": "member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_confinement.rs",
+          "symbol": "writes"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_confinement.rs",
+          "symbol": "map_confined_from_registry"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_confinement.rs",
+          "symbol": "effect_confined"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_confinement.rs",
+          "symbol": "bidirectional_literal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_confinement.rs",
+          "symbol": "source_index_is_not_symmetric"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_confinement.rs",
+          "symbol": "implementation_writes"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "kind": "Definition",
+      "title": "Context lift",
+      "status": "partial",
+      "scope": "The arbitrary-index least constructor grammar, dependent outcome continuations, Child roots and fresh binder continuations are encoded. Actual dependent stages lift to the unique holding table and own-table provision with strict definedness and actual inverse receipts; mixed prefixes derive typing, confinement and all-table recovery. The remaining definition-level gap is the original total Gamma denotation of that grammar, not missing least syntax. The existing interpreters are strict Optional relations with binding, type, primitive-domain, name freshness and installation guards. Actual coherent Loading prefixes with equal table observations and providers may give different fresh Child success domains due to an existing empty declaration. Thus successful-prefix safety and grammar membership do not by themselves provide the original globally total lift or strong witness.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "child_lands"
+        },
+        {
+          "file": "crates/cordis-kernel/src/coeffects.rs",
+          "symbol": "lift"
+        },
+        {
+          "file": "crates/cordis-kernel/src/projection.rs",
+          "symbol": "operation_stage_lift"
+        },
+        {
+          "file": "crates/cordis-kernel/src/projection.rs",
+          "symbol": "provision_stage_lift"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "run"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "undo"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "immediate_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "run_projects"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "run_definedness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "inverse_projects"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "run"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "undo"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "pending_domain_gap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "domain_respect_failure"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "kind": "Lemma",
+      "title": "Lifted admissibility",
+      "status": "partial",
+      "scope": "The dependent/child least grammar with observational primitive witnesses derives typed successful-prefix safety, authentic original-index receipts and child retention for all nine rules. Per-step models establish admissibility without assumed successor invariants. MixedDriver and FreshDriver implement closed instructions and construct actual histories from empty; FreshDriver admits dynamic allocation and one owning pending admission, including landing Divert after intervening checked calls. Strict failure is an absent transition. These results do not establish the original full recursive-context strong witness: guarded Child success domains can distinguish equal observations. Arbitrary callbacks/Future internals and unrestricted interference remain open.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "forward_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "inverse_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "configuration_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "history_sound"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "components_typed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "configuration_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "trace_current_witness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "step_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "configuration_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "execution_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "program_natural"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "pending_domain_gap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "domain_respect_failure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admitted_landing_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "kind": "Definition",
+      "title": "Execution and episode observations",
+      "status": "formalized",
+      "scope": "Conditional definition over supplied G/N/K/V/I and a registry interpretation. Generic fields retain declarations, parent, retired bit, table, phase, committed providers, greatest-bisimulation root/current functions and actual total G-to-G accumulators. The all-phase table union and Equation54 are explicit: its whole-state relation keeps controls; function fields use Definition34 all-key table observation at every input. Finite and infinite empty-origin executions, maximal installed episodes including finite final intervals and infinite open tails, and the frozen Equation52 state map are encoded. Adapters prove exact projection on all inputs, nonliteral field relations, finite episodes and the existing real nine-rule frozen edit/state-map factorization. A nonempty example has different boolean roots and extensionally different accumulator functions. This formalizes the definition under the supplied interpretation; it does not construct Gamma, a registry edit interpretation for every G, or Lemma60 for arbitrary Child/partial programs. A separate controlled strict Table-only field refinement constructs all nine steps and finite target traces with unequal real inverse words. Its legal-input PER and checked pure-table domain counterexample remain explicit boundaries of the implementation bridge, not missing parts of this conditional definition.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "history"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "birth_records_are_landings"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "begin_separates_generations"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "captured_generation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "generation_matches"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "check_current"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "episode"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "episode_boundaries"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rule_frames.rs",
+          "symbol": "factorization"
+        },
+        {
+          "file": "crates/cordis-kernel/src/indexed_ordering.rs",
+          "symbol": "trace"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "execution_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admitted_landing_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "relation_partial_equivalence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "step_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "execution_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "nonliteral_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "maps"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "partial_maps"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "partial_iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "witnesses"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "partial_witnesses"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "model_iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "model_accumulators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation_example.rs",
+          "symbol": "nonliteral_iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation_example.rs",
+          "symbol": "frame_is_necessary"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "append_accumulators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "controlled_partial_refinement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "execution_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs",
+          "symbol": "table_aliases"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs",
+          "symbol": "least_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_per.rs",
+          "symbol": "configuration_relation_per"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_example.rs",
+          "symbol": "actual_unequal_fields"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_example.rs",
+          "symbol": "actual_success_and_failure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_example.rs",
+          "symbol": "actual_suffix_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs",
+          "symbol": "pure_table_self_relation_fails"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "episode"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "state_map"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "model_projection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "model_related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "model_factorization"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "nonliteral_fields_example"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "kind": "Lemma",
+      "title": "Rule frame facts",
+      "status": "proved",
+      "scope": "Nine-rule frozen state-map/edit factorization, actual accumulator-source tags, foreign table domains and changed-key witnesses, installed/committed episode frames, new entry provenance and immutable metadata/monotone retirement across registry lifetimes. Primitive admissibility includes child insertion and actual inverse applications with child-retire transition shape; this does not itself identify a concrete captured child handle.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "installation_frame"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "frame"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "step_preserves_history"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rule_frames.rs",
+          "symbol": "factorization"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rule_frames.rs",
+          "symbol": "foreign_change_key"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rule_frames.rs",
+          "symbol": "entry_origin"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rule_frames.rs",
+          "symbol": "step_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rule_frames.rs",
+          "symbol": "metadata_lifetime"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "installation_step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "committed_prefix"
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "kind": "Lemma",
+      "title": "Observational rule invariance",
+      "status": "partial",
+      "scope": "Actual arbitrary-index mixed configurations now have a strict partial field refinement for the Table-only profile. Roots and current indices are compared by genuine greatest bisimulation; accumulators denote their actual g::restore functions, with no equal token, history or length premise. The legal-input PER requires both inputs well formed, the actor registered, and equal controls/per-provider domains with keywise observations. Both forward and actual inverse success/failure are retained. Symmetry, transitivity and domain reflexivity are proved without assuming every configuration reflexive. All nine target steps and every prefix of the full finite target execution are constructed from source execution and the initial relation. External Insert separately requires related roots and least grammar membership. Least dependent membership and a static primitive contract supply genuine self/alias bisimulation. A nonempty from-empty example observes 0 on one trace versus 1 then an extra read on the other, after a real external increment; external unloading restores 0. The endpoints have different root/current IDs and one versus two real read inverses. Registered legal test inputs exhibit actual None and Some, and Finish/Retire/Leave/Unload suffix transport is derived. The earlier total table-only Model and arbitrary-carrier/index S-to-K outside-frame bridges remain separate. This controlled legal-input relation is stronger than the pure table base used for function fields in Equation (54); the whole-state Equation (54) itself also compares controls; it does not establish the original full-context function relation, mixed Child spawning/retirement quotient, or recursive Gamma representation. The original whole-paper statement remains partial. A mechanically checked boundary uses two real from-empty, well-formed registered states with literally identical tables and all-key projection but different committed providers: the same actual root and both real inverse words have None/Some differences. They are not self-related under strict pure-table tests, while the controlled self-relations hold. This separates the domains without refuting the assumed original total witnessed components.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/quotient.rs",
+          "symbol": "step_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/quotient.rs",
+          "symbol": "execution_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "iteration_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "shared_provider_cleanup"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_runs.rs",
+          "symbol": "run_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_runs.rs",
+          "symbol": "projected_receipts"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "relation_partial_equivalence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "step_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "execution_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/functional_quotient.rs",
+          "symbol": "nonliteral_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "maps"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "partial_maps"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "partial_iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "witnesses"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "partial_witnesses"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "model_iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation.rs",
+          "symbol": "model_accumulators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation_example.rs",
+          "symbol": "nonliteral_iterators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/interface_observation_example.rs",
+          "symbol": "frame_is_necessary"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "related"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "append_accumulators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "controlled_partial_refinement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient.rs",
+          "symbol": "execution_simulates"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs",
+          "symbol": "table_aliases"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs",
+          "symbol": "least_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_per.rs",
+          "symbol": "configuration_relation_per"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_example.rs",
+          "symbol": "actual_unequal_fields"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_example.rs",
+          "symbol": "actual_success_and_failure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_example.rs",
+          "symbol": "actual_suffix_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs",
+          "symbol": "pure_table_self_relation_fails"
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "kind": "Lemma",
+      "title": "Name equivariance",
+      "status": "partial",
+      "scope": "Arbitrary name bijections and fresh-allocation matching; models conjugated, arbitrary opaque callbacks not intrinsically name-parametric. A fixed fresh-child binder grammar now reconstructs allocation choices from actual captured receipts and proves strict run/undo/restore and historical equivariance. Fresh-choice extension protects the complete configuration support, including removed historical names and name-bearing continuation indices. Programs must satisfy explicit structural naturality; future external input names are not silently held fixed under a birth renaming. The FreshDriver and fresh_semantics paths below close this dynamic-allocation integration for a fixed closed program; arbitrary callbacks and the original total-context witness remain separate obligations. Complete external input extraction commutes with alpha transport, including Insert actor, parent, declarations and arbitrary root. Literal equality of input streams is equivalent to fixing every referenced payload field; alpha-equivalent endpoints alone do not supply this premise. Fresh-equivariant least membership and all nine rules now transport complete actual traces. Syntactic naturality proves equality with the same installed program family, and natural_from_empty derives every renamed prefix safe. Actual external actor/parent/root and lifecycle allocation choices are transported together, preserving strict inverse domains.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/alpha.rs",
+          "symbol": "full_step_equivariant"
+        },
+        {
+          "file": "crates/cordis-kernel/src/alpha.rs",
+          "symbol": "full_execution_equivariant"
+        },
+        {
+          "file": "crates/cordis-kernel/src/alpha.rs",
+          "symbol": "fresh_full_insert_matches"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "fresh_choice"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "history_forward"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "restore_forward"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_grammar.rs",
+          "symbol": "atomic_program_natural"
+        },
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "execution_inputs"
+        },
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "literal_stream"
+        },
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "retirement_requires_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_equivariance.rs",
+          "symbol": "member_forward"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_equivariance.rs",
+          "symbol": "natural_step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_equivariance.rs",
+          "symbol": "natural_from_empty"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_equivariance.rs",
+          "symbol": "strict_inverse_domains"
+        },
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "natural_execution_inputs"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "kind": "Lemma",
+      "title": "Vestigial entries",
+      "status": "refuted",
+      "scope": "Original statement false. Corrected full nine-rule bisimulation and constructed suffix deletion now proved under explicit primitive erasure/retained-entry laws and parent/freshness/provision exceptions.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "vestigial_parent_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "vestigial_insert_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "vestigial_control_bisimulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "full_step_bisimulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "suffix_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "child_retirement_erases"
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "kind": "Definition",
+      "title": "Well-formed registries",
+      "status": "formalized",
+      "scope": "The original four registry clauses are encoded separately, with committed omega represented as a total functional graph on dependencies. Finite registry/tree shape belongs to Definition 50. The implementation reachable-state invariant implies these clauses, but additionally excludes self-provider commitments and requires committed providers to declare the referenced key. A finite self-committed state satisfies the printed clauses and shape but not the stronger invariant; it is not claimed reachable.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "well_formed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "registry"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "strengthened_implies_paper"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "paper_does_not_imply_strengthened"
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "kind": "Theorem",
+      "title": "Preservation",
+      "status": "partial",
+      "scope": "Primitive admissibility preserves the nine full rules. A stable homogeneous receipt history constructs one fixed Model; the dependent/child interpretation with observational primitive witnesses derives finite typed contexts, authentic history, retention and all-prefix safety. MixedDriver and FreshDriver construct corresponding actual histories for closed instructions, including fresh allocation and single-admission landing after intervening calls. These are executable refinements of the stated strict partial models. The original unrestricted context/strong-component bridge and arbitrary host callbacks remain open.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "full_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "execution_resource_safety"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_lift.rs",
+          "symbol": "catalog_execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_syntax.rs",
+          "symbol": "dependent_embedding"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "run_admissible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_lift.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "configuration_preservation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "from_empty_safe"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_semantics.rs",
+          "symbol": "execution_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admitted_landing_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "kind": "Definition",
+      "title": "Independence and entanglement",
+      "status": "partial",
+      "scope": "The compound Definition65 predicate is encoded under an explicit total semantic Language/View interpretation and a supplied Definition44/46 operation-independence relation. The all-key observation base, both complete transformation monoids, both reachable yield-stability directions and the original entanglement disjunction are explicit. Child dependencies/provisions agree and its actual fresh actor/root is compared recursively in the same greatest relation as continuations. View families must denote the evaluated language; payload provenance connects descriptors to actual inserted records but does not establish the typed Definition52 component gate or captured retirement inverse. Shared operation keys come from least semantic reach and interpreted operations, not declarations or only scheduled calls. Every historically held component in finite/infinite executions is quantified, including internal Child, removed records and reused names; the literal unequal-name reading and stronger birth-distinct reading are separate. A named total-lift adapter uses every argument and exact raw outcome stability across all-argument monoids. A separate strict Library adapter preserves None and derives full partial-monoid stability from actual scalar laws. Nonempty Unit/reused-name execution and strict integer-translation examples instantiate these respective interfaces. The complete original typed total-context/Child interpretation and the bridge to the real strict interpreter remain open, so65 stays partial and66 is not inferred.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "independent"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "event"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "independent_keys"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "interface_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_execution.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "greatest_bisimulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "definition42_projection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "ordinary_independence_equivalence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "pairwise"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "pairwise_birth_distinct"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "child_agreement_names_actual_components"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "strict_basis_full"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "nonempty_unit_and_reused_name"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "internal_child_is_catalogued"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "strict_source_commutative_key"
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "kind": "Lemma",
+      "title": "Pairwise independence",
+      "status": "partial",
+      "scope": "Least partial grammar and witnessed keys imply reachable partial-monoid independence with greatest-bisimulation continuations. Actual mixed traces now require only observational scalar commutation for recovery. General full-state independence and its alignment with the original coeffect/partial-domain interpretation remain open. A real two-actor Unit/Operation Iter diamond now permits a shared third provider. Strict reverse domains, raw outcomes, arbitrary-I next indices, captured provider/key names and related actual inverse maps are derived from the local pair interface. The two reverse history entries contain their own inputs and exchange their fresh journal tokens. An actual shared-provider Iter exchange now transports every legal finite suffix across all nine rules. Both sides keep their own historical inputs; a proved token transposition relates actual receipts by strict observational inverse domains. The admissibility of old receipts is derived from a real prefix starting at empty. The target suffix, including foreign Unload and retained-child Remove guards, is constructed rather than assumed; this remains a one-diamond result, not arbitrary-schedule confluence. The arbitrary-I/J dependent grammar bridge now derives the complete generic strict partial monoid/continuation relation directly from least membership and shared-key scalar laws, including different outcome carriers. Its stage projection does not enumerate continuation indices. This still does not supply the original full-state total-context independence.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "reachable_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "grammar_monoids_commute"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_independence.rs",
+          "symbol": "grammar_yields_stable"
+        },
+        {
+          "file": "crates/cordis-kernel/src/iterator_bridge.rs",
+          "symbol": "grammar_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "independent_keys"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "interface_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_execution.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_iteration_exchange.rs",
+          "symbol": "diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_iteration_exchange.rs",
+          "symbol": "shared_provider"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_iteration_exchange.rs",
+          "symbol": "raw_outcome_changes_continuation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "iteration_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "shared_provider_cleanup"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "interpreter"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "reachable_member"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "grammar_generators"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "grammar_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence_example.rs",
+          "symbol": "arbitrary_index_example"
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "kind": "Lemma",
+      "title": "Entangled steps",
+      "status": "partial",
+      "scope": "Actual empty-origin mixed traces derive pinned provider identities, provision separation and foreign observational compatibility. Restriction absorption treats consumer effects; clause (3) is derived because a Loading entangled actor contributes an empty effect word. The general scalar interface retains observational commutation of identity-extended generators; strict event recovery separately derives actual pending inverse domains from primitive witnesses and inverse-crossing laws. The constructive non-consuming-owner profile now includes arbitrary-age Table journals, Provision and dynamic foreign Insert/Remove; its strict batch and actual target steps are derived. This extends that trace construction, not all original entangled/Child full-context cases.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "control_no_deadlock"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_observations"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "pinned_provider_lifetime"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "entangled_provider_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "consumer_after_actual_provision"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "entangled_absorption"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_recovery.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_domains.rs",
+          "symbol": "enabled_after_witness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "independent_keys"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "interface_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_execution.rs",
+          "symbol": "foreign_compatible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_recovery.rs",
+          "symbol": "partial_forward_commutation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "forward_commutation_does_not_preserve_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "strict_fragment_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "next_foreign_call"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "actual_shared_terminal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled_loading.rs",
+          "symbol": "trace_pins"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled_loading.rs",
+          "symbol": "actual_loading_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled_loading.rs",
+          "symbol": "actual_provider_retirement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "actual_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "terminal_with_foreign_unloads"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "mixed_foreign_unload_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "history_alone_is_insufficient"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "actual_compressed_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "delete_execution"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "kind": "Theorem",
+      "title": "Global recovery exactness",
+      "status": "partial",
+      "scope": "Actual arbitrary-index mixed traces derive all-table observational recovery from typed primitive witnesses and real journals. Earlier identity-extended results express a foreign value replay. The following strict-domain result constructs a legal surviving lifecycle execution and closes a restricted terminal specialization; it does not by itself identify every arbitrary-prefix result with the original Equation55 frozen state-map composition. Constructive terminal recovery starts with a real empty-origin setup and combines all foreign Unit/Operation/Provision/Child landings, arbitrary-age mixed Table/Child journal Unloads at any interior position, and actual foreign Insert/Remove in one source/target induction. The owner remains registered, starts Inactive with an empty table, and uses Table instructions; it may publish private provisions and share dependencies. Initial foreign declarations and the dependencies of each newly inserted or instantiated fiber avoid the owner's private provisions; actual source O-Insert supplies provision freshness. Only new owner entries require Table metadata. Foreign historical entries retain their original inputs after removal or name reuse. Mixed LIFO restoration performs the captured child's real retirement and strict Table inverses. Target restore success, authentic compressed journals, every surviving target step, and prefix separation are derived from the actual source execution. If the source ends with the owner Unloading, its actual final restore is defined, its guarded Unload is legal, and the resulting control equals the constructed target's control; corresponding tables are observationally related and both owner tables are empty. A nonempty example interleaves old foreign +7, owner Q99/+5, and foreign Child/R77/+11; the mixed stack [1,4,5,6] maps to [1,2,3,4], child3 is retired and legally removed, and final cleanup restores K10 with Q/R empty. Owner Child, consumers of the owner's private provisions, and interior owner Unload remain outside this profile. Selective scalar commutation and strict partial-domain laws remain explicit; this is not original full-context membership, global liveness, or arbitrary-schedule confluence.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "erase_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "dynamic_execution_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/history.rs",
+          "symbol": "recover_group"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "full_episode_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "mediated_forward_meaning"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "mediated_inverse_meaning"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_recovery.rs",
+          "symbol": "actual_episode_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "actual_episode_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/partial_domains.rs",
+          "symbol": "forward_identity_extension"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recovery_examples.rs",
+          "symbol": "scalar_interface"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recovery_examples.rs",
+          "symbol": "terminal_operation_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_execution.rs",
+          "symbol": "actual_episode_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_examples.rs",
+          "symbol": "actual_observational_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "forward_commutation_does_not_preserve_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "strict_fragment_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "next_foreign_call"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "actual_shared_terminal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "actual_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "terminal_with_foreign_unloads"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "mixed_foreign_unload_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "history_alone_is_insufficient"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "actual_compressed_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "bootstrap_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "actual_providing_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "foreign_cross"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "old_journal_is_not_individual_retractions"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "old_inverse_interleaving"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_receipt_support.rs",
+          "symbol": "history_from_empty"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_unload.rs",
+          "symbol": "delete_with_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_closure.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_closed_example.rs",
+          "symbol": "actual_closed_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving.rs",
+          "symbol": "batch_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving_example.rs",
+          "symbol": "actual_interleaved_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload.rs",
+          "symbol": "restore_mixed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload_example.rs",
+          "symbol": "actual_mixed_age_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "actual_singleton_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "nonempty_actual_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "inactive_guard_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_journal.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_journal_example.rs",
+          "symbol": "actual_provision_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "landing_catalogue"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload_example.rs",
+          "symbol": "actual_internal_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_table_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_table_unload_example.rs",
+          "symbol": "actual_internal_table_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_provision_transport.rs",
+          "symbol": "synchronized_landing"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion_example.rs",
+          "symbol": "actual_generalized_table_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "insert_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "remove_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "references_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "source_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion_example.rs",
+          "symbol": "closed_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_foreign_restore.rs",
+          "symbol": "table_inverse"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_foreign_restore.rs",
+          "symbol": "restore"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "source_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "actual_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_target_stack"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_closed_deletion"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "kind": "Corollary",
+      "title": "Terminal recovery",
+      "status": "partial",
+      "scope": "Actual terminal owner restoration, including foreign Child cleanup, is derived for the following restricted profile. Constructive terminal recovery starts with a real empty-origin setup and combines all foreign Unit/Operation/Provision/Child landings, arbitrary-age mixed Table/Child journal Unloads at any interior position, and actual foreign Insert/Remove in one source/target induction. The owner remains registered, starts Inactive with an empty table, and uses Table instructions; it may publish private provisions and share dependencies. Initial foreign declarations and the dependencies of each newly inserted or instantiated fiber avoid the owner's private provisions; actual source O-Insert supplies provision freshness. Only new owner entries require Table metadata. Foreign historical entries retain their original inputs after removal or name reuse. Mixed LIFO restoration performs the captured child's real retirement and strict Table inverses. Target restore success, authentic compressed journals, every surviving target step, and prefix separation are derived from the actual source execution. If the source ends with the owner Unloading, its actual final restore is defined, its guarded Unload is legal, and the resulting control equals the constructed target's control; corresponding tables are observationally related and both owner tables are empty. A nonempty example interleaves old foreign +7, owner Q99/+5, and foreign Child/R77/+11; the mixed stack [1,4,5,6] maps to [1,2,3,4], child3 is retired and legally removed, and final cleanup restores K10 with Q/R empty. Owner Child, consumers of the owner's private provisions, and interior owner Unload remain outside this profile. Selective scalar commutation and strict partial-domain laws remain explicit; this is not original full-context membership, global liveness, or arbitrary-schedule confluence. The original unrestricted Corollary69 still depends on the outstanding full-context component and independence bridges.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "closed_owner_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/witnessed.rs",
+          "symbol": "ResourceEpisode"
+        },
+        {
+          "file": "crates/cordis-kernel/src/entangled.rs",
+          "symbol": "full_terminal_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "recovery_and_child_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_recovery.rs",
+          "symbol": "actual_terminal_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "actual_terminal_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_grammar.rs",
+          "symbol": "unload_retires"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recovery_examples.rs",
+          "symbol": "scalar_interface"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recovery_examples.rs",
+          "symbol": "terminal_operation_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_execution.rs",
+          "symbol": "actual_terminal_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/observational_examples.rs",
+          "symbol": "actual_observational_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_journal.rs",
+          "symbol": "forward_commutation_does_not_preserve_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "strict_fragment_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "next_foreign_call"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "actual_shared_terminal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "actual_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "terminal_with_foreign_unloads"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "mixed_foreign_unload_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "history_alone_is_insufficient"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "actual_compressed_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "bootstrap_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "actual_providing_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "foreign_cross"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "old_journal_is_not_individual_retractions"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_batch_recovery.rs",
+          "symbol": "old_inverse_interleaving"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_receipt_support.rs",
+          "symbol": "history_from_empty"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_unload.rs",
+          "symbol": "delete_with_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_closure.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_closed_example.rs",
+          "symbol": "actual_closed_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving.rs",
+          "symbol": "batch_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving_example.rs",
+          "symbol": "actual_interleaved_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload.rs",
+          "symbol": "restore_mixed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload_example.rs",
+          "symbol": "actual_mixed_age_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "actual_singleton_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "nonempty_actual_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "inactive_guard_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_journal.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_journal_example.rs",
+          "symbol": "actual_provision_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "landing_catalogue"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload_example.rs",
+          "symbol": "actual_internal_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_table_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_table_unload_example.rs",
+          "symbol": "actual_internal_table_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_provision_transport.rs",
+          "symbol": "synchronized_landing"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion_example.rs",
+          "symbol": "actual_generalized_table_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "insert_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "remove_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "references_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "source_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion_example.rs",
+          "symbol": "closed_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_foreign_restore.rs",
+          "symbol": "table_inverse"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_foreign_restore.rs",
+          "symbol": "restore"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "source_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "actual_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_target_stack"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_closed_deletion"
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "kind": "Theorem",
+      "title": "Lifecycle ordering",
+      "status": "partial",
+      "scope": "For the same actual mixed traces, observational primitive recovery establishes Begin publication, fixed commitments/provider domains, containing-episode order, and actual LIFO calls linked to earlier original-index landings. Admission scripts preserve exact event provenance through intervening calls and landing Divert. Child retention and strict partial domains are explicit model conditions. No lossless bridge from every original full-context component or arbitrary host execution is claimed.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "execution_resource_safety"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_observations"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "begin_provided"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "dependency_lifetime"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "episode_order"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_ordering.rs",
+          "symbol": "episode_operation_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/grammar_ordering.rs",
+          "symbol": "invocation_prior_landing"
+        },
+        {
+          "file": "crates/cordis-kernel/src/indexed_ordering.rs",
+          "symbol": "trace"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_ordering.rs",
+          "symbol": "empty_episode_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_ordering.rs",
+          "symbol": "observational_empty_episode_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admitted_landing_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "kind": "Theorem",
+      "title": "Resolution coherence",
+      "status": "refuted",
+      "scope": "The unconditional closure assertion in original clause (2) is false for the finite sequences allowed by Definition 58. A four-step empty-origin trace Insert/Begin/Retire/aborting Divert has episode [2,4], Loading interval [2,3] and Divert at 3<4, yet no closing Unload in the given sequence. The component is original total, terminating, strongly witnessed Unit on every state; both the actual interpreter and the total Unit Model execute the trace. Unload is enabled in the last state, and arbitrarily many legal Retire steps can postpone it. These finite prefixes are not claimed to be maximal or fair. Fixed opening resolution, the phase dichotomy and recovery conditional on an actual Unload remain proved; a possible future extension does not establish closure of the given sequence. Arbitrary host Futures remain outside this result.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/program_trace.rs",
+          "symbol": "local_refinement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_trace.rs",
+          "symbol": "catalog_from_history"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_trace.rs",
+          "symbol": "driver_trace_refinement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "coherent_loading_interval"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_ordering.rs",
+          "symbol": "empty_episode_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_ordering.rs",
+          "symbol": "observational_episode_ordering"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "execution_refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "program_natural"
+        },
+        {
+          "file": "crates/cordis-kernel/src/resolution_completion_counterexample.rs",
+          "symbol": "paper_component"
+        },
+        {
+          "file": "crates/cordis-kernel/src/resolution_completion_counterexample.rs",
+          "symbol": "actual_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/resolution_completion_counterexample.rs",
+          "symbol": "arbitrary_delay"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "kind": "Definition",
+      "title": "Provider precedence",
+      "status": "formalized",
+      "scope": "Direct provider edges and a separate explicit topological rank, not allocation order.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "predecessor"
+        },
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "precedence_ranking"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "kind": "Theorem",
+      "title": "Progress and termination",
+      "status": "partial",
+      "scope": "Actual fixed-registry traces yield target-change/step bounds. Under local table footprint, terminal total provision and continuation rank, construct a full landing execution to quiet. Dynamic registry changes remain outside this profile. In the strict guarded fresh-child interpretation, a seven-step execution from empty reaches a nonquiet Loading state with no enabled core lifecycle rule. The fixed natural catalogue has empty dependencies, at most three names and one landing per component; every successful Finish publishes all provisions. This pinpoints the missing definedness/total-witness bridge, not an unconditional refutation of original Theorem 73. An added failure exit changes the transition system.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/termination.rs",
+          "symbol": "finite_lifecycle_bound"
+        },
+        {
+          "file": "crates/cordis-kernel/src/termination.rs",
+          "symbol": "finite_execution_bound"
+        },
+        {
+          "file": "crates/cordis-kernel/src/termination.rs",
+          "symbol": "normal_form_exists"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "blocked_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "blocked_catalogue"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "strict_progress_boundary"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "kind": "Definition",
+      "title": "Support equation",
+      "status": "formalized",
+      "scope": "Parent/provider/retirement support equation.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "support_clause"
+        },
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "support_solution"
+        }
+      ]
+    },
+    {
+      "id": 75,
+      "kind": "Lemma",
+      "title": "Support well-foundedness",
+      "status": "refuted",
+      "scope": "A six-step execution from empty using only external Insert/Retire/Remove and one fixed total Unit program has acyclic current and historical provider precedence, but a parent/provider support cycle. Total Unit paper witnesses are proved for arbitrary state types and the actual table observation; no Child primitive or partial-to-total bridge is used. Every historical catalogue name occurs in the execution. Definition 76 total provision is not a premise of Lemma 75 and is not asserted here. Only well-foundedness is refuted; this example has a unique empty support solution. The older Child/control profile remains a separate implementation regression. Quiet control uniqueness has an alternative proof that avoids the invalid union-rank inference.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "replacement_support_cycle"
+        },
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "replacement_cycle_reachable"
+        },
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "quiet_control_unique"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "total_unit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "component_witness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "actual_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "provider_rankings"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "catalogue_provenance"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "quiet_mixed_cycle"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "support_still_unique"
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "kind": "Definition",
+      "title": "Total provision",
+      "status": "formalized",
+      "scope": "Generic component-level total provision quantifies every dependency-satisfying input and every completed finite iterator run. Together with the component output-domain bound it yields exactly the declared provision domain. A separate operational predicate quantifies actual Begin-to-Finish activations, including foreign interleaving, and implies table completeness at Finish and throughout a confined Active suffix. Current-state total_active is only a consequence, not the component definition; a real Unit activation with nonempty declarations demonstrates the distinction. The general generic-iterator to interleaved full-context representation bridge remains separate.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "total_active"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "completion_total"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "completed_provision_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "operational_total"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "completed_active_total"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "totality_is_not_a_current_state_test"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "kind": "Lemma",
+      "title": "Support at quiescence",
+      "status": "refuted",
+      "scope": "Original claim fails for a five-step total, ranked, quiet trace with external insertion under a retired parent. Lifecycle-born retirement closure is derived from actual history; origin-aware corrected support preserves general external O-Insert.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "external_parent_support_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "creation_history_closure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained_protocol_quiet_support"
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "kind": "Lemma",
+      "title": "Transposition",
+      "status": "partial",
+      "scope": "Original statement not yet discharged or unconditionally refuted: the counterexample below is established in the encoded full-State rules; the original Definition 48/56 component and total-context representation bridge is not instantiated. In the encoded rules, clause (2) exchange fails: an activation creates the parent read by a following O-Insert, although it does not create that insertion target; the counterexample is reachable from empty. Corrected actual diamonds now cover every lifecycle rule and all three external rules under observational primitives. Landing/Insert retains a pre-existing parent guard, landing/Retire an existing non-acting target, and Begin/self-Retire is forbidden. Unload/Remove excludes its actor and children captured in its pending journal; inverse domains and all other reverse guards are derived. Landing endpoints have identical live state and corresponding authentic receipts despite different recorded inputs; pure-control and Unload endpoints are literally equal. Every legal finite suffix is transported, and guarded normalization preserves complete external input order. This does not establish the printed unconditional transposition.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/paper_counterexamples.rs",
+          "symbol": "transposition_parent_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_counterexamples.rs",
+          "symbol": "transposition_counterexample_reachable"
+        },
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "activation_diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_transposition.rs",
+          "symbol": "observed_pair"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_transposition.rs",
+          "symbol": "concrete_diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_transposition.rs",
+          "symbol": "concrete_parent_rejection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_transport.rs",
+          "symbol": "child_diamond_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_transport.rs",
+          "symbol": "step_bisimulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_orchestration.rs",
+          "symbol": "orchestration_diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_orchestration.rs",
+          "symbol": "orchestration_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/causal_normalization.rs",
+          "symbol": "adjacent_swap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/causal_normalization.rs",
+          "symbol": "normalize"
+        },
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "self_retirement_blocks_begin"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "restore_cross"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "retained_remove_blocks"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "kind": "Lemma",
+      "title": "Episode deletion",
+      "status": "partial",
+      "scope": "The original Child deletion obstruction still lacks the Definition48/56 component bridge and is not an unconditional original refutation. Constructive deletion now starts with a real empty-origin setup and combines all foreign Unit/Operation/Provision/Child landings, arbitrary-age mixed Table/Child journal Unloads at any interior position, and real foreign Insert/Remove in one source/target induction. The deleted owner remains registered, initially Inactive with an empty table, and uses Table instructions; it may publish private provisions and share dependencies. Initial foreign declarations and the dependencies of each newly inserted/instantiated child avoid those private provisions; real source Insert supplies provision freshness. Only new owner entries require Table metadata. Foreign historical entries retain their original inputs even after their actor is removed or its name reused. Mixed LIFO recursion performs real captured-child retirement and actual partial Table inverses; it derives target restore success, compressed live tokens and updated state relations from the real source. Every source prefix separation, surviving target transition and final actual owner Unload is a conclusion. A nonempty example starts with foreign +7, interleaves owner Q99/+5 with foreign Child/R77/+11, transports the real mixed stack [1,4,5,6] to [1,2,3,4], retires and removes child3, then restores K10 with Q/R empty. The general theorem retains Table-only owner, private-provision separation and no interior owner Unload; owner Child, owner consumers and unrestricted schedules remain outside this profile. Selective scalar commutation and strict partial domains remain explicit; this is not original full-context component membership, global liveness or arbitrary-schedule confluence.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "closed_owner_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/preservation.rs",
+          "symbol": "vestigial_control_bisimulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "deletion_counterexample_quiet"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "deletion_counterexample_prefix_impossible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "unload_born_leaf_vestigial"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "recovery_and_child_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/isolated_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/isolated_deletion.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/isolated_deletion.rs",
+          "symbol": "closed_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/isolated_deletion.rs",
+          "symbol": "actual_filtered_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "strict_fragment_recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_replay.rs",
+          "symbol": "next_foreign_call"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_execution.rs",
+          "symbol": "actual_shared_terminal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "actual_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "terminal_with_foreign_unloads"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "mixed_foreign_unload_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_unload.rs",
+          "symbol": "history_alone_is_insufficient"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_unload_execution.rs",
+          "symbol": "actual_compressed_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "bootstrap_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "actual_providing_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_receipt_support.rs",
+          "symbol": "history_from_empty"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_unload.rs",
+          "symbol": "delete_with_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_closure.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_closed_example.rs",
+          "symbol": "actual_closed_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving.rs",
+          "symbol": "batch_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_journal_interleaving_example.rs",
+          "symbol": "actual_interleaved_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload.rs",
+          "symbol": "restore_mixed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_age_unload_example.rs",
+          "symbol": "actual_mixed_age_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "actual_singleton_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "nonempty_actual_example"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_support.rs",
+          "symbol": "inactive_guard_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_journal.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/old_provision_journal_example.rs",
+          "symbol": "actual_provision_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "landing_catalogue"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_old_unload_example.rs",
+          "symbol": "actual_internal_old_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_table_unload.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/internal_table_unload_example.rs",
+          "symbol": "actual_internal_table_unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_provision_transport.rs",
+          "symbol": "synchronized_landing"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/generalized_table_deletion_example.rs",
+          "symbol": "actual_generalized_table_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "insert_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "remove_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_registry.rs",
+          "symbol": "references_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "source_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/dynamic_table_deletion_example.rs",
+          "symbol": "closed_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_transport.rs",
+          "symbol": "landing_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_transport.rs",
+          "symbol": "retained_children_defined"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_transport.rs",
+          "symbol": "restore_children"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_transport.rs",
+          "symbol": "unload_transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_transport_example.rs",
+          "symbol": "actual_target_and_closure"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_transport_example.rs",
+          "symbol": "pending_inverse_blocks_remove"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_foreign_restore.rs",
+          "symbol": "table_inverse"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_foreign_restore.rs",
+          "symbol": "restore"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "source_metadata"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "delete_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion.rs",
+          "symbol": "closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_target_stack"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_closed_deletion"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "kind": "Theorem",
+      "title": "Canonical form and confluence",
+      "status": "partial",
+      "scope": "The encoded Child model has a quiet trace without the printed orchestration-first order, but the original full-component representation is missing. A fixed natural guarded fresh-binder program also yields unequal quiet service-key domains under the same literal named inputs; it satisfies finite bounds and total-on-provision, not the original strong full-context iterator witness. Thus original clauses (1) and (2) remain unresolved. Positive results comprise quiet confluence for actual private-provision ProgramDriver traces, guarded normalization preserving full external inputs, joinability and unique normal descendants of one trace, and actual shared-provider Iter diamonds with all-rule suffix transport and authentic exchanged receipts. Providing-owner deletion constructs another restricted trace transformation. These results do not prove arbitrary-schedule dynamic canonical form or confluence. Birth-referential input transport fixes the literal-name ambiguity but does not itself prove confluence.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/paper_counterexamples.rs",
+          "symbol": "canonical_counterexample_quiet"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_counterexamples.rs",
+          "symbol": "canonical_orchestration_prefix_impossible"
+        },
+        {
+          "file": "crates/cordis-kernel/src/canonical.rs",
+          "symbol": "unique_complete_result"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_normal_form.rs",
+          "symbol": "trace_inputs"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_normal_form.rs",
+          "symbol": "driver_quiet_confluence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/causal_normalization.rs",
+          "symbol": "adjacent_swap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/causal_normalization.rs",
+          "symbol": "normalize"
+        },
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "self_retirement_blocks_begin"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "restore_cross"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "retained_remove_blocks"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rewrite_confluence.rs",
+          "symbol": "local_diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rewrite_confluence.rs",
+          "symbol": "unique_normal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rewrite_confluence.rs",
+          "symbol": "normal_join"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rewrite_confluence.rs",
+          "symbol": "actual_choices"
+        },
+        {
+          "file": "crates/cordis-kernel/src/rewrite_confluence.rs",
+          "symbol": "actual_join"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_iteration_exchange.rs",
+          "symbol": "diamond"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_iteration_exchange.rs",
+          "symbol": "shared_provider"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "iteration_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "shared_provider_cleanup"
+        },
+        {
+          "file": "crates/cordis-kernel/src/allocation_inputs.rs",
+          "symbol": "literal_input_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/allocation_inputs.rs",
+          "symbol": "total_component"
+        },
+        {
+          "file": "crates/cordis-kernel/src/allocation_inputs.rs",
+          "symbol": "bounded_catalogue"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
+          "symbol": "pending_domain_gap"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "every_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_execution.rs",
+          "symbol": "terminal_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "bootstrap_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "actual_providing_deletion"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "kind": "Definition",
+      "title": "Configuration entries",
+      "status": "formalized",
+      "scope": "The six-field entry is encoded exactly as an executable generic record: id, url, isolate, intercept, config and disabled. Opaque parameter types preserve the distinction between module URL and annotations/configuration. Verified constructors and edits preserve the other fields, enabled is exactly the negation of this entry's administrative disabled bit, and binding applies the selected module to precisely its config. Reconciliation keys pair the surrounding parent with the stable id; the parent is not a seventh record field. The host adapter projects named plugin leaves only after an explicit URL resolver succeeds; groups, includes and child-bearing entries are rejected. Raw config and the entry's own status are preserved before host normalization. This formalizes Definition 81 itself, not the following reconciliation soundness claims. JSON/URL parsing, module callbacks, whole-tree reconciliation and persistence remain unverified host integration obligations.",
+      "evidence": [
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "Entry"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "reconciliation_key"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "bound_effect"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "binding_ignores_administration"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "sibling_keys"
+        },
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "as_paper_entry"
+        }
+      ]
+    }
+  ],
+  "integrationObligations": [
+    {
+      "id": "whole-lifecycle",
+      "status": "open",
+      "description": "Conditional dependent/child nine-rule interpretations prove typed prefix safety, authentic histories and provider ordering. The original Child deletion obstruction still lacks the Definition48/56 component bridge and is not an unconditional original refutation. Constructive deletion now starts with a real empty-origin setup and combines all foreign Unit/Operation/Provision/Child landings, arbitrary-age mixed Table/Child journal Unloads at any interior position, and real foreign Insert/Remove in one source/target induction. The deleted owner remains registered, initially Inactive with an empty table, and uses Table instructions; it may publish private provisions and share dependencies. Initial foreign declarations and the dependencies of each newly inserted/instantiated child avoid those private provisions; real source Insert supplies provision freshness. Only new owner entries require Table metadata. Foreign historical entries retain their original inputs even after their actor is removed or its name reused. Mixed LIFO recursion performs real captured-child retirement and actual partial Table inverses; it derives target restore success, compressed live tokens and updated state relations from the real source. Every source prefix separation, surviving target transition and final actual owner Unload is a conclusion. A nonempty example starts with foreign +7, interleaves owner Q99/+5 with foreign Child/R77/+11, transports the real mixed stack [1,4,5,6] to [1,2,3,4], retires and removes child3, then restores K10 with Q/R empty. The general theorem retains Table-only owner, private-provision separation and no interior owner Unload; owner Child, owner consumers and unrestricted schedules remain outside this profile. Selective scalar commutation and strict partial domains remain explicit; this is not original full-context component membership, global liveness or arbitrary-schedule confluence."
+    },
+    {
+      "id": "corrected-specification",
+      "status": "open",
+      "description": "Original Lemmas 62, 75 and 77 and the unconditional completion clause of Theorem 71 have Unit-only counterexamples; the support-cycle witness uses six external steps and directly proved total Unit components. The encoded Child exchange/deletion/ordering witnesses retain original-component representation gaps; items 78/79/80 remain partial. A consistent whole-paper interpretation still needs one recursive context model, original total-component witnesses or explicit revised domain contracts, strong field observation/bisimulation, precise parent/name input dependencies and a general canonical/confluence proof. Existing retention and guarded normalization results are scoped corrections, not a silent replacement of the original completion target. Conditional original Component and execution/field-observation signatures are now formalized separately from existence of their recursive context model and implementation membership."
+    },
+    {
+      "id": "executable-simulation",
+      "status": "open",
+      "description": "ProgramDriver, MixedDriver and FreshDriver construct actual fixed-program source histories, with cross-provider values, heterogeneous LIFO receipts, allocation, retention and first-error machine atomicity. An owning single-admission protocol captures generation/pc/template and simulates real landing Divert after intervening calls; the Call/Admit/Land/Release runner proves exact event coverage and one source history from empty. Actions remain a closed synchronous language at landing. Arbitrary verified callbacks, Future internals, multiple simultaneous admissions and the original full-context representation remain separate obligations."
+    },
+    {
+      "id": "host-boundary",
+      "status": "open",
+      "description": "Ordinary Rust async runtime, callbacks, events, timers and loader remain tested adapters; no unrestricted host refinement is claimed."
+    }
+  ]
+}

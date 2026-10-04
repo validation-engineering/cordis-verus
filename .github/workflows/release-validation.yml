@@ -1,0 +1,48 @@
+name: Full release validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Full quality (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    env:
+      CARGO_TERM_COLOR: never
+      RUST_BACKTRACE: "1"
+      CORDIS_NEGATIVE_TIMEOUT: "1200"
+      CORDIS_NEGATIVE_JOBS: "2"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install checksum-locked Verus and Rust
+        run: ./scripts/install-verus.sh
+      - name: Complete full-crate negative and release-quality gate
+        run: python3 scripts/record-verification.py
+      - name: Retain full validation evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: full-validation-${{ matrix.os }}
+          path: |
+            docs/verification-report.json
+            target/validation/quality.log
+            target/proof-negative/*.json
+            target/proof-negative/*.txt
+            target/release-artifacts/*.crate
+            target/release-artifacts/package-report.json
+          if-no-files-found: warn
+          retention-days: 14

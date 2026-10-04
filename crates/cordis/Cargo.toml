@@ -1,0 +1,22 @@
+[package]
+name = "cordis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "Typed Rust Cordis runtime backed by a verified lifecycle kernel"
+readme = "README.md"
+keywords = ["plugins", "lifecycle", "verification", "dependency-injection"]
+categories = ["development-tools", "asynchronous"]
+include = ["src/**", "tests/**", "examples/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
+# Repository starts private; registry publication is a separate maintainer decision.
+publish = false
+
+[dependencies]
+cordis-kernel = { path = "../cordis-kernel", version = "=0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

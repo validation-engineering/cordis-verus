@@ -1,0 +1,2966 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "provider-lifetime-guard",
+      "mutation": {
+        "file": "lib.rs",
+        "old": "if l.binding.provider == id && (!node.present || node.phase == Phase::Inactive || node.restoring) { return Err(Error::Relied); }",
+        "new": "// Negative test: provider lifetime guard intentionally removed."
+      },
+      "targets": [
+        {
+          "kind": "root",
+          "timingModule": "",
+          "function": "cordis_negative::Kernel::update_node"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::update_node",
+          "module": "",
+          "file": "lib.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "proof {\n                assert forall|a: int| 0 <= a < k + 1 && #[trigger] self.links[a].live implies {\n                    &&& (self.links[a].consumer == id ==> node.present && node.phase != Phase::Inactive)\n                    &&& (self.links[a].binding.provider == id ==> node.present && node.phase != Phase::Inactive && !node.restoring)"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::Kernel::update_node detects provider-lifetime-guard. The mutation remains the exact canonical change to lib.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "cleanup-stack-fifo",
+      "mutation": {
+        "file": "effects.rs",
+        "old": "self.tokens.pop()",
+        "new": "if self.tokens.len() == 0 { None } else { Some(self.tokens.remove(0)) }"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effects",
+          "descendants": false,
+          "function": "cordis_negative::effects::EffectStack::pop"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::effects::EffectStack::pop",
+          "module": "effects",
+          "file": "effects.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "&& final(self).view() == old(self).view(),\n            old(self).view().len() > 0 ==> token == Some(old(self).view().last())\n                && final(self).view() == old(self).view().drop_last()\n                && final(self).view().len() + 1 == old(self).view().len(),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::effects::EffectStack::pop detects cleanup-stack-fifo. The mutation remains the exact canonical change to effects.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "provision-conflict-guard",
+      "mutation": {
+        "file": "lib.rs",
+        "old": "if d.provides && d.port == p && self.nodes[d.owner].present { return false; }",
+        "new": "// Negative test: registered provision conflict guard removed."
+      },
+      "targets": [
+        {
+          "kind": "root",
+          "timingModule": "",
+          "function": "cordis_negative::Kernel::check_provisions"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::check_provisions",
+          "module": "",
+          "file": "lib.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "invariant k <= self.declarations.len(), self.wf(),\n                    forall|a: int| 0 <= a < k && self.declarations[a].provides && self.nodes[self.declarations[a].owner as int].present\n                        ==> self.declarations[a].port != p,\n                decreases self.declarations.len() - k,"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::Kernel::check_provisions detects provision-conflict-guard. The mutation remains the exact canonical change to lib.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "inverse-restores-wrong-cell",
+      "mutation": {
+        "file": "resources.rs",
+        "old": "self.cells.set(inverse.index, inverse.before);",
+        "new": "self.cells.set(inverse.index, inverse.after);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "resources",
+          "descendants": false,
+          "function": "cordis_negative::resources::Store::undo"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::resources::Store::undo",
+          "module": "resources",
+          "file": "resources.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "(0 <= inverse.slot() < old(self).view().len() && old(self).view()[inverse.slot()] == inverse.post()) ==> result.is_ok(),\n            result.is_ok() ==> 0 <= inverse.slot() < old(self).view().len()\n                && old(self).view()[inverse.slot()] == inverse.post()\n                && final(self).view() == old(self).view().update(inverse.slot(), inverse.pre()),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::resources::Store::undo detects inverse-restores-wrong-cell. The mutation remains the exact canonical change to resources.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "compaction-drops-live-bindings",
+      "mutation": {
+        "file": "lib.rs",
+        "old": "if self.links[i].live {",
+        "new": "if !self.links[i].live {"
+      },
+      "targets": [
+        {
+          "kind": "root",
+          "timingModule": "",
+          "function": "cordis_negative::Kernel::compact_bindings"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::compact_bindings",
+          "module": "",
+          "file": "lib.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "kept.len() <= i, positions.len() == kept.len(),\n                kept@ == self.links@.subrange(0, i as int).filter(keep),\n                forall|l: Link| #[trigger] keep(l) == l.live,\n                forall|a: int| 0 <= a < kept.len() ==> 0 <= #[trigger] positions[a] < i"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::Kernel::compact_bindings detects compaction-drops-live-bindings. The mutation remains the exact canonical change to lib.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "stage-loses-pending-admission",
+      "mutation": {
+        "file": "episode.rs",
+        "old": "if self.in_flight { return true; }",
+        "new": "if self.in_flight { return false; }"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "episode",
+          "descendants": false,
+          "function": "cordis_negative::episode::StageProtocol::admit"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::episode::StageProtocol::admit",
+          "module": "episode",
+          "file": "episode.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "final(self).inverse_view() == old(self).inverse_view(),\n            poll == final(self).pending(),\n            poll ==> old(self).pending() || (!old(self).settled()\n                && !old(self).cancellation() && target.is_some()"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::episode::StageProtocol::admit detects stage-loses-pending-admission. The mutation remains the exact canonical change to episode.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "support-ignores-provider",
+      "mutation": {
+        "file": "progress.rs",
+        "old": "ok = ok && selected[p];",
+        "new": "ok = ok;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "progress",
+          "descendants": false,
+          "function": "cordis_negative::progress::support"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::progress::support",
+          "module": "progress",
+          "file": "progress.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "forall|b: int| 0 <= b < j ==> edges[i as int][b] < i,\n                ok == (enabled[i as int] && forall|b: int| 0 <= b < j ==> #[trigger] selected[edges[i as int][b] as int]),\n            decreases predecessors[i as int].len() - j,\n        {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::progress::support detects support-ignores-provider. The mutation remains the exact canonical change to progress.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "journal-restores-first-inverse",
+      "mutation": {
+        "file": "history.rs",
+        "old": "let inverse = self.entries.pop().unwrap();",
+        "new": "let inverse = self.entries.remove(0);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "history",
+          "descendants": false,
+          "function": "cordis_negative::history::Journal::rollback_one"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::history::Journal::rollback_one",
+          "module": "history",
+          "file": "history.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let inverse = self.entries.remove(0);\n        assert(self.store.view()[inverse.slot()] == inverse.post());\n        let ghost slot = inverse.slot();\n        let ghost before = inverse.pre();"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::history::Journal::rollback_one detects journal-restores-first-inverse. The mutation remains the exact canonical change to history.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "episode-token-names-wrong-inverse",
+      "mutation": {
+        "file": "witnessed.rs",
+        "old": "let token = self.journal.len();",
+        "new": "let token = 0;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "witnessed",
+          "descendants": false,
+          "function": "cordis_negative::witnessed::ResourceEpisode::land_write"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::witnessed::ResourceEpisode::land_write",
+          "module": "witnessed",
+          "file": "witnessed.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires old(self).wf(),\n        ensures final(self).wf(), final(self).initial() == old(self).initial(),\n            final(self).committed() == old(self).committed(),\n            (old(self).pending() && old(self).depth() < usize::MAX && index < old(self).view().len()"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::witnessed::ResourceEpisode::land_write detects episode-token-names-wrong-inverse. The mutation remains the exact canonical change to witnessed.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "child-inverse-retires-parent",
+      "mutation": {
+        "file": "ownership.rs",
+        "old": "match kernel.retire(child) {",
+        "new": "match kernel.retire(self.actor) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "ownership",
+          "descendants": false,
+          "function": "cordis_negative::ownership::ChildEpisode::rollback_one"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::ownership::ChildEpisode::rollback_one",
+          "module": "ownership",
+          "file": "ownership.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "old(self).retirable(old(kernel).paper()) ==> final(self).retirable(final(kernel).paper()),\n            old(self).retirable(old(kernel).paper()) ==> result.is_ok(),\n            (result == Ok(None)) == (!old(self).settled() || old(self).children().len() == 0),\n            result.is_ok() && result.unwrap().is_some() ==> old(self).settled()"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::ownership::ChildEpisode::rollback_one detects child-inverse-retires-parent. The mutation remains the exact canonical change to ownership.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "child-handle-ignores-episode-generation",
+      "mutation": {
+        "file": "ownership.rs",
+        "old": "if kernel.episode_generation(self.actor) != Some(expected) {",
+        "new": "if false {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "ownership",
+          "descendants": false,
+          "function": "cordis_negative::ownership::ChildEpisode::check_generation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::ownership::ChildEpisode::check_generation",
+          "module": "ownership",
+          "file": "ownership.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "fn check_generation(&self,kernel:&Kernel) -> (result:Result<(),ChildError>)\n        ensures result.is_ok() == self.generation_matches(kernel),\n    {\n        if let Some(expected) = self.generation {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::ownership::ChildEpisode::check_generation detects child-handle-ignores-episode-generation. The mutation remains the exact canonical change to ownership.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "begin-reuses-episode-generation",
+      "mutation": {
+        "file": "lib.rs",
+        "old": "node.generation += 1;",
+        "new": "node.generation += 0;"
+      },
+      "targets": [
+        {
+          "kind": "root",
+          "timingModule": "",
+          "function": "cordis_negative::Kernel::begin"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::begin",
+          "module": "",
+          "file": "lib.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.generation_of(id) == Some(node.generation));\n            assert(node.generation as nat == old(self).generation_of(id).unwrap() as nat + 1);\n            assert forall|n: usize| n != id implies self.generation_of(n) == old(self).generation_of(n) by {\n                assert(self.registered(n) == old(self).registered(n));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::Kernel::begin detects begin-reuses-episode-generation. The mutation remains the exact canonical change to lib.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "driver-skips-resource-recovery",
+      "mutation": {
+        "file": "driver.rs",
+        "old": "let _restored = self.episodes[id].rollback();",
+        "new": "let _restored = true;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "driver",
+          "descendants": false,
+          "function": "cordis_negative::driver::Driver::unload"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::driver::Driver::unload",
+          "module": "driver",
+          "file": "driver.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),\n            r.is_ok() ==> paper::step(old(self).control(), final(self).control(), id, paper::Rule::Unload)\n                && final(self).resource(id) == old(self).initial(id),\n    {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::driver::Driver::unload detects driver-skips-resource-recovery. The mutation remains the exact canonical change to driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "normal-form-ignores-retirement",
+      "mutation": {
+        "file": "global.rs",
+        "old": "&& left.fibers[n].retired == right.fibers[n].retired",
+        "new": "&& true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "global",
+          "descendants": false,
+          "function": "cordis_negative::global::quiet_active_unique"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::global::quiet_active_unique",
+          "module": "global",
+          "file": "global.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "pub proof fn quiet_active_unique(left: State, right: State, ranks: Seq<nat>)\n    requires paper::well_formed(left), paper::well_formed(right),\n        paper::quiet(left), paper::quiet(right), retirement_closed(left), retirement_closed(right),\n        same_input(left, right), support_ranking(left, ranks),\n    ensures active(left) == active(right),\n{\n    quiet_active_support(left);\n    quiet_active_support(right);\n    assert forall|n: usize| support_clause(left, active(right), n) == support_clause(right, active(right), n) by {\n        assert(paper::registered(left, n) == paper::registered(right, n));\n        if paper::registered(left, n) {\n            assert(paper::interface_same(left.fibers[n], right.fibers[n]));\n            assert(left.fibers[n].retired == right.fibers[n].retired);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::global::quiet_active_unique detects normal-form-ignores-retirement. The mutation remains the exact canonical change to global.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "renaming-leaves-stale-provider",
+      "mutation": {
+        "file": "alpha.rs",
+        "old": "provider: (r.forward)(b.provider)",
+        "new": "provider: b.provider"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "alpha",
+          "descendants": false,
+          "function": "cordis_negative::alpha::target_forward"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::alpha::target_forward",
+          "module": "alpha",
+          "file": "alpha.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert forall|b: Binding| view(r, v).contains(b) implies\n        rename(r, s).fibers[(r.forward)(n)].dependencies.contains(Port { key: b.key, realm: b.realm })\n        && control::publishes(rename(r, s), Port { key: b.key, realm: b.realm }, b.provider) by {\n        let old = binding(inverse(r), b);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::alpha::target_forward detects renaming-leaves-stale-provider. The mutation remains the exact canonical change to alpha.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "dynamic-stage-discards-real-inverse",
+      "mutation": {
+        "file": "canonical.rs",
+        "old": "machine.inverses[owner as int].push(yielded.1)),",
+        "new": "machine.inverses[owner as int].push(|s: S| s)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "canonical",
+          "descendants": false,
+          "function": "cordis_negative::canonical::erase_local_stage"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::canonical::erase_local_stage",
+          "module": "canonical",
+          "file": "canonical.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires shaped(machine), enabled(machine, owner), witnessed(family),\n    ensures erase_owner(advance(family, machine, owner), owner, original) == erase_owner(machine, owner, original),\n{\n    let yielded = family(owner, machine.pending[owner as int].unwrap())(machine.context);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::canonical::erase_local_stage detects dynamic-stage-discards-real-inverse. The mutation remains the exact canonical change to canonical.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "iterator-fuel-does-not-decrease",
+      "mutation": {
+        "file": "termination.rs",
+        "old": "&&& label.1 == control::Rule::Iter ==> after[label.0 as int] < before[label.0 as int]",
+        "new": "&&& label.1 == control::Rule::Iter ==> after[label.0 as int] <= before[label.0 as int]"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "termination",
+          "descendants": false,
+          "function": "cordis_negative::termination::transition_accounting"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::termination::transition_accounting",
+          "module": "termination",
+          "file": "termination.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires transition(a, z, before, after, label, bound),\n    ensures cost(label, n) + potential(z, after, n, bound)\n        <= potential(a, before, n, bound) + (bound + 3) * changed(a, z, n),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::termination::transition_accounting detects iterator-fuel-does-not-decrease. The mutation remains the exact canonical change to termination.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "program-copy-ignores-source",
+      "mutation": {
+        "file": "program.rs",
+        "old": "Instruction::Copy{source,index,next} => (index,self.episode.read(source).unwrap(),next),",
+        "new": "Instruction::Copy{source:_,index,next} => (index,0,next),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "program",
+          "descendants": false,
+          "function": "cordis_negative::program::ProgramEpisode::step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::program::ProgramEpisode::step",
+          "module": "program",
+          "file": "program.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "proof { instruction_bounds(instruction,self.pc,self.code.len(),self.view()); }\n        assert((index,value,next) == instruction.operands(self.view()));\n        assert(self.episode.view()[index as int].depth < u64::MAX);\n        let _written = self.episode.land_write(self.owner,index,value);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::program::ProgramEpisode::step detects program-copy-ignores-source. The mutation remains the exact canonical change to program.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "atomic-landing-skips-target-check",
+      "mutation": {
+        "file": "program.rs",
+        "old": "match self.kernel.leave_if_changed(id) {\n            Ok(()) => {\n                self.episodes[id].cancel();",
+        "new": "match Err::<(), Error>(Error::Changed) {\n            Ok(()) => {\n                self.episodes[id].cancel();"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "program",
+          "descendants": false,
+          "function": "cordis_negative::program::ProgramDriver::land"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::program::ProgramDriver::land",
+          "module": "program",
+          "file": "program.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),\n            r.is_ok() ==> crate::program_trace::atomic_ack(old(self).snapshot(),final(self).snapshot(),id,r.unwrap()),\n    {\n        let ghost entry=*self;"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::program::ProgramDriver::land detects atomic-landing-skips-target-check. The mutation remains the exact canonical change to program.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "api-insertion-reuses-historical-name",
+      "mutation": {
+        "file": "program_refinement.rs",
+        "old": "n == a.allocated && z.allocated == a.allocated+1",
+        "new": "n <= a.allocated && z.allocated == a.allocated+1"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "program_trace",
+          "descendants": false,
+          "function": "cordis_negative::program_trace::acknowledgement_frame"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::program_trace::acknowledgement_frame",
+          "module": "program_trace",
+          "file": "program_trace.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "forall|n:usize| c::registered(a.control,n) && c::registered(z.control,n) ==> configuration_equal(a,z,n),\n        forall|n:usize| n < a.allocated && !c::registered(a.control,n) ==> !c::registered(z.control,n),\n{\n    match event {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::program_trace::acknowledgement_frame detects api-insertion-reuses-historical-name. The mutation remains the exact canonical change to program_refinement.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "provision-inverse-ignores-domain",
+      "mutation": {
+        "file": "mediated.rs",
+        "old": "undo: |x: IMap<K, V>| if x.dom().contains(key) { Some(x.remove(key)) } else { None }, next",
+        "new": "undo: |x: IMap<K, V>| Some(x.remove(key)), next"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mediated",
+          "descendants": false,
+          "function": "cordis_negative::mediated::provision_inverse_domain"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mediated::provision_inverse_domain",
+          "module": "mediated",
+          "file": "mediated.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires !input.dom().contains(key),\n    ensures (run(Node::<K, V, O>::Provision { key, value, next }, input).unwrap().undo)(current).is_some()\n        == current.dom().contains(key),\n        !current.dom().contains(key) ==> (run(Node::<K, V, O>::Provision { key, value, next }, input).unwrap().undo)(current) == None,"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mediated::provision_inverse_domain detects provision-inverse-ignores-domain. The mutation remains the exact canonical change to mediated.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "coeffect-independence-discards-outcome",
+      "mutation": {
+        "file": "partial_independence.rs",
+        "old": "a.unwrap().outcome == b.unwrap().outcome\n            && mediated::partial_related",
+        "new": "true\n            && mediated::partial_related"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_iteration_exchange",
+          "descendants": false,
+          "function": "cordis_negative::mixed_iteration_exchange::raw_outcome_changes_continuation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_iteration_exchange::raw_outcome_changes_continuation",
+          "module": "mixed_iteration_exchange",
+          "file": "mixed_iteration_exchange.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if pi::value_independent(eq,op,op) {\n        assert(pi::value_stable(eq,op,f));assert(f(0).is_some());assert(op(0).unwrap().outcome==op(f(0).unwrap()).unwrap().outcome);assert(false);\n    }\n    assert(!pi::value_independent(eq,op,op));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_iteration_exchange::raw_outcome_changes_continuation detects coeffect-independence-discards-outcome. The mutation remains the exact canonical change to partial_independence.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "interception-reverses-metadata-order",
+      "mutation": {
+        "file": "contexts.rs",
+        "old": "{Some((c.providers[k])((m.merge)(k,mu,(c.carried)(k))))} else {None}",
+        "new": "{Some((c.providers[k])((m.merge)(k,(c.carried)(k),mu)))} else {None}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "contexts",
+          "descendants": false,
+          "function": "cordis_negative::contexts::interception_provision"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::contexts::interception_provision",
+          "module": "contexts",
+          "file": "contexts.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures intercepted_set(c,k,p).is_some(),interception_typed(m,family,intercepted_set(c,k,p).unwrap()),\n        intercepted_get(m,intercepted_set(c,k,p).unwrap(),k,mu)==Some(p((m.merge)(k,mu,(c.carried)(k)))),\n        intercepted_revoke(intercepted_set(c,k,p).unwrap(),k)==Some(c),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::contexts::interception_provision detects interception-reverses-metadata-order. The mutation remains the exact canonical change to contexts.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "child-removal-ignores-retained-token",
+      "mutation": {
+        "file": "child_history.rs",
+        "old": "==> kind(token) != Some(child)\n}",
+        "new": "==> kind(token) != Some(child) || a.control.fibers[child].retired\n}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "child_history",
+          "descendants": false,
+          "function": "cordis_negative::child_history::step_preserves_retention"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::child_history::step_preserves_retention",
+          "module": "child_history",
+          "file": "child_history.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(s::registered(a,child));\n                if rule == c::Rule::Remove { assert(child != n); }\n                assert(s::registered(z,child));\n            }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::child_history::step_preserves_retention detects child-removal-ignores-retained-token. The mutation remains the exact canonical change to child_history.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "iterator-lift-reverses-inverse-composition",
+      "mutation": {
+        "file": "iterators.rs",
+        "old": "f::Tracked { value: tail.value, undo: f::compose(first.undo, tail.undo) }",
+        "new": "f::Tracked { value: tail.value, undo: f::compose(tail.undo, first.undo) }"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "iterators",
+          "descendants": false,
+          "function": "cordis_negative::iterators::completed_effect_stable"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::iterators::completed_effect_stable",
+          "module": "iterators",
+          "file": "iterators.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(f::tracked_equal((tail_left.undo)(s), (tail_right.undo)(s)));\n            assert forall|x: S| #[trigger] (((left.undo)(s)).undo)(x) == (((right.undo)(s)).undo)(x) by {\n                assert((((tail_left.undo)(s)).undo)(family(next.unwrap(), x).state)\n                    == (((tail_right.undo)(s)).undo)(family(next.unwrap(), x).state));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::iterators::completed_effect_stable detects iterator-lift-reverses-inverse-composition. The mutation remains the exact canonical change to iterators.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "iterator-run-discards-continuation",
+      "mutation": {
+        "file": "iterators.rs",
+        "old": "run(family, yielded.next, (fuel - 1) as nat, current)",
+        "new": "run(family, None, (fuel - 1) as nat, current)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "iterators",
+          "descendants": false,
+          "function": "cordis_negative::iterators::prefix_recovery"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::iterators::prefix_recovery",
+          "module": "iterators",
+          "file": "iterators.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "next.is_some() ==> witnessed(eq, family, next.unwrap()),\n    ensures {\n        let result = run(family, next, fuel, initial);\n        &&& eq((result.current.undo)(result.current.value), (initial.undo)(initial.value))"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::iterators::prefix_recovery detects iterator-run-discards-continuation. The mutation remains the exact canonical change to iterators.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "erasure-drops-parent-read",
+      "mutation": {
+        "file": "deletion.rs",
+        "old": "&&& (rule == c::Rule::Insert ==> z.control.fibers[actor].parent != Some(removed))",
+        "new": "&&& (rule == c::Rule::Insert ==> true)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "deletion",
+          "descendants": false,
+          "function": "cordis_negative::deletion::full_step_erases"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::deletion::full_step_erases",
+          "module": "deletion",
+          "file": "deletion.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "c::Rule::Insert => {\n            if s::registered(a,removed) { s::vestigial_insert_forward(a.control,z.control,removed,actor); }\n            else {\n                assert(!s::registered(z,removed));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::deletion::full_step_erases detects erasure-drops-parent-read. The mutation remains the exact canonical change to deletion.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "entangled-recovery-loses-restriction",
+      "mutation": {
+        "file": "entangled.rs",
+        "old": "Action::Restriction { key } => state.remove(key),",
+        "new": "Action::Restriction { key: _ } => state,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "entangled",
+          "descendants": false,
+          "function": "cordis_negative::entangled::actual_restriction_erases"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::entangled::actual_restriction_erases",
+          "module": "entangled",
+          "file": "entangled.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if journal.last() == (Action::Restriction { key: k }) {\n        absent_stays_absent(journal.drop_last(), apply(journal.last(), state), k);\n    } else {\n        assert(journal.drop_last().contains(Action::Restriction { key: k })) by {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::entangled::actual_restriction_erases detects entangled-recovery-loses-restriction. The mutation remains the exact canonical change to entangled.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "normal-form-counts-phantom-stages",
+      "mutation": {
+        "file": "program_refinement.rs",
+        "old": "(x.depths[n]-1) as nat).next < x.codes[n].len())",
+        "new": "(x.depths[n]-1) as nat).next <= x.codes[n].len())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "program_normal_form",
+          "descendants": false,
+          "function": "cordis_negative::program_normal_form::quiet_row_equal"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::program_normal_form::quiet_row_equal",
+          "module": "program_normal_form",
+          "file": "program_normal_form.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if a.control.fibers[n].phase == Phase::Active {\n        terminal_depth_unique(a.codes[n],a.owners[n],a.initial[n],a.depths[n],b.depths[n]);\n    } else {assert(a.control.fibers[n].phase == Phase::Inactive);}\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::program_normal_form::quiet_row_equal detects normal-form-counts-phantom-stages. The mutation remains the exact canonical change to program_refinement.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "model-allows-undeclared-provision",
+      "mutation": {
+        "file": "preservation.rs",
+        "old": "&& z.tables[actor].dom().subset_of(a.control.fibers[actor].provisions)",
+        "new": "&& true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "preservation",
+          "descendants": false,
+          "function": "cordis_negative::preservation::table_preservation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::preservation::table_preservation",
+          "module": "preservation",
+          "file": "preservation.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "{\n    assert forall|n:usize| s::registered(z,n) implies {\n        &&& z.tables[n].dom().subset_of(z.control.fibers[n].provisions)\n        &&& (z.control.fibers[n].phase == Phase::Inactive ==> z.iterators[n].is_none()"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::preservation::table_preservation detects model-allows-undeclared-provision. The mutation remains the exact canonical change to preservation.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-local-is-uniform",
+      "mutation": {
+        "file": "observational_algebra.rs",
+        "old": "        == (forall|s: S| #[trigger] eq((effect(input).undo)(effect(s).value), s)),",
+        "new": "        == eq((effect(input).undo)(effect(input).value), input),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "observational_algebra",
+          "descendants": false,
+          "function": "cordis_negative::observational_algebra::full_accumulator_recovery_iff"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::observational_algebra::full_accumulator_recovery_iff",
+          "module": "observational_algebra",
+          "file": "observational_algebra.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires c::equivalence(eq), o::witnessed_effect(eq, effect),\n    ensures (forall|phi: spec_fn(S) -> S| o::related_maps(eq, phi, phi)\n        ==> #[trigger] full_recovery(eq, effect, input, phi))\n        == eq((effect(input).undo)(effect(input).value), input),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::observational_algebra::full_accumulator_recovery_iff detects observational-local-is-uniform. The mutation remains the exact canonical change to observational_algebra.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "dependent-operation-loses-outcome-fiber",
+      "mutation": {
+        "file": "dependent_grammar.rs",
+        "old": "&&& (lib.outcomes)(a,y.outcome)",
+        "new": "&&& true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "dependent_grammar",
+          "descendants": false,
+          "function": "cordis_negative::dependent_grammar::selected_continuation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::dependent_grammar::selected_continuation",
+          "module": "dependent_grammar",
+          "file": "dependent_grammar.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let k=(lib.key)(a);let op=(lib.apply)(a,x);\n            assert(operation_typed(lib,a,x));assert((lib.outcomes)(a,op(s[k]).unwrap().outcome));\n        },\n        _=>{},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::dependent_grammar::selected_continuation detects dependent-operation-loses-outcome-fiber. The mutation remains the exact canonical change to dependent_grammar.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "grammar-inverse-forgets-captured-provider",
+      "mutation": {
+        "file": "grammar_lift.rs",
+        "old": "inverse:Inverse::Operation {provider,key,undo:y.undo}",
+        "new": "inverse:Inverse::Operation {provider:actor,key,undo:y.undo}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "dependent_lift",
+          "descendants": false,
+          "function": "cordis_negative::dependent_lift::inverse_projects"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::dependent_lift::inverse_projects",
+          "module": "dependent_lift",
+          "file": "dependent_lift.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "p::unique_owner(input);p::lookup(input,ISet::full(),key,provider);\n            lift::resolution_sound(current,actor,key);p::unique_owner(current);p::lookup(current,ISet::full(),key,provider);\n            let value=(y.undo)(current.tables[provider][key]).unwrap();\n            c::finite_embedding(now,now,key,value);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::dependent_lift::inverse_projects detects grammar-inverse-forgets-captured-provider. The mutation remains the exact canonical change to grammar_lift.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "grammar-repeat-call-uses-fresh-token",
+      "mutation": {
+        "file": "grammar_lift.rs",
+        "old": "first_call(a.history,actor,a.state.iterators[actor].unwrap(),a.state)",
+        "new": "a.history.len()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "grammar_lift",
+          "descendants": false,
+          "function": "cordis_negative::grammar_lift::catalog_landing_agrees"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::grammar_lift::catalog_landing_agrees",
+          "module": "grammar_lift",
+          "file": "grammar_lift.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "history_prefix(z.history,history),history_sound(programs,history),\n    ensures yielded_call_agrees(catalog_model(history),programs,a,actor),\n{\n    metadata_frame(programs,allowed,a,z,actor,rule);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::grammar_lift::catalog_landing_agrees detects grammar-repeat-call-uses-fresh-token. The mutation remains the exact canonical change to grammar_lift.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "child-driver-removal-ignores-journals",
+      "mutation": {
+        "file": "child_driver.rs",
+        "old": "if self.has_reference(id) {return Err(ChildDriverError::Retained);}",
+        "new": "if false && self.has_reference(id) {return Err(ChildDriverError::Retained);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "child_driver",
+          "descendants": false,
+          "function": "cordis_negative::child_driver::ChildDriver::remove"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::child_driver::ChildDriver::remove",
+          "module": "child_driver",
+          "file": "child_driver.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if false && self.has_reference(id) {return Err(ChildDriverError::Retained);}\n        proof {self.removal_refines(id);}\n        match self.kernel.remove(id) {\n            Ok(())=>{proof {self.rebuild(&prior,id,id,Some(id));} Ok(())},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::child_driver::ChildDriver::remove detects child-driver-removal-ignores-journals. The mutation remains the exact canonical change to child_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "child-driver-skips-drift-diversion",
+      "mutation": {
+        "file": "child_driver.rs",
+        "old": "if !has_target {\n                    proof {self.kernel.paper_observations(id);}",
+        "new": "if false && !has_target {\n                    proof {self.kernel.paper_observations(id);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "child_driver",
+          "descendants": false,
+          "function": "cordis_negative::child_driver::ChildDriver::land_child"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::child_driver::ChildDriver::land_child",
+          "module": "child_driver",
+          "file": "child_driver.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "proof {\n                    assert(child_landing(prior.control(),self.control(),id,child));\n                    assert(child != id);\n                    assert forall|j:int| 0 <= j < self.episodes[id as int].children().len() implies"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::child_driver::ChildDriver::land_child detects child-driver-skips-drift-diversion. The mutation remains the exact canonical change to child_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "dependent-landing-drops-continuation",
+      "mutation": {
+        "file": "dependent_lift.rs",
+        "old": "roots:a.roots,current:a.current.insert(actor,next),history:a.history.push(e)",
+        "new": "roots:a.roots,current:a.current.insert(actor,None),history:a.history.push(e)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "dependent_lift",
+          "descendants": false,
+          "function": "cordis_negative::dependent_lift::frame"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::dependent_lift::frame",
+          "module": "dependent_lift",
+          "file": "dependent_lift.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures {\n        &&& forall|n:usize| s::registered(a.state,n) && s::registered(z.state,n) ==> r::interface_same(a.state.control.fibers[n],z.state.control.fibers[n])\n            && a.state.effects[n]==z.state.effects[n] && a.roots[n]==z.roots[n]\n        &&& forall|n:usize| n!=actor ==> s::registered(a.state,n)==s::registered(z.state,n)"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::dependent_lift::frame detects dependent-landing-drops-continuation. The mutation remains the exact canonical change to dependent_lift.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "grammar-inverse-origin-fifo-token",
+      "mutation": {
+        "file": "grammar_ordering.rs",
+        "old": "token==tokens.last() && before==input && after==next",
+        "new": "token==tokens.first() && before==input && after==next"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "grammar_ordering",
+          "descendants": false,
+          "function": "cordis_negative::grammar_ordering::restore_operation_origin"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::grammar_ordering::restore_operation_origin",
+          "module": "grammar_ordering",
+          "file": "grammar_ordering.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "inverse_operation_origin(receipt,input,provider,key);\n        assert(changed_invocation(history,tokens,input,actor,provider,key,token,input,next));\n    } else {\n        restore_operation_origin(history,tokens.drop_last(),next,actor,provider,key);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::grammar_ordering::restore_operation_origin detects grammar-inverse-origin-fifo-token. The mutation remains the exact canonical change to grammar_ordering.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "unload-state-map-forgets-actual-stack",
+      "mutation": {
+        "file": "rule_frames.rs",
+        "old": "Source::Restoration{actor,tokens:a.accumulators[actor]}",
+        "new": "Source::Restoration{actor,tokens:Seq::empty()}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "rule_frames",
+          "descendants": false,
+          "function": "cordis_negative::rule_frames::factorization"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::rule_frames::factorization",
+          "module": "rule_frames",
+          "file": "rule_frames.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires s::shaped(a),s::step(model,a,z,actor,rule),\n    ensures z==bracket(z,actor,rule,apply(model,source(model,a,z,actor,rule),a)),\n        (matches!(source(model,a,z,actor,rule),Source::Restoration{..})) == (rule==c::Rule::Unload),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::rule_frames::factorization detects unload-state-map-forgets-actual-stack. The mutation remains the exact canonical change to rule_frames.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "iterator-independence-discards-continuation",
+      "mutation": {
+        "file": "iterator_independence.rs",
+        "old": "q::continuation(|i:I,j:I|q::iterator_related(eq,family,i,j),a.next,b.next)",
+        "new": "true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "iterator_bridge",
+          "descendants": false,
+          "function": "cordis_negative::iterator_bridge::failure_sink_obstruction"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::iterator_bridge::failure_sink_obstruction",
+          "module": "iterator_bridge",
+          "file": "iterator_bridge.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(encoded(id,None).next.is_none());assert(encoded(id,Some(s)).next.is_some());\n    assert(!total::yields_related(base,encoded,encoded(id,None),encoded(id,Some(s))));\n    if total::stable(base,encoded,id,lifted) {total::stable_at(base,encoded,id,lifted,Some(s));}\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::iterator_bridge::failure_sink_obstruction detects iterator-independence-discards-continuation. The mutation remains the exact canonical change to iterator_independence.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "indexed-model-forgets-inverse-token",
+      "mutation": {
+        "file": "indexed_ordering.rs",
+        "old": "local_model(s::Yield {state:out.state,inverse:a.history.len(),next:dl::marker(out.next)},receipt_history(a.history))",
+        "new": "local_model(s::Yield {state:out.state,inverse:0,next:dl::marker(out.next)},receipt_history(a.history))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "indexed_ordering",
+          "descendants": false,
+          "function": "cordis_negative::indexed_ordering::dependent_step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::indexed_ordering::dependent_step",
+          "module": "indexed_ordering",
+          "file": "indexed_ordering.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "local_restore_agreement(result,receipt_history(a.history),a.state.accumulators[actor],a.state,actor);\n        g::restore_refines(model,receipt_history(a.history),a.state.accumulators[actor],a.state,actor);\n    }\n    match rule {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::indexed_ordering::dependent_step detects indexed-model-forgets-inverse-token. The mutation remains the exact canonical change to indexed_ordering.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-removal-ignores-retention",
+      "mutation": {
+        "file": "mixed_grammar.rs",
+        "old": "&& ch::remove_unreferenced(kind(a.history),a.state,actor)",
+        "new": "&& true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "isolated_deletion",
+          "descendants": false,
+          "function": "cordis_negative::isolated_deletion::orchestration_transport"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::isolated_deletion::orchestration_transport",
+          "module": "isolated_deletion",
+          "file": "isolated_deletion.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "r::Rule::Remove=>{\n                assert(actor!=removed);remove_unreferenced_transport(a,target,actor,removed);\n                assert forall|n:usize| s::registered(target.state,n) implies target.state.control.fibers[n].parent!=Some(actor) by {\n                    assert(s::registered(a.state,n));assert(a.state.control.fibers[n].parent!=Some(actor));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::isolated_deletion::orchestration_transport detects mixed-removal-ignores-retention. The mutation remains the exact canonical change to mixed_grammar.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-child-inverse-skips-retirement",
+      "mutation": {
+        "file": "mixed_grammar.rs",
+        "old": "if s::registered(a,child) {Some(s::with_control(a,global::retire_fiber(a.control,child)))} else {None}",
+        "new": "if s::registered(a,child) {Some(a)} else {None}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "fresh_grammar",
+          "descendants": false,
+          "function": "cordis_negative::fresh_grammar::inverse_well_formed"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::fresh_grammar::inverse_well_formed",
+          "module": "fresh_grammar",
+          "file": "fresh_grammar.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "mx::Receipt::Table {receipt}=>lift::undo_preservation(receipt,a),\n        mx::Receipt::Child {child,..}=>inv::retire_preservation(a,mx::undo(receipt,a).unwrap(),child),\n    }\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::fresh_grammar::inverse_well_formed detects mixed-child-inverse-skips-retirement. The mutation remains the exact canonical change to mixed_grammar.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "grammar-recovery-discards-restriction",
+      "mutation": {
+        "file": "grammar_recovery.rs",
+        "old": "gl::Inverse::Provision {key}=>e::Action::Restriction {key},",
+        "new": "gl::Inverse::Provision {key:_}=>e::Action::Identity,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "grammar_recovery",
+          "descendants": false,
+          "function": "cordis_negative::grammar_recovery::receipt_projection"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::grammar_recovery::receipt_projection",
+          "module": "grammar_recovery",
+          "file": "grammar_recovery.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires inv::well_formed(a),gl::undo(receipt,a).is_some(),\n    ensures p::project(gl::undo(receipt,a).unwrap(),ISet::full())==e::apply(receipt_action(receipt),p::project(a,ISet::full())),\n{gl::inverse_projects(receipt,a);}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::grammar_recovery::receipt_projection detects grammar-recovery-discards-restriction. The mutation remains the exact canonical change to grammar_recovery.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-origin-skips-inverse-context",
+      "mutation": {
+        "file": "mixed_ordering.rs",
+        "old": "invokes(history,tokens.drop_last(),next,actor,token,before,after)",
+        "new": "invokes(history,tokens.drop_last(),input,actor,token,before,after)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_ordering",
+          "descendants": false,
+          "function": "cordis_negative::mixed_ordering::restore_origin"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_ordering::restore_origin",
+          "module": "mixed_ordering",
+          "file": "mixed_ordering.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "changed_invocation(history,tokens.drop_last(),next,actor,provider,key,inner,before,after);\n        assert(changed_invocation(history,tokens,input,actor,provider,key,inner,before,after));\n    }\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_ordering::restore_origin detects mixed-origin-skips-inverse-context. The mutation remains the exact canonical change to mixed_ordering.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-recovery-child-corrupts-table",
+      "mutation": {
+        "file": "mixed_recovery.rs",
+        "old": "mx::Receipt::Child {..}=>e::Action::Identity",
+        "new": "mx::Receipt::Child {..}=>e::Action::Restriction {key:Port {key:0,realm:0}}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_recovery",
+          "descendants": false,
+          "function": "cordis_negative::mixed_recovery::node_actions_typed"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_recovery::node_actions_typed",
+          "module": "mixed_recovery",
+          "file": "mixed_recovery.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "e::inverse_action(receipt_action(mx::run(lib,node,a,actor).unwrap().receipt)),\n        e::key(receipt_action(mx::run(lib,node,a,actor).unwrap().receipt)).is_some() ==>\n            dep::declarations(a,actor).contains(e::key(receipt_action(mx::run(lib,node,a,actor).unwrap().receipt)).unwrap()),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_recovery::node_actions_typed detects mixed-recovery-child-corrupts-table. The mutation remains the exact canonical change to mixed_recovery.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "iterator-bridge-compares-failed-foreign-map",
+      "mutation": {
+        "file": "iterator_bridge.rs",
+        "old": "requires stable(eq,family,id,map),map(s).is_some(),",
+        "new": "requires stable(eq,family,id,map),map(s).is_none(),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "iterator_bridge",
+          "descendants": false,
+          "function": "cordis_negative::iterator_bridge::encoded_yields_on_domain"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::iterator_bridge::encoded_yields_on_domain",
+          "module": "iterator_bridge",
+          "file": "iterator_bridge.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires stable(eq,family,id,map),map(s).is_none(),\n    ensures total::yields_related(|a:Option<S>,b:Option<S>|it::optional_eq(eq,a,b),it::encode_partial(family),\n        it::encode_partial(family)(id,Some(s)),it::encode_partial(family)(id,it::lift_partial(map,Some(s)))),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::iterator_bridge::encoded_yields_on_domain detects iterator-bridge-compares-failed-foreign-map. The mutation remains the exact canonical change to iterator_bridge.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-transposition-ignores-parent-read",
+      "mutation": {
+        "file": "mixed_transposition.rs",
+        "old": "insertion_ready(lib,programs,b,id,parent,dependencies,provisions,root),parent!=Some(child),",
+        "new": "insertion_ready(lib,programs,b,id,parent,dependencies,provisions,root),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_transposition",
+          "descendants": false,
+          "function": "cordis_negative::mixed_transposition::child_insert_diamond"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_transposition::child_insert_diamond",
+          "module": "mixed_transposition",
+          "file": "mixed_transposition.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "}\n    if let Some(p)=parent {assert(p!=child);assert(s::registered(a.state,p));}\n    assert(insertion_ready(lib,programs,a,id,parent,dependencies,provisions,root));\n    insertion_step(lib,programs,b,id,parent,dependencies,provisions,root);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_transposition::child_insert_diamond detects mixed-transposition-ignores-parent-read. The mutation remains the exact canonical change to mixed_transposition.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "recovery-example-inverse-adds-again",
+      "mutation": {
+        "file": "recovery_examples.rs",
+        "old": "undo:|after:int|Some(after-amount)",
+        "new": "undo:|after:int|Some(after+amount)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_iteration_exchange",
+          "descendants": false,
+          "function": "cordis_negative::mixed_iteration_exchange::translation_generator"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_iteration_exchange::translation_generator",
+          "module": "mixed_iteration_exchange",
+          "file": "mixed_iteration_exchange.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let before=choose|v:int| #[trigger] op(v).is_some() && op(v).unwrap().undo==f;\n        assert(f =~= shift(-amount));\n    }\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_iteration_exchange::translation_generator detects recovery-example-inverse-adds-again. The mutation remains the exact canonical change to recovery_examples.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-transport-drops-new-receipt",
+      "mutation": {
+        "file": "mixed_transport.rs",
+        "old": "history:if g::landing(left,next,rule) {right.history.push(next.history.last())} else {right.history}",
+        "new": "history:right.history"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_transport",
+          "descendants": false,
+          "function": "cordis_negative::mixed_transport::step_transport"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_transport::step_transport",
+          "module": "mixed_transport",
+          "file": "mixed_transport.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(next.history==left.history.push(g::entry(lib,programs,left,actor)));\n        assert(result.history==right.history.push(g::entry(lib,programs,right,actor)));\n        assert(t::same_receipts(next,result)) by {\n            assert forall|i:int| 0<=i<next.history.len() implies {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_transport::step_transport detects mixed-transport-drops-new-receipt. The mutation remains the exact canonical change to mixed_transport.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-witness-discards-recovery",
+      "mutation": {
+        "file": "observational_grammar.rs",
+        "old": "operation_respects(eq,op) && operation_witness(eq,op)",
+        "new": "operation_respects(eq,op)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "observational_grammar",
+          "descendants": false,
+          "function": "cordis_negative::observational_grammar::stage_admissible"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::observational_grammar::stage_admissible",
+          "module": "observational_grammar",
+          "file": "observational_grammar.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(operation_admissible(|u:U,v:U|eq(k,u,v),op));\n                assert((y.undo)(y.value).is_some());let restored=(y.undo)(y.value).unwrap();\n                assert(eq(k,restored,s[k]));\n                d::update_related(eq,observed,k,s,s,restored,s[k]);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::observational_grammar::stage_admissible detects observational-witness-discards-recovery. The mutation remains the exact canonical change to observational_grammar.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-journal-discards-commutation",
+      "mutation": {
+        "file": "observational_recovery.rs",
+        "old": "k!=j || forall|v:V| #[trigger] eq(k,f(g(v)),g(f(v)))",
+        "new": "true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "observational_recovery",
+          "descendants": false,
+          "function": "cordis_negative::observational_recovery::atomic_commutation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::observational_recovery::atomic_commutation",
+          "module": "observational_recovery",
+          "file": "observational_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if let e::Action::Operation {key:j,update:g}=foreign {\n                if i==j && i==key && state.dom().contains(key) {assert(eq(key,f(g(state[key])),g(f(state[key]))));}\n            }\n        }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::observational_recovery::atomic_commutation detects observational-journal-discards-commutation. The mutation remains the exact canonical change to observational_recovery.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-retire-actor-read-bypass",
+      "mutation": {
+        "file": "mixed_orchestration.rs",
+        "old": "requires s::registered(a.state,id),s::registered(a.state,actor),id!=actor,",
+        "new": "requires s::registered(a.state,id),s::registered(a.state,actor),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_orchestration",
+          "descendants": false,
+          "function": "cordis_negative::mixed_orchestration::retire_target"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_orchestration::retire_target",
+          "module": "mixed_orchestration",
+          "file": "mixed_orchestration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires s::registered(a.state,id),s::registered(a.state,actor),\n    ensures s::target(a.state,actor,view)==s::target(retire(a,id).state,actor,view),\n        s::coherent(a.state,actor)==s::coherent(retire(a,id).state,actor),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_orchestration::retire_target detects mixed-retire-actor-read-bypass. The mutation remains the exact canonical change to mixed_orchestration.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-remove-provider-read-bypass",
+      "mutation": {
+        "file": "mixed_orchestration.rs",
+        "old": "requires inv::well_formed(a.state),s::registered(a.state,id),a.state.control.fibers[id].phase==crate::Phase::Inactive,\n        id!=actor,g::run(lib,node,a.state,actor).is_some(),",
+        "new": "requires inv::well_formed(a.state),s::registered(a.state,id),\n        id!=actor,g::run(lib,node,a.state,actor).is_some(),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_orchestration",
+          "descendants": false,
+          "function": "cordis_negative::mixed_orchestration::remove_run"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_orchestration::remove_run",
+          "module": "mixed_orchestration",
+          "file": "mixed_orchestration.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(a.state.control.fibers[provider].phase!=crate::Phase::Inactive);}\n                assert(provider!=id);\n            },\n            _=>{},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_orchestration::remove_run detects mixed-remove-provider-read-bypass. The mutation remains the exact canonical change to mixed_orchestration.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "causal-suffix-history-bypass",
+      "mutation": {
+        "file": "causal_normalization.rs",
+        "old": "let moved=transport::transport(states.subrange(i+2,states.len() as int),labels.subrange(i+2,labels.len() as int),reverse);",
+        "new": "let moved=states.subrange(i+2,states.len() as int);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "causal_normalization",
+          "descendants": false,
+          "function": "cordis_negative::causal_normalization::adjacent_swap"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::causal_normalization::adjacent_swap",
+          "module": "causal_normalization",
+          "file": "causal_normalization.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(result.len()==states.len());assert(result.first()==states.first());\n    assert(result.last()==moved.last());assert(suffix.last()==states.last());\n    assert forall|j:int| 0<=j<=i implies result[j]==states[j] by { }\n    assert(result[i+1]==middle);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::causal_normalization::adjacent_swap detects causal-suffix-history-bypass. The mutation remains the exact canonical change to causal_normalization.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "administrative-self-retire-bypass",
+      "mutation": {
+        "file": "administrative_orchestration.rs",
+        "old": "&& !(rule==r::Rule::Begin && external==r::Rule::Retire && actor==id)",
+        "new": "&& true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "administrative_orchestration",
+          "descendants": false,
+          "function": "cordis_negative::administrative_orchestration::diamond"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::administrative_orchestration::diamond",
+          "module": "administrative_orchestration",
+          "file": "administrative_orchestration.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if actor!=id {o::retire_target(a,id,actor,b.state.control.fibers[actor].committed);}\n            else {assert(rule!=r::Rule::Begin);assert(!s::coherent(middle.state,actor));}\n        },\n        r::Rule::Remove=>{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::administrative_orchestration::diamond detects administrative-self-retire-bypass. The mutation remains the exact canonical change to administrative_orchestration.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "strict-journal-forgets-foreign-inverse",
+      "mutation": {
+        "file": "strict_journal.rs",
+        "old": "crosses(eq,journal(prefix),e.forward) && crosses(eq,journal(prefix),e.inverse)",
+        "new": "crosses(eq,journal(prefix),e.forward)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "strict_journal",
+          "descendants": false,
+          "function": "cordis_negative::strict_journal::recovery"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::strict_journal::recovery",
+          "module": "strict_journal",
+          "file": "strict_journal.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "} else {\n            word_commutes(eq,word,e.forward);word_commutes(eq,word,e.inverse);\n            domains::enabled_diamond(eq,e.forward,restore,e.inverse,before);\n            let recovered=restore(before).unwrap();let replay=foreign(prefix,initial).unwrap();"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::strict_journal::recovery detects strict-journal-forgets-foreign-inverse. The mutation remains the exact canonical change to strict_journal.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "unload-captured-child-bypass",
+      "mutation": {
+        "file": "unload_orchestration.rs",
+        "old": "external==r::Rule::Remove && id!=actor && no_child(a.history,a.state.accumulators[actor],id)",
+        "new": "external==r::Rule::Remove && id!=actor"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "unload_orchestration",
+          "descendants": false,
+          "function": "cordis_negative::unload_orchestration::diamond"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::unload_orchestration::diamond",
+          "module": "unload_orchestration",
+          "file": "unload_orchestration.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "}\n    restore_cross(lib,programs,a.history,a.state.accumulators[actor],a.state,actor,id,external,f.parent,f.dependencies,f.provisions);\n    if external==r::Rule::Remove {\n        assert(recovered.control.fibers[id]==a.state.control.fibers[id]);assert(recovered.tables[id]==a.state.tables[id]);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::unload_orchestration::diamond detects unload-captured-child-bypass. The mutation remains the exact canonical change to unload_orchestration.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "isolated-history-counts-deleted-entry",
+      "mutation": {
+        "file": "isolated_deletion.rs",
+        "old": "g::owner(history[token as int-1].landed.receipt)==removed {0nat} else {1nat}",
+        "new": "g::owner(history[token as int-1].landed.receipt)==removed {1nat} else {1nat}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "isolated_deletion",
+          "descendants": false,
+          "function": "cordis_negative::isolated_deletion::histories_skip"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::isolated_deletion::histories_skip",
+          "module": "isolated_deletion",
+          "file": "isolated_deletion.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires histories(source,target,removed),g::owner(entry.landed.receipt)==removed,\n    ensures histories(source.push(entry),target,removed),\n        forall|t:nat| t<=source.len() ==> index(source.push(entry),removed,t)==index(source,removed,t),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::isolated_deletion::histories_skip detects isolated-history-counts-deleted-entry. The mutation remains the exact canonical change to isolated_deletion.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "rewrite-receipt-correspondence-bypass",
+      "mutation": {
+        "file": "rewrite_confluence.rs",
+        "old": "a.len()==z.len() && forall|i:int| 0<=i<a.len() ==> tr::related(a[i],z[i])",
+        "new": "a.len()==z.len() && forall|i:int| 0<=i<a.len() ==> a[i].state==z[i].state && a[i].roots==z[i].roots && a[i].current==z[i].current"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "rewrite_confluence",
+          "descendants": false,
+          "function": "cordis_negative::rewrite_confluence::symmetric"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::rewrite_confluence::symmetric",
+          "module": "rewrite_confluence",
+          "file": "rewrite_confluence.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "assert forall|i:int| 0<=i<z.len() implies tr::related(z[i],a[i]) by {tr::symmetric(a[i],z[i]);}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::rewrite_confluence::symmetric detects rewrite-receipt-correspondence-bypass. The mutation remains the exact canonical change to rewrite_confluence.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "iteration-forward-only-bypass",
+      "mutation": {
+        "file": "mixed_iteration_exchange.rs",
+        "old": "|| pi::value_independent(|u:U,v:U|eq((lib.key)(a),u,v),(lib.apply)(a,x),(lib.apply)(b,y))",
+        "new": "|| pi::commutes(|u:U,v:U|eq((lib.key)(a),u,v),pi::value_forward((lib.apply)(a,x)),pi::value_forward((lib.apply)(b,y)))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_iteration_exchange",
+          "descendants": false,
+          "function": "cordis_negative::mixed_iteration_exchange::local_independence"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_iteration_exchange::local_independence",
+          "module": "mixed_iteration_exchange",
+          "file": "mixed_iteration_exchange.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if (lib.key)(a)==(lib.key)(b) {\n                    pi::shared_operations(eq,(lib.key)(a),(lib.apply)(a,x),(lib.apply)(b,y),|out:B|dep::marker(an(out)),|out:B|dep::marker(bn(out)));\n                } else {pi::distinct_nodes(eq,dep::stage(lib,left),dep::stage(lib,right));}\n            },_=>{},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_iteration_exchange::local_independence detects iteration-forward-only-bypass. The mutation remains the exact canonical change to mixed_iteration_exchange.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "entangled-loading-drops-pinning",
+      "mutation": {
+        "file": "entangled_loading.rs",
+        "old": "forall|owner:usize| gr::installed(state,owner) ==> gr::pinned(state,owner)",
+        "new": "true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "entangled_loading",
+          "descendants": false,
+          "function": "cordis_negative::entangled_loading::pin_step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::entangled_loading::pin_step",
+          "module": "entangled_loading",
+          "file": "entangled_loading.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if gr::installed(a.state,owner) {\n            assert(gr::pinned(a.state,owner));\n            execution::episode_step(eq,lib,programs,a,z,actor,rule,owner);\n        } else {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::entangled_loading::pin_step detects entangled-loading-drops-pinning. The mutation remains the exact canonical change to entangled_loading.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "shared-history-reuses-source-landing",
+      "mutation": {
+        "file": "shared_execution.rs",
+        "old": "g::land(lib,programs,target,actor,next.state.control.fibers[actor].phase)",
+        "new": "g::land(lib,programs,source,actor,next.state.control.fibers[actor].phase)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "shared_execution",
+          "descendants": false,
+          "function": "cordis_negative::shared_execution::foreign_landing"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::shared_execution::foreign_landing",
+          "module": "shared_execution",
+          "file": "shared_execution.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let out=advance(lib,programs,a,z,target,actor,rule,owner);\n    assert(g::step(lib,programs,target,out,actor,rule));\n    ol::configuration_preservation(eq,lib,programs,target,out,actor,rule);\n    source_domains(eq,lib,programs,a,z,actor,rule);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::shared_execution::foreign_landing detects shared-history-reuses-source-landing. The mutation remains the exact canonical change to shared_execution.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "shared-outcome-stability-bypass",
+      "mutation": {
+        "file": "shared_replay.rs",
+        "old": "==> pi::value_independent(|u:U,v:U|eq((lib.key)(a),u,v),(lib.apply)(a,x),(lib.apply)(b,y))",
+        "new": "==> (forall|f:m::PartialMap<U>,g:m::PartialMap<U>| #![trigger pi::value_generators((lib.apply)(a,x)).contains(f),pi::value_generators((lib.apply)(b,y)).contains(g)] pi::value_generators((lib.apply)(a,x)).contains(f) && pi::value_generators((lib.apply)(b,y)).contains(g) ==> pi::commutes(|u:U,v:U|eq((lib.key)(a),u,v),f,g))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "shared_replay",
+          "descendants": false,
+          "function": "cordis_negative::shared_replay::stages_independent"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::shared_replay::stages_independent",
+          "module": "shared_replay",
+          "file": "shared_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if (lib.key)(a)==(lib.key)(b) {\n                    assert(pi::value_independent(|u:U,v:U|eq((lib.key)(a),u,v),(lib.apply)(a,x),(lib.apply)(b,y)));\n                    pi::shared_operations(eq,(lib.key)(a),(lib.apply)(a,x),(lib.apply)(b,y),|out:B|dep::marker(an(out)),|out:B|dep::marker(bn(out)));\n                } else {pi::distinct_nodes(eq,dep::stage(lib,left),dep::stage(lib,right));}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::shared_replay::stages_independent detects shared-outcome-stability-bypass. The mutation remains the exact canonical change to shared_replay.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-driver-xor-skips-payload",
+      "mutation": {
+        "file": "mixed_driver.rs",
+        "old": "self.write_slot(provider,index,Some(value^mask));\n                Inverse::Xor {provider,key,mask}",
+        "new": "self.write_slot(provider,index,Some(value));\n                Inverse::Xor {provider,key,mask}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_driver",
+          "descendants": false,
+          "function": "cordis_negative::mixed_driver::MixedDriver::execute"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_driver::MixedDriver::execute",
+          "module": "mixed_driver",
+          "file": "mixed_driver.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],\n            out.is_ok() ==> {\n                let y=mx::run(library(),instruction_node(old(self).blueprints@,_blueprint,instruction),old(self).primitive_state(),actor);\n                &&& y.is_some() && final(self).physical(y.unwrap().state) && out.unwrap().model()==y.unwrap().receipt"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_driver::MixedDriver::execute detects mixed-driver-xor-skips-payload. The mutation remains the exact canonical change to mixed_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-runs-domain-bypass",
+      "mutation": {
+        "file": "mixed_observational_runs.rs",
+        "old": "    &&& a.control==b.control\n    &&& forall|id:usize| s::registered(a,id) ==> {\n        &&& a.tables[id].dom()==b.tables[id].dom()\n        &&& forall|key:Port| a.tables[id].dom().contains(key) ==> eq(key,a.tables[id][key],b.tables[id][key])\n    }",
+        "new": "    &&& a.control==b.control\n    &&& forall|id:usize| s::registered(a,id) ==> {\n        &&& forall|key:Port| a.tables[id].dom().contains(key) ==> eq(key,a.tables[id][key],b.tables[id][key])\n    }"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_observational_runs",
+          "descendants": false,
+          "function": "cordis_negative::mixed_observational_runs::run_transport"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_observational_runs::run_transport",
+          "module": "mixed_observational_runs",
+          "file": "mixed_observational_runs.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "syntax::permitted(lib,dep::declarations(a,actor),a.control.fibers[actor].provisions,node),g::run(lib,node,a,actor).is_some(),\n    ensures {\n        let left=g::run(lib,node,a,actor).unwrap();let right=g::run(lib,node,b,actor).unwrap();\n        &&& g::run(lib,node,b,actor).is_some()"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_observational_runs::run_transport detects observational-runs-domain-bypass. The mutation remains the exact canonical change to mixed_observational_runs.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-receipts-projection-bypass",
+      "mutation": {
+        "file": "mixed_observational_runs.rs",
+        "old": "requires exchange::mixed_names(left,right),m::partial_related(pi::context_eq(eq),exchange::inverse(left),exchange::inverse(right)),",
+        "new": "requires exchange::mixed_names(left,right),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_observational_runs",
+          "descendants": false,
+          "function": "cordis_negative::mixed_observational_runs::projected_receipts"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_observational_runs::projected_receipts",
+          "module": "mixed_observational_runs",
+          "file": "mixed_observational_runs.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if let lift::Inverse::Operation {key,undo:f,..}=a.inverse {\n                if let lift::Inverse::Operation {undo:h,..}=b.inverse {inverse_from_projection(eq,key,f,h);}\n            }\n        }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_observational_runs::projected_receipts detects observational-receipts-projection-bypass. The mutation remains the exact canonical change to mixed_observational_runs.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-token-renaming-bypass",
+      "mutation": {
+        "file": "mixed_observational_transport.rs",
+        "old": "Seq::new(source.len(),|i:int|token(h,source[i]))",
+        "new": "source"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_observational_transport",
+          "descendants": false,
+          "function": "cordis_negative::mixed_observational_transport::tokens_laws"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_observational_transport::tokens_laws",
+          "module": "mixed_observational_transport",
+          "file": "mixed_observational_transport.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures tokens(h,source.push(fresh))==tokens(h,source).push(token(h,fresh)),\n        source.len()>0 ==> tokens(h,source).last()==token(h,source.last())\n            && tokens(h,source.drop_last())==tokens(h,source).drop_last(),\n        tokens(h,Seq::empty())==Seq::<nat>::empty(),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_observational_transport::tokens_laws detects observational-token-renaming-bypass. The mutation remains the exact canonical change to mixed_observational_transport.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "foreign-inverse-discards-reverse-witness",
+      "mutation": {
+        "file": "foreign_unload.rs",
+        "old": "inverse:prior[token as int].forward,own:false",
+        "new": "inverse:identity(),own:false"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "foreign_unload",
+          "descendants": false,
+          "function": "cordis_negative::foreign_unload::source_invariant"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::foreign_unload::source_invariant",
+          "module": "foreign_unload",
+          "file": "foreign_unload.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert((e.forward)(before).is_some());let after=(e.forward)(before).unwrap();\n        assert((e.inverse)(after).is_some());assert(eq((e.inverse)(after).unwrap(),before));\n        assert(p::respects(eq,e.forward));\n        assert forall|i:int| 0<=i<all.len() implies retracts(eq,#[trigger] all[i],after) by {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::foreign_unload::source_invariant detects foreign-inverse-discards-reverse-witness. The mutation remains the exact canonical change to foreign_unload.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "external-input-forgets-parent-renaming",
+      "mutation": {
+        "file": "external_inputs.rs",
+        "old": "actor:(rho.forward)(actor),parent:names::parent(rho,parent),dependencies,provisions,root:(h.forward)(root)",
+        "new": "actor:(rho.forward)(actor),parent,dependencies,provisions,root:(h.forward)(root)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "external_inputs",
+          "descendants": false,
+          "function": "cordis_negative::external_inputs::extraction"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::external_inputs::extraction",
+          "module": "external_inputs",
+          "file": "external_inputs.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires names::bijective(rho),label.1==r::Rule::Insert ==> r::registered(after.state.control,label.0) && after.roots.dom().contains(label.0),\n    ensures causal::input(fresh::configuration(rho,h,after),((rho.forward)(label.0),label.1))\n        ==optional(rho,h,causal::input(after,label)),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::external_inputs::extraction detects external-input-forgets-parent-renaming. The mutation remains the exact canonical change to external_inputs.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "fresh-history-name-support",
+      "mutation": {
+        "file": "fresh_grammar.rs",
+        "old": ".union(ISet::new(|name:usize|exists|i:int|0<=i<a.history.len() && entry_names(action,a.history[i]).contains(name)))",
+        "new": ".union(ISet::empty())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "fresh_grammar",
+          "descendants": false,
+          "function": "cordis_negative::fresh_grammar::configuration_agrees"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::fresh_grammar::configuration_agrees",
+          "module": "fresh_grammar",
+          "file": "fresh_grammar.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert forall|name:usize| #[trigger] entry_names(action,a.history[i]).contains(name) implies (rho.forward)(name)==(other.forward)(name) by {\n                    assert(configuration_names(action,a).contains(name));\n                }\n            }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::fresh_grammar::configuration_agrees detects fresh-history-name-support. The mutation remains the exact canonical change to fresh_grammar.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "fresh-landing-discards-allocation-choice",
+      "mutation": {
+        "file": "fresh_semantics.rs",
+        "old": "landed:run(lib,programs(actor)(iterator),a.state,actor,choice).unwrap()",
+        "new": "landed:run(lib,programs(actor)(iterator),a.state,actor,None).unwrap()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "fresh_semantics",
+          "descendants": false,
+          "function": "cordis_negative::fresh_semantics::step_refines"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::fresh_semantics::step_refines",
+          "module": "fresh_semantics",
+          "file": "fresh_semantics.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let model=local_model(lib,programs,a,choice);\n    assert(s::step(model,a.state,z.state,actor,rule));\n    assert(inv::admissible_step(model,a.state,z.state,actor,rule));\n    inv::full_preservation(model,a.state,z.state,actor,rule);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::fresh_semantics::step_refines detects fresh-landing-discards-allocation-choice. The mutation remains the exact canonical change to fresh_semantics.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "allocation-child-provision-collision",
+      "mutation": {
+        "file": "allocation_inputs.rs",
+        "old": "pub open spec fn key_b()->Port {Port {key:1,realm:0}}",
+        "new": "pub open spec fn key_b()->Port {Port {key:0,realm:0}}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "allocation_inputs",
+          "descendants": false,
+          "function": "cordis_negative::allocation_inputs::actual_execution"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::allocation_inputs::actual_execution",
+          "module": "allocation_inputs",
+          "file": "allocation_inputs.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(g::step(lib,code,t[4],t[5],second,r::Rule::Begin,None));g::configuration_preservation(eq,lib,code,t[4],t[5],second,r::Rule::Begin,None);\n    assert(g::step(lib,code,t[5],t[6],second,r::Rule::Finish,Some(3)));g::configuration_preservation(eq,lib,code,t[5],t[6],second,r::Rule::Finish,Some(3));\n    assert(g::step(lib,code,t[6],t[7],2,r::Rule::Retire,None));g::configuration_preservation(eq,lib,code,t[6],t[7],2,r::Rule::Retire,None);\n    assert(g::step(lib,code,t[7],t[8],3,r::Rule::Begin,None));g::configuration_preservation(eq,lib,code,t[7],t[8],3,r::Rule::Begin,None);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::allocation_inputs::actual_execution detects allocation-child-provision-collision. The mutation remains the exact canonical change to allocation_inputs.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "fresh-driver-child-blueprint",
+      "mutation": {
+        "file": "fresh_driver.rs",
+        "old": "super::Instruction::Child {blueprint,next,..}=>super::Instruction::Child {expected:draft.rows.len(),blueprint,next},",
+        "new": "super::Instruction::Child {blueprint:_,next,..}=>super::Instruction::Child {expected:draft.rows.len(),blueprint:0,next},"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "fresh_driver",
+          "descendants": false,
+          "function": "cordis_negative::fresh_driver::FreshDriver::step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::fresh_driver::FreshDriver::step",
+          "module": "fresh_driver",
+          "file": "fresh_driver.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "proof {\n            draft.fresh_landing_simulation(&initial,&landed,actor,blueprint,pc,template,instruction,receipt,next,outcome);\n            reveal(MixedDriver::fresh_ack);\n        }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::fresh_driver::FreshDriver::step detects fresh-driver-child-blueprint. The mutation remains the exact canonical change to fresh_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "shared-unload-keeps-uncompressed-token",
+      "mutation": {
+        "file": "shared_unload_execution.rs",
+        "old": "tokens.map(|_i:int,t:nat|index(history,offset,owner,t))",
+        "new": "tokens.map(|_i:int,t:nat|t)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "shared_unload_execution",
+          "descendants": false,
+          "function": "cordis_negative::shared_unload_execution::rename_laws"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::shared_unload_execution::rename_laws",
+          "module": "shared_unload_execution",
+          "file": "shared_unload_execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "rename(history,offset,owner,Seq::empty())==Seq::<nat>::empty(),\n        tokens.len()>0 ==> rename(history,offset,owner,tokens).last()==index(history,offset,owner,tokens.last())\n            && rename(history,offset,owner,tokens).drop_last()==rename(history,offset,owner,tokens.drop_last()),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::shared_unload_execution::rename_laws detects shared-unload-keeps-uncompressed-token. The mutation remains the exact canonical change to shared_unload_execution.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "fresh-equivariance-retains-literal-parent",
+      "mutation": {
+        "file": "fresh_equivariance.rs",
+        "old": "==crate::mixed_transposition::insert(f::configuration(rho,h,a),(rho.forward)(actor),names::parent(rho,parent),dependencies,provisions,(h.forward)(root))",
+        "new": "==crate::mixed_transposition::insert(f::configuration(rho,h,a),(rho.forward)(actor),parent,dependencies,provisions,(h.forward)(root))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "fresh_equivariance",
+          "descendants": false,
+          "function": "cordis_negative::fresh_equivariance::insert_payload_forward"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::fresh_equivariance::insert_payload_forward",
+          "module": "fresh_equivariance",
+          "file": "fresh_equivariance.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires names::bijective(rho),\n    ensures f::configuration(rho,h,crate::mixed_transposition::insert(a,actor,parent,dependencies,provisions,root))\n        ==crate::mixed_transposition::insert(f::configuration(rho,h,a),(rho.forward)(actor),parent,dependencies,provisions,(h.forward)(root)),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::fresh_equivariance::insert_payload_forward detects fresh-equivariance-retains-literal-parent. The mutation remains the exact canonical change to fresh_equivariance.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "guarded-child-domain-success-only",
+      "mutation": {
+        "file": "guarded_child_domains.rs",
+        "old": "            && p::project(left.state,keys)==p::project(right.state,keys)\n            ==> #[trigger] defined(left)==#[trigger] defined(right)",
+        "new": "            && p::project(left.state,keys)==p::project(right.state,keys)\n            && defined(left) && defined(right)\n            ==> #[trigger] defined(left)==#[trigger] defined(right)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "guarded_child_domains",
+          "descendants": false,
+          "function": "cordis_negative::guarded_child_domains::domain_respect_failure"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::guarded_child_domains::domain_respect_failure",
+          "module": "guarded_child_domains",
+          "file": "guarded_child_domains.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(eligible_input(left) && eligible_input(right));\n    if strict_domain_respect(keys) {assert(defined(left)==defined(right));}\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::guarded_child_domains::domain_respect_failure detects guarded-child-domain-success-only. The mutation remains the exact canonical change to guarded_child_domains.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "admitted-fresh-generation-guard",
+      "mutation": {
+        "file": "admitted_fresh_driver.rs",
+        "old": "if draft.kernel.episode_generation(actor)!=Some(self.generation) {return Err(AdmissionError::StaleAdmission);}",
+        "new": "let _unchecked_generation=draft.kernel.episode_generation(actor);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "admitted_fresh_driver",
+          "descendants": false,
+          "function": "cordis_negative::admitted_fresh_driver::Admission::land"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::admitted_fresh_driver::Admission::land",
+          "module": "admitted_fresh_driver",
+          "file": "admitted_fresh_driver.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> final(self).same(old(self)),\n            out.is_ok() ==> final(self).consumed() && !old(self).consumed() && old(self).bound(&old(self).machine())\n                && out.unwrap().actor==old(self).identity().0\n                && old(self).machine().ack(&final(self).machine(),out.unwrap().label().0,out.unwrap().label().1,out.unwrap().label().2)"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::admitted_fresh_driver::Admission::land detects admitted-fresh-generation-guard. The mutation remains the exact canonical change to admitted_fresh_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "admitted-script-event-provenance",
+      "mutation": {
+        "file": "admitted_script.rs",
+        "old": "events.push(ScriptEvent {action_index:i,effect});",
+        "new": "events.push(ScriptEvent {action_index:i+1,effect});"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "admitted_script",
+          "descendants": false,
+          "function": "cordis_negative::admitted_script::run_script"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::admitted_script::run_script",
+          "module": "admitted_script",
+          "file": "admitted_script.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert forall|k:int|0<=k<events.len() implies events[k].action_index!=j by {\n                            if k<previous.len() {assert(events[k]==previous[k]);}else{assert(events[k].action_index==i);}\n                        }\n                    }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::admitted_script::run_script detects admitted-script-event-provenance. The mutation remains the exact canonical change to admitted_script.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "selective-recovery-forgets-owner-foreign-crossing",
+      "mutation": {
+        "file": "selective_foreign_recovery.rs",
+        "old": "(!records[i].own || !call.own)",
+        "new": "(!records[i].own && !call.own)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "selective_foreign_recovery",
+          "descendants": false,
+          "function": "cordis_negative::selective_foreign_recovery::catalog_theory"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::selective_foreign_recovery::catalog_theory",
+          "module": "selective_foreign_recovery",
+          "file": "selective_foreign_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "}\n            assert forall|i:int,j:int| 0<=i<records.len() && 0<=j<records.len() && (!records[i].own || !records[j].own) implies fu::compatible(eq,#[trigger] records[i],#[trigger] records[j]) by {\n                if i<before.len() {assert(records[i]==before[i]);}\n                if j<before.len() {assert(records[j]==before[j]);}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::selective_foreign_recovery::catalog_theory detects selective-recovery-forgets-owner-foreign-crossing. The mutation remains the exact canonical change to selective_foreign_recovery.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "providing-owner-publication-guard-bypass",
+      "mutation": {
+        "file": "providing_owner_transport.rs",
+        "old": "        deletion::separated(source.state,owner),s::registered(source.state,actor),actor!=owner,",
+        "new": "        s::registered(source.state,actor),actor!=owner,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "providing_owner_transport",
+          "descendants": false,
+          "function": "cordis_negative::providing_owner_transport::publication"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::providing_owner_transport::publication",
+          "module": "providing_owner_transport",
+          "file": "providing_owner_transport.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(dep::declarations(source.state,actor).contains(key));\n            assert(!source.state.control.fibers[owner].provisions.contains(key));\n            assert(!source.state.tables[owner].dom().contains(key));\n        } else if s::registered(source.state,n) {assert(source.state.control.fibers[n]==target.state.control.fibers[n]);}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::providing_owner_transport::publication detects providing-owner-publication-guard-bypass. The mutation remains the exact canonical change to providing_owner_transport.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "strict-batch-redo-guard-bypass",
+      "mutation": {
+        "file": "strict_batch_recovery.rs",
+        "old": "        p::commutes(eq,foreign,redo),p::commutes(eq,foreign,undo),",
+        "new": "        p::commutes(eq,foreign,undo),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "strict_batch_recovery",
+          "descendants": false,
+          "function": "cordis_negative::strict_batch_recovery::foreign_cross"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::strict_batch_recovery::foreign_cross",
+          "module": "strict_batch_recovery",
+          "file": "strict_batch_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(eq(rebuilt,state));assert(foreign(rebuilt).is_some());\n    assert(p::optional_equal(eq,p::compose(foreign,redo)(erased),p::compose(redo,foreign)(erased)));\n    assert(foreign(erased).is_some());assert(redo(foreign(erased).unwrap()).is_some());\n    assert(eq(foreign(rebuilt).unwrap(),redo(foreign(erased).unwrap()).unwrap()));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::strict_batch_recovery::foreign_cross detects strict-batch-redo-guard-bypass. The mutation remains the exact canonical change to strict_batch_recovery.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "strict-batch-old-record-retraction",
+      "mutation": {
+        "file": "strict_batch_recovery.rs",
+        "old": "        !fu::retracts(tables_equal(),fu::Pair {forward:old_events()[0].forward,inverse:old_events()[0].inverse,own:false},cut()),\n        m::run",
+        "new": "        fu::retracts(tables_equal(),fu::Pair {forward:old_events()[0].forward,inverse:old_events()[0].inverse,own:false},cut()),\n        m::run"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "strict_batch_recovery",
+          "descendants": false,
+          "function": "cordis_negative::strict_batch_recovery::old_journal_is_not_individual_retractions"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::strict_batch_recovery::old_journal_is_not_individual_retractions",
+          "module": "strict_batch_recovery",
+          "file": "strict_batch_recovery.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "redo(old_events())(IMap::empty())==Some(cut()),\n        fu::retracts(tables_equal(),fu::Pair {forward:old_events()[0].forward,inverse:old_events()[0].inverse,own:false},cut()),\n        m::run(provision(0,9),IMap::empty()).is_some(),\n        m::run(operation(0,1),IMap::empty().insert(0,9)).is_some(),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::strict_batch_recovery::old_journal_is_not_individual_retractions detects strict-batch-old-record-retraction. The mutation remains the exact canonical change to strict_batch_recovery.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "orchestration-support-cycle-parent-blocks-removal",
+      "mutation": {
+        "file": "orchestration_support_cycle.rs",
+        "old": "t::insert(a2,2,Some(1),",
+        "new": "t::insert(a2,2,Some(0),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "orchestration_support_cycle",
+          "descendants": false,
+          "function": "cordis_negative::orchestration_support_cycle::actual_execution"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::orchestration_support_cycle::actual_execution",
+          "module": "orchestration_support_cycle",
+          "file": "orchestration_support_cycle.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(g::step(lib,programs(),states[3],states[4],0,r::Rule::Retire));\n    assert(g::step(lib,programs(),states[4],states[5],0,r::Rule::Remove));\n    t::insertion_step(lib,programs(),states[5],3,None,ex::provided(1),ex::provided(0),());\n    assert(g::execution(lib,programs(),states,steps)) by {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::orchestration_support_cycle::actual_execution detects orchestration-support-cycle-parent-blocks-removal. The mutation remains the exact canonical change to orchestration_support_cycle.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "old-receipt-current-domain-bypass",
+      "mutation": {
+        "file": "old_receipt_support.rs",
+        "old": "        g::run(lib,programs(actor)(old.iterator),old.input,actor)==Some(old.landed),g::undo(old.landed.receipt,current).is_some(),",
+        "new": "        g::run(lib,programs(actor)(old.iterator),old.input,actor)==Some(old.landed),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "old_receipt_support",
+          "descendants": false,
+          "function": "cordis_negative::old_receipt_support::old_permitted_now"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::old_receipt_support::old_permitted_now",
+          "module": "old_receipt_support",
+          "file": "old_receipt_support.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let key=(lib.key)(operation);\n            assert(lift::resolve(current,actor,key).is_some());\n            lift::resolution_sound(current,actor,key);\n            assert(dep::declarations(current,actor).contains(key));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::old_receipt_support::old_permitted_now detects old-receipt-current-domain-bypass. The mutation remains the exact canonical change to old_receipt_support.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "old-journal-provider-guard-bypass",
+      "mutation": {
+        "file": "old_journal_unload.rs",
+        "old": "        state.control.fibers[owner].phase!=Phase::Inactive,!r::relied(state.control,actor),",
+        "new": "        state.control.fibers[owner].phase!=Phase::Inactive,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "old_journal_unload",
+          "descendants": false,
+          "function": "cordis_negative::old_journal_unload::provider_guard_separates_installed_owner"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::old_journal_unload::provider_guard_separates_installed_owner",
+          "module": "old_journal_unload",
+          "file": "old_journal_unload.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert forall|key:Port| crate::dependent_lift::declarations(state,owner).contains(key)\n        implies !state.control.fibers[actor].provisions.contains(key) by {\n        if state.control.fibers[owner].provisions.contains(key) {\n            assert(owner!=actor);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::old_journal_unload::provider_guard_separates_installed_owner detects old-journal-provider-guard-bypass. The mutation remains the exact canonical change to old_journal_unload.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "old-journal-terminal-phase-bypass",
+      "mutation": {
+        "file": "old_journal_closure.rs",
+        "old": "        target_proof::controls(z,out,owner),source_proof::separated(z.state,owner),z.state.control.fibers[owner].phase==Phase::Unloading,",
+        "new": "        target_proof::controls(z,out,owner),source_proof::separated(z.state,owner),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "old_journal_closure",
+          "descendants": false,
+          "function": "cordis_negative::old_journal_closure::close_from_strict_word"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::old_journal_closure::close_from_strict_word",
+          "module": "old_journal_closure",
+          "file": "old_journal_closure.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "separated_no_users(z.state,owner);let terminal=g::unload(z,owner);\n    assert(g::step(lib,programs,z,terminal,owner,r::Rule::Unload));ol::configuration_preservation(eq,lib,programs,z,terminal,owner,r::Rule::Unload);\n    let restored=g::restore(z.history,z.state.accumulators[owner],z.state,owner).unwrap();p::unique_owner(restored);\n    p::lifecycle_edit(restored,owner,Phase::Inactive,ISet::empty(),None,Seq::empty(),ISet::full());"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::old_journal_closure::close_from_strict_word detects old-journal-terminal-phase-bypass. The mutation remains the exact canonical change to old_journal_closure.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "observational-permutation-forgets-commutation",
+      "mutation": {
+        "file": "observational_permutation.rs",
+        "old": "witnessed(eq,effects),commuting(eq,p::returned(effects,x)),p::permutation(order,effects.len()),",
+        "new": "witnessed(eq,effects),p::permutation(order,effects.len()),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "observational_permutation",
+          "descendants": false,
+          "function": "cordis_negative::observational_permutation::actual_inverse_recovery"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::observational_permutation::actual_inverse_recovery",
+          "module": "observational_permutation",
+          "file": "observational_permutation.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "let inverses=p::returned(effects,x);p::returned_length(effects,x);returned_respects(eq,effects,x);dynamic_recovery(eq,effects,x);\n    p::reverse_permutation(inverses);permutation_execution(eq,inverses,order,p::reverse_indices(inverses.len()),p::apply(effects,x));\n    h::inverse_history(inverses,p::apply(effects,x));\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::observational_permutation::actual_inverse_recovery detects observational-permutation-forgets-commutation. The mutation remains the exact canonical change to observational_permutation.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "component-totality-drops-provision-obligation",
+      "mutation": {
+        "file": "paper_invariants.rs",
+        "old": "==> provisions.subset_of(owned(it::run(family,Some(root),fuel,f::unit(input)).current.value).dom())",
+        "new": "==> true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "paper_invariants",
+          "descendants": false,
+          "function": "cordis_negative::paper_invariants::completed_provision_domain"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::paper_invariants::completed_provision_domain",
+          "module": "paper_invariants",
+          "file": "paper_invariants.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "{\n    assert(owned(it::run(family,Some(root),fuel,f::unit(input)).current.value).dom() =~= provisions);\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::paper_invariants::completed_provision_domain detects component-totality-drops-provision-obligation. The mutation remains the exact canonical change to paper_invariants.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "functional-quotient-begin-own-root",
+      "mutation": {
+        "file": "functional_quotient.rs",
+        "old": "r::Rule::Begin=>s::edit(b,n,Phase::Loading,z.control.fibers[n].committed,Some(b.effects[n]),Seq::empty()),",
+        "new": "r::Rule::Begin=>s::edit(b,n,Phase::Loading,z.control.fibers[n].committed,Some(a.effects[n]),Seq::empty()),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "functional_quotient",
+          "descendants": false,
+          "function": "cordis_negative::functional_quotient::step_simulates"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::functional_quotient::step_simulates",
+          "module": "functional_quotient",
+          "file": "functional_quotient.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "s::step(model,a,z,n,rule),rule==r::Rule::Insert ==> iterator_related(eq,model,n,z.effects[n],new_effect),\n    ensures s::step(model,b,successor(model,a,z,b,n,rule,new_effect),n,rule),\n        related(eq,model,z,successor(model,a,z,b,n,rule,new_effect)),\n        p::well_formed(successor(model,a,z,b,n,rule,new_effect)),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::functional_quotient::step_simulates detects functional-quotient-begin-own-root. The mutation remains the exact canonical change to functional_quotient.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "old-journal-own-as-foreign",
+      "mutation": {
+        "file": "old_journal_interleaving.rs",
+        "old": "        0<=j<fu::catalog(actions.drop_last()).len(),fu::catalog(actions.drop_last())[j].own,\n        !fu::event(fu::catalog(actions.drop_last()),actions.last()).own,",
+        "new": "        0<=j<fu::catalog(actions.drop_last()).len(),fu::catalog(actions.drop_last())[j].own,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "old_journal_interleaving",
+          "descendants": false,
+          "function": "cordis_negative::old_journal_interleaving::foreign_crosses_record"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::old_journal_interleaving::foreign_crosses_record",
+          "module": "old_journal_interleaving",
+          "file": "old_journal_interleaving.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "match actions.last() {\n        fu::Action::Forward {call}=>{assert(!call.own);assert(fu::compatible(eq,record,call));},\n        fu::Action::Inverse {token}=>{assert(!records[token as int].own);assert(fu::compatible(eq,record,records[token as int]));},\n        fu::Action::Identity=>{fu::identity_contract(eq,record.forward);fu::identity_contract(eq,record.inverse);},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::old_journal_interleaving::foreign_crosses_record detects old-journal-own-as-foreign. The mutation remains the exact canonical change to old_journal_interleaving.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "mixed-age-token-identity",
+      "mutation": {
+        "file": "mixed_age_unload.rs",
+        "old": "        let token=tokens.last();let mapped=history::index(left,offset,owner,token);",
+        "new": "        let token=tokens.last();let mapped=token;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_age_unload",
+          "descendants": false,
+          "function": "cordis_negative::mixed_age_unload::restore_mixed"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_age_unload::restore_mixed",
+          "module": "mixed_age_unload",
+          "file": "mixed_age_unload.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "} else {assert(g::owner(left[token as int].landed.receipt)!=owner);}\n        assert(mapped<right.len());assert(obs::receipt_related(eq,receipt,replacement));\n        receipt_crosses_batch(eq,lib,programs,left,actions,offset,owner,actor,token,source);\n        fu::table_inverse_projects(receipt,source);let sa=g::undo(receipt,source).unwrap();"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::mixed_age_unload::restore_mixed detects mixed-age-token-identity. The mutation remains the exact canonical change to mixed_age_unload.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "old-provision-without-installed-owner",
+      "mutation": {
+        "file": "old_provision_support.rs",
+        "old": "current.control.fibers[owner].phase!=Phase::Inactive,!r::relied(current.control,actor),\n        g::undo(receipt::<U>(actor,key),current).is_some(),",
+        "new": "!r::relied(current.control,actor),\n        g::undo(receipt::<U>(actor,key),current).is_some(),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "old_provision_support",
+          "descendants": false,
+          "function": "cordis_negative::old_provision_support::installed_stage_cross"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::old_provision_support::installed_stage_cross",
+          "module": "old_provision_support",
+          "file": "old_provision_support.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "replay::context_equivalence(eq,lib);cut_contract(eq,actor,key);\n    old::provider_guard_separates_installed_owner(current,owner,actor);\n    own::stage_respects(eq,lib,node,dep::declarations(current,owner),current.control.fibers[owner].provisions);\n    pi::generator_respects(eq,dep::stage(lib,node),f);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::old_provision_support::installed_stage_cross detects old-provision-without-installed-owner. The mutation remains the exact canonical change to old_provision_support.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "configuration-enabled-polarity",
+      "mutation": {
+        "file": "configuration_entry.rs",
+        "old": "        !self.disabled\n",
+        "new": "        self.disabled\n"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_entry",
+          "descendants": false,
+          "function": "cordis_negative::configuration_entry::Entry::enabled"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_entry::Entry::enabled",
+          "module": "configuration_entry",
+          "file": "configuration_entry.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn enabled(&self)->(enabled:bool)\n        ensures enabled==!self.disabled,\n    {\n        self.disabled"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::configuration_entry::Entry::enabled detects configuration-enabled-polarity. The mutation remains the exact canonical change to configuration_entry.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "resolution-completion-missing-retirement",
+      "mutation": {
+        "file": "resolution_completion_counterexample.rs",
+        "old": "    let a3=orchestration::retire(a2,0);",
+        "new": "    let a3=a2;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "resolution_completion_counterexample",
+          "descendants": false,
+          "function": "cordis_negative::resolution_completion_counterexample::actual_execution"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::resolution_completion_counterexample::actual_execution",
+          "module": "resolution_completion_counterexample",
+          "file": "resolution_completion_counterexample.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "ch::concrete_child_retirement(xs[2].state,0);\n    assert(g::step(lib,programs,xs[2],xs[3],0,r::Rule::Retire));\n    assert(g::step(lib,programs,xs[3],xs[4],0,r::Rule::Divert));\n    assert(g::execution(lib,programs,xs,es)) by {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::resolution_completion_counterexample::actual_execution detects resolution-completion-missing-retirement. The mutation remains the exact canonical change to resolution_completion_counterexample.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "old-provision-journal-finishes-before-cut",
+      "mutation": {
+        "file": "old_provision_journal_example.rs",
+        "old": "select:|_:()|if actor==2 && stage==1 {Some(2nat)}else{None}",
+        "new": "select:|_:()|None"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "old_provision_journal_example",
+          "descendants": false,
+          "function": "cordis_negative::old_provision_journal_example::actual_setup"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::old_provision_journal_example::actual_setup",
+          "module": "old_provision_journal_example",
+          "file": "old_provision_journal_example.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(lift::resolve(states[7].state,2,ex::key(0))==Some(0usize));\n    assert(g::step(lib,programs(),states[7],states[8],2,r::Rule::Iter));\n    ol::configuration_preservation(ex::equality(),lib,programs(),states[7],states[8],2,r::Rule::Iter);\n    assert(states[8].state.accumulators[2usize] =~= seq![1nat,2nat]);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::old_provision_journal_example::actual_setup detects old-provision-journal-finishes-before-cut. The mutation remains the exact canonical change to old_provision_journal_example.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "internal-old-owner-capture",
+      "mutation": {
+        "file": "internal_old_unload.rs",
+        "old": "        prefix.push(if g::landing(a,z,label.1) {fu::Action::Forward {call:fu::entry_pair(lib,programs,g::entry(lib,programs,a,label.0),owner)}} else {fu::Action::Identity})",
+        "new": "        prefix.push(if g::landing(a,z,label.1) {fu::Action::Forward {call:fu::entry_pair(lib,programs,g::entry(lib,programs,a,label.0),label.0)}} else {fu::Action::Identity})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "internal_old_unload",
+          "descendants": false,
+          "function": "cordis_negative::internal_old_unload::source_metadata"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::internal_old_unload::source_metadata",
+          "module": "internal_old_unload",
+          "file": "internal_old_unload.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let entry=g::entry(lib,programs,a,label.0);let call=fu::entry_pair(lib,programs,entry,owner);\n            assert(actions==before.push(fu::Action::Forward {call}));\n            assert(fu::fresh_records(lib,programs,z.history,offset,owner) =~= records.push(call));\n        } else {assert(z.history==a.history);}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::internal_old_unload::source_metadata detects internal-old-owner-capture. The mutation remains the exact canonical change to internal_old_unload.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "derived-recovery-keeps-discarded-handle",
+      "mutation": {
+        "file": "effect_realization.rs",
+        "old": "Some((heap.remove(child),parent))",
+        "new": "Some((heap.remove(child),child))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effect_realization",
+          "descendants": false,
+          "function": "cordis_negative::effect_realization::derived_realizes"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::effect_realization::derived_realizes",
+          "module": "effect_realization",
+          "file": "effect_realization.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires heap.dom().contains(parent),!heap.dom().contains(child),effect(heap[parent]).is_some(),\n    ensures {\n        let result=derived(effect,heap,parent,child);let landed=result.unwrap();let y=effect(heap[parent]).unwrap();\n        &&& result.is_some() && landed.context==child && child!=parent"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::effect_realization::derived_realizes detects derived-recovery-keeps-discarded-handle. The mutation remains the exact canonical change to effect_realization.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "interface-outside-frame",
+      "mutation": {
+        "file": "interface_observation.rs",
+        "old": "requires o::related_maps(observed(eq,keys,project),f,g),map_frame(keys,project,f),map_frame(keys,project,g),",
+        "new": "requires o::related_maps(observed(eq,keys,project),f,g),map_frame(keys,project,f),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "interface_observation",
+          "descendants": false,
+          "function": "cordis_negative::interface_observation::maps"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::interface_observation::maps",
+          "module": "interface_observation",
+          "file": "interface_observation.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "assert forall|a:S,b:S| global(a,b) implies #[trigger] global(f(a),g(b)) by {\n        restrict(eq,keys,project,a,b);assert(local(f(a),g(b)));join(eq,keys,project,a,b,f(a),g(b));\n    }\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::interface_observation::maps detects interface-outside-frame. The mutation remains the exact canonical change to interface_observation.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "internal-table-inactive-phase",
+      "mutation": {
+        "file": "internal_table_unload.rs",
+        "old": "s::registered(a.state,owner),a.state.control.fibers[owner].phase==Phase::Inactive,",
+        "new": "s::registered(a.state,owner),true,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "internal_table_unload",
+          "descendants": false,
+          "function": "cordis_negative::internal_table_unload::inactive_words"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::internal_table_unload::inactive_words",
+          "module": "internal_table_unload",
+          "file": "internal_table_unload.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "{\n    let es=fu::events(actions);assert(a.state.accumulators[owner].len()==0);assert(sj::journal(es).len()==0);word_lengths(es);\n    assert(batch::redo(es) =~= fu::identity());assert(batch::undo(es) =~= fu::identity());\n}"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::internal_table_unload::inactive_words detects internal-table-inactive-phase. The mutation remains the exact canonical change to internal_table_unload.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "generalized-table-rejects-new-provision",
+      "mutation": {
+        "file": "generalized_table_deletion.rs",
+        "old": "source_proof::table_node(node)\n    }",
+        "new": "source_proof::table_node(node) && (labels[i].0!=owner ==> replay::operational_mixed(node))\n    }"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "generalized_table_deletion_example",
+          "descendants": false,
+          "function": "cordis_negative::generalized_table_deletion_example::actual_fragment"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::generalized_table_deletion_example::actual_fragment",
+          "module": "generalized_table_deletion_example",
+          "file": "generalized_table_deletion_example.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub proof fn actual_fragment()\n    ensures full::fragment(base::programs(),source(),labels(),1),!previous::fragment(base::programs(),source(),labels(),1),\n{\n    actual_source();reveal(source);reveal(fp::example_prefix);reveal(base::setup);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::generalized_table_deletion_example::actual_fragment detects generalized-table-rejects-new-provision. The mutation remains the exact canonical change to generalized_table_deletion.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "foreign-provision-target-domain",
+      "mutation": {
+        "file": "foreign_provision_transport.rs",
+        "old": "requires s::registered(target,actor),source.control.fibers[actor]==target.control.fibers[actor],source.tables[actor].dom()==target.tables[actor].dom(),",
+        "new": "requires s::registered(target,actor),source.control.fibers[actor]==target.control.fibers[actor],"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "foreign_provision_transport",
+          "descendants": false,
+          "function": "cordis_negative::foreign_provision_transport::run_transport"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::foreign_provision_transport::run_transport",
+          "module": "foreign_provision_transport",
+          "file": "foreign_provision_transport.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "dep::run(lib,d::Node::Provision {key,value,next},source,actor).is_some(),\n    ensures {\n        let a=dep::run(lib,d::Node::Provision {key,value,next},source,actor).unwrap();let b=dep::run(lib,d::Node::Provision {key,value,next},target,actor);\n        &&& b.is_some() && a.next==b.unwrap().next && a.receipt==b.unwrap().receipt"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::foreign_provision_transport::run_transport detects foreign-provision-target-domain. The mutation remains the exact canonical change to foreign_provision_transport.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "dependent-independence-discards-yield-stability",
+      "mutation": {
+        "file": "dependent_independence.rs",
+        "old": "==> p::value_independent(|u:U,v:U|eq((l.key)(a),u,v),(l.apply)(a,x),(r.apply)(b,y))",
+        "new": "==> (forall|f:m::PartialMap<U>,g:m::PartialMap<U>| #![trigger p::value_generators((l.apply)(a,x)).contains(f),p::value_generators((r.apply)(b,y)).contains(g)] p::value_generators((l.apply)(a,x)).contains(f) && p::value_generators((r.apply)(b,y)).contains(g) ==> p::commutes(|u:U,v:U|eq((l.key)(a),u,v),f,g))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "dependent_independence",
+          "descendants": false,
+          "function": "cordis_negative::dependent_independence::local_independence"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::dependent_independence::local_independence",
+          "module": "dependent_independence",
+          "file": "dependent_independence.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert((l.key)(op)==(r.key)(other));\n                                assert(p::value_independent(|u:U,v:U|eq((l.key)(op),u,v),(l.apply)(op,x),(r.apply)(other,y)));\n                                p::shared_operations(eq,(l.key)(op),(l.apply)(op,x),(r.apply)(other,y),|_:B|None,|_:D|None);\n                            },_=>{},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::dependent_independence::local_independence detects dependent-independence-discards-yield-stability. The mutation remains the exact canonical change to dependent_independence.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "dynamic-insert-ignores-private-dependency",
+      "mutation": {
+        "file": "dynamic_table_registry.rs",
+        "old": "actor!=owner && (rule==r::Rule::Insert ==> z.state.control.fibers[actor].dependencies.disjoint(a.state.control.fibers[owner].provisions))",
+        "new": "actor!=owner"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "dynamic_table_registry_example",
+          "descendants": false,
+          "function": "cordis_negative::dynamic_table_registry_example::private_dependency_boundary"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::dynamic_table_registry_example::private_dependency_boundary",
+          "module": "dynamic_table_registry_example",
+          "file": "dynamic_table_registry_example.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(z.state.control.fibers[3usize].dependencies.contains(ex::key(1)));assert(a.state.control.fibers[1usize].provisions.contains(ex::key(1)));\n    assert(!dynamic::guard(a,z,3,r::Rule::Insert,1));\n    assert(s::registered(z.state,3));assert(crate::dependent_lift::declarations(z.state,3).contains(ex::key(1)));\n    assert(z.state.control.fibers[1usize].provisions.contains(ex::key(1)));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::dynamic_table_registry_example::private_dependency_boundary detects dynamic-insert-ignores-private-dependency. The mutation remains the exact canonical change to dynamic_table_registry.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "strict-partial-quotient-ignores-inverse-word",
+      "mutation": {
+        "file": "strict_partial_quotient.rs",
+        "old": "|input:s::State<U>|g::restore(a.history,a.state.accumulators[actor],input,actor)",
+        "new": "|input:s::State<U>|g::restore(a.history,Seq::empty(),input,actor)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "strict_partial_quotient",
+          "descendants": false,
+          "function": "cordis_negative::strict_partial_quotient::unloading_related"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::strict_partial_quotient::unloading_related",
+          "module": "strict_partial_quotient",
+          "file": "strict_partial_quotient.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "let x=g::restore(a.history,a.state.accumulators[actor],a.state,actor).unwrap();let y=g::restore(b.history,b.state.accumulators[actor],b.state,actor).unwrap();\n    restore_frame(a.history,a.state.accumulators[actor],a.state,actor);restore_frame(b.history,b.state.accumulators[actor],b.state,actor);\n    let u=g::Configuration {state:x,..a};let v=g::Configuration {state:y,..b};\n    framed_related(eq,lib,programs,a,b,u,v);empty_accumulators(eq,actor,a.history,b.history);"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::strict_partial_quotient::unloading_related detects strict-partial-quotient-ignores-inverse-word. The mutation remains the exact canonical change to strict_partial_quotient.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "strict-partial-quotient-per-forgets-symmetry",
+      "mutation": {
+        "file": "strict_partial_quotient_per.rs",
+        "old": "&&& forall|x:S,y:S| #[trigger] eq(x,y) ==> eq(y,x)",
+        "new": "&&& true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "strict_partial_quotient_per",
+          "descendants": false,
+          "function": "cordis_negative::strict_partial_quotient_per::map_per"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::strict_partial_quotient_per::map_per",
+          "module": "strict_partial_quotient_per",
+          "file": "strict_partial_quotient_per.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if o::related_maps(eq,f,g) {\n        assert forall|a:S,b:S|eq(a,b) implies #[trigger] eq(g(a),f(b)) by {\n            assert(eq(b,a));assert(eq(f(b),g(a)));\n        }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::strict_partial_quotient_per::map_per detects strict-partial-quotient-per-forgets-symmetry. The mutation remains the exact canonical change to strict_partial_quotient_per.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "strict-alias-ignores-static-primitive",
+      "mutation": {
+        "file": "strict_partial_quotient_reflexive.rs",
+        "old": "requires inv::well_formed(a),d::permitted(lib,ISet::full(),ISet::full(),node),dep::run(lib,node,a,actor).is_some(),",
+        "new": "requires inv::well_formed(a),dep::run(lib,node,a,actor).is_some(),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "strict_partial_quotient_reflexive",
+          "descendants": false,
+          "function": "cordis_negative::strict_partial_quotient_reflexive::actual_permission"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::strict_partial_quotient_reflexive::actual_permission",
+          "module": "strict_partial_quotient_reflexive",
+          "file": "strict_partial_quotient_reflexive.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires inv::well_formed(a),dep::run(lib,node,a,actor).is_some(),\n    ensures d::permitted(lib,dep::declarations(a,actor),a.control.fibers[actor].provisions,node),\n{\n    match node {"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::strict_partial_quotient_reflexive::actual_permission detects strict-alias-ignores-static-primitive. The mutation remains the exact canonical change to strict_partial_quotient_reflexive.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "paper-component-missing-leastness",
+      "mutation": {
+        "file": "paper_components.rs",
+        "old": "it::paper_witnessed(|a:G,b:G|observed(eq,coeffects,c.dependencies.union(c.provisions),a,b),family,c.root)",
+        "new": "it::witnessed(|a:G,b:G|observed(eq,coeffects,c.dependencies.union(c.provisions),a,b),family,c.root)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "paper_components",
+          "descendants": false,
+          "function": "cordis_negative::paper_components::component_stage_witness"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::paper_components::component_stage_witness",
+          "module": "paper_components",
+          "file": "paper_components.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "q::iterator_related(|a:G,b:G|observed(eq,coeffects,c.dependencies.union(c.provisions),a,b),family,c.root,c.root),\n        family(c.root,input).next.is_some() ==> it::paper_witnessed(\n            |a:G,b:G|observed(eq,coeffects,c.dependencies.union(c.provisions),a,b),family,family(c.root,input).next.unwrap()),\n{"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::paper_components::component_stage_witness detects paper-component-missing-leastness. The mutation remains the exact canonical change to paper_components.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "paper-observation-active-accumulator-erased",
+      "mutation": {
+        "file": "paper_observations.rs",
+        "old": "(Theta::Active {accumulator:g,committed:a},Theta::Active {accumulator:h,committed:b})=>a==b && o::related_maps(base,g,h),",
+        "new": "(Theta::Active {accumulator:g,committed:a},Theta::Active {accumulator:h,committed:b})=>a==b,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "paper_observations",
+          "descendants": false,
+          "function": "cordis_negative::paper_observations::accumulator_application"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::paper_observations::accumulator_application",
+          "module": "paper_observations",
+          "file": "paper_observations.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "(Theta::Unloading{accumulator:g,committed:_},Theta::Unloading{accumulator:h,committed:_})=>{\n            assert(o::related_maps(base,g,h));assert(base(g(x),h(y)));\n        },\n        _=>{},"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::paper_observations::accumulator_application detects paper-observation-active-accumulator-erased. The mutation remains the exact canonical change to paper_observations.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "paper-confinement-wrong-read-registry",
+      "mutation": {
+        "file": "paper_confinement.rs",
+        "old": "    &&& forall|m:N,k:K| p::registered(view,a,m) && d.contains(k)\n        ==> p::lookup(view,a,m,k)==p::lookup(view,b,m,k)",
+        "new": "    &&& forall|m:N,k:K| p::registered(view,b,m) && d.contains(k)\n        ==> p::lookup(view,a,m,k)==p::lookup(view,b,m,k)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "paper_confinement",
+          "descendants": false,
+          "function": "cordis_negative::paper_confinement::source_index_is_not_symmetric"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::paper_confinement::source_index_is_not_symmetric",
+          "module": "paper_confinement",
+          "file": "paper_confinement.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "p::lookup(read_view(),read_after(),1,7)==Some(42),\n        literal_reads(read_view(),read_before(),read_after(),0,read_keys()),\n        !literal_reads(read_view(),read_after(),read_before(),0,read_keys()),\n        !symmetric_reads(read_view(),read_before(),read_after(),0,read_keys()),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::paper_confinement::source_index_is_not_symmetric detects paper-confinement-wrong-read-registry. The mutation remains the exact canonical change to paper_confinement.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "foreign-child-owner-guard",
+      "mutation": {
+        "file": "foreign_child_transport.rs",
+        "old": "actor!=owner && match programs(actor)(a.current[actor].unwrap())",
+        "new": "match programs(actor)(a.current[actor].unwrap())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "foreign_child_transport",
+          "descendants": false,
+          "function": "cordis_negative::foreign_child_transport::source_landing"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::foreign_child_transport::source_landing",
+          "module": "foreign_child_transport",
+          "file": "foreign_child_transport.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures g::well_formed(lib,programs,z),own::separated(z.state,owner),\n        z.state.control.fibers[owner]==a.state.control.fibers[owner],z.state.tables[owner]==a.state.tables[owner],z.state.accumulators[owner]==a.state.accumulators[owner],\n        z.current[owner]==a.current[owner],z.roots[owner]==a.roots[owner],\n        p::project(z.state,ISet::full())==p::project(a.state,ISet::full()),"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::foreign_child_transport::source_landing detects foreign-child-owner-guard. The mutation remains the exact canonical change to foreign_child_transport.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "paper-instantiation-captured-parent",
+      "mutation": {
+        "file": "paper_instantiation.rs",
+        "old": "Some(state)=>Some(Landing {state,name:child,inverse:Receipt{child},next:body(child)}),",
+        "new": "Some(state)=>Some(Landing {state,name:child,inverse:Receipt{child:parent},next:body(child)}),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "paper_instantiation",
+          "descendants": false,
+          "function": "cordis_negative::paper_instantiation::typed_instantiation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::paper_instantiation::typed_instantiation",
+          "module": "paper_instantiation",
+          "file": "paper_instantiation.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures instantiate(eq,view,edit,installs,a,parent,child,component,body).is_some(),\n        {\n            let y=instantiate(eq,view,edit,installs,a,parent,child,component,body).unwrap();\n            &&& y.name==child && y.inverse.child==child && y.next==body(child)"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::paper_instantiation::typed_instantiation detects paper-instantiation-captured-parent. The mutation remains the exact canonical change to paper_instantiation.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "foreign-child-private-dependency-guard",
+      "mutation": {
+        "file": "foreign_child_deletion.rs",
+        "old": "source_proof::table_node(node) || child::guard(programs,source[i],labels[i].0,owner)",
+        "new": "source_proof::table_node(node) || (labels[i].0!=owner && child::child_node(node))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "foreign_child_deletion",
+          "descendants": false,
+          "function": "cordis_negative::foreign_child_deletion::source_metadata"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::foreign_child_deletion::source_metadata",
+          "module": "foreign_child_deletion",
+          "file": "foreign_child_deletion.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "} else if g::landing(a,z,label.1) && child::child_node(programs(label.0)(a.current[label.0].unwrap())) {\n            child::source_landing(eq,lib,programs,a,z,label.0,label.1,owner);\n        } else {source_proof::interface_frame(eq,lib,programs,a,z,label.0,label.1,owner);}\n        assert(r::interface_same(a.state.control.fibers[owner],z.state.control.fibers[owner]));"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::foreign_child_deletion::source_metadata detects foreign-child-private-dependency-guard. The mutation remains the exact canonical change to foreign_child_deletion.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "paper-trace-child-dependencies",
+      "mutation": {
+        "file": "paper_trace_independence.rs",
+        "old": "a.dependencies==b.dependencies && a.provisions==b.provisions && relation((left,a.root),(right,b.root))",
+        "new": "true && a.provisions==b.provisions && relation((left,a.root),(right,b.root))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "paper_trace_independence",
+          "descendants": false,
+          "function": "cordis_negative::paper_trace_independence::child_payload_contract"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::paper_trace_independence::child_payload_contract",
+          "module": "paper_trace_independence",
+          "file": "paper_trace_independence.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires yields_related(base,lang,a,b),a.payload==(Payload::Child {fresh:left,component:lc}),b.payload==(Payload::Child {fresh:right,component:rc}),\n    ensures lc.dependencies==rc.dependencies,lc.provisions==rc.provisions,\n        iterator_related(base,lang,(left,lc.root),(right,rc.root)),\n{ }"
+        }
+      ],
+      "selectionRationale": "The contract in cordis_negative::paper_trace_independence::child_payload_contract detects paper-trace-child-dependencies. The mutation remains the exact canonical change to paper_trace_independence.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+name: Feature or compatibility request
+description: Propose an API or an upstream behavior to support
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case and expected behavior
+      description: Include upstream source/tests or paper references when available.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Acceptance criteria
+      description: What observable behavior or proof obligation would establish success?
+    validations:
+      required: true

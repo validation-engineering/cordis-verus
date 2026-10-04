@@ -1,0 +1,13 @@
+[workspace]
+members = ["crates/cordis-kernel", "crates/cordis"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.98.1"
+repository = "https://github.com/Stool233/cordis-verus"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

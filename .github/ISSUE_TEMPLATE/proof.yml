@@ -1,0 +1,22 @@
+name: Verification or semantic gap
+description: A failing proof, missing contract, counterexample, or paper mismatch
+body:
+  - type: textarea
+    id: claim
+    attributes:
+      label: Contract or claim under review
+      description: Link the source function and paper definition/theorem, if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Counterexample or verifier output
+      description: Include the source revision, toolchain.lock.json version, and a minimal trace.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected correction
+      description: Distinguish an implementation bug from a missing hypothesis or an overstated claim.

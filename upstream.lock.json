@@ -1,0 +1,86 @@
+{
+  "schema": "cordis-verus.upstream-lock/v1",
+  "checkedAt": "2026-10-03T00:32:16.866329Z",
+  "repositories": {
+    "cordis": {
+      "url": "https://github.com/cordiverse/cordis.git",
+      "path": "upstream/cordis",
+      "branch": "main",
+      "revision": "f8ea3cd50f1a5724e8e715995bcde131c9c12b2c",
+      "tree": "f9e330f9e3d195aa47323b0857ef67c79d0bfac9",
+      "committedAt": "2026-09-08T23:39:20+08:00",
+      "subject": "chore: bump versions",
+      "sourceTrees": {
+        "packages/core/src": "e4f2c7bea1591a9a65dd98168fba9d2aeae271a1",
+        "packages/loader/src": "60809566cb524900ad5a01428189446aede674d1",
+        "packages/hmr/src": "7f03d59fba3d2a305224781ce3836e3701fdfb4f"
+      },
+      "license": "MIT",
+      "unmodifiedAtLock": true,
+      "licensePath": "upstream/cordis/LICENSE"
+    },
+    "deepseekHarness": {
+      "url": "https://github.com/deepseek-ai/deepseek-harness.git",
+      "path": "upstream/deepseek-harness",
+      "branch": "master",
+      "revision": "da00f7f5358f2949383b35c14f548bc20187d80c",
+      "tree": "3c6b47ceb23985cdeaa53d169f29362e1412479d",
+      "committedAt": "2026-10-03T07:44:05+08:00",
+      "subject": "Merge pull request #5623 from deepseek-harness/feat/experimental-claude-code-mods-20261002",
+      "sourceTrees": {
+        "vendor/cordis/src": "cce345a89dd9de4f5d2d98ae807a386e96814bde",
+        "vendor/cosmokit/src": "d89a6968001afe2a39c156c83c6c4e1344a06045",
+        "packages/core/agent-loop/src": "75e74c1077fb164672b5030110bb76e2ebbc627d",
+        "packages/core/scope/src": "063653c7f29651399a6673f8f26696eca269d9fc",
+        "packages/llm/llm/src": "5f8d8900b58f1a4895ec1f801139467c5ed66833"
+      },
+      "license": "MIT",
+      "unmodifiedAtLock": true,
+      "licensePath": "upstream/deepseek-harness/LICENSE"
+    },
+    "paper": {
+      "url": "https://github.com/cordiverse/paper.git",
+      "path": "upstream/paper",
+      "branch": "main",
+      "revision": "0d43a6f18004a7b5bf9662c31aa08c3712d232ec",
+      "tree": "24e9b9a392e8ea8249dec2993d54bd9a02ef3cee",
+      "committedAt": "2026-08-29T00:59:24+08:00",
+      "subject": "read the paper on arxiv",
+      "sourceTrees": {},
+      "license": "NOASSERTION",
+      "unmodifiedAtLock": true
+    }
+  },
+  "paper": {
+    "title": "A Programming Paradigm for Spatiotemporal Composability",
+    "authors": [
+      "Yifan Shi",
+      "Wei Zhang",
+      "Tianyi Cui"
+    ],
+    "version": "arXiv:2608.25512v1",
+    "submittedAt": "2026-08-26T08:22:19Z",
+    "url": "https://arxiv.org/abs/2608.25512v1",
+    "pdfUrl": "https://arxiv.org/pdf/2608.25512v1",
+    "pages": 92,
+    "path": "reference/arxiv-2608.25512v1.pdf",
+    "sha256": "390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0",
+    "textPath": "reference/arxiv-2608.25512v1.txt",
+    "textSha256": "b1f29dafd129114c1c4a5f90477a5771ba9215ef9d240142b819c3b291ce6d4a",
+    "textFormat": "Page-delimited PDF text extraction; mathematical layout must be checked against PDF.",
+    "license": "LicenseRef-arXiv-nonexclusive-distrib-1.0",
+    "licenseUrl": "https://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+    "redistributionPermission": "Not established for this project; local research reference, not covered by project MIT license.",
+    "retrievalProvenance": "Reused exact v1 PDF and page-delimited extraction from the pre-existing local formal-study reference cache; PDF SHA-256 independently recomputed and matches the previous study lock. Official arXiv version and license rechecked on 2026-10-03."
+  },
+  "verusRelease": {
+    "repository": "https://github.com/verus-lang/verus",
+    "version": "0.2026.09.27.3cf1832",
+    "revision": "3cf18325f0fd0c3040fbdec8c0f2255c0504c91a",
+    "tag": "release/0.2026.09.27.3cf1832",
+    "url": "https://github.com/verus-lang/verus/releases/tag/release/0.2026.09.27.3cf1832",
+    "publishedAt": "2026-09-28T03:59:13Z",
+    "toolchainLock": "toolchain.lock.json",
+    "provenance": "Official release metadata and bundled version.json; toolchain.lock.json pins per-platform asset digests."
+  }
+}
