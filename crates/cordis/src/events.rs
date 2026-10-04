@@ -691,7 +691,7 @@ impl<R, E> Future for Parallel<R, E> {
         let mut pending = false;
         for (_, slot) in &mut this.slots {
             if let Slot::Pending(future) = slot {
-                let result = catch_unwind(AssertUnwindSafe(|| future.as_mut().poll(cx)));
+                let result = crate::future_support::poll_catching_unwind(future.as_mut(), cx);
                 match result {
                     Ok(Poll::Pending) => pending = true,
                     Ok(Poll::Ready(result)) => {

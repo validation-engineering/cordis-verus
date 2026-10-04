@@ -5,6 +5,7 @@
 //! of arbitrary effects. An in-flight setup stage is always allowed to land so
 //! its inverse can be collected; cancellation stops subsequent stages.
 use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, StorageStats};
+use crate::future_support::poll_catching_unwind;
 use cordis_kernel::episode::StageProtocol;
 use cordis_kernel::{Binding, Error as KernelError, Kernel, Phase, Port};
 use std::any::Any;
@@ -174,11 +175,12 @@ struct EffectStatus {
     initialized: bool,
     finished: bool,
     errors: Vec<String>,
-    wakers: Vec<Waker>,
+    next_waiter: u64,
+    wakers: BTreeMap<u64, Waker>,
     driver: Option<Waker>,
 }
-fn wake_waiters(wakers: Vec<Waker>) {
-    for waker in wakers {
+fn wake_waiters(wakers: BTreeMap<u64, Waker>) {
+    for waker in wakers.into_values() {
         waker.wake();
     }
 }
@@ -213,31 +215,57 @@ impl EffectHandle {
     pub fn join(&self) -> EffectJoin {
         EffectJoin {
             handle: self.clone(),
+            waiter: None,
         }
     }
 }
+/// Wait for an effect's stage and inverses to finish. Dropping this wait removes
+/// its waker registration; it does not cancel the effect itself.
+#[must_use = "poll or await join to wait for effect cleanup"]
 pub struct EffectJoin {
     handle: EffectHandle,
+    waiter: Option<u64>,
 }
 impl Future for EffectJoin {
     type Output = CallbackResult;
     fn poll(self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Self::Output> {
-        let mut status = lock(&self.handle.status);
-        if status.finished {
-            return Poll::Ready(if status.errors.is_empty() {
-                Ok(())
+        let this = self.get_mut();
+        // A custom waker can reenter an effect handle from clone or Drop too.
+        let mut waker = Some(cx.waker().clone());
+        let (result, previous) = {
+            let mut status = lock(&this.handle.status);
+            if status.finished {
+                let result = if status.errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(status.errors.join("; "))
+                };
+                let previous = this.waiter.take().and_then(|id| status.wakers.remove(&id));
+                (Poll::Ready(result), previous)
             } else {
-                Err(status.errors.join("; "))
-            });
-        }
-        if !status
-            .wakers
-            .iter()
-            .any(|waker| waker.will_wake(cx.waker()))
-        {
-            status.wakers.push(cx.waker().clone());
-        }
-        Poll::Pending
+                let id = *this.waiter.get_or_insert_with(|| {
+                    let id = status.next_waiter;
+                    status.next_waiter =
+                        id.checked_add(1).expect("effect join identities exhausted");
+                    id
+                });
+                (
+                    Poll::Pending,
+                    status.wakers.insert(id, waker.take().unwrap()),
+                )
+            }
+        };
+        drop(previous);
+        result
+    }
+}
+impl Drop for EffectJoin {
+    fn drop(&mut self) {
+        let previous = self
+            .waiter
+            .take()
+            .and_then(|id| lock(&self.handle.status).wakers.remove(&id));
+        drop(previous);
     }
 }
 
@@ -647,6 +675,46 @@ struct Group {
     running: Option<CleanupFuture>,
     handle: EffectHandle,
 }
+
+/// Only a queued future may be discarded on withdrawal. Once its first poll
+/// begins, the runtime owns it until it lands and can register its inverse.
+enum RootSetup {
+    Dormant,
+    Queued(SetupFuture),
+    Running(SetupFuture),
+    Done,
+}
+impl RootSetup {
+    fn is_pending(&self) -> bool {
+        matches!(self, Self::Queued(_) | Self::Running(_))
+    }
+    fn is_done(&self) -> bool {
+        matches!(self, Self::Done)
+    }
+    fn poll(
+        &mut self,
+        withdrawing: bool,
+        cx: &mut TaskContext<'_>,
+    ) -> Option<Poll<CallbackResult>> {
+        match std::mem::replace(self, Self::Done) {
+            Self::Queued(_) if withdrawing => None,
+            Self::Queued(mut future) | Self::Running(mut future) => {
+                Some(match poll_catching_unwind(future.as_mut(), cx) {
+                    Ok(Poll::Pending) => {
+                        *self = Self::Running(future);
+                        Poll::Pending
+                    }
+                    Ok(Poll::Ready(result)) => Poll::Ready(result),
+                    Err(panic) => Poll::Ready(Err(panic_message(panic))),
+                })
+            }
+            state => {
+                *self = state;
+                None
+            }
+        }
+    }
+}
 struct Mounted {
     name: String,
     parent: Option<PluginId>,
@@ -655,9 +723,7 @@ struct Mounted {
     provisions: Vec<Port>,
     setup: Callback,
     episode: Option<AsyncSetup>,
-    initializing: Option<SetupFuture>,
-    root_done: bool,
-    root_started: bool,
+    root_setup: RootSetup,
     groups: BTreeMap<usize, Group>,
     root_running: Option<CleanupFuture>,
     failed: Option<String>,
@@ -789,7 +855,7 @@ impl Runtime {
             if matches!(phase, Phase::Loading | Phase::Active) && !self.coherent(id) {
                 blockers.push(Blocker::TargetChanged);
             }
-            if owner.initializing.is_some() {
+            if owner.root_setup.is_pending() {
                 blockers.push(Blocker::SetupPending);
             }
             let groups: Vec<_> = owner
@@ -906,9 +972,7 @@ impl Runtime {
                 provisions,
                 setup: plugin.setup,
                 episode: None,
-                initializing: None,
-                root_done: false,
-                root_started: false,
+                root_setup: RootSetup::Dormant,
                 groups: BTreeMap::new(),
                 root_running: None,
                 failed: None,
@@ -1271,22 +1335,16 @@ impl Runtime {
             group: 0,
         };
         plugin.episode = Some(episode.clone());
-        plugin.root_done = false;
-        plugin.root_started = false;
+        plugin.root_setup = RootSetup::Done;
         let result = catch_unwind(AssertUnwindSafe(|| match &mut plugin.setup {
-            Callback::Sync(callback) => {
-                let result = callback(&mut Setup { inner: &episode });
-                plugin.root_done = true;
-                result
-            }
+            Callback::Sync(callback) => callback(&mut Setup { inner: &episode }),
             Callback::Async(callback) => {
-                plugin.initializing = Some(callback(episode));
+                plugin.root_setup = RootSetup::Queued(callback(episode));
                 Ok(())
             }
         }))
         .unwrap_or_else(|panic| Err(panic_message(panic)));
         if let Err(message) = result {
-            plugin.root_done = true;
             self.latch(id, message);
         }
     }
@@ -1372,7 +1430,7 @@ impl Runtime {
             }
         }
         if let Some(future) = running {
-            match catch_unwind(AssertUnwindSafe(|| future.as_mut().poll(cx))) {
+            match poll_catching_unwind(future.as_mut(), cx) {
                 Ok(Poll::Pending) => return (progress, true),
                 Ok(Poll::Ready(result)) => {
                     *running = None;
@@ -1413,14 +1471,16 @@ impl Runtime {
                 .groups
                 .remove(&key)
                 .unwrap();
-            let cancelled = {
+            let driver = cx.waker().clone();
+            let (cancelled, previous) = {
                 let mut status = lock(&group.handle.status);
-                status.driver = Some(cx.waker().clone());
+                let previous = status.driver.replace(driver);
                 if unloading || !can_start {
                     status.cancelled = true;
                 }
-                status.cancelled
+                (status.cancelled, previous)
             };
+            drop(previous);
             if cancelled {
                 let mut state = lock(&self.mounted[&id].episode.as_ref().unwrap().state);
                 state.cancelled_groups.insert(group.id);
@@ -1579,44 +1639,36 @@ impl Runtime {
                 let Some(episode) = self.mounted[&id].episode.clone() else {
                     continue;
                 };
-                lock(&episode.state).driver = Some(cx.waker().clone());
-                // A pending setup is never dropped on withdrawal. It can still
-                // register its inverse and private payload when it lands.
-                if phase == Phase::Unloading && !self.mounted[&id].root_started {
-                    let plugin = self.mounted.get_mut(&id).unwrap();
-                    plugin.initializing = None;
-                    plugin.root_done = true;
-                }
-                let future = self.mounted.get_mut(&id).unwrap().initializing.take();
-                if let Some(mut future) = future {
-                    self.mounted.get_mut(&id).unwrap().root_started = true;
-                    match catch_unwind(AssertUnwindSafe(|| future.as_mut().poll(cx))) {
-                        Ok(Poll::Pending) => {
-                            self.mounted.get_mut(&id).unwrap().initializing = Some(future);
-                            pending = true;
-                        }
-                        Ok(Poll::Ready(result)) => {
-                            self.mounted.get_mut(&id).unwrap().root_done = true;
-                            progress = true;
-                            if let Err(message) = result {
-                                if !(phase == Phase::Unloading && message == CANCELLED) {
-                                    self.latch(id, message);
-                                }
+                let driver = cx.waker().clone();
+                let previous = lock(&episode.state).driver.replace(driver);
+                drop(previous);
+                let root_poll = self
+                    .mounted
+                    .get_mut(&id)
+                    .unwrap()
+                    .root_setup
+                    .poll(phase == Phase::Unloading, cx);
+                match root_poll {
+                    Some(Poll::Pending) => pending = true,
+                    Some(Poll::Ready(result)) => {
+                        progress = true;
+                        if let Err(message) = result {
+                            if !(phase == Phase::Unloading && message == CANCELLED) {
+                                self.latch(id, message);
                             }
                         }
-                        Err(panic) => {
-                            self.mounted.get_mut(&id).unwrap().root_done = true;
-                            self.latch(id, panic_message(panic));
-                            progress = true;
-                        }
                     }
+                    None => {}
                 }
                 match self.drain_requests(id) {
                     Ok(did) => progress |= did,
                     Err(error) => return Poll::Ready(Err(error)),
                 }
                 let unloading = phase == Phase::Unloading;
-                if unloading && self.mounted[&id].root_done && !self.kernel.cleanup_started(id) {
+                if unloading
+                    && self.mounted[&id].root_setup.is_done()
+                    && !self.kernel.cleanup_started(id)
+                {
                     // Do not restore any resource while any group has a setup
                     // poll outstanding: it may still rely on that resource.
                     let in_flight = lock(&episode.state)
@@ -1644,7 +1696,7 @@ impl Runtime {
                     Ok(did) => progress |= did,
                     Err(error) => return Poll::Ready(Err(error)),
                 }
-                if unloading && cleanup_allowed && self.mounted[&id].root_done {
+                if unloading && cleanup_allowed && self.mounted[&id].root_setup.is_done() {
                     let mut running = self.mounted.get_mut(&id).unwrap().root_running.take();
                     let (did, waiting) = self.poll_cleanup(id, 0, &mut running, None, cx);
                     self.mounted.get_mut(&id).unwrap().root_running = running;
@@ -1668,13 +1720,14 @@ impl Runtime {
                         drop(state);
                         let plugin = self.mounted.get_mut(&id).unwrap();
                         plugin.episode = None;
+                        plugin.root_setup = RootSetup::Dormant;
                         plugin.restart = false;
                         self.values.retain(|(owner, _, _), _| *owner != id);
                         drop(episode_values);
                         progress = true;
                     }
                 } else if phase == Phase::Loading
-                    && self.mounted[&id].root_done
+                    && self.mounted[&id].root_setup.is_done()
                     && self.mounted[&id]
                         .groups
                         .values()
@@ -1831,7 +1884,7 @@ impl Future for Join<'_> {
             Some(Phase::Inactive | Phase::Active)
         ) && !self.runtime.retired(id)
             && !owner.restart
-            && owner.initializing.is_none()
+            && !owner.root_setup.is_pending()
             && owner
                 .groups
                 .values()
@@ -1859,5 +1912,124 @@ impl Future for Join<'_> {
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
             _ => Poll::Pending,
         }
+    }
+}
+
+#[cfg(test)]
+mod setup_cancellation_tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+    struct RootFuture {
+        setup: AsyncSetup,
+        ready: Arc<AtomicBool>,
+        log: Arc<Mutex<Vec<&'static str>>>,
+    }
+    impl Future for RootFuture {
+        type Output = CallbackResult;
+        fn poll(self: Pin<&mut Self>, _: &mut TaskContext<'_>) -> Poll<Self::Output> {
+            lock(&self.log).push("poll");
+            if !self.ready.load(Ordering::SeqCst) {
+                return Poll::Pending;
+            }
+            lock(&self.log).push("land");
+            let log = self.log.clone();
+            self.setup
+                .on_cleanup(move || {
+                    lock(&log).push("landed-inverse");
+                    Ok(())
+                })
+                .unwrap();
+            Poll::Ready(Ok(()))
+        }
+    }
+    impl Drop for RootFuture {
+        fn drop(&mut self) {
+            lock(&self.log).push("future-drop");
+        }
+    }
+    struct QueuedRoot {
+        runtime: Runtime,
+        owner: PluginId,
+        ready: Arc<AtomicBool>,
+        log: Arc<Mutex<Vec<&'static str>>>,
+    }
+    impl QueuedRoot {
+        fn new() -> Self {
+            let mut runtime = Runtime::new();
+            let log = Arc::new(Mutex::new(Vec::new()));
+            let ready = Arc::new(AtomicBool::new(false));
+            let output = log.clone();
+            let gate = ready.clone();
+            let owner = runtime
+                .mount(
+                    &Context::new(),
+                    None,
+                    Plugin::new_async("root-cancellation", move |setup| {
+                        lock(&output).push("factory");
+                        let log = output.clone();
+                        setup
+                            .on_cleanup(move || {
+                                lock(&log).push("factory-inverse");
+                                Ok(())
+                            })
+                            .unwrap();
+                        RootFuture {
+                            setup,
+                            ready: gate.clone(),
+                            log: output.clone(),
+                        }
+                    }),
+                )
+                .unwrap();
+            // Stop at the driver's real Begin/start boundary, before the next
+            // pass may poll the returned future. This makes both cancellation
+            // schedules explicit without relying on the driver's loop budget.
+            runtime.kernel.begin(owner).unwrap();
+            runtime.start(owner, &mut TaskContext::from_waker(Waker::noop()));
+            Self {
+                runtime,
+                owner,
+                ready,
+                log,
+            }
+        }
+        fn drive(&mut self) -> Poll<Result<(), RuntimeError>> {
+            Pin::new(&mut self.runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop()))
+        }
+    }
+
+    #[test]
+    fn withdrawing_unpolled_setup_keeps_factory_registered_inverses() {
+        let mut root = QueuedRoot::new();
+        assert_eq!(*lock(&root.log), vec!["factory"]);
+        root.runtime.dispose(root.owner).unwrap();
+        assert_eq!(root.drive(), Poll::Ready(Ok(())));
+        assert_eq!(
+            *lock(&root.log),
+            vec!["factory", "future-drop", "factory-inverse"]
+        );
+        assert!(!root.runtime.contains(root.owner));
+    }
+
+    #[test]
+    fn withdrawing_pending_setup_keeps_future_and_collects_its_late_inverse() {
+        let mut root = QueuedRoot::new();
+        assert_eq!(root.drive(), Poll::Pending);
+        root.runtime.dispose(root.owner).unwrap();
+        assert_eq!(root.drive(), Poll::Pending);
+        assert!(!root.runtime.cleanup_started(root.owner));
+        assert!(lock(&root.log)
+            .iter()
+            .all(|entry| !entry.contains("inverse")));
+        assert!(!lock(&root.log).contains(&"future-drop"));
+        root.ready.store(true, Ordering::SeqCst);
+        assert_eq!(root.drive(), Poll::Ready(Ok(())));
+        assert!(lock(&root.log).ends_with(&[
+            "land",
+            "future-drop",
+            "landed-inverse",
+            "factory-inverse",
+        ]));
+        assert!(!root.runtime.contains(root.owner));
     }
 }

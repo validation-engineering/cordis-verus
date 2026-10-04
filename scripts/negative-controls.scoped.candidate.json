@@ -1906,21 +1906,21 @@
       "targets": [
         {
           "kind": "module",
-          "path": "fresh_driver",
+          "path": "mixed_driver::fresh",
           "descendants": false,
-          "function": "cordis_negative::fresh_driver::FreshDriver::step"
+          "function": "cordis_negative::mixed_driver::fresh::instantiate_template"
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::fresh_driver::FreshDriver::step",
-          "module": "fresh_driver",
+          "function": "cordis_negative::mixed_driver::fresh::instantiate_template",
+          "module": "mixed_driver::fresh",
           "file": "fresh_driver.rs",
-          "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "proof {\n            draft.fresh_landing_simulation(&initial,&landed,actor,blueprint,pc,template,instruction,receipt,next,outcome);\n            reveal(MixedDriver::fresh_ack);\n        }"
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==match template {\n        super::Instruction::Child {blueprint:child_blueprint,next:child_next,..}=>super::Instruction::Child {\n            expected:draft.rows.len(),blueprint:child_blueprint,next:child_next,\n        },\n        _=>template,\n    },"
         }
       ],
-      "selectionRationale": "The contract in cordis_negative::fresh_driver::FreshDriver::step detects fresh-driver-child-blueprint. The mutation remains the exact canonical change to fresh_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+      "selectionRationale": "The executable instantiate_template helper preserves the original child blueprint and continuation while substituting the actual fresh identity. FreshDriver::step executes its returned instruction. Its postcondition detects fresh-driver-child-blueprint; the mutation remains the exact canonical change to fresh_driver.rs. A fresh same-function positive and a complete mutant compilation are required before accepting the diagnostic."
     },
     {
       "name": "shared-unload-keeps-uncompressed-token",

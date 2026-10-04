@@ -4,6 +4,20 @@ Changes are recorded before release. There is no published release yet.
 
 ## Unreleased — 0.1.0
 
+- Pin Verus to the official `0.2026.10.04.1687598` rolling release, with platform
+  archive checksums and the matching source revision in the upstream lock.
+- Represent closed-driver transitions as operation-specific enums, carrying
+  actual step outcomes and explicit Divert/Leave routing without inconsistent
+  command/actor fields.
+- Cancelled effect joins unregister their Wakers immediately. Keep setup futures
+  in explicit lifecycle states and retain started stages until their inverses land.
+- Share panic-aware Future polling and loader source-tracking reset/parent lookup,
+  retaining all-settled events and recovery bookkeeping before suspension.
+- Make lifecycle-frame, Begin-boundary, history-catalog and constructive-deletion
+  proofs explicit under Verus's source-typed function encoding. Split source and
+  target witnesses into small lemmas while preserving public contracts and
+  existing per-function solver resource limits.
+
 - Prepare the first private GitHub development snapshot with a bilingual entry point,
   architecture/module navigation, an explicit progress ledger and acceptance-based roadmap.
 - Verify 2,227 whole-kernel obligations on the pinned toolchain; keep paper-wide

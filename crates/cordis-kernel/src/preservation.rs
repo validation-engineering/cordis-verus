@@ -16,6 +16,56 @@ pub open spec fn structural(s:c::State) -> bool {
         && s.fibers[n].provisions.contains(p) && s.fibers[m].provisions.contains(p) ==> n == m
 }
 
+/// Keep the existential ranking witness separate from declaration uniqueness.
+/// All lambda arguments retain the original usize domain; no cross-domain
+/// function equality is used when the inserted name receives its fresh rank.
+proof fn control_parent_ranking(a:c::State,z:c::State,n:usize,rule:c::Rule,rank:spec_fn(usize)->nat)
+    requires c::well_formed(a),c::step(a,z,n,rule),c::parent_ranking(a,rank),
+    ensures exists|next_rank:spec_fn(usize)->nat| c::parent_ranking(z,next_rank),
+{
+    if rule==c::Rule::Insert {
+        let inserted_rank=match z.fibers[n].parent {Some(p)=>rank(p)+1,None=>0nat};
+        let next_rank:spec_fn(usize)->nat=|m:usize|if m==n {inserted_rank}else{rank(m)};
+        assert(next_rank(n)==inserted_rank);
+        assert(c::parent_ranking(z,next_rank)) by {
+            assert forall|m:usize| c::registered(z,m) implies match z.fibers[m].parent {
+                Some(p)=>next_rank(p)<next_rank(m),None=>true,
+            } by {
+                if m==n {
+                    if let Some(p)=z.fibers[n].parent {
+                        assert(c::registered(a,p));
+                        assert(p!=n);
+                        assert(next_rank(p)==rank(p));
+                        assert(inserted_rank==rank(p)+1);
+                    }
+                } else {
+                    assert(c::registered(a,m));
+                    assert(a.fibers[m]==z.fibers[m]);
+                    assert(next_rank(m)==rank(m));
+                    if let Some(p)=z.fibers[m].parent {
+                        assert(c::registered(a,p));
+                        assert(p!=n);
+                        assert(next_rank(p)==rank(p));
+                        assert(rank(p)<rank(m));
+                    }
+                }
+            }
+        }
+        assert(exists|r:spec_fn(usize)->nat|c::parent_ranking(z,r));
+    } else {
+        assert(c::parent_ranking(z,rank)) by {
+            assert forall|m:usize| c::registered(z,m) implies match z.fibers[m].parent {
+                Some(p)=>rank(p)<rank(m),None=>true,
+            } by {
+                assert(c::registered(a,m));
+                assert(z.fibers[m].parent==a.fibers[m].parent);
+                if let Some(p)=z.fibers[m].parent {assert(rank(p)<rank(m));}
+            }
+        }
+        assert(exists|r:spec_fn(usize)->nat|c::parent_ranking(z,r));
+    }
+}
+
 #[verifier::rlimit(15)]
 pub proof fn control_structure(a:c::State,z:c::State,n:usize,rule:c::Rule)
     requires c::well_formed(a), c::step(a,z,n,rule),
@@ -30,31 +80,14 @@ pub proof fn control_structure(a:c::State,z:c::State,n:usize,rule:c::Rule)
                 if m != n { assert(c::registered(a,m)); }
             }
         }
-        let inserted_rank = match z.fibers[n].parent { Some(p) => rank(p)+1, None => 0nat };
-        let next_rank = |m:usize| if m == n { inserted_rank } else { rank(m) };
-        assert(c::parent_ranking(z,next_rank)) by {
-            assert forall|m:usize| c::registered(z,m) implies match z.fibers[m].parent {
-                Some(p) => next_rank(p) < next_rank(m), None => true,
-            } by {
-                if m == n {
-                    if let Some(p) = z.fibers[n].parent { assert(c::registered(a,p)); assert(p != n); }
-                } else {
-                    assert(c::registered(a,m));
-                    assert(a.fibers[m] == z.fibers[m]);
-                    if let Some(p) = z.fibers[m].parent { assert(c::registered(a,p)); assert(p != n); }
-                }
-            }
-        }
+        assert(exists|b:nat|c::name_bound(z,b));
     } else {
         assert(c::name_bound(z,bound)) by {
             assert forall|m:usize| c::registered(z,m) implies m < bound by { assert(c::registered(a,m)); }
         }
-        assert(c::parent_ranking(z,rank)) by {
-            assert forall|m:usize| c::registered(z,m) implies match z.fibers[m].parent {
-                Some(p) => rank(p) < rank(m), None => true,
-            } by { assert(c::registered(a,m)); assert(z.fibers[m].parent == a.fibers[m].parent); }
-        }
+        assert(exists|b:nat|c::name_bound(z,b));
     }
+    control_parent_ranking(a,z,n,rule,rank);
     assert forall|m:usize| c::registered(z,m) implies match z.fibers[m].parent {
         Some(p) => c::registered(z,p), None => true,
     } by {

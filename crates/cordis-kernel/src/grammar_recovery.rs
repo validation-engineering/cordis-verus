@@ -473,9 +473,51 @@ pub proof fn trace_provided_journals<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:d
     }
 }
 
+/// Instantiate the whole-trace invariants only at the actual Begin boundary.
+/// Keeping this cut separate avoids carrying three quantified trace invariants
+/// through the subsequent segment/recovery calculation.
+#[verifier::spinoff_prover]
+proof fn actual_begin_facts<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:dl::Library<A,X,U,B>,programs:dl::Programs<A,X,U,B,I>,
+    states:Seq<dl::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize,b:int)
+    requires d::primitive_theory(eq,lib),dl::execution(lib,programs,states,labels),states.first()==dl::empty::<U,I>(),
+        0<b<states.len(),labels[b-1]==(owner,r::Rule::Begin),
+    ensures dl::well_formed(lib,programs,states[b]),history_typed(lib,states[b].history),
+        pinned(states[b].state,owner),states[b].state.accumulators[owner].len()==0,
+        states[b].state.tables[owner].is_empty(),
+{
+    dl::empty_well_formed(lib,programs);
+    assert(dl::well_formed(lib,programs,states.first()));
+    dl::execution_preservation(eq,lib,programs,states,labels);
+    assert(history_typed(lib,states.first().history));
+    assert(provided_journals(states.first()));
+    trace_history_typed(eq,lib,programs,states,labels);
+    trace_provided_journals(eq,lib,programs,states,labels);
+    let before=states[b-1];let after=states[b];
+    assert(dl::well_formed(lib,programs,before));
+    assert(dl::well_formed(lib,programs,after));
+    assert(history_typed(lib,after.history));
+    assert(provided_journals(before));
+    assert(0<=b-1<labels.len());
+    assert(dl::step(lib,programs,before,after,owner,r::Rule::Begin));
+    begin_pin(eq,lib,programs,before,after,owner);
+    assert(before.state.control.fibers[owner].phase==Phase::Inactive);
+    assert(before.state.accumulators[owner].len()==0);
+    assert(own_word(before,owner).len()==0);
+    assert(before.state.tables[owner].is_empty()) by {
+        assert forall|k:Port| !#[trigger] before.state.tables[owner].dom().contains(k) by {
+            if before.state.tables[owner].dom().contains(k) {
+                assert(e::erases(own_word(before,owner),k));
+                assert(!own_word(before,owner).contains(e::Action::Restriction {key:k}));
+            }
+        }
+    }
+    assert(after.state.tables[owner]==before.state.tables[owner]);
+}
+
 /// Derive the episode hypotheses from a concrete Begin in a whole trace from
 /// the empty registry. No invented past receipt, projection equation, or
 /// end-state recovery assertion appears among the inputs.
+#[verifier::spinoff_prover]
 pub proof fn actual_episode_recovery<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:dl::Library<A,X,U,B>,programs:dl::Programs<A,X,U,B,I>,states:Seq<dl::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize,b:int,u:int)
     requires d::primitive_theory(eq,lib),independent_keys(lib),dl::execution(lib,programs,states,labels),states.first()==dl::empty::<U,I>(),
         0<b<=u<states.len(),labels[b-1]==(owner,r::Rule::Begin),forall|i:int| b<=i<=u ==> installed(states[i].state,owner),
@@ -487,20 +529,26 @@ pub proof fn actual_episode_recovery<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:d
         &&& states[b].state.tables[owner].is_empty()
     },
 {
-    dl::empty_well_formed(lib,programs);dl::execution_preservation(eq,lib,programs,states,labels);
-    assert(history_typed(lib,states.first().history));assert(provided_journals(states.first()));
-    trace_history_typed(eq,lib,programs,states,labels);trace_provided_journals(eq,lib,programs,states,labels);
-    begin_pin(eq,lib,programs,states[b-1],states[b],owner);
-    assert(states[b-1].state.control.fibers[owner].phase==Phase::Inactive);
-    assert(states[b-1].state.accumulators[owner].len()==0);
-    assert(states[b-1].state.tables[owner].is_empty()) by {
-        assert forall|k:Port| !#[trigger] states[b-1].state.tables[owner].dom().contains(k) by {
-            if states[b-1].state.tables[owner].dom().contains(k) {assert(e::erases(own_word(states[b-1],owner),k));assert(own_word(states[b-1],owner).len()==0);}
+    actual_begin_facts(eq,lib,programs,states,labels,owner,b);
+    let segment=states.subrange(b,u+1);let steps=labels.subrange(b,u);
+    assert(segment.len()==u-b+1);
+    assert(steps.len()==u-b);
+    assert(segment.first()==states[b]);
+    assert(segment.last()==states[u]);
+    assert(dl::execution(lib,programs,segment,steps)) by {
+        assert forall|i:int| 0<=i<steps.len() implies dl::step(lib,programs,segment[i],segment[i+1],steps[i].0,steps[i].1) by {
+            assert(0<=b+i<labels.len());
+            assert(segment[i]==states[b+i]);
+            assert(segment[i+1]==states[b+i+1]);
+            assert(steps[i]==labels[b+i]);
+            assert(dl::step(lib,programs,states[b+i],states[b+i+1],labels[b+i].0,labels[b+i].1));
         }
     }
-    let segment=states.subrange(b,u+1);let steps=labels.subrange(b,u);
-    assert(dl::execution(lib,programs,segment,steps)) by {assert forall|i:int| 0<=i<steps.len() implies dl::step(lib,programs,segment[i],segment[i+1],steps[i].0,steps[i].1) by {assert(segment[i]==states[b+i]);assert(segment[i+1]==states[b+i+1]);assert(steps[i]==labels[b+i]);}}
-    assert forall|i:int| 0<=i<segment.len() implies installed(segment[i].state,owner) by {assert(segment[i]==states[b+i]);}
+    assert forall|i:int| 0<=i<segment.len() implies installed(segment[i].state,owner) by {
+        assert(b<=b+i<=u);
+        assert(segment[i]==states[b+i]);
+        assert(installed(states[b+i].state,owner));
+    }
     episode_recovery(eq,lib,programs,segment,steps,owner);
 }
 /// The actual terminal Unload recovers the foreign value replay and empties

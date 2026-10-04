@@ -147,6 +147,93 @@ pub proof fn source_indices()
 }
 #[verifier::spinoff_prover]
 #[verifier::rlimit(30)]
+proof fn source_history_head()
+    ensures trace().first().history[0]==trace().last().history[0],
+{
+    reveal(trace);
+}
+
+#[verifier::spinoff_prover]
+#[verifier::rlimit(30)]
+proof fn deletion_history()
+    ensures {
+        let source=trace();let target=deletion::delete(ex::library(),programs(),source,labels(),1);
+        &&& g::execution(ex::library(),programs(),target,sh::labels_without(labels(),1))
+        &&& source.first().history.len()==1 && source.last().history.len()==4
+        &&& history::histories(ex::equality(),source.last().history,target.last().history,1,1)
+    },
+{
+    actual_source();sh::example_interface();
+    deletion::delete_execution(ex::equality(),ex::library(),programs(),trace(),labels(),1);
+}
+
+// Separate the full deletion theorem from its pre-Unload prefix. Each call
+// exposes many quantified invariants; their consumers need only these concrete
+// history facts and one final lifecycle step, not both theorem contexts at once.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(30)]
+proof fn compressed_target()
+    ensures {
+        let source=trace();let target=deletion::delete(ex::library(),programs(),source,labels(),1);
+        &&& source.len()==11 && target.len()==7
+        &&& source.first().history.len()==1 && source.last().history.len()==4 && target.last().history.len()==2
+        &&& target.last().history[0]==source.first().history[0]
+        &&& g::step(ex::library(),programs(),target[target.len() as int-2],target.last(),2,r::Rule::Unload)
+    },
+{
+    deletion_history();source_indices();
+    let source=trace();let steps=labels();let lib=ex::library();
+    reveal_with_fuel(sh::labels_without,11);
+    let target=deletion::delete(lib,programs(),source,steps,1);
+    let kept=sh::labels_without(steps,1);
+    assert(kept.len()==6);assert(kept[5]==(2usize,r::Rule::Unload));
+    assert(target.len()==7);
+    assert(g::step(lib,programs(),target[5],target[6],2,r::Rule::Unload));
+    assert(history::histories(ex::equality(),source.last().history,target.last().history,1,1));
+    assert(history::index(source.last().history,1,1,source.last().history.len())==2);
+    assert(target.last().history[0]==source.last().history[0]);
+    source_history_head();
+}
+
+#[verifier::spinoff_prover]
+#[verifier::rlimit(30)]
+proof fn compressed_pre_unload()
+    ensures {
+        let target=deletion::delete(ex::library(),programs(),trace(),labels(),1);
+        &&& target.len()>=2
+        &&& target[target.len() as int-2].state.accumulators[2usize]==seq![1nat]
+    },
+{
+    actual_source();source_indices();sh::example_interface();
+    let source=trace();let steps=labels();let lib=ex::library();
+    let prefix=source.drop_last();let earlier=steps.drop_last();
+    assert(prefix.len()==10);assert(earlier.len()==9);
+    assert(g::execution(lib,programs(),prefix,earlier));
+    assert(source_proof::fragment(programs(),prefix,earlier,1,1));
+    assert(prefix.first()==source.first());
+    deletion::delete_execution(ex::equality(),lib,programs(),prefix,earlier,1);
+    let previous=deletion::delete(lib,programs(),prefix,earlier,1);
+    let a=prefix.last();let b=previous.last();
+    assert(a==source[9]);
+    assert(g::step(lib,programs(),a,source[10],2,r::Rule::Unload));
+    assert(s::registered(a.state,2));
+    assert(a.history==source.last().history);
+    assert(a.state.accumulators[2usize]==seq![3nat]);
+    assert(history::index(a.history,1,1,3)==1);
+    assert(b.state.accumulators[2usize]==history::rename(a.history,1,1,a.state.accumulators[2usize]));
+    history::rename_laws(a.history,1,1,Seq::empty(),3);
+    assert(Seq::<nat>::empty().push(3) =~= seq![3nat]);
+    assert(b.state.accumulators[2usize] =~= seq![1nat]);
+    let target=deletion::delete(lib,programs(),source,steps,1);
+    reveal(deletion::delete);
+    assert(steps.last()==(2usize,r::Rule::Unload));
+    assert(target==previous.push(g::unload(b,2)));
+    assert(previous.len()>=1);
+    assert(target[target.len() as int-2]==b);
+}
+
+#[verifier::spinoff_prover]
+#[verifier::rlimit(30)]
 pub proof fn compressed_history()
     ensures {
         let source=trace();let target=deletion::delete(ex::library(),programs(),source,labels(),1);
@@ -156,18 +243,7 @@ pub proof fn compressed_history()
         &&& g::step(ex::library(),programs(),target[target.len() as int-2],target.last(),2,r::Rule::Unload)
     },
 {
-    actual_source();source_indices();sh::example_interface();let lib=ex::library();let source=trace();let steps=labels();
-    deletion::delete_execution(ex::equality(),lib,programs(),source,steps,1);
-    reveal_with_fuel(sh::labels_without,11);
-    let target=deletion::delete(lib,programs(),source,steps,1);let prefix=source.drop_last();let earlier=steps.drop_last();
-    assert(g::execution(lib,programs(),prefix,earlier));assert(source_proof::fragment(programs(),prefix,earlier,1,1));
-    assert(prefix.first()==source.first());deletion::delete_execution(ex::equality(),lib,programs(),prefix,earlier,1);
-    let previous=deletion::delete(lib,programs(),prefix,earlier,1);let a=prefix.last();let b=previous.last();
-    assert(a.state.accumulators[2usize] =~= seq![3nat]);assert(g::owner(a.history[1].landed.receipt)==1);assert(g::owner(a.history[2].landed.receipt)==1);assert(g::owner(a.history[3].landed.receipt)==2);
-    assert(history::index(a.history,1,1,3)==1);assert(history::index(a.history,1,1,4)==2);assert(b.state.accumulators[2usize] =~= seq![1nat]);
-    reveal(deletion::delete);assert(target==previous.push(g::unload(b,2)));assert(target[target.len() as int-2]==b);
-    assert(sh::labels_without(steps,1).last()==(2usize,r::Rule::Unload));
-    assert(source.last().history==a.history);assert(target.last().history==b.history);
+    compressed_target();compressed_pre_unload();
 }
 #[verifier::spinoff_prover]
 #[verifier::rlimit(30)]

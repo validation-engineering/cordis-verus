@@ -645,6 +645,42 @@ pub proof fn terminal_deletion<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libr
     }
 }
 
+/// Finite source data used by the compressed-history example. Keeping this
+/// calculation separate leaves the transport proof abstract over state maps.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(30)]
+proof fn compressed_source_facts()
+    ensures {
+        let source=fu::mixed_trace();let labels=fu::mixed_labels();let a=source.drop_last().last();
+        &&& source.len()==10 && labels.len()==9 && labels.last()==(2usize,r::Rule::Unload)
+        &&& s::registered(a.state,2)
+        &&& a.state.accumulators[2usize]==seq![2nat]
+        &&& g::owner(a.history[1].landed.receipt)==1
+        &&& g::owner(a.history[2].landed.receipt)==2
+        &&& source.last().history==a.history
+        &&& a.history[0]==source.first().history[0]
+        &&& sh::labels_without(labels,1).len()==6
+        &&& sh::labels_without(labels,1).last()==(2usize,r::Rule::Unload)
+    },
+{
+    fu::mixed_execution();sh::example_interface();
+    ol::execution_preservation(ex::equality(),ex::library(),sh::example_programs(),fu::mixed_trace(),fu::mixed_labels());
+    reveal(fu::mixed_trace);reveal(sh::example_trace);reveal_with_fuel(sh::labels_without,10);
+    let source=fu::mixed_trace();let labels=fu::mixed_labels();let a=source.drop_last().last();
+    assert(source.len()==10 && labels.len()==9 && labels.last()==(2usize,r::Rule::Unload));
+    assert(a==source[8]);assert(g::well_formed(ex::library(),sh::example_programs(),a));
+    assert(s::registered(a.state,1));assert(s::registered(a.state,2));
+    assert(a.state.accumulators[1usize] =~= seq![1nat]);
+    assert(a.state.accumulators[2usize] =~= seq![2nat]);
+    assert(a.state.accumulators[1usize][0]==1nat);assert(a.state.accumulators[2usize][0]==2nat);
+    assert(g::owner(a.history[1].landed.receipt)==1);
+    assert(g::owner(a.history[2].landed.receipt)==2);
+    assert(source.last().history==a.history);
+    assert(a.history[0]==source.first().history[0]);
+    assert(sh::labels_without(labels,1).len()==6);
+    assert(sh::labels_without(labels,1).last()==(2usize,r::Rule::Unload));
+}
+
 /// A real +5 owner / +7 foreign execution with a nonempty provider history.
 /// The source foreign inverse lives at token 2; its target counterpart lives
 /// at token 1 and is used by an actual target lifecycle Unload.
@@ -667,23 +703,36 @@ pub proof fn actual_compressed_unload()
         &&& g::well_formed(ex::library(),sh::example_programs(),target.last())
     },
 {
-    fu::mixed_execution();sh::example_interface();let lib=ex::library();let programs=sh::example_programs();let source=fu::mixed_trace();let labels=fu::mixed_labels();
+    fu::mixed_execution();sh::example_interface();compressed_source_facts();let lib=ex::library();let programs=sh::example_programs();let source=fu::mixed_trace();let labels=fu::mixed_labels();
     terminal_deletion(ex::equality(),lib,programs,source,labels,1);delete_execution(ex::equality(),lib,programs,source,labels,1);
-    reveal(fu::mixed_trace);reveal(sh::example_trace);reveal_with_fuel(sh::labels_without,10);reveal_with_fuel(index,4);
+    reveal_with_fuel(index,4);
     let target=delete(lib,programs,source,labels,1);let prefix=source.drop_last();let earlier=labels.drop_last();
     assert(prefix.len()==9);assert(labels.len()==9);assert(source.len()==10);
-    assert(g::execution(lib,programs,prefix,earlier));assert(fu::fragment(programs,prefix,earlier,1,1));
+    assert(g::execution(lib,programs,prefix,earlier)) by {
+        assert forall|i:int|0<=i<earlier.len() implies g::step(lib,programs,prefix[i],prefix[i+1],earlier[i].0,earlier[i].1) by {
+            assert(prefix[i]==source[i]);assert(prefix[i+1]==source[i+1]);assert(earlier[i]==labels[i]);
+        }
+    }
+    assert(fu::fragment(programs,prefix,earlier,1,1));
     assert(prefix.first()==source.first());delete_execution(ex::equality(),lib,programs,prefix,earlier,1);
     let previous=delete(lib,programs,prefix,earlier,1);let a=prefix.last();let b=previous.last();
-    assert(a.state.accumulators[2usize] =~= seq![2nat]);
-    assert(g::owner(a.history[1].landed.receipt)==1);assert(g::owner(a.history[2].landed.receipt)==2);
     assert(index(a.history,1,1,2)==1);assert(index(a.history,1,1,3)==2);
-    assert(b.state.accumulators[2usize] =~= seq![1nat]);
+    assert(related(ex::equality(),a,b,1,1));
+    assert(b.state.accumulators[2usize]==rename(a.history,1,1,a.state.accumulators[2usize]));
+    assert(rename(a.history,1,1,seq![2nat]) =~= seq![1nat]);
+    assert(b.state.accumulators[2usize]==seq![1nat]);
     reveal(delete);assert(target==previous.push(advance(lib,programs,a,source.last(),b,2,r::Rule::Unload,1)));
+    assert(sh::labels_without(labels,1).len()==6);
+    assert(target.len()==7);
     assert(target[target.len() as int-2]==b);
     assert(sh::labels_without(labels,1).last()==(2usize,r::Rule::Unload));
-    assert(source.last().history==a.history);
+    assert(g::step(lib,programs,b,target.last(),2,r::Rule::Unload));
     assert(target.last().history==b.history);
+    assert(histories(ex::equality(),a.history,b.history,1,1));
+    assert(b.history.len()==2);
+    assert(b.history[0]==a.history[0]);
+    assert(obs::receipt_related(ex::equality(),a.history[2].landed.receipt,b.history[1].landed.receipt));
+    assert(g::well_formed(lib,programs,target.last()));
 }
 
 } // verus!

@@ -277,6 +277,47 @@ pub proof fn trace_provided_journals<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:m
     }
 }
 
+/// Project the quantified empty-origin invariants onto the one real Begin.
+/// The recovery calculation below then needs only these boundary facts, not
+/// all intermediate histories and table invariants in the original trace.
+#[verifier::spinoff_prover]
+proof fn actual_begin_facts<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:mx::Programs<A,X,U,B,I>,
+    states:Seq<mx::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize,b:int)
+    requires weak::primitive_theory(eq,lib),mx::execution(lib,programs,states,labels),states.first()==mx::empty::<U,I>(),
+        0<b<states.len(),labels[b-1]==(owner,r::Rule::Begin),
+    ensures mx::well_formed(lib,programs,states[b]),history_typed(lib,states[b].history),
+        pinned(states[b].state,owner),states[b].state.accumulators[owner].len()==0,
+        states[b].state.tables[owner].is_empty(),
+{
+    mx::empty_well_formed(lib,programs);
+    assert(mx::well_formed(lib,programs,states.first()));
+    ol::execution_preservation(eq,lib,programs,states,labels);
+    assert(history_typed(lib,states.first().history));
+    assert(provided_journals(states.first()));
+    trace_history_typed(eq,lib,programs,states,labels);
+    trace_provided_journals(eq,lib,programs,states,labels);
+    let before=states[b-1];let after=states[b];
+    assert(mx::well_formed(lib,programs,before));
+    assert(mx::well_formed(lib,programs,after));
+    assert(history_typed(lib,after.history));
+    assert(provided_journals(before));
+    assert(0<=b-1<labels.len());
+    assert(mx::step(lib,programs,before,after,owner,r::Rule::Begin));
+    begin_pin(eq,lib,programs,before,after,owner);
+    assert(before.state.control.fibers[owner].phase==Phase::Inactive);
+    assert(before.state.accumulators[owner].len()==0);
+    assert(own_word(before,owner).len()==0);
+    assert(before.state.tables[owner].is_empty()) by {
+        assert forall|key:Port| !#[trigger] before.state.tables[owner].dom().contains(key) by {
+            if before.state.tables[owner].dom().contains(key) {
+                assert(e::erases(own_word(before,owner),key));
+                assert(!own_word(before,owner).contains(e::Action::Restriction {key}));
+            }
+        }
+    }
+    assert(after.state.tables[owner]==before.state.tables[owner]);
+}
+
 /// Recover an episode selected by its real Begin from an empty-origin trace.
 /// Authentic history, provider pinning and initial table emptiness are derived.
 #[verifier::spinoff_prover]
@@ -292,20 +333,20 @@ pub proof fn actual_episode_recovery<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:m
         &&& states[b].state.tables[owner].is_empty()
     },
 {
-    mx::empty_well_formed(lib,programs);ol::execution_preservation(eq,lib,programs,states,labels);
-    assert(history_typed(lib,states.first().history));assert(provided_journals(states.first()));
-    trace_history_typed(eq,lib,programs,states,labels);trace_provided_journals(eq,lib,programs,states,labels);
-    begin_pin(eq,lib,programs,states[b-1],states[b],owner);
-    assert(states[b-1].state.control.fibers[owner].phase==Phase::Inactive);
-    assert(states[b-1].state.accumulators[owner].len()==0);
-    assert(states[b-1].state.tables[owner].is_empty()) by {
-        assert forall|k:Port| !#[trigger] states[b-1].state.tables[owner].dom().contains(k) by {
-            if states[b-1].state.tables[owner].dom().contains(k) {assert(e::erases(own_word(states[b-1],owner),k));assert(own_word(states[b-1],owner).len()==0);}
+    actual_begin_facts(eq,lib,programs,states,labels,owner,b);
+    let segment=states.subrange(b,u+1);let steps=labels.subrange(b,u);
+    assert(segment.len()==u-b+1);assert(steps.len()==u-b);
+    assert(segment.first()==states[b]);assert(segment.last()==states[u]);
+    assert(mx::execution(lib,programs,segment,steps)) by {
+        assert forall|i:int| 0<=i<steps.len() implies mx::step(lib,programs,segment[i],segment[i+1],steps[i].0,steps[i].1) by {
+            assert(0<=b+i<labels.len());
+            assert(segment[i]==states[b+i]);assert(segment[i+1]==states[b+i+1]);assert(steps[i]==labels[b+i]);
+            assert(mx::step(lib,programs,states[b+i],states[b+i+1],labels[b+i].0,labels[b+i].1));
         }
     }
-    let segment=states.subrange(b,u+1);let steps=labels.subrange(b,u);
-    assert(mx::execution(lib,programs,segment,steps)) by {assert forall|i:int| 0<=i<steps.len() implies mx::step(lib,programs,segment[i],segment[i+1],steps[i].0,steps[i].1) by {assert(segment[i]==states[b+i]);assert(segment[i+1]==states[b+i+1]);assert(steps[i]==labels[b+i]);}}
-    assert forall|i:int| 0<=i<segment.len() implies installed(segment[i].state,owner) by {assert(segment[i]==states[b+i]);}
+    assert forall|i:int| 0<=i<segment.len() implies installed(segment[i].state,owner) by {
+        assert(b<=b+i<=u);assert(segment[i]==states[b+i]);assert(installed(states[b+i].state,owner));
+    }
     episode_recovery(eq,lib,programs,segment,steps,owner);
 }
 

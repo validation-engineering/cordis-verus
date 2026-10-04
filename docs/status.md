@@ -7,9 +7,10 @@ refinement of the entire paper.
 
 ## Verified checkpoint
 
-The frozen kernel passed **2,227 Verus verification obligations, zero errors**,
-with `--no-cheating --compile` on Verus `0.2026.09.27.3cf1832` and Rust `1.98.1`.
-The workspace passed **259 Rust tests and 2 doctests**, formatting and Clippy.
+The [development report](development-report.json) records the current whole-kernel
+verification count and workspace test counts, bound to their exact source hashes.
+The workflow uses `--no-cheating --compile` on the official Verus rolling release
+`0.2026.10.04.1687598` and Rust `1.98.1`, and checks formatting and Clippy.
 These are verification obligations and tests, not a count of paper theorems.
 The behavior tests include 8,232 bounded lifecycle traces.
 
@@ -18,6 +19,19 @@ checks for the prepared repository, including isolated package tests and builds.
 Its schema differs from the [full release report](verification-report.json).
 `python3 scripts/record-development.py --check` checks freshness, not new proofs.
 Raw development logs and crate artifacts stay in `target/`.
+
+The toolchain was checked against official release metadata on 2026-10-04.
+This rolling release is pinned to `168759867f8c4ba0be848f5a3e438c75cee3e6e3`,
+including a matching source checkout and three platform archive checksums.
+The observed main branch was ahead at `fc7d32e1d9917d31dda119e5742286b10c0ffcd6`;
+the project uses the published binary identified above. Cordis main still matched
+the locked `f8ea3cd50f1a5724e8e715995bcde131c9c12b2c` revision.
+
+The maintenance changes represent driver transitions and root setup ownership
+with enums, unregister cancelled effect-join waiters, and share polling and
+loader bookkeeping helpers. Started setup/effect futures remain owned by the
+runtime until landing, and inverses are collected before cancellation cleanup.
+Host regression tests cover these behaviors; they are not new async proofs.
 
 ## Paper coverage
 

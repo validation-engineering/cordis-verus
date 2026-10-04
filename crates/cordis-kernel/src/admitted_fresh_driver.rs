@@ -74,7 +74,7 @@ impl Admission {
         requires old(self).wf(),
         ensures final(self).wf(),final(self).identity()==old(self).identity(),final(self).consumed()==old(self).consumed(),
             out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> out.unwrap().command==command && old(self).machine().ack(&final(self).machine(),
+            out.is_ok() ==> out.unwrap().command()==command && old(self).machine().ack(&final(self).machine(),
                 super::label(out.unwrap()).0,super::label(out.unwrap()).1,super::label(out.unwrap()).2),
     {self.machine.apply(command)}
 

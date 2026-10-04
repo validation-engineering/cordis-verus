@@ -22,7 +22,7 @@ impl Effect {
         match *self {Self::Call(t)=>super::super::label(t),Self::Land(landed)=>landed.label()}
     }
     pub open spec fn matches(&self,action:ScriptAction)->bool {
-        match *self {Self::Call(t)=>action==ScriptAction::Call(t.command),Self::Land(_)=>action==ScriptAction::Land}
+        match *self {Self::Call(t)=>action==ScriptAction::Call(t.command()),Self::Land(_)=>action==ScriptAction::Land}
     }
 }
 #[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]

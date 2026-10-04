@@ -163,6 +163,79 @@ pub proof fn token_indices()
     actual_landings();reveal(source);assert(source().last().history==prefix().last().history);reveal_with_fuel(history::index,8);
 }
 
+/// Read the concrete source prefix separately from constructing its target.
+/// Unfolding source() here must not also unfold the surviving execution.
+#[verifier::spinoff_prover]
+proof fn target_stack_source()
+    ensures {
+        let states=source().take(9);let steps=labels().take(8);let a=states.last();
+        &&& g::execution(ex::library(),programs(),states,steps)
+        &&& deletion::fragment(programs(),states,steps,1)
+        &&& states.first()==setup().last()
+        &&& s::registered(a.state,2) && a.history.len()==7
+        &&& a.state.accumulators[2usize]==seq![1nat,4nat,5nat,6nat]
+        &&& a.history[4].landed.receipt==(g::Receipt::<int>::Child {actor:2,child:3})
+        &&& history::index(a.history,2,1,1)==1 && history::index(a.history,2,1,4)==2
+        &&& history::index(a.history,2,1,5)==3 && history::index(a.history,2,1,6)==4
+    },
+{
+    actual_landings();actual_cleanup();token_indices();
+    let states=source().take(9);let steps=labels().take(8);
+    assert(states.len()==9);assert(steps.len()==8);
+    assert(states.first()==source().first());assert(states.last()==source()[8]);
+    assert(g::execution(ex::library(),programs(),states,steps)) by {
+        assert forall|i:int| 0<=i<steps.len() implies g::step(ex::library(),programs(),states[i],states[i+1],steps[i].0,steps[i].1) by {
+            assert(states[i]==source()[i]);assert(states[i+1]==source()[i+1]);assert(steps[i]==labels()[i]);
+            assert(g::step(ex::library(),programs(),source()[i],source()[i+1],labels()[i].0,labels()[i].1));
+        }
+    }
+    assert(deletion::fragment(programs(),states,steps,1)) by {
+        assert forall|i:int| 0<=i<steps.len() && g::landing(states[i],states[i+1],steps[i].1) implies {
+            let node=programs()(steps[i].0)(states[i].current[steps[i].0].unwrap());
+            own::table_node(node) || child::guard(programs(),states[i],steps[i].0,1)
+        } by {assert(states[i]==source()[i]);assert(states[i+1]==source()[i+1]);assert(steps[i]==labels()[i]);}
+        assert forall|i:int| #![trigger steps[i]] 0<=i<steps.len() implies {
+            let label=steps[i];
+            &&& ((label.1==r::Rule::Insert || label.1==r::Rule::Remove) ==> crate::dynamic_table_registry::guard(states[i],states[i+1],label.0,label.1,1))
+            &&& (label.1==r::Rule::Unload ==> label.0!=1)
+        } by {assert(states[i]==source()[i]);assert(states[i+1]==source()[i+1]);assert(steps[i]==labels()[i]);}
+    }
+    assert(labels()[8]==(2usize,r::Rule::Unload));
+    assert(g::step(ex::library(),programs(),source()[8],source()[9],2,r::Rule::Unload));
+    assert(s::registered(states.last().state,2));
+    reveal(source);
+    assert(states.last().history==source().last().history);
+    assert(states.last().history==prefix().last().history);
+    assert(g::well_formed(ex::library(),programs(),source()[8]));
+    assert(states.last().state.accumulators[2usize]==seq![1nat,4nat,5nat,6nat]);
+}
+
+/// Extract only the four concrete token images and the retained Child receipt
+/// from an authentic deletion relation. No target execution is unfolded here.
+#[verifier::spinoff_prover]
+proof fn compressed_target_stack(a:g::Configuration<int,nat>,target:g::Configuration<int,nat>)
+    requires crate::providing_owner_transport::related(ex::equality(),a,target,2,1),
+        s::registered(a.state,2),a.history.len()==7,a.state.accumulators[2usize]==seq![1nat,4nat,5nat,6nat],
+        a.history[4].landed.receipt==(g::Receipt::<int>::Child {actor:2,child:3}),
+        history::index(a.history,2,1,1)==1,history::index(a.history,2,1,4)==2,
+        history::index(a.history,2,1,5)==3,history::index(a.history,2,1,6)==4,
+    ensures target.state.accumulators[2usize]==seq![1nat,2nat,3nat,4nat],
+        target.history[2].landed.receipt==(g::Receipt::<int>::Child {actor:2,child:3}),
+{
+    let tokens=a.state.accumulators[2usize];let renamed=history::rename(a.history,2,1,tokens);
+    assert(target.state.accumulators[2usize]==renamed);
+    assert(renamed.len()==4);
+    assert(renamed[0]==history::index(a.history,2,1,1));
+    assert(renamed[1]==history::index(a.history,2,1,4));
+    assert(renamed[2]==history::index(a.history,2,1,5));
+    assert(renamed[3]==history::index(a.history,2,1,6));
+    assert(renamed =~= seq![1nat,2nat,3nat,4nat]);
+    assert(history::histories(ex::equality(),a.history,target.history,2,1));
+    assert(g::owner(a.history[4].landed.receipt)==2);
+    assert(obs::receipt_related(ex::equality(),a.history[4].landed.receipt,target.history[history::index(a.history,2,1,4) as int].landed.receipt));
+    assert(obs::receipt_related(ex::equality(),a.history[4].landed.receipt,target.history[2].landed.receipt));
+}
+
 /// The surviving prefix has its own actual mixed stack. Old token 1 stays
 /// in place; the three new receipts use compressed tokens 2, 3, and 4.
 #[verifier::spinoff_prover]
@@ -176,15 +249,13 @@ pub proof fn actual_target_stack()
         &&& states.last().state.accumulators[2usize]==seq![1nat,4nat,5nat,6nat]
     },
 {
-    actual_setup();actual_landings();actual_cleanup();token_indices();sh::example_interface();
+    actual_setup();target_stack_source();sh::example_interface();
     let states=source().take(9);let steps=labels().take(8);let lib=ex::library();let eq=ex::equality();
-    assert(g::execution(lib,programs(),states,steps));assert(deletion::fragment(programs(),states,steps,1));
+    assert(states.first()==setup().last());assert(states.first().history.len()==2);
     deletion::delete_execution(eq,lib,programs(),setup(),setup_labels(),states,steps,1);
     let target=deletion::delete(lib,programs(),states,steps,1).last();
-    reveal(source);assert(states.last()==source()[8]);assert(states.last().history==source().last().history);assert(states.last().history==prefix().last().history);
-    let tokens=states.last().state.accumulators[2usize];assert(tokens==seq![1nat,4nat,5nat,6nat]);
-    assert(history::rename(states.last().history,2,1,tokens) =~= seq![1nat,2nat,3nat,4nat]);
-    assert(crate::mixed_observational_runs::receipt_related(eq,states.last().history[4].landed.receipt,target.history[2].landed.receipt));
+    assert(crate::providing_owner_transport::related(eq,states.last(),target,2,1));
+    compressed_target_stack(states.last(),target);
 }
 
 #[verifier::spinoff_prover]

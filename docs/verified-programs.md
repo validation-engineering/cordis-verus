@@ -81,6 +81,10 @@ Unit／Provision／Xor／Child receipt。Xor 沿 episode 的 committed provider
 | `Child { expected, blueprint, next }` | 创建对应蓝图的子组件并检查实际 fresh ID | 退休捕获的 child |
 
 `Command` 支持 Insert、Begin、Step、Retire、Depart、Unload、Remove。
+成功结果 `Transition` 使用对应的枚举变体：`Step { actor, outcome }`
+必有实际返回值，`Depart { actor, departure }` 使用 `Departure::Divert`
+或 `Departure::Leave`。`actor()` 与 `command()` 提供带验证契约的投影；
+调用方可以直接匹配变体，不需要检查彼此独立的可选字段。
 `run_script` 返回 `ScriptReport { machine, transitions, error }`；执行在首个
 错误停止，`transitions` 只包含已经成功的命令。每次成功都模拟同一个蓝图
 库下的实际 `mixed_grammar::step`，源 history 从 empty 构造，包含各次真实

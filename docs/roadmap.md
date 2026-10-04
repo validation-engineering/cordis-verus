@@ -1,6 +1,6 @@
 # 路线图与验收条件
 
-当前基线为冻结的 2,227/0 正向验证、259 tests 和 2 doctests。论文清单为 42 formalized、17 proved、18 partial、4 refuted，另有 4 项整体义务 open。完整发布质量尚未通过；这些数字不是后续改动的自动证据，最新状态见[status](status.md)。
+当前正向验证和测试结果以绑定源码哈希的[开发记录](development-report.json)为准。论文清单为 42 formalized、17 proved、18 partial、4 refuted，另有 4 项整体义务 open。完整发布质量尚未通过；这些数字不是后续改动的自动证据，最新状态见[status](status.md)。
 
 工作按下面的交付物推进，不承诺日期。每项范围变化都应同步合同、非空示例、负控和 ledger；原文反例保留原状态，修订定理另列前提。
 

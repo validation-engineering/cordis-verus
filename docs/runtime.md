@@ -51,6 +51,8 @@ async fn application() -> Result<(), RuntimeError> {
 
 同一组内的 stages 顺序运行，已完成 stage 的 inverse 先收集，再允许下一 stage 开始；组内逆序逐个等待清理。不同 effect groups 可以交错初始化与恢复，某组 Pending 不阻止其他组推进。直接登记的 `on_cleanup`/`on_cleanup_async` 形成根 cleanup 组。`EffectHandle::join()` 等待该组结束；它不自行轮询 Runtime，调用方仍需驱动 runtime。
 
+取消或丢弃 `EffectJoin` 只撤销该等待者，并立即注销其 Waker；不会取消 effect。`EffectHandle::cancel()` 才提交组取消请求。已开始并返回 Pending 的 stage 仍由 runtime 持有，等待返回并收集 inverse 后再恢复。根 setup 使用明确的未开始、排队、运行中和完成状态，只有尚未首次 poll 的 setup 可以直接撤销。等待者的 Waker 克隆、替换、析构和唤醒均在状态锁外执行。
+
 取消发生时，在途的 setup/stage 继续到达可收集 inverse 的边界，随后停止后续 stages 并恢复已登记效果。每个新 stage 前都会重新检查当前依赖，而不是只在整段初始化开始时检查。`AsyncSetup::is_cancelled()` 支持协作退出；`ensure_active()` 用于在获取新资源前检查 owner/group 是否仍接受新效果。保留的 `CANCELLED` 结果仅在已取消的 episode/group 中视作协作终止，活跃 callback 返回它仍算失败。
 
 完成的旧 episode 不接受新登记；即使 owner 用同一 ID restart，旧 `AsyncSetup` 也不能向新 activation 登记资源。在途 stage 获知取消后仍可登记已经产生效果的 inverse，使该效果被正常收回。框架不会强制终止永不完成的 future。

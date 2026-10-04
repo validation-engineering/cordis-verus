@@ -1,6 +1,6 @@
 {
   "schema": "cordis-verus.upstream-lock/v1",
-  "checkedAt": "2026-10-03T00:32:16.866329Z",
+  "checkedAt": "2026-10-04T04:44:16Z",
   "repositories": {
     "cordis": {
       "url": "https://github.com/cordiverse/cordis.git",
@@ -49,6 +49,23 @@
       "sourceTrees": {},
       "license": "NOASSERTION",
       "unmodifiedAtLock": true
+    },
+    "verus": {
+      "url": "https://github.com/verus-lang/verus.git",
+      "path": "upstream/verus",
+      "branch": "main",
+      "revision": "168759867f8c4ba0be848f5a3e438c75cee3e6e3",
+      "tree": "b26e805f07acb15d2997264d6c758b09a1db270a",
+      "committedAt": "2026-10-04T01:55:06Z",
+      "subject": "Preserve source types in SpecFn lambda values (revise and merge) (#3040)",
+      "sourceTrees": {
+        "source/rust_verify": "ef8842a56cbf329665d4cff7e91b3a4cd39aaf4b",
+        "source/vstd": "c57d48b093ad87003fdbe282cb28e83cd3ba800c",
+        "source/rust_verify_test/tests": "82df40a044badfc3c5c12ccb419725f056092df0"
+      },
+      "license": "MIT",
+      "unmodifiedAtLock": true,
+      "licensePath": "upstream/verus/LICENSE"
     }
   },
   "paper": {
@@ -75,12 +92,14 @@
   },
   "verusRelease": {
     "repository": "https://github.com/verus-lang/verus",
-    "version": "0.2026.09.27.3cf1832",
-    "revision": "3cf18325f0fd0c3040fbdec8c0f2255c0504c91a",
-    "tag": "release/0.2026.09.27.3cf1832",
-    "url": "https://github.com/verus-lang/verus/releases/tag/release/0.2026.09.27.3cf1832",
-    "publishedAt": "2026-09-28T03:59:13Z",
+    "version": "0.2026.10.04.1687598",
+    "revision": "168759867f8c4ba0be848f5a3e438c75cee3e6e3",
+    "tag": "release/rolling/0.2026.10.04.1687598",
+    "url": "https://github.com/verus-lang/verus/releases/tag/release/rolling/0.2026.10.04.1687598",
+    "publishedAt": "2026-10-04T02:44:08Z",
     "toolchainLock": "toolchain.lock.json",
-    "provenance": "Official release metadata and bundled version.json; toolchain.lock.json pins per-platform asset digests."
+    "provenance": "Latest published official rolling release at the recorded check; official per-platform asset digests, bundled version.json and a matching clean source checkout. Main branch may be ahead of published binaries.",
+    "channel": "rolling",
+    "checkedAt": "2026-10-04T04:44:16Z"
   }
 }

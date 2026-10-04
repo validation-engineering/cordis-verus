@@ -27,6 +27,22 @@ pub open spec fn trace<V>(model:s::Model<V>,states:Seq<s::State<V>>,labels:Seq<(
     p::execution(model,states,labels) && p::well_formed(states.first())
 }
 
+/// Primitive frames preserve installation, including names absent initially:
+/// their only permitted new entries are Inactive. Instantiate that clause at
+/// the queried name before reasoning about the outer lifecycle edit.
+proof fn primitive_installation<V>(a:s::State<V>,z:s::State<V>,n:usize)
+    requires p::installation_frame(a,z),
+    ensures installed(a,n)==installed(z,n),
+        installed(a,n) ==> a.control.fibers[n].phase==z.control.fibers[n].phase,
+{
+    if s::registered(a,n) {
+        assert(s::registered(z,n));
+        assert(a.control.fibers[n].phase==z.control.fibers[n].phase);
+    } else if s::registered(z,n) {
+        assert(z.control.fibers[n].phase==Phase::Inactive);
+    }
+}
+
 /// Only the actor's outer Begin/Unload edits change installed status. Nested
 /// child primitives create Inactive entries or change retirement alone.
 pub proof fn installation_step<V>(model:s::Model<V>,a:s::State<V>,z:s::State<V>,actor:usize,rule:c::Rule,n:usize)
@@ -37,9 +53,57 @@ pub proof fn installation_step<V>(model:s::Model<V>,a:s::State<V>,z:s::State<V>,
         actor!=n && installed(a,n) ==> installed(z,n) && a.control.fibers[n].phase==z.control.fibers[n].phase,
 {
     if e::lands(model,a,z,actor,rule) {
-        p::forward_preservation(a,(model.iterate)(actor,a.iterators[actor].unwrap(),a).state,actor);
+        let yielded=(model.iterate)(actor,a.iterators[actor].unwrap(),a);
+        p::forward_preservation(a,yielded.state,actor);
+        primitive_installation(a,yielded.state,n);
+        assert(s::registered(yielded.state,actor));
+        if actor==n {
+            assert(installed(a,n));
+            assert(installed(z,n));
+        } else {
+            assert(s::registered(z,n)==s::registered(yielded.state,n));
+            if s::registered(yielded.state,n) {
+                assert(z.control.fibers[n]==yielded.state.control.fibers[n]);
+            }
+        }
     } else if rule==c::Rule::Unload {
+        let recovered=s::restore(model,a.accumulators[actor],a);
         p::restore_preservation(model,a.accumulators[actor],a,actor);
+        primitive_installation(a,recovered,n);
+        if actor==n {
+            assert(installed(a,n));
+            assert(!installed(z,n));
+        } else {
+            assert(s::registered(z,n)==s::registered(recovered,n));
+            if s::registered(recovered,n) {
+                assert(z.control.fibers[n]==recovered.control.fibers[n]);
+            }
+        }
+    } else {
+        match rule {
+            c::Rule::Insert | c::Rule::Retire | c::Rule::Remove => {
+                assert(c::step(a.control,z.control,actor,rule));
+                assert(c::frame(a.control,z.control,actor));
+                if actor!=n {
+                    assert(s::registered(a,n)==s::registered(z,n));
+                    if s::registered(a,n) {
+                        assert(a.control.fibers[n]==z.control.fibers[n]);
+                    }
+                }
+            },
+            c::Rule::Begin | c::Rule::Divert | c::Rule::Leave => {
+                // Here Divert is its immediate branch; landed Divert was
+                // handled above with the actual primitive frame.
+                assert(s::registered(a,actor));
+                if actor!=n {
+                    assert(s::registered(a,n)==s::registered(z,n));
+                    if s::registered(a,n) {
+                        assert(a.control.fibers[n]==z.control.fibers[n]);
+                    }
+                }
+            },
+            _ => {assert(false);},
+        }
     }
     if installed(a,n) && installed(z,n) {e::actual_accumulator_step(model,a,z,actor,rule,n);}
 }

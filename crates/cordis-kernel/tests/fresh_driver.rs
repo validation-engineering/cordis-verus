@@ -1,5 +1,5 @@
 use cordis_kernel::mixed_driver::fresh::{
-    run_script, Blueprint, Command, DriverError, FreshDriver, Instruction, Outcome,
+    run_script, Blueprint, Command, DriverError, FreshDriver, Instruction, Outcome, Transition,
 };
 use cordis_kernel::{Error, Phase, Port};
 
@@ -163,18 +163,24 @@ fn actual_script_refinement_covers_both_births_in_one_fixed_program_history() {
     assert_eq!(report.error, None);
     assert_eq!(report.transitions.len(), commands.len());
     assert_eq!(
-        report.transitions[6].outcome,
-        Some(Outcome::Child {
-            child: 2,
-            finished: false
-        })
+        report.transitions[6],
+        Transition::Step {
+            actor: 1,
+            outcome: Outcome::Child {
+                child: 2,
+                finished: false
+            }
+        }
     );
     assert_eq!(
-        report.transitions[21].outcome,
-        Some(Outcome::Child {
-            child: 5,
-            finished: false
-        })
+        report.transitions[21],
+        Transition::Step {
+            actor: 1,
+            outcome: Outcome::Child {
+                child: 5,
+                finished: false
+            }
+        }
     );
     assert_eq!(report.machine.phase(1), Some(Phase::Inactive));
     assert_eq!(report.machine.inverse_count(1), Some(0));

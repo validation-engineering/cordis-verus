@@ -690,6 +690,7 @@ pub proof fn initial_related<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Prog
 /// compressed journal indices and original raw dependent outcomes. No legal
 /// surviving execution or completed recovery is supplied by the caller.
 #[verifier::rlimit(25)]
+#[verifier::spinoff_prover]
 pub proof fn delete_execution<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,
     source:Seq<g::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,removed:usize)
     requires og::primitive_theory(eq,lib),g::execution(lib,programs,source,labels),g::well_formed(lib,programs,source.first()),
@@ -708,29 +709,61 @@ pub proof fn delete_execution<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libra
     let target=delete(lib,programs,source,labels,removed);let kept=labels_without(labels,removed);
     if labels.len()==0 {
         assert(source.len()==1);assert(source.first()==source.last());
+        assert(target==seq![source.first()]);assert(kept==Seq::<(usize,r::Rule)>::empty());
         initial_related(lib,programs,source.first(),removed);
+        assert forall|i:int| 0<=i<target.len() implies g::well_formed(lib,programs,target[i]) by {
+            assert(i==0);assert(target[i]==source.first());
+        }
     } else {
         let previous=labels.drop_last();let prefix=source.drop_last();
-        assert(g::execution(lib,programs,prefix,previous));
-        assert(separation(programs,prefix,previous,removed));
+        assert(prefix.len()==previous.len()+1);
+        assert(prefix.first()==source.first());
+        assert(g::execution(lib,programs,prefix,previous)) by {
+            assert forall|i:int| 0<=i<previous.len() implies g::step(lib,programs,prefix[i],prefix[i+1],previous[i].0,previous[i].1) by {
+                assert(prefix[i]==source[i]);assert(prefix[i+1]==source[i+1]);assert(previous[i]==labels[i]);
+                assert(g::step(lib,programs,source[i],source[i+1],labels[i].0,labels[i].1));
+            }
+        }
+        assert(separation(programs,prefix,previous,removed)) by {
+            assert forall|i:int| 0<=i<prefix.len() implies isolated(prefix[i].state,removed) by {
+                assert(prefix[i]==source[i]);assert(isolated(source[i].state,removed));
+            }
+            assert forall|i:int| 0<=i<previous.len() && previous[i].0==removed && g::landing(prefix[i],prefix[i+1],previous[i].1)
+                implies table_stage(programs(removed)(prefix[i].current[removed].unwrap())) by {
+                assert(prefix[i]==source[i]);assert(prefix[i+1]==source[i+1]);assert(previous[i]==labels[i]);
+            }
+        }
         delete_execution(eq,lib,programs,prefix,previous,removed);
         let before=delete(lib,programs,prefix,previous,removed);let earlier=labels_without(previous,removed);let label=labels.last();
-        assert(prefix.last()==source[source.len()-2]);
-        step_transport(eq,lib,programs,prefix.last(),source.last(),before.last(),label.0,label.1,removed);
-        ol::configuration_preservation(eq,lib,programs,prefix.last(),source.last(),label.0,label.1);
+        let a=prefix.last();let z=source.last();
+        assert(a==source[source.len()-2]);
+        assert(g::execution(lib,programs,before,earlier));
+        assert(before.len()>0);
+        assert(before.first()==source.first());
+        assert(g::well_formed(lib,programs,a));
+        assert(g::well_formed(lib,programs,before.last()));
+        assert(related(a,before.last(),removed));
+        assert(local_history(a.history,removed));
+        assert(g::step(lib,programs,a,z,label.0,label.1));
+        assert(isolated(a.state,removed));assert(isolated(z.state,removed));
+        step_transport(eq,lib,programs,a,z,before.last(),label.0,label.1,removed);
+        ol::configuration_preservation(eq,lib,programs,a,z,label.0,label.1);
         if keep(label.0,label.1,removed) {
-            let out=successor(lib,programs,prefix.last(),source.last(),before.last(),label.0,label.1,removed);
+            let out=successor(lib,programs,a,z,before.last(),label.0,label.1,removed);
             assert(target==before.push(out));assert(kept==earlier.push(label));
+            assert(g::step(lib,programs,before.last(),out,label.0,label.1));
+            assert(related(z,out,removed));
             ol::configuration_preservation(eq,lib,programs,before.last(),out,label.0,label.1);
+            crate::old_journal_closure::append_execution(lib,programs,before,earlier,out,label.0,label.1);
+            assert(target.first()==before.first());assert(target.last()==out);
             assert forall|i:int| 0<=i<target.len() implies g::well_formed(lib,programs,target[i]) by {
-                if i<before.len() {assert(target[i]==before[i]);} else {assert(i==before.len());assert(target[i]==out);}
+                if i<before.len() {
+                    assert(target[i]==before[i]);assert(g::well_formed(lib,programs,before[i]));
+                } else {assert(i==before.len());assert(target[i]==out);}
             }
-            assert(g::execution(lib,programs,target,kept)) by {
-                assert forall|i:int| 0<=i<kept.len() implies g::step(lib,programs,target[i],target[i+1],kept[i].0,kept[i].1) by {
-                    if i<earlier.len() {assert(target[i]==before[i]);assert(target[i+1]==before[i+1]);}
-                    else {assert(i==earlier.len());assert(target[i]==before.last());}
-                }
-            }
+        } else {
+            assert(target==before);assert(kept==earlier);
+            assert(related(z,before.last(),removed));
         }
     }
 }

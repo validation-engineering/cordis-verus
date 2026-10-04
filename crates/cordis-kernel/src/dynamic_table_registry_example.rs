@@ -100,13 +100,37 @@ pub proof fn actual_registry_transport()
     actual_source_registry();fp::actual_prefix();sh::example_interface();
     let lib=ex::library();let programs=base::programs();let eq=ex::equality();let a=prefix().last();let b=inserted();let c=retired();let d=removed();let kept=target();
     fp::prefix_batch(eq,lib,programs,prefix(),fp::example_labels(),1);
+    // The deleted prefix contains only owner lifecycle steps. Derive its
+    // singleton result from the execution theorem, without unfolding runs.
+    deletion::delete_execution(eq,lib,programs,prefix(),fp::example_labels(),1);
+    let erased=deletion::delete(lib,programs,prefix(),fp::example_labels(),1);
+    reveal_with_fuel(sh::labels_without,4);
+    assert(sh::labels_without(fp::example_labels(),1).len()==0);
+    assert(erased.len()==1);
+    assert(erased.last()==erased.first());
+    assert(kept[0]==prefix().first());
+    assert(kept[1]==dynamic::advance(lib,programs,a,b,kept[0],3,r::Rule::Insert,1));
     dynamic::insert_transport(eq,lib,programs,a,b,kept[0],1,1,3);
+    assert(g::step(lib,programs,kept[0],kept[1],3,r::Rule::Insert));
+    assert(g::well_formed(lib,programs,kept[1]));
+    assert(transport::related(eq,b,kept[1],1,1));
     transport::control_transport(eq,lib,programs,b,c,kept[1],1,1,3,r::Rule::Retire);
     assert(transport::advance(lib,programs,b,c,kept[1],3,r::Rule::Retire,1)==kept[2]);
+    assert(g::step(lib,programs,kept[1],kept[2],3,r::Rule::Retire));
+    assert(g::well_formed(lib,programs,kept[2]));
+    assert(transport::related(eq,c,kept[2],1,1));
+    assert(kept[3]==dynamic::advance(lib,programs,c,d,kept[2],3,r::Rule::Remove,1));
     dynamic::remove_transport(eq,lib,programs,c,d,kept[2],1,1,3);
+    assert(g::step(lib,programs,kept[2],kept[3],3,r::Rule::Remove));
+    assert(g::well_formed(lib,programs,kept[3]));
+    assert(transport::related(eq,d,kept[3],1,1));
     assert forall|i:int|0<=i<3 implies g::step(lib,programs,kept[i],kept[i+1],3,seq![r::Rule::Insert,r::Rule::Retire,r::Rule::Remove][i]) by {if i==0{}else if i==1{}else{assert(i==2);}}
-    reveal(fp::example_prefix);reveal(base::setup);reveal_with_fuel(deletion::delete,4);
-    assert(kept[0]==source().first());cancellation(kept[0],3,Some(1),ex::provided(0),ISet::empty(),0nat);
+    assert(kept[1]==insert::insert(kept[0],3,Some(1),ex::provided(0),ISet::empty(),0nat));
+    cancellation(kept[0],3,Some(1),ex::provided(0),ISet::empty(),0nat);
+    assert(kept[3]==kept[0]);
+    reveal(fp::example_prefix);reveal(base::setup);
+    assert(kept[0]==source().first());
+    assert(kept[0].state.tables[0usize][ex::key(0)]==10);
 }
 
 /// The extra dependency restriction is not an O-Insert guard: this real

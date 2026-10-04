@@ -6,14 +6,14 @@ A Rust implementation of Cordis lifecycle and reversible effects, with executabl
 
 This is a separate project from the earlier TLA+ study. Its semantic reference is [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1), with pinned official Cordis and DeepSeek Harness snapshots as implementation references. It offers corresponding Rust interfaces; it does not execute TypeScript plugins or implement Harness's model APIs, permission system, or UI.
 
-**This is the first private research/development snapshot: experimental version 0.1.0, not published on crates.io, and not through the complete release quality gate.** Public APIs and proof coverage are still evolving.
+**This is a private research/development project: experimental version 0.1.0, not published on crates.io, and not through the complete release quality gate.** Public APIs and proof coverage are still evolving, with Cordis behavior and paper semantics guiding implementation changes.
 
 ## Current progress
 
 | Check | Frozen snapshot result |
 | --- | --- |
-| Whole-crate positive Verus verification | **2,227 verified / 0 errors**, with `--no-cheating --compile` |
-| Rust behavior tests | **259 tests + 2 doctests** passed |
+| Whole-crate positive Verus verification | `--no-cheating --compile`; results and source hashes are in the [development record](docs/development-report.json)'s `proof` field |
+| Rust behavior tests | The same record's `tests` field; development checks also validate isolated crate archives |
 | All 81 numbered paper items | **42 formalized · 17 proved · 18 partial · 4 refuted** |
 | Integration obligations | **4 open** |
 | Negative controls and release evidence | **114 controls awaiting full calibration**; complete `quality.sh` has not passed |
@@ -74,6 +74,11 @@ Tools and inputs are pinned in [toolchain.lock.json](toolchain.lock.json), [Carg
 Scoped results include actual nine-rule executions, provider ordering, observational recovery, guarded exchanges and suffix transport, and episode deletion with mixed foreign Table/Child journals and dynamic registry changes. Their contract premises remain essential; these are not general scheduling confluence or complete host proofs. See [architecture](docs/architecture.md), [refinement](docs/refinement.md), and the [paper ledger](docs/paper-coverage.md).
 
 Unit-component witnesses refute the original statements of Lemmas 62, 75, and 77 and the unconditional completion clause of Theorem 71(2). Encoded Child exchange/deletion and literal-input examples still have original Component representation gaps; **they do not unconditionally refute original items 78/79/80**. See the [paper audit](docs/paper-audit.md).
+
+The current tool is the official Verus rolling release `0.2026.10.04.1687598`,
+pinned by full commit and per-platform archive SHA-256. The upstream lock also
+pins matching Verus source for inspecting language support and proof behavior.
+Stable releases, rolling releases, and newer main-branch commits are distinguished.
 
 ## Contributing and licensing
 

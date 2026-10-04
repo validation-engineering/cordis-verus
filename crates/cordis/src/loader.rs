@@ -316,6 +316,26 @@ struct Snapshot {
     nodes: BTreeMap<String, Node>,
     order: Vec<String>,
 }
+impl Snapshot {
+    fn parent_for(&self, node: &Node, root_parent: Option<PluginId>) -> Option<PluginId> {
+        node.parent
+            .as_ref()
+            .and_then(|parent| self.nodes[parent].id)
+            .or(root_parent)
+    }
+}
+
+/// File provenance and save progress belong to the last successful file load.
+/// Clear them together only after switching to a non-file source succeeds.
+#[derive(Default)]
+struct SourceTracking {
+    root: Option<PathBuf>,
+    contents: BTreeMap<PathBuf, String>,
+    checkpoints: BTreeMap<PathBuf, ConfigTree>,
+    pending_sync: BTreeSet<PathBuf>,
+    resolutions: BTreeMap<PathBuf, PathBuf>,
+}
+
 struct Transaction {
     before: Snapshot,
     created: Vec<PluginId>,
@@ -343,11 +363,7 @@ pub struct Loader {
     current: Snapshot,
     pending: Option<Transaction>,
     revision: u64,
-    source: Option<PathBuf>,
-    sources: BTreeMap<PathBuf, String>,
-    save_checkpoints: BTreeMap<PathBuf, ConfigTree>,
-    save_pending_sync: BTreeSet<PathBuf>,
-    source_resolutions: BTreeMap<PathBuf, PathBuf>,
+    source: SourceTracking,
 }
 impl Loader {
     pub fn new(context: Context, registry: FactoryRegistry) -> Self {
@@ -367,11 +383,7 @@ impl Loader {
             current: Snapshot::default(),
             pending: None,
             revision: 0,
-            source: None,
-            sources: BTreeMap::new(),
-            save_checkpoints: BTreeMap::new(),
-            save_pending_sync: BTreeSet::new(),
-            source_resolutions: BTreeMap::new(),
+            source: SourceTracking::default(),
         }
     }
     pub fn runtime(&self) -> &Runtime {
@@ -404,7 +416,7 @@ impl Loader {
         self.pending.is_some()
     }
     pub fn watched_files(&self) -> impl Iterator<Item = &Path> {
-        self.sources.keys().map(PathBuf::as_path)
+        self.source.contents.keys().map(PathBuf::as_path)
     }
 
     fn prepare(&self, tree: ConfigTree) -> Result<Snapshot, LoaderError> {
@@ -588,11 +600,7 @@ impl Loader {
     pub async fn load_json(&mut self, json: &str) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
         let report = self.apply(ConfigTree::from_json(json)?).await?;
-        self.source = None;
-        self.sources.clear();
-        self.save_checkpoints.clear();
-        self.save_pending_sync.clear();
-        self.source_resolutions.clear();
+        self.source = SourceTracking::default();
         Ok(report)
     }
     pub async fn apply(&mut self, tree: ConfigTree) -> Result<ApplyReport, LoaderError> {
@@ -713,11 +721,7 @@ impl Loader {
                 Some(plugin) => plugin,
                 None => node.build()?,
             };
-            let parent = node
-                .parent
-                .as_ref()
-                .and_then(|parent| plan.nodes[parent].id)
-                .or(self.parent);
+            let parent = plan.parent_for(node, self.parent);
             let id = self.runtime.mount(node.scope.context(), parent, plugin)?;
             self.pending.as_mut().unwrap().created.push(id);
             plan.nodes.get_mut(path).unwrap().id = Some(id);
@@ -756,11 +760,12 @@ impl Loader {
                 continue;
             }
             let plugin = node.build()?;
-            let parent = node
-                .parent
+            let parent = self
+                .pending
                 .as_ref()
-                .and_then(|parent| self.pending.as_ref().unwrap().before.nodes[parent].id)
-                .or(self.parent);
+                .unwrap()
+                .before
+                .parent_for(&node, self.parent);
             let id = self.runtime.mount(node.scope.context(), parent, plugin)?;
             self.pending
                 .as_mut()
@@ -793,20 +798,16 @@ impl Loader {
     }
     pub async fn dispose(&mut self) -> Result<ApplyReport, LoaderError> {
         let report = self.apply(ConfigTree::default()).await?;
-        self.source = None;
-        self.sources.clear();
-        self.save_checkpoints.clear();
-        self.save_pending_sync.clear();
-        self.source_resolutions.clear();
+        self.source = SourceTracking::default();
         Ok(report)
     }
     pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
         let loaded = read_tree(path.as_ref())?;
         let report = self.apply(loaded.tree).await?;
-        self.source = Some(loaded.root);
-        self.source_resolutions = loaded.resolutions;
-        self.save_checkpoints = loaded
+        self.source.root = Some(loaded.root);
+        self.source.resolutions = loaded.resolutions;
+        self.source.checkpoints = loaded
             .sources
             .iter()
             .map(|(path, text)| {
@@ -817,9 +818,10 @@ impl Loader {
                 )
             })
             .collect();
-        self.sources = loaded.sources;
-        self.save_pending_sync
-            .retain(|path| self.sources.contains_key(path));
+        self.source.contents = loaded.sources;
+        self.source
+            .pending_sync
+            .retain(|path| self.source.contents.contains_key(path));
         Ok(report)
     }
     /// Prepare an explicit, inspectable three-way save without writing files.
@@ -833,21 +835,22 @@ impl Loader {
         }
         let root = self
             .source
+            .root
             .as_ref()
             .ok_or_else(|| SaveError::new(None, SaveErrorKind::NoFileSource))?;
         let (desired, include_targets) = project_sources(
             root,
-            &self.sources,
-            &self.source_resolutions,
+            &self.source.contents,
+            &self.source.resolutions,
             &self.current.tree,
         )?;
         let plan = SavePlan::prepare(
             self.current.tree.clone(),
-            self.sources.clone(),
-            self.save_checkpoints.clone(),
+            self.source.contents.clone(),
+            self.source.checkpoints.clone(),
             desired,
             self.registry.revision,
-            self.save_pending_sync.clone(),
+            self.source.pending_sync.clone(),
             include_targets,
         )?;
         let merged = read_tree_cached(root, Some(plan.merged_sources())).map_err(|error| {
@@ -871,10 +874,10 @@ impl Loader {
             return Err(SaveError::new(None, SaveErrorKind::RecoveryPending));
         }
         if plan.tree != self.current.tree
-            || plan.sources != self.sources
-            || plan.checkpoints != self.save_checkpoints
+            || plan.sources != self.source.contents
+            || plan.checkpoints != self.source.checkpoints
             || plan.registry_revision != self.registry.revision
-            || plan.pending_sync != self.save_pending_sync
+            || plan.pending_sync != self.source.pending_sync
         {
             return Err(SaveError::new(None, SaveErrorKind::StalePlan));
         }
@@ -885,12 +888,13 @@ impl Loader {
             Err(error) => &error.report,
         };
         for path in report.written.iter().chain(&report.unchanged) {
-            self.save_checkpoints
+            self.source
+                .checkpoints
                 .insert(path.clone(), desired[path].clone());
             if report.durability_uncertain.contains(path) {
-                self.save_pending_sync.insert(path.clone());
+                self.source.pending_sync.insert(path.clone());
             } else {
-                self.save_pending_sync.remove(path);
+                self.source.pending_sync.remove(path);
             }
         }
         result
@@ -903,7 +907,7 @@ impl Loader {
     /// Poll contents and factory revisions once from an application's timer/event
     /// loop. Invalid files leave the previous successful source snapshot intact.
     pub async fn poll_reload(&mut self) -> Result<ApplyReport, LoaderError> {
-        let Some(path) = self.source.clone() else {
+        let Some(path) = self.source.root.clone() else {
             return self.reload().await;
         };
         self.load_file(path).await

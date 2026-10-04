@@ -1,30 +1,31 @@
 {
   "schema_version": 1,
   "verus": {
-    "version": "0.2026.09.27.3cf1832",
-    "tag": "release/0.2026.09.27.3cf1832",
-    "commit": "3cf18325f0fd0c3040fbdec8c0f2255c0504c91a",
-    "release_url": "https://github.com/verus-lang/verus/releases/tag/release/0.2026.09.27.3cf1832",
+    "version": "0.2026.10.04.1687598",
+    "tag": "release/rolling/0.2026.10.04.1687598",
+    "commit": "168759867f8c4ba0be848f5a3e438c75cee3e6e3",
+    "release_url": "https://github.com/verus-lang/verus/releases/tag/release/rolling/0.2026.10.04.1687598",
     "assets": {
       "arm64-macos": {
-        "url": "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.27.3cf1832/verus-0.2026.09.27.3cf1832-arm64-macos.zip",
-        "sha256": "14ae529ef84178dd6b6debac76dd093803fcfd01123023561e19ac1575e53b83",
-        "archive": "verus-0.2026.09.27.3cf1832-arm64-macos.zip",
+        "url": "https://github.com/verus-lang/verus/releases/download/release/rolling/0.2026.10.04.1687598/verus-0.2026.10.04.1687598-arm64-macos.zip",
+        "sha256": "5ac2a44a1c1bf1536f67adc5f16827ca711974b98b749f09bbf9771806edc09a",
+        "archive": "verus-0.2026.10.04.1687598-arm64-macos.zip",
         "directory": "verus-arm64-macos"
       },
       "x86-linux": {
-        "url": "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.27.3cf1832/verus-0.2026.09.27.3cf1832-x86-linux.zip",
-        "sha256": "43814031e10df043221d83c7fa842e3ebd662cb7b0090fc1eb4d7a8673226978",
-        "archive": "verus-0.2026.09.27.3cf1832-x86-linux.zip",
+        "url": "https://github.com/verus-lang/verus/releases/download/release/rolling/0.2026.10.04.1687598/verus-0.2026.10.04.1687598-x86-linux.zip",
+        "sha256": "46e85f93fc77e41723d589e21bc4d36c6ab2f9d98c9f07e721051879496ce580",
+        "archive": "verus-0.2026.10.04.1687598-x86-linux.zip",
         "directory": "verus-x86-linux"
       },
       "x86-macos": {
-        "url": "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.27.3cf1832/verus-0.2026.09.27.3cf1832-x86-macos.zip",
-        "sha256": "c304fd8fe2eb143cc5a615461fb37b17f00d2387d6054ec013717eb056c0b0ff",
-        "archive": "verus-0.2026.09.27.3cf1832-x86-macos.zip",
+        "url": "https://github.com/verus-lang/verus/releases/download/release/rolling/0.2026.10.04.1687598/verus-0.2026.10.04.1687598-x86-macos.zip",
+        "sha256": "f55c5f1bc1d667b4dda7f7c8e28a0585ca515c7312570b5ec51bc020dcac7803",
+        "archive": "verus-0.2026.10.04.1687598-x86-macos.zip",
         "directory": "verus-x86-macos"
       }
-    }
+    },
+    "channel": "rolling"
   },
   "rust": {
     "channel": "1.98.1",

@@ -96,7 +96,7 @@ fn admitted_child_allocates_at_landing_and_diverts_without_terminal_publication(
             blueprint: 0,
         })
         .unwrap()
-        .actor;
+        .actor();
     assert_eq!(external, 1);
     admitted.apply(Command::Retire { actor: parent }).unwrap();
     let result = admitted.land().unwrap();
@@ -155,7 +155,7 @@ fn old_generation_is_rejected_even_when_same_code_and_pc_return_on_reactivation(
             blueprint: 0,
         })
         .unwrap()
-        .actor;
+        .actor();
     admitted
         .apply(Command::Begin { actor: replacement })
         .unwrap();

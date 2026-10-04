@@ -249,6 +249,7 @@ pub open spec fn history_catalog(states:Seq<p::Snapshot>) -> p::Snapshot {
     }
 }
 
+#[verifier::spinoff_prover]
 pub proof fn catalog_from_history(states:Seq<p::Snapshot>,events:Seq<Event>)
     requires raw_execution(states,events),
     ensures api_execution(history_catalog(states),states,events),
@@ -258,15 +259,46 @@ pub proof fn catalog_from_history(states:Seq<p::Snapshot>,events:Seq<Event>)
             implies configuration_equal(history_catalog(states),states[i],n) by {
             assert(seen(states,n));
             let j=occurrence(states,n);
+            assert(0 <= j < states.len());
+            assert(c::registered(states[j].control,n));
             if i <= j {
                 let xs=states.subrange(0,j+1);let es=events.subrange(0,j);
-                assert(raw_execution(xs,es));
+                assert(raw_execution(xs,es)) by {
+                    assert forall|k:int| 0 <= k < xs.len() implies p::wf(xs[k]) by {
+                        assert(xs[k] == states[k]);
+                    }
+                    assert forall|k:int| 0 <= k < es.len() implies ack(xs[k],xs[k+1],es[k]) by {
+                        assert(xs[k] == states[k]);
+                        assert(xs[k+1] == states[k+1]);
+                        assert(es[k] == events[k]);
+                    }
+                }
+                assert(xs[i] == states[i]);
+                assert(xs.last() == states[j]);
+                assert(n < states[i].allocated);
                 historical_configuration(xs,es,i,n);
             } else {
                 let xs=states.subrange(0,i+1);let es=events.subrange(0,i);
-                assert(raw_execution(xs,es));
+                assert(raw_execution(xs,es)) by {
+                    assert forall|k:int| 0 <= k < xs.len() implies p::wf(xs[k]) by {
+                        assert(xs[k] == states[k]);
+                    }
+                    assert forall|k:int| 0 <= k < es.len() implies ack(xs[k],xs[k+1],es[k]) by {
+                        assert(xs[k] == states[k]);
+                        assert(xs[k+1] == states[k+1]);
+                        assert(es[k] == events[k]);
+                    }
+                }
+                assert(xs[j] == states[j]);
+                assert(xs.last() == states[i]);
+                assert(n < states[j].allocated);
                 historical_configuration(xs,es,j,n);
             }
+            assert(configuration_equal(states[i],states[j],n));
+            assert(history_catalog(states).layouts[n] == states[j].layouts[n]);
+            assert(history_catalog(states).codes[n] == states[j].codes[n]);
+            assert(history_catalog(states).initial[n] == states[j].initial[n]);
+            assert(history_catalog(states).owners[n] == states[j].owners[n]);
         }
     }
 }

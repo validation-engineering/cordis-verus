@@ -6,14 +6,14 @@
 
 这是独立于原 TLA+ 研究的新项目，以 [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1) 为语义来源，以 Cordis 和 DeepSeek Harness 的锁定官方快照为功能参考。项目提供 Rust 对应接口，不运行 TypeScript 插件，也不实现 Harness 的模型 API、权限系统或 UI。
 
-**这是首个私有研究开发快照（实验性 0.1.0），尚未发布到 crates.io，完整发布质量门槛尚未通过。** 公共 API 和证明边界仍在演进。
+**这是私有研究开发项目（实验性 0.1.0），尚未发布到 crates.io，完整发布质量门槛尚未通过。** 公共 API 和证明边界仍在演进；实现优先对齐 Cordis 行为和论文语义。
 
 ## 当前进度
 
 | 检查对象 | 冻结快照结果 |
 | --- | --- |
-| Verus 全库正向验证 | **2,227 verified / 0 errors**，使用 `--no-cheating --compile` |
-| Rust 行为测试 | **259 tests + 2 doctests** 通过 |
+| Verus 全库正向验证 | 使用 `--no-cheating --compile`；结果与源码哈希见[开发记录](docs/development-report.json)的 `proof` 字段 |
+| Rust 行为测试 | 同一记录的 `tests` 字段；开发检查另包含独立 crate 打包测试 |
 | 论文 81 个编号条目 | **42 formalized · 17 proved · 18 partial · 4 refuted** |
 | 整体连接义务 | **4 项 open** |
 | 负控与发布证据 | **114 项负控待完成全量校准**；完整 `quality.sh` 尚未通过 |
@@ -72,6 +72,8 @@ python3 scripts/check-paper-coverage.py
 已完成的受限证明包括实际九规则轨迹、provider 次序、观察恢复、带守卫的交换与后缀运输，以及允许 foreign Table／Child 混合日志和动态 registry 的 episode 删除。其条件和局限保留在合同中，不能提升为任意调度汇合或完整宿主证明。详见[架构](docs/architecture.md)、[refinement](docs/refinement.md)和[逐项覆盖清单](docs/paper-coverage.md)。
 
 论文 Lemma 62、75、77 和 Theorem 71(2) 的无条件闭合断言有 Unit 组件的原文反例。Child 的交换、删除与字面输入见证仍有原 Component 表示缺口，**不构成原文 78／79／80 的无条件反驳**。判断依据见[论文审计](docs/paper-audit.md)。
+
+当前使用 Verus 官方滚动发布 `0.2026.10.04.1687598`，按完整提交和各平台归档 SHA-256 固定。上游锁同时记录匹配的 Verus 源码，供核对语言能力和证明实现；正式发布、滚动发布和更靠前的主分支提交分别对待。
 
 ## 参与与许可
 

@@ -6,7 +6,7 @@
 //! parent module; old receipts retain their captured identity.
 #[cfg(verus_keep_ghost)]
 use super::Receipt;
-pub use super::{Command, DriverError, Index, Outcome, Transition};
+pub use super::{Command, Departure, DriverError, Index, Outcome, Transition};
 use super::{Inverse, MixedDriver};
 #[cfg(verus_keep_ghost)]
 use crate::{
@@ -108,6 +108,22 @@ pub proof fn instantiate_instruction(bank:Seq<super::Blueprint>,blueprint:usize,
         fg::instantiate(instruction_node(bank,blueprint,instruction),selected)==Some(super::instruction_node(bank,blueprint,concrete))
     },
 {match instruction {super::Instruction::Child {..}=>{},_=>{}}}
+
+/// Instantiate only the child identity; the installed blueprint and
+/// continuation remain part of the original instruction.
+fn instantiate_template(draft:&MixedDriver,template:super::Instruction)->(out:super::Instruction)
+    ensures out==match template {
+        super::Instruction::Child {blueprint:child_blueprint,next:child_next,..}=>super::Instruction::Child {
+            expected:draft.rows.len(),blueprint:child_blueprint,next:child_next,
+        },
+        _=>template,
+    },
+{
+    match template {
+        super::Instruction::Child {blueprint,next,..}=>super::Instruction::Child {expected:draft.rows.len(),blueprint,next},
+        _=>template,
+    }
+}
 
 pub struct FreshDriver {inner:super::MixedDriver}
 impl FreshDriver {
@@ -243,10 +259,7 @@ impl FreshDriver {
         let pc=match draft.rows[actor].current {None=>return Err(DriverError::InvalidInstruction),Some(pc)=>pc};
         let blueprint=draft.rows[actor].blueprint;let length=draft.blueprints[blueprint].code.len();
         let template=if pc==length {super::Instruction::Unit} else {draft.blueprints[blueprint].code[pc]};
-        let instruction=match template {
-            super::Instruction::Child {blueprint,next,..}=>super::Instruction::Child {expected:draft.rows.len(),blueprint,next},
-            _=>template,
-        };
+        let instruction=instantiate_template(&draft,template);
         let next=match instruction {super::Instruction::Unit=>None,super::Instruction::Provide {next,..}=>next,
             super::Instruction::Xor {next,..}=>next,super::Instruction::Child {next,..}=>next};
         if let Some(next)=next {if next<=pc || next>length {return Err(DriverError::InvalidInstruction);}}
@@ -267,20 +280,22 @@ impl FreshDriver {
     pub fn apply(&mut self,command:Command)->(out:Result<Transition,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> out.unwrap().command==command
+            out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),label(out.unwrap()).0,label(out.unwrap()).1,label(out.unwrap()).2),
     {
-        let mut outcome=None;let mut diverted=false;
-        let actor=match command {
-            Command::Insert {parent,blueprint}=>self.insert(parent,blueprint)?,
-            Command::Begin {actor}=>{self.begin(actor)?;actor},
-            Command::Step {actor}=>{outcome=Some(self.step(actor)?);actor},
-            Command::Retire {actor}=>{self.retire(actor)?;actor},
-            Command::Depart {actor}=>{diverted=self.phase(actor)==Some(Phase::Loading);self.depart(actor)?;actor},
-            Command::Unload {actor}=>{self.unload(actor)?;actor},
-            Command::Remove {actor}=>{self.remove(actor)?;actor},
+        let transition=match command {
+            Command::Insert {parent,blueprint}=>Transition::Insert {parent,blueprint,actor:self.insert(parent,blueprint)?},
+            Command::Begin {actor}=>{self.begin(actor)?;Transition::Begin {actor}},
+            Command::Step {actor}=>Transition::Step {actor,outcome:self.step(actor)?},
+            Command::Retire {actor}=>{self.retire(actor)?;Transition::Retire {actor}},
+            Command::Depart {actor}=>{
+                let departure=if self.phase(actor)==Some(Phase::Loading) {Departure::Divert} else {Departure::Leave};
+                self.depart(actor)?;Transition::Depart {actor,departure}
+            },
+            Command::Unload {actor}=>{self.unload(actor)?;Transition::Unload {actor}},
+            Command::Remove {actor}=>{self.remove(actor)?;Transition::Remove {actor}},
         };
-        Ok(Transition {command,actor,outcome,diverted})
+        Ok(transition)
     }
     pub proof fn advance_source(&self,after:&Self,bank:Seq<super::Blueprint>,a:mx::Configuration<u64,Index>,actor:usize,rule:r::Rule,selected:Option<usize>)->(z:mx::Configuration<u64,Index>)
         requires self.represents(bank,a),fs::well_formed(super::library(),programs(bank),a),self.ack(after,actor,rule,selected),
@@ -581,7 +596,7 @@ impl MixedDriver {
 }
 
 pub open spec fn label(transition:Transition)->fs::Label {
-    (transition.label().0,transition.label().1,match transition.command {Command::Step {..}=>choice(transition.outcome.unwrap()),_=>None})
+    (transition.label().0,transition.label().1,match transition {Transition::Step {outcome,..}=>choice(outcome),_=>None})
 }
 pub open spec fn labels(transitions:Seq<Transition>)->Seq<fs::Label> {transitions.map(|_:int,t:Transition|label(t))}
 
@@ -612,7 +627,7 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
     ensures out.machine.wf(),out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
-        forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command==commands[i],
+        forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
     let ghost bank=blueprints@.map(|_:int,bp:Blueprint|bp.compiled());
     let mut machine=FreshDriver::new(blueprints);let mut transitions:Vec<Transition>=Vec::new();let mut i=0;
@@ -620,7 +635,7 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
     proof {fs::empty_well_formed(super::library(),programs(bank));}
     while i<commands.len()
         invariant i<=commands.len(),transitions.len()==i,machine.wf(),bank==blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),
-            forall|j:int|0<=j<i ==> transitions[j].command==commands[j],
+            forall|j:int|0<=j<i ==> transitions[j].command()==commands[j],
             states.first()==mx::empty::<u64,Index>(),fs::execution(super::library(),programs(bank),states,labels(transitions@)),
             machine.represents(bank,states.last()),fs::well_formed(super::library(),programs(bank),states.last()),
         decreases commands.len()-i,

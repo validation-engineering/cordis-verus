@@ -71,15 +71,71 @@ pub enum Command {
     Insert {parent:Option<usize>,blueprint:usize}, Begin {actor:usize}, Step {actor:usize},
     Retire {actor:usize}, Depart {actor:usize}, Unload {actor:usize}, Remove {actor:usize},
 }
+/// The two successful outcomes of a departure command.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
-pub struct Transition {pub command:Command,pub actor:usize,pub outcome:Option<Outcome>,pub diverted:bool}
+pub enum Departure { Divert, Leave }
+
+/// A successful checked command. Only a Step carries its actual outcome, and
+/// only a Depart carries its routing decision. The command's actor is stored
+/// once; insertion additionally records the newly allocated actor.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
+pub enum Transition {
+    Insert { parent:Option<usize>, blueprint:usize, actor:usize },
+    Begin { actor:usize },
+    Step { actor:usize, outcome:Outcome },
+    Retire { actor:usize },
+    Depart { actor:usize, departure:Departure },
+    Unload { actor:usize },
+    Remove { actor:usize },
+}
 impl Transition {
+    pub open spec fn command_spec(&self)->Command {
+        match *self {
+            Self::Insert {parent,blueprint,..}=>Command::Insert {parent,blueprint},
+            Self::Begin {actor}=>Command::Begin {actor},
+            Self::Step {actor,..}=>Command::Step {actor},
+            Self::Retire {actor}=>Command::Retire {actor},
+            Self::Depart {actor,..}=>Command::Depart {actor},
+            Self::Unload {actor}=>Command::Unload {actor},
+            Self::Remove {actor}=>Command::Remove {actor},
+        }
+    }
+    #[verifier::when_used_as_spec(command_spec)]
+    pub fn command(&self)->(out:Command)
+        ensures out==self.command_spec(),
+    {
+        match *self {
+            Self::Insert {parent,blueprint,..}=>Command::Insert {parent,blueprint},
+            Self::Begin {actor}=>Command::Begin {actor},
+            Self::Step {actor,..}=>Command::Step {actor},
+            Self::Retire {actor}=>Command::Retire {actor},
+            Self::Depart {actor,..}=>Command::Depart {actor},
+            Self::Unload {actor}=>Command::Unload {actor},
+            Self::Remove {actor}=>Command::Remove {actor},
+        }
+    }
+    pub open spec fn actor_spec(&self)->usize {
+        match *self {
+            Self::Insert {actor,..}|Self::Begin {actor}|Self::Step {actor,..}|Self::Retire {actor}|
+            Self::Depart {actor,..}|Self::Unload {actor}|Self::Remove {actor}=>actor,
+        }
+    }
+    #[verifier::when_used_as_spec(actor_spec)]
+    pub fn actor(&self)->(out:usize)
+        ensures out==self.actor_spec(),
+    {
+        match *self {
+            Self::Insert {actor,..}|Self::Begin {actor}|Self::Step {actor,..}|Self::Retire {actor}|
+            Self::Depart {actor,..}|Self::Unload {actor}|Self::Remove {actor}=>actor,
+        }
+    }
     pub open spec fn label(&self)->(usize,r::Rule) {
-        (self.actor,match self.command {
-            Command::Insert {..}=>r::Rule::Insert,Command::Begin {..}=>r::Rule::Begin,
-            Command::Step {..}=>outcome_rule(self.outcome.unwrap()),Command::Retire {..}=>r::Rule::Retire,
-            Command::Depart {..}=>if self.diverted {r::Rule::Divert} else {r::Rule::Leave},
-            Command::Unload {..}=>r::Rule::Unload,Command::Remove {..}=>r::Rule::Remove,
+        (self.actor_spec(),match *self {
+            Self::Insert {..}=>r::Rule::Insert,Self::Begin {..}=>r::Rule::Begin,
+            Self::Step {outcome,..}=>outcome_rule(outcome),Self::Retire {..}=>r::Rule::Retire,
+            Self::Depart {departure:Departure::Divert,..}=>r::Rule::Divert,
+            Self::Depart {departure:Departure::Leave,..}=>r::Rule::Leave,
+            Self::Unload {..}=>r::Rule::Unload,Self::Remove {..}=>r::Rule::Remove,
         })
     }
 }
@@ -1446,20 +1502,22 @@ impl MixedDriver {
     pub fn apply(&mut self,command:Command)->(out:Result<Transition,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> out.unwrap().command==command
+            out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),out.unwrap().label().0,out.unwrap().label().1),
     {
-        let mut outcome=None;let mut diverted=false;
-        let actor=match command {
-            Command::Insert {parent,blueprint}=>self.insert(parent,blueprint)?,
-            Command::Begin {actor}=>{self.begin(actor)?;actor},
-            Command::Step {actor}=>{outcome=Some(self.step(actor)?);actor},
-            Command::Retire {actor}=>{self.retire(actor)?;actor},
-            Command::Depart {actor}=>{diverted=self.phase(actor)==Some(Phase::Loading);self.depart(actor)?;actor},
-            Command::Unload {actor}=>{self.unload(actor)?;actor},
-            Command::Remove {actor}=>{self.remove(actor)?;actor},
+        let transition=match command {
+            Command::Insert {parent,blueprint}=>Transition::Insert {parent,blueprint,actor:self.insert(parent,blueprint)?},
+            Command::Begin {actor}=>{self.begin(actor)?;Transition::Begin {actor}},
+            Command::Step {actor}=>Transition::Step {actor,outcome:self.step(actor)?},
+            Command::Retire {actor}=>{self.retire(actor)?;Transition::Retire {actor}},
+            Command::Depart {actor}=>{
+                let departure=if self.phase(actor)==Some(Phase::Loading) {Departure::Divert} else {Departure::Leave};
+                self.depart(actor)?;Transition::Depart {actor,departure}
+            },
+            Command::Unload {actor}=>{self.unload(actor)?;Transition::Unload {actor}},
+            Command::Remove {actor}=>{self.remove(actor)?;Transition::Remove {actor}},
         };
-        Ok(Transition {command,actor,outcome,diverted})
+        Ok(transition)
     }
     pub proof fn advance_source(&self,after:&Self,bank:Seq<Blueprint>,a:mx::Configuration<u64,Index>,actor:usize,rule:r::Rule)->(z:mx::Configuration<u64,Index>)
         requires self.represents(bank,a),mx::well_formed(library(),programs(bank),a),self.ack(after,actor,rule),
@@ -1524,6 +1582,13 @@ pub proof fn execution_refines(bank:Seq<Blueprint>,machines:Seq<MixedDriver>,lab
         let states=seq![mx::empty::<u64,Index>()];
         mx::empty_well_formed(library(),programs(bank));
         mx::from_empty_safe(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels);
+        assert forall|i:int|0<=i<states.len() implies machines[i].represents(bank,states[i]) by {
+            assert(i==0);
+            assert(machines[i]==machines.first());
+            assert(states[i]==mx::empty::<u64,Index>());
+        }
+        assert(mx::execution(library(),programs(bank),states,labels));
+        assert(states.first()==mx::empty::<u64,Index>());
         assert(exists|states:Seq<mx::Configuration<u64,Index>>| {
             &&& mx::execution(library(),programs(bank),states,labels) && states.first()==mx::empty::<u64,Index>()
             &&& forall|i:int|0<=i<states.len() ==> machines[i].represents(bank,states[i])
@@ -1591,7 +1656,7 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
     ensures out.machine.wf(),out.refines(blueprints@),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
-        forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command==commands[i],
+        forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
     let ghost bank=blueprints@;
     let mut machine=MixedDriver::new(blueprints);let mut transitions:Vec<Transition>=Vec::new();let mut i=0;
@@ -1599,7 +1664,7 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
     proof {mx::empty_well_formed(library(),programs(bank));}
     while i<commands.len()
         invariant i<=commands.len(),transitions.len()==i,machine.wf(),bank==blueprints@,
-            forall|j:int|0<=j<i ==> transitions[j].command==commands[j],
+            forall|j:int|0<=j<i ==> transitions[j].command()==commands[j],
             states.first()==mx::empty::<u64,Index>(),mx::execution(library(),programs(bank),states,labels(transitions@)),
             machine.represents(bank,states.last()),mx::well_formed(library(),programs(bank),states.last()),
         decreases commands.len()-i,

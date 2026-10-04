@@ -27,6 +27,8 @@ flowchart TD
 
 `ProgramDriver` 使用固定私有 cell 程序；`MixedDriver` 使用混合指令和固定 expected child identity；`FreshDriver` 在真实落地时分配 Child 名称。`admitted_fresh_driver`／`admitted_script` 将单个拥有机器的 admission 与后续调用、落地和释放接为一条历史。具体差异见[程序指南](verified-programs.md)。
 
+闭合驱动的 `Transition` 是按操作区分的枚举：`Step` 必须携带实际 `Outcome`，`Depart` 明确区分 `Divert` 与 `Leave`，actor 只保存一次。规则标签和 fresh child choice 从这些变体构造，避免独立字段组成没有语义的记录。宿主根 setup 也通过枚举保存阶段与 Future 的所有权；异步轮询的 panic 捕获共用内部辅助函数，调度、Pending 保留和清理次序仍由 runtime／事件派发各自控制。
+
 ## 生命周期中的关键数据
 
 - **target** 是当前可用 provider 计算出的绑定；**committed** 是 Begin 时保存、贯穿本 episode 的 provider 身份。Active 中 target 暂时改变是允许的中间状态。

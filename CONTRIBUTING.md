@@ -43,7 +43,10 @@ intentional, reviewed change and rerun proofs, negative tests, and packaging.
 
 ## Version and support policy
 
-The two crates currently share version 0.1.0 and are developed together. Patch
+The two crates currently share unreleased version 0.1.0 and are developed together.
+During this unpublished development stage, prioritize Cordis behavior and paper
+semantics; update callers and documentation directly when an API changes rather
+than adding compatibility shims for earlier development snapshots. After publication, patch
 releases aim to fix behavior without intentional public API removal. Breaking
 API or documented semantic changes require a 0.x minor release with migration
 notes. Before 1.0, downstream users should expect changes and pin versions when

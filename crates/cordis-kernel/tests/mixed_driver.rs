@@ -412,7 +412,7 @@ fn verified_script_entry_runs_shared_payload_child_restore_and_strict_failure_pr
     assert_eq!(report.error, Some(DriverError::NonemptyTable));
     assert_eq!(report.transitions.len(), 20);
     for (transition, command) in report.transitions.iter().zip(&commands) {
-        assert_eq!(transition.command, *command);
+        assert_eq!(transition.command(), *command);
     }
     assert_eq!(report.machine.read(0, key()), Some(7 ^ 8));
     assert_eq!(report.machine.phase(1), None);
