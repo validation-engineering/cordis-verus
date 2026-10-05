@@ -11,6 +11,7 @@ import { defineProperty } from './support.js';
 
 const require = createRequire(import.meta.url);
 const invocation = new AsyncLocalStorage();
+const mutation = new AsyncLocalStorage();
 const kDomain = Symbol('cordis-verus.domain');
 const kRetryCleanup = Symbol('cordis-verus.retry-cleanup');
 export const FiberState = Object.freeze({ PENDING: 0, LOADING: 1, ACTIVE: 2, FAILED: 3, DISPOSED: 4, UNLOADING: 5 });
@@ -103,9 +104,9 @@ function assertNotWaitingForAncestor(target, operation) {
       const parent=invoking.parent.fiber;
       invoking=parent===invoking?undefined:parent;
     }
-    // A reverse Rust call also cannot wait for a provider whose committed lease
-    // its own job keeps alive, including through intermediate JS services.
-    if (token?.rustAuthority) {
+    // An active callback cannot wait for a provider whose committed lease it
+    // keeps alive, including through intermediate JS services.
+    if (invocationBlocksWait(token)) {
       const domain = token.fiber._domain;
       for (const provider of domain.fibers.values()) {
         let affected = false;
@@ -115,11 +116,28 @@ function assertNotWaitingForAncestor(target, operation) {
           owner=parent===owner?undefined:parent;
         }
         if (affected && domain.command({op:'committed_reaches',from:token.fiber.id,generation:token.generation,target:provider.id}).reachable) {
-          throw new CordisError('REENTRANT_MUTATION',`Cannot await ${operation} of a provider retained by the current Rust call`);
+          throw new CordisError('REENTRANT_MUTATION',`Cannot await ${operation} of a provider retained by the current action`);
         }
       }
     }
   }
+}
+
+function liveInvocation(domain) {
+  return [...invocationScopes()].some(token => token.fiber._domain === domain && invocationBlocksWait(token));
+}
+
+export function assertDomainMutation(ctx, options = {}) {
+  ctx[kDomain].assertMutationAdmission({recovery:options.recovery === true});
+}
+
+/** Serialize external revisions in one execution domain. The callback's steps
+ * are scoped authority for lifecycle work, not permission inherited by plugins. */
+export function domainMutation(ctx, execute, options = {}) {
+  try {
+    if (typeof execute !== 'function') throw new TypeError('domainMutation requires a callback');
+    return Promise.resolve(ctx[kDomain].enqueueMutation(execute, {recovery:options.recovery === true}));
+  } catch (error) { return Promise.reject(error); }
 }
 
 class Domain {
@@ -138,6 +156,10 @@ class Domain {
     this.counter = 0n;
     this.scheduled = false;
     this.closed = false;
+    this.acceptingMutations = true;
+    this.mutationQueue = [];
+    this.currentMutation = undefined;
+    this.updateFrames = [];
     this.errors = [];
     this.progress = 0;
     this.waiters = new Set();
@@ -146,6 +168,151 @@ class Domain {
     this.checking = false;
     this.diagnostics = [];
     this.rust = new RustHost(this, {invocation:()=>invocation.getStore(),run:(token,callback)=>invocation.run(token,callback),assertCurrent:assertCurrentInvocation,stale:()=>new CordisError('STALE_EPISODE','Rust service handle is no longer admitted')});
+  }
+  assertMutationAdmission({recovery = false, closing = false} = {}) {
+    assertCurrentInvocation(this);
+    if (liveInvocation(this) || mutation.getStore()?.domain === this && mutation.getStore().active) {
+      throw new CordisError('REENTRANT_MUTATION', 'External mutations cannot wait inside a lifecycle action or another mutation; use the transaction steps');
+    }
+    if (this.closed || !this.acceptingMutations && !recovery && !closing) {
+      throw new CordisError('DOMAIN_CLOSED', 'The domain no longer accepts external revisions');
+    }
+  }
+  enqueueMutation(execute, options = {}) {
+    this.assertMutationAdmission(options);
+    if (options.closing) this.acceptingMutations = false;
+    if (!this.currentMutation && !this.mutationQueue.length) return this.executeMutation(execute, options);
+    const pending = Promise.withResolvers();
+    this.mutationQueue.push({execute, options, pending, origin:invocation.getStore()});
+    pending.promise.catch(() => {});
+    return pending.promise;
+  }
+  executeMutation(execute, options) {
+    const token = {domain:this, active:true, recovery:!!options.recovery, origin:invocation.getStore(), steps:new Set(), failures:new Set()};
+    this.currentMutation = token;
+    const finish = () => {
+      token.active = false;
+      this.currentMutation = undefined;
+      this.wake();
+      if (this.mutationQueue.length) queueMicrotask(() => {
+        if (this.currentMutation) return;
+        const next = this.mutationQueue.shift();
+        if (!next) return;
+        try { next.pending.resolve(invocation.run(next.origin, () => this.executeMutation(next.execute, next.options))); }
+        catch (error) { next.pending.reject(error); }
+      });
+    };
+    const step = (operation, target, ...args) => {
+      if (!token.active || mutation.getStore() !== token || invocation.getStore() !== token.origin || liveInvocation(this) || this.updateFrames.length) {
+        throw new CordisError('REENTRANT_MUTATION', 'Transaction steps are only valid in their active coordinator callback');
+      }
+      return token.performStep(operation, target, ...args);
+    };
+    token.performStep = (operation, target, ...args) => {
+      const fiber = target?.ctx?.fiber;
+      if (!fiber || fiber._domain !== this) throw new CordisError('FOREIGN_DOMAIN', 'Transaction steps require a fiber in this domain');
+      if (token.recovery && !['dispose','retryCleanup'].includes(operation)) {
+        throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions only dispose or retry cleanup');
+      }
+      let result;
+      try { result = fiber[{'dispose':'_dispose','restart':'_restart','retryCleanup':'_retryCleanup','update':'_update'}[operation]](...args); }
+      catch (error) { token.failures.add(error); throw error; }
+      if (result?.then) {
+        const promise = Promise.resolve(result);
+        token.steps.add(promise);
+        const landed = () => token.steps.delete(promise);
+        promise.then(landed, error => { token.failures.add(error); landed(); });
+      }
+      return result;
+    };
+    const steps = Object.freeze(Object.fromEntries(['dispose','restart','retryCleanup','update'].map(name => [name,(fiber,...args) => step(name,fiber,...args)])));
+    try {
+      assertCurrentInvocation(this);
+      if (this.closed) throw new CordisError('DOMAIN_CLOSED', 'The domain is closed');
+      if (!options.recovery && this.command({op:'snapshot'}).plugins.some(fiber => fiber.cleanupFailed)) {
+        throw new CordisError('CLEANUP_BLOCKED', 'Unconfirmed cleanup blocks external revisions; retry cleanup first');
+      }
+      const land = async (value, failure, failed = false) => {
+        try {
+          if (failed) token.failures.add(failure);
+          while (token.steps.size) {
+            await Promise.allSettled([...token.steps]);
+          }
+          // Preserve the callback's public error contract (including LoaderError
+          // code/details and primitive rejection values). Step failures still
+          // prevent a successful callback from committing, and remain diagnostic
+          // when the callback has already supplied its recovery-specific error.
+          if (failed) {
+            for (const error of token.failures) if (error !== failure) this.diagnostics.push({kind:'mutation-step',error:serializableError(error)});
+            throw failure;
+          }
+          const errors = [...token.failures];
+          if (errors.length === 1) throw errors[0];
+          if (errors.length) throw new AggregateError(errors, 'Mutation and lifecycle steps failed');
+          return value;
+        } finally { finish(); }
+      };
+      let result;
+      try { result = mutation.run(token, () => execute(steps)); }
+      catch (error) {
+        if (!token.steps.size) throw error;
+        result = Promise.reject(error);
+      }
+      if (result?.then || token.steps.size || token.failures.size) {
+        const promise = Promise.resolve(result).then(value => land(value), error => land(undefined,error,true));
+        token.promise = promise;
+        promise.catch(() => {});
+        return promise;
+      }
+      finish();
+      return result;
+    } catch (error) { finish(); throw error; }
+  }
+
+  currentUpdateFrame() {
+    const frame = this.updateFrames.at(-1);
+    return frame?.token?.active && frame.token === this.currentMutation
+      && mutation.getStore() === frame.token && invocation.getStore() === frame.origin
+      && !liveInvocation(this) ? frame : undefined;
+  }
+  assertUpdateWait(target, operation) {
+    if (!this.currentUpdateFrame()) {
+      if (this.updateFrames.length) throw new CordisError('REENTRANT_MUTATION', 'Plugin actions cannot borrow a configuration update frame');
+      return;
+    }
+    for (const frame of this.updateFrames) {
+      // A config observer may revise children or unrelated fibers, but must not
+      // wait for itself, its owners, or a provider retained by its own episode.
+      invocation.run({fiber:frame.fiber,generation:frame.fiber._generation,
+        kind:'update',active:true,parentInvocation:frame.origin}, () => assertNotWaitingForAncestor(target, operation));
+    }
+  }
+  delegateUpdateMutation(fiber, operation, ...args) {
+    const frame = this.currentUpdateFrame();
+    if (!frame) {
+      if (this.updateFrames.length) throw new CordisError('REENTRANT_MUTATION', 'Plugin actions cannot borrow a configuration update frame');
+      return;
+    }
+    this.assertUpdateWait(fiber, operation);
+    return {result:frame.token.performStep(operation, fiber, ...args)};
+  }
+  updateHook(fiber, execute) {
+    // Legacy Include/Group hooks synchronously issue child lifecycle operations
+    // and may return void. Join those operations to the current revision without
+    // letting asynchronous continuations or plugin actions borrow its authority.
+    const frame = {fiber,token:this.currentMutation,origin:invocation.getStore()};
+    this.updateFrames.push(frame);
+    try { return execute(); }
+    finally { this.updateFrames.pop(); }
+  }
+
+  assertResourceAdmission() {
+    if (mutation.getStore()?.domain === this && mutation.getStore().active && mutation.getStore().recovery) {
+      throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions cannot acquire new resources');
+    }
+    if (this.closed || !this.acceptingMutations && !(mutation.getStore()?.domain === this && mutation.getStore().active) && !liveInvocation(this)) {
+      throw new CordisError('DOMAIN_CLOSED', 'The domain is closing or closed');
+    }
   }
   command(command) {
     const result = this.driver.command(JSON.stringify(command));
@@ -276,6 +443,12 @@ class Domain {
   async settle() {
     assertCurrentInvocation(this);
     if ([...invocationScopes()].some(token => token.fiber._domain === this && invocationBlocksWait(token))) throw new CordisError('REENTRANT_MUTATION','Cannot await domain settlement from its own action');
+    if (!(mutation.getStore()?.domain === this && mutation.getStore().active)) {
+      while (this.currentMutation || this.mutationQueue.length) {
+        const revision = this.progress;
+        await this.changed(revision);
+      }
+    }
     // A blocked dependency is settled Pending, not falsely reported ready.
     while (true) {
       this.pump();
@@ -336,12 +509,35 @@ export class Fiber {
     this._removedFlag = false;
     this._publications = new Map();
     this.ctx = runtime ? parent.extend({fiber:this}) : parent;
-    this.dispose = () => this._dispose();
+    this._mutations = new Set();
+    this.dispose = () => {
+      if (this._removedFlag) return Promise.resolve();
+      assertNotWaitingForAncestor(this, 'disposal');
+      const delegated = this._domain.delegateUpdateMutation(this, 'dispose');
+      if (delegated) return this._trackMutation(delegated.result);
+      // Owned structural inverses cannot wait behind their own outer revision.
+      if (liveInvocation(this._domain)) return this._dispose();
+      // Teardown observers may join the already-issued native withdrawal.
+      if (this._disposing && mutation.getStore()?.domain === this._domain && mutation.getStore().active) return this._disposing;
+      this._domain.assertMutationAdmission({recovery:true});
+      if (this._disposalRequest) return this._disposalRequest;
+      if (this._disposing) return this._disposing;
+      const result = this._domain.enqueueMutation(() => this._dispose(), {recovery:true});
+      this._disposalRequest = this._trackMutation(Promise.resolve(result));
+      const request = this._disposalRequest;
+      request.catch(() => {
+        // A queued request can lose episode admission before native withdrawal.
+        // Such a rejected request must not poison future external disposal.
+        if (!this._disposing && this._disposalRequest === request) this._disposalRequest = undefined;
+      });
+      return this._disposalRequest;
+    };
   }
   get name() { return this.runtime?.name || this._parentFiber?.name || 'root'; }
   get _domain() { return this.ctx[kDomain]; }
   assertActive() {
     assertCurrentInvocation(this._domain);
+    this._domain.assertResourceAdmission();
     if (this.uid === null || this._domain.closed) throw new CordisError('INACTIVE_EFFECT', 'cannot create effect on inactive context');
     const token = invocation.getStore();
     if (token?.fiber === this && token.generation !== this._generation) throw new CordisError('STALE_EPISODE', 'cannot create effect from an old episode');
@@ -521,6 +717,14 @@ export class Fiber {
     return this._disposing;
   }
   async await() {
+    assertNotWaitingForAncestor(this, 'fiber readiness');
+    this._domain.assertUpdateWait(this, 'fiber readiness');
+    if (!(mutation.getStore()?.domain === this._domain && mutation.getStore().active)) {
+      while (this._mutations.size) await Promise.all([...this._mutations]);
+    }
+    return this._awaitReady();
+  }
+  async _awaitReady() {
     assertNotWaitingForAncestor(this,'fiber readiness');
     // Await only this fiber's native readiness, not unrelated setup actions.
     while (true) {
@@ -623,6 +827,10 @@ export class Fiber {
     });
   }
   async retryCleanup() {
+    assertNotWaitingForAncestor(this, 'cleanup retry');
+    return this._domain.enqueueMutation(() => this._retryCleanup(), {recovery:true});
+  }
+  async _retryCleanup() {
     assertNotWaitingForAncestor(this,'cleanup retry');
     const reply=this._domain.command({op:'retry_cleanup',id:this.id});
     for (const inverse of this._disposables) inverse[kRetryCleanup]?.();
@@ -631,6 +839,7 @@ export class Fiber {
     await this._domain.settle();
     if (this._error) throw this._error;
     this._disposing=undefined;
+    this._disposalRequest=undefined;
   }
   getEffects() { return [...this._disposables].map(value => value[symbols.effect]).filter(Boolean); }
   _assertRegistered() {
@@ -640,33 +849,58 @@ export class Fiber {
     config = this.ctx.waterfall(this,'internal/config',config,() => config);
     return resolveConfig(this.runtime,config);
   }
+  _trackMutation(result) {
+    if (!result?.then) return result;
+    const promise = Promise.resolve(result);
+    this._mutations.add(promise);
+    const finish = () => this._mutations.delete(promise);
+    promise.then(finish, finish);
+    return promise;
+  }
   async restart() {
+    const fiber = this.ctx.fiber;
+    assertNotWaitingForAncestor(fiber, 'restart');
+    const delegated = fiber._domain.delegateUpdateMutation(fiber, 'restart');
+    return fiber._trackMutation(delegated ? delegated.result : fiber._domain.enqueueMutation(() => fiber._restart()));
+  }
+  async _restart() {
     const fiber = this.ctx.fiber;
     fiber._assertRegistered();
     assertNotWaitingForAncestor(fiber,'restart');
     fiber._domain.command({op:'restart',id:fiber.id});
     fiber._error = undefined;
     fiber._domain.schedule();
-    await fiber.await();
+    await fiber._awaitReady();
   }
   update(config,noSave=false) {
+    const fiber = this.ctx.fiber;
+    fiber._assertRegistered();
+    assertNotWaitingForAncestor(fiber, 'update');
+    const delegated = fiber._domain.delegateUpdateMutation(fiber, 'update', config, noSave);
+    const result = fiber._trackMutation(delegated ? delegated.result : fiber._domain.enqueueMutation(() => fiber._update(config,noSave)));
+    if (fiber._domain.profile === 'harness') {
+      result?.catch(error => fiber.ctx.logger.error(error));
+      return;
+    }
+    return result;
+  }
+  _update(config,noSave=false) {
     const fiber = this.ctx.fiber;
     fiber._assertRegistered();
     if (fiber._domain.profile === 'harness') {
       fiber._config = config;
       if (fiber.state !== FiberState.ACTIVE) {
-        fiber.restart().catch(error => fiber.ctx.logger.error(error));
-        return;
+        return fiber._restart();
       }
       config = fiber._resolveConfig(config);
     } else config = resolveConfig(fiber.runtime,config);
-    const result = fiber.ctx.waterfall(fiber,'internal/update',config,noSave,() => {
-      fiber.config = config; fiber._error = undefined; return fiber.restart();
-    });
+    const result = fiber._domain.updateHook(fiber, () => fiber.ctx.waterfall(fiber,'internal/update',config,noSave,() => {
+      fiber.config = config; fiber._error = undefined; return fiber._restart();
+    }));
     if (result === undefined) return;
     const task = Promise.resolve(result);
     task.catch(() => {});
-    if (fiber._domain.profile !== 'harness') return task;
+    return task;
   }
 }
 
@@ -987,9 +1221,13 @@ export class Context {
   snapshot() { return {...this[kDomain].command({op:'snapshot'}),diagnostics:[...this[kDomain].diagnostics]}; }
   async dispose() {
     assertNotWaitingForAncestor(this.root.fiber,'domain disposal');
-    if (this[kDomain].closing) return this[kDomain].closing;
     const domain=this[kDomain];
-    domain.closing=this.root.fiber._dispose().then(()=>{domain.rust.close(); domain.closed=true;},error=>{domain.closing=undefined;throw error;});
+    if (domain.closed) return domain.closing;
+    domain.assertMutationAdmission({closing:true,recovery:true});
+    if (domain.closing) return domain.closing;
+    domain.closing=Promise.resolve(domain.enqueueMutation(() => this.root.fiber._dispose().then(() => {
+      domain.rust.close(); domain.closed=true;
+    }), {closing:true,recovery:true})).catch(error=>{domain.closing=undefined;throw error;});
     return domain.closing;
   }
 }

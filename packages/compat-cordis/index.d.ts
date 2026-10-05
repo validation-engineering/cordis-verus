@@ -171,3 +171,15 @@ export class LoggerService {
 export const defaultFormatters: Record<string, Formatter>;
 export const c16: number[];
 export const c256: number[];
+
+/** Explicit external revision transaction; lifecycle callbacks cannot nest it. */
+export interface MutationSteps {
+  dispose(fiber: Fiber): Promise<void>;
+  restart(fiber: Fiber): Promise<void>;
+  retryCleanup(fiber: Fiber): Promise<void>;
+  update(fiber: Fiber, config: any, noSave?: boolean): Awaitable<void>;
+}
+export function domainMutation<T>(ctx: Context, execute: (steps: Readonly<MutationSteps>) => Awaitable<T>, options?: { recovery?: boolean }): Promise<T>;
+
+/** Check admission without queuing or changing domain state. */
+export function assertDomainMutation(ctx: Context, options?: { recovery?: boolean }): void;

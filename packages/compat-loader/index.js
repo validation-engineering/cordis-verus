@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathToFileURL } from 'node:url';
-import { Context, FiberState, Inject } from '@cordis-verus/compat-cordis';
+import { Context, FiberState, Inject, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
 import { isConstructor } from '@cordis-verus/compat-cordis/utils';
 import { LoaderError, fileURL, jsonValue, readTree } from './config.js';
 import { ModuleHost } from './module-host.js';
@@ -59,7 +59,6 @@ export class Loader {
     this.lastRecovery = undefined;
     this._entries = new Map();
     this._labels = new Map();
-    this._queue = Promise.resolve();
     this._accepting = true;
   }
   entries() { return this._entries.values(); }
@@ -72,13 +71,17 @@ export class Loader {
     if (reentrant(this)) return Promise.reject(new LoaderError('REENTRANT_MUTATION', 'Loader mutations cannot be awaited from their own setup, cleanup or mutation operation; mount children with ctx.plugin()'));
     if (!this._accepting && !closing) return Promise.reject(new LoaderError('LOADER_CLOSED', 'Loader is closing or closed'));
     if (this.state === 'blocked' && !closing) return Promise.reject(new LoaderError('CLEANUP_BLOCKED', 'Unfinished cleanup prevents another activation; retryCleanup() first'));
-    const result = this._queue.then(() => {
+    // Admit directly to the domain queue: an instance-local queue would let
+    // another Loader or a direct Fiber update overtake earlier requests.
+    return domainMutation(this.ctx, async steps => {
       if (this.state === 'blocked' && !closing) throw new LoaderError('CLEANUP_BLOCKED', 'Unfinished cleanup prevents activation');
       const token = { loader: this, active: true };
-      return operation.run(token, async () => { try { return await task(); } finally { token.active = false; } });
-    });
-    this._queue = result.catch(() => {});
-    return result;
+      this._steps = steps;
+      return operation.run(token, async () => {
+        try { return await task(); }
+        finally { token.active = false; this._steps = undefined; }
+      });
+    }, { recovery: closing });
   }
   apply(tree, options = {}) {
     // Capture caller input at admission, before it can change while queued.
@@ -225,7 +228,7 @@ export class Loader {
   async _drainRoots(generation, roots) {
     let failure;
     const disposals = roots.map(fiber => {
-      try { const task = fiber.dispose(); task.catch(error => { failure ??= error; }); return task; }
+      try { const task = this._steps.dispose(fiber); task.catch(error => { failure ??= error; }); return task; }
       catch (error) { failure ??= error; return Promise.resolve(); }
     });
     try { await this.ctx.settle(); } catch (error) { failure ??= error; }
@@ -321,7 +324,7 @@ export class Loader {
         // A retained consumer may have failed while observing the candidate.
         // Restore its old recipe without manufacturing a successful completion.
         for (const record of restored.records.values()) if (record.fiber?.state === FiberState.FAILED) {
-          const task = record.fiber.restart(); task.catch(() => {});
+          const task = this._steps.restart(record.fiber); task.catch(() => {});
         }
         await this._start(restored);
         this._commit(restored, previousSource);
@@ -348,7 +351,7 @@ export class Loader {
       const fibers = [...this.ctx.registry.values()].flatMap(runtime => [...runtime.fibers]);
       for (const node of nodes.filter(node => owned.has(node.id) && node.cleanupFailed).reverse()) {
         const fiber = fibers.find(item => item.id === node.id);
-        if (fiber) await fiber.retryCleanup();
+        if (fiber) await this._steps.retryCleanup(fiber);
       }
       await this._drain(this._blocked);
       this._blocked = undefined;
@@ -359,13 +362,23 @@ export class Loader {
   }
   dispose() {
     if (reentrant(this)) return Promise.reject(new LoaderError('REENTRANT_MUTATION', 'Cannot dispose Loader from its own callback'));
+    // Check before joining a queued close: the current action may be ahead of
+    // that close, in which case returning its Promise would deadlock the queue.
+    try { assertDomainMutation(this.ctx, { recovery: true }); }
+    catch (error) { return Promise.reject(error); }
+    if (this._disposeTask) return this._disposeTask;
     this._accepting = false;
-    return this._serialize(async () => {
+    const task = this._serialize(async () => {
       await this._drain(this._active ?? this._blocked);
       this._active = undefined;
       this._blocked = undefined;
       this._entries.clear();
       this.state = 'closed';
-    }, true);
+    }, true).catch(error => {
+      this._disposeTask = undefined;
+      throw error;
+    });
+    this._disposeTask = task;
+    return task;
   }
 }

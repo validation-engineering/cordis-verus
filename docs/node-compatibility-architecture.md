@@ -295,9 +295,11 @@ ModuleHost:
 
 生产基础能力是可重现的域重启与旧制品恢复。细粒度原地 HMR 是独立能力，使用锁定 Node 版本的 ModuleHost adapter，并承认 native addon、全局副作用或无法刷新模块需要升级为域重启。Node 的 ESM 缓存独立于 require.cache；URL 加查询参数或只删 CJS 缓存都不等价于完整卸载。[Node ESM 文档](https://nodejs.org/api/esm.html#no-requirecache)
 
-配置更新、插件管理、HMR 与 shutdown 使用单一 mutation coordinator，但必须区分两类命令。外部 revision 请求按事务串行；当前 episode 中的 child 创建、effect 登记、服务发布和合法读取按 admission 立即处理，属于当前事务拥有的资源，不能排队等待该事务结束。因此候选 setup 内 `await ctx.plugin(child)` 可以继续推进，回滚也能找到它的 child。
+完整目标中，配置更新、插件管理、HMR 与 shutdown 使用单一 mutation coordinator，但必须区分两类命令。外部 revision 请求按事务串行；当前 episode 中的 child 创建、effect 登记、服务发布和合法读取按 admission 立即处理，属于当前事务拥有的资源，不能排队等待该事务结束。因此候选 setup 内 `await ctx.plugin(child)` 可以继续推进，回滚也能找到它的 child。
 
 从 setup/cleanup 重入的全局 update/reload 若需要等待当前 action 自己退出，返回明确的 `ReentrantMutation`；同一销毁任务重复请求加入现有任务，但不得允许已知自等待。profile 返回值外形仍保持，必要的错误差异列入矩阵。事务执行上下文携带来源 ticket，不能只用全局布尔锁判断重入。任意 JS Promise 构造的等待环不能普遍检测；只检测框架可观察的等待依赖，其余保持 draining 诊断。
+
+当前实现已将多个 JSON Loader、直接 Fiber 更新/清理和 Context 关闭接入同域 `domainMutation`；内部步骤携带作用域能力，恢复仅允许清理。官方 Include/Group 在 `internal/update` 同步调用栈中发起的子级生命周期操作并入当前事务；精确调用来源与 self/owner/committed-provider 等待检查防止权限逃逸和已知自等待。该权限不跨异步续程。原版 Loader 整条配置持久化事务和模块图 HMR 尚需适配。
 
 恢复期间到来的外部 revision 必须排队、合并或明确拒绝，不能覆盖恢复 journal；恢复所需的 episode-local completion 和 cleanup 命令必须仍能推进。普通服务调用继续遵循各自 admission。
 

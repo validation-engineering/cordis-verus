@@ -99,6 +99,36 @@ await ctx.dispose()        // 同样会等待所有 owned task，然后清理资
 
 这些差异限制“完全替换”的声明；需要逐个目标应用验证。
 
+## 同域外部变更事务
+
+`domainMutation(ctx, callback)` 为同一 Context 域内的多个 JSON Loader、直接 Fiber
+update/restart/dispose/retryCleanup 与最终 `Context.dispose()` 提供统一提交顺序。
+它是兼容层扩展；同步 `ctx.plugin/provide/effect` 仍保留原调用形态，应用可以把外部批量
+操作显式放进事务。原版官方 Loader 整条配置持久化事务、Worker supervisor 与模块图 HMR
+仍需各自适配，不能把这里的 Fiber 级接入称为全部装载协议已经完成。
+
+```js
+import { domainMutation } from '@cordis-verus/compat-cordis'
+await domainMutation(ctx, async steps => {
+  await steps.update(existingFiber, { prefix: 'Welcome' })
+  await ctx.plugin(anotherPlugin)
+})
+```
+
+回调使用 `steps.update/restart/dispose/retryCleanup` 执行内部生命周期步骤；直接嵌套
+外部 mutation 会拒绝 `REENTRANT_MUTATION`。steps 绑定当前事务和调用来源；受管理的
+setup/cleanup/task/effect 回调及其完成后的续程不能借用，`internal/update` 回调也不能借用外层 steps，事务结束后能力失效。已发出的步骤必须落地；即使回调未等待它们，
+其失败也不能变成成功提交。回调自身失败保留原错误及 Loader code/details，其他步骤错误
+保存在 snapshot diagnostics。事务只保证排队和排空，不自动回滚已完成的 Fiber 变更或外部副作用；JSON Loader 的旧 recipe 恢复由 Loader 另行实现。
+
+为保留官方 Include/Group 的调用方式，`internal/update` 的**同步调用栈**可以发起子插件或无关 Fiber 的 update/restart/dispose；这些操作加入当前事务，清理及失败仍由该事务收束。该调用栈不能等待自身、owner 或自己保留的 committed provider，也不能被新插件动作、effect 回调或异步续程借用。显式嵌套 `domainMutation` 仍被拒绝。这个兼容规则不把原版 Loader 的文件持久化、模块导入和整批配置变更变成原子事务。
+
+失败 cleanup 阻止新的外部 revision；`{ recovery: true }` 仅用于 dispose/retryCleanup，
+不能挂载插件或获取新资源。最终关闭一经接纳便关闭新外部准入，但已接纳事务内的
+child/effect/completion 继续推进；关闭失败仍保留恢复入口。Harness update 仍返回 void，
+`fiber.await()` 从事务外等待已排队的更新/卸载；Cordis 未排队的 veto 可直接返回 undefined；排队的 update 返回 Promise，veto 仍生效。
+普通 JS 与 Rust 回调均拒绝等待自己仍保留的 committed provider。
+
 ## JSON Loader 与 Worker 代码更新
 
 `@cordis-verus/compat-loader` 提供 JSON Include/group、稳定 entry ID、isolate/inject、模块解析、串行配置事务和失败恢复。配置更新先准备模块，按稳定 ID、factory/revision、配置和 realm 比较，只排空变化子树；未变 Fiber 保留，依赖触发的 episode 重启仍由 Driver 决定。候选失败必须先清理候选，再按保存的旧 factory/config recipe 恢复。内部 child/effect 注册不排在全局事务队列后面。

@@ -49,7 +49,10 @@ lifecycle actions. A verified PublicationRegistry tracks revocation and cleanup
 leases independently of logical provider identity. Rust Runtime and Node now share LifecycleDriver control and a verified action ledger;
 backend values and journals remain separate. Service checks, two profiles, JSON
 Incremental Loader transactions, owned tasks and Worker artifact recovery have executable
-regressions. Existing paper completion counts are unchanged.
+regressions. A shared domain mutation queue now orders multiple JSON Loaders, direct Fiber revisions and final
+Context shutdown. Scoped lifecycle steps cannot escape into plugin continuations, failed cleanup
+blocks new revisions, and accepted work drains before close. Original Loader persistence and
+module-graph/supervisor transactions still require separate integration. Existing paper completion counts are unchanged.
 
 The [Rust factory SDK](rust-node-plugins.md) adds same-graph JSON services,
 pull streams, explicit opaque object/callback adapters and event-driven Futures

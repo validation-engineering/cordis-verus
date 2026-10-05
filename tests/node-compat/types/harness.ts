@@ -20,3 +20,27 @@ async function app() {
   await ctx.dispose();
 }
 void app;
+
+
+import { domainMutation, assertDomainMutation, type MutationSteps } from '@deepseek-ai/cordis';
+async function coordinated(ctx: Context, fiber: Fiber): Promise<number> {
+  assertDomainMutation(ctx, { recovery: true });
+  const value: number = await domainMutation(ctx, async (steps: Readonly<MutationSteps>) => {
+    await steps.update(fiber, { enabled: true });
+    await steps.restart(fiber);
+    // @ts-expect-error Steps are scoped readonly authority.
+    steps.dispose = async () => {};
+    // @ts-expect-error Lifecycle steps require a Fiber, not a Context.
+    await steps.dispose(ctx);
+    return 42;
+  });
+  await domainMutation(ctx, async steps => {
+    await steps.retryCleanup(fiber);
+    await steps.dispose(fiber);
+  }, { recovery: true });
+  // @ts-expect-error A transaction result retains its inferred value type.
+  const invalid: string = await domainMutation(ctx, () => 42);
+  void invalid;
+  return value;
+}
+void coordinated;
