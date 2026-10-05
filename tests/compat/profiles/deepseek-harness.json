@@ -1,0 +1,26 @@
+{
+  "schema": "cordis-verus.compatibility-profile/v1",
+  "id": "deepseek-harness",
+  "package": "@deepseek-ai/cordis",
+  "version": "4.0.4",
+  "upstreamRepository": "deepseekHarness",
+  "revision": "da00f7f5358f2949383b35c14f548bc20187d80c",
+  "source": "upstream/deepseek-harness/vendor/cordis/src/fiber.ts",
+  "policies": {
+    "initialConfigResolution": "at-activation-after-dependencies",
+    "configOnReactivation": "resolve-raw-config-again",
+    "internalConfigWaterfall": true,
+    "updateReturn": "undefined",
+    "inactiveUpdateConfigResolution": "deferred-until-activation",
+    "failedDependencyRefresh": "may-retry-after-epoch-change",
+    "observerPublication": "after-parent-disposer-assignment",
+    "effectOwnershipRegistration": "before-execute",
+    "unloadingEffectAdmission": "rejected",
+    "teardownObserverErrors": "log-each-and-continue",
+    "inFlightExternalCleanup": "structural-owner-joins",
+    "staleLoadingCheckpoint": "skip-plugin-body"
+  },
+  "evidenceKind": "source-audit",
+  "conformanceClaim": false,
+  "note": "This profile is distinct from cordis. The original Cordis core suite is not a complete or authoritative Harness behavior oracle."
+}

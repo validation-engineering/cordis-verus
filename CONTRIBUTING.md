@@ -4,16 +4,19 @@ Chinese and English issues, documentation, and pull requests are welcome. This
 is an experimental 0.1 project; open a short design discussion before a large API
 or semantic change. Small bug fixes can go directly to a pull request.
 
-Install Rustup, Python 3.9 or newer, Git, and curl, then run:
+Install Rustup, Python 3.9 or newer, Git, curl and Node 22.22.0, then run:
 
 ```sh
 ./scripts/install-verus.sh
+npm ci --ignore-scripts
 ./scripts/check-development.sh
 ```
 
 The script runs formatting, Clippy with warnings denied, rustdoc, executable
 whole-kernel Verus proofs, behavior tests, examples, and isolated
-crate archive tests/release builds. After dependencies are cached,
+crate archive tests/release builds, a source-bound Node addon and self-contained
+Node behavior tests. Optional upstream differential tests use `npm run test:compat`;
+see [Node compatibility](docs/node-compatibility.md) for the locked-source prerequisite. After dependencies are cached,
 `python3 scripts/package-check.py --offline` checks packaging without network.
 Full release acceptance additionally requires `./scripts/quality.sh`, including
 all full-crate negative mutations. See [validation](docs/validation.md) for the
@@ -43,7 +46,7 @@ intentional, reviewed change and rerun proofs, negative tests, and packaging.
 
 ## Version and support policy
 
-The two crates currently share unreleased version 0.1.0 and are developed together.
+The four Rust crates currently share unreleased version 0.1.0 and are developed together.
 During this unpublished development stage, prioritize Cordis behavior and paper
 semantics; update callers and documentation directly when an API changes rather
 than adding compatibility shims for earlier development snapshots. After publication, patch

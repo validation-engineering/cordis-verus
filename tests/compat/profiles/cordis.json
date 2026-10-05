@@ -1,0 +1,24 @@
+{
+  "schema": "cordis-verus.compatibility-profile/v1",
+  "id": "cordis",
+  "package": "cordis",
+  "version": "4.0.0-rc.10",
+  "upstreamRepository": "cordis",
+  "revision": "f8ea3cd50f1a5724e8e715995bcde131c9c12b2c",
+  "source": "upstream/cordis/packages/core/src/fiber.ts",
+  "policies": {
+    "initialConfigResolution": "at-mount-before-dependencies",
+    "configOnReactivation": "reuse-resolved-config",
+    "internalConfigWaterfall": false,
+    "updateReturn": "waterfall-result-as-handled-promise-or-undefined",
+    "inactiveUpdateConfigResolution": "synchronous",
+    "failedDependencyRefresh": "blocked-until-update",
+    "observerPublication": "before-parent-disposer-assignment",
+    "effectOwnershipRegistration": "after-execute",
+    "unloadingEffectAdmission": "uid-only",
+    "teardownObserverErrors": "emit-propagates"
+  },
+  "evidenceKind": "source-audit",
+  "conformanceClaim": false,
+  "note": "These describe the pinned upstream, including behaviors the verified host may intentionally strengthen. Passing selected fixtures does not establish complete compatibility."
+}

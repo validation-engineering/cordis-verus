@@ -1,0 +1,7 @@
+[
+  {
+    "id": "greeting",
+    "name": "./plugins/greeting.mjs",
+    "config": { "prefix": "Hello" }
+  }
+]

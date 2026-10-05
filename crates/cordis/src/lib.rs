@@ -6,6 +6,7 @@ mod future_support;
 pub mod loader;
 pub mod owned_events;
 pub mod persistence;
+pub mod process_plugin;
 pub mod resources;
 pub mod runtime;
 pub mod timer;

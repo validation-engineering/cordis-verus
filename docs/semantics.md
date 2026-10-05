@@ -159,7 +159,7 @@ cooperative async 表示外层可把清理推迟到未来的 poll/step 完成，
 
 [timer.rs](../crates/cordis/src/timer.rs) 提供单工作线程或手动时钟、timeout/interval、sleep/ticks、debounce/throttle。owner 绑定在 setup 中登记 cleanup，外部 shutdown 等待在途 callback；同一 timer service 内的 callback 发起 shutdown 时只发出取消，避免彼此 join。interval 使用 fixed-delay，不补发过去的 tick。sleep/ticks 观察 owner 取消，使初始化等待 timer 时可以退出。
 
-[loader.md](loader.md) 说明配置树、schema/default、metadata/interception、Include、文件 polling 与 factory revision HMR。配置先验证再变更；替换用 fresh ID，失败/取消保留可恢复事务和旧 factory。其 JSON、文件 I/O、回滚编排和 callback 都是普通 Rust，不能由内核证明替代。
+[loader.md](loader.md) 说明配置树、schema/default、metadata/interception、Include、文件 polling、factory revision 和原地更新。配置先验证再变更；替换用 fresh ID，提交前的失败/取消保留可恢复事务和旧 factory。原地更新先登记补偿计划，提交后的依赖传播错误通过 PostCommit 单独报告，不伪装为已恢复旧配置。动态服务通过有显式 owner anchor 依赖的子 provider 表达，服务检查是额外的宿主 activation 守卫；共享 payload 槽保持 committed provider 身份。[外部插件](process-plugins.md) 的 JSON-RPC、代码快照、文件 I/O、回滚编排和任意 callback 都属于普通 Rust，不能由内核证明替代。
 
 ## 保持语义的历史回收
 

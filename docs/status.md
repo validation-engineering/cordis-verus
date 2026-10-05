@@ -1,4 +1,4 @@
-# Current status — 2026-10-04
+# Current status — 2026-10-05
 
 This is an experimental development checkpoint for the initially private
 [Stool233/cordis-verus](https://github.com/Stool233/cordis-verus) repository.
@@ -32,6 +32,61 @@ with enums, unregister cancelled effect-join waiters, and share polling and
 loader bookkeeping helpers. Started setup/effect futures remain owned by the
 runtime until landing, and inverses are collected before cancellation cleanup.
 Host regression tests cover these behaviors; they are not new async proofs.
+
+The host compatibility work adds dynamic service child providers with explicit
+owner lifetime dependencies, shared provider payload slots and consumer-specific
+availability checks. Loader supports opt-in reversible configuration updates;
+external executable plugins use bounded JSON-RPC with code snapshots for rollback.
+These are host behavior changes, not new kernel theorems or TypeScript plugin
+compatibility. See [runtime](runtime.md), [loader](loader.md), and
+[process plugins](process-plugins.md) for the operational boundaries.
+
+## Native Node compatibility slice
+
+The new `cordis-driver`, Node-API binding and JS facade run a tested subset of
+original Cordis plugins. Service values remain in JavaScript; Rust selects
+lifecycle actions. A verified PublicationRegistry tracks revocation and cleanup
+leases independently of logical provider identity. Rust Runtime and Node now share LifecycleDriver control and a verified action ledger;
+backend values and journals remain separate. Service checks, two profiles, JSON
+Incremental Loader transactions, owned tasks and Worker artifact recovery have executable
+regressions. Existing paper completion counts are unchanged.
+
+The [Rust factory SDK](rust-node-plugins.md) adds same-graph JSON services,
+pull streams, explicit opaque object/callback adapters and event-driven Futures
+through user-compiled addons. Objects and callbacks are acquired through declared
+factory methods; arguments and results remain JSON. They are not arbitrary handles
+or closures embedded in DTOs.
+
+The [static typed adapter](typed-rust-plugins.md) now executes real `cordis::Plugin` definitions in the Node graph. It retains original slots and per-Fiber FnMut state, rejects unsupported dynamic operations, and records legacy FnOnce cleanup failure permanently instead of accepting an empty retry. This does not close the remaining dynamic Runtime or paper refinement obligations.
+
+Borrowed object release drops an adapter reference; owned release waits for its
+explicit cleanup and retains failed work for retry. Ordinary JS inverses must all
+succeed before the consumer's object LIFO phase and its own Rust session teardown.
+This preserves handles and instances for failed-inverse retry. Reverse `JsObject`,
+`JsCallback` and `JsStream` capabilities are action-scoped, including clones. Explicit
+Rust close reports `ObjectBusy`/`StreamBusy` for pending method/pull work; automatic
+journals still drain real completion, with stream return issued before joining next.
+These ownership and reentrancy rules have host regression coverage, not new paper
+completion claims.
+Native manifests now bind the selected platform artifact to its bytes and build
+inputs; local bundle assembly preserves actual host evidence. Declared platform
+targets are not a claim that every remote build has passed.
+See the [Node guide](node-compatibility.md) for commands and remaining M0–M7 work.
+The source-bound development report separately records native build and Node
+behavioral tests. Optional locked-upstream differential tests are separate evidence
+in `target/node-compat/differential.json`; the default CI does not run that suite.
+None of these records proves arbitrary JS callbacks or complete profile compatibility.
+
+The [performance tools](benchmarks.md) provide source/build-bound measurements,
+raw batch samples and explicit baseline comparison. A local smoke measurement has exercised the scenario runner; it does not establish
+a stable baseline or an accepted budget. Tool tests are not measurement evidence;
+platform baselines, production workloads and long-running resource tests still
+require separate runs and acceptance.
+
+Remaining integration work includes dynamic typed Runtime/publication migration, broader
+interface and ABI contracts, more Cordis/Harness ecosystem coverage, module-graph
+HMR, actual platform acceptance and host-to-paper refinement. The full long-term
+architecture and release gate remain incomplete.
 
 ## Paper coverage
 

@@ -1,0 +1,40 @@
+{
+  "name": "cordis-verus-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/compat-cordis",
+    "packages/compat-loader",
+    "packages/compat-harness"
+  ],
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "scripts": {
+    "build:native": "node scripts/build-node.mjs",
+    "test:node": "node --test --test-timeout=30000 tests/node-compat/*.test.mjs tests/node-loader/*.test.mjs tests/benchmarks/*.test.mjs",
+    "test:compat": "node scripts/check-node-compat.mjs --build",
+    "example:node": "node --import ./packages/compat-cordis/register.js examples/node/basic.mjs",
+    "test:types": "node scripts/sync-profile-types.mjs --check && node --test tests/node-compat/types.test.mjs tests/node-loader/types.test.mjs",
+    "test:upstream-core": "node scripts/check-upstream-core.mjs",
+    "example:node-loader": "node --import ./packages/compat-cordis/register.js examples/node-loader/main.mjs",
+    "test:profiles": "node scripts/check-node-profiles.mjs",
+    "test:distribution": "node scripts/check-npm-package.mjs",
+    "test:harness": "node scripts/check-harness-compat.mjs",
+    "benchmark": "node scripts/benchmark.mjs"
+  },
+  "devDependencies": {
+    "@standard-schema/spec": "1.1.0",
+    "cosmokit": "1.8.1",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vite": "7.3.5",
+    "vitest": "4.1.11",
+    "zod": "4.4.3"
+  },
+  "overrides": {
+    "vite": "$vite",
+    "esbuild": "$esbuild"
+  }
+}

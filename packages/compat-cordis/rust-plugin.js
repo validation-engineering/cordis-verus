@@ -1,0 +1,285 @@
+// Explicit JSON service adapters for user-compiled Rust factories. Rust owns
+// Futures and values; the ordinary Fiber journal owns their graph lifetime.
+import { symbols } from './utils.js';
+import { types } from 'node:util';
+import { JavaScriptStreams, rustStream } from './rust-streams.js';
+import { JavaScriptObjects, isOpaqueValue, rustObject } from './rust-objects.js';
+
+// Root a domain only while Rust work is actually outstanding. An idle N-API
+// callback must not retain Host → Domain → NativeDriver → callback forever.
+const activeHosts = new Set();
+
+function errorText(error) {
+  try { return String(error); } catch { return 'JavaScript service threw an unprintable value'; }
+}
+
+export function jsonValue(value) {
+  // Reject lossy or executable coercions rather than silently JSON-roundtripping
+  // arbitrary JS values (Date, BigInt, toJSON, undefined, cycles, etc.).
+  const seen = new Set();
+  const visit = item => {
+    if (item === null || typeof item === 'string' || typeof item === 'boolean') return item;
+    if (typeof item === 'number' && Number.isFinite(item)) return item;
+    if (typeof item !== 'object' || item === null) throw new TypeError('Rust service values must be finite JSON data');
+    if (isOpaqueValue(item)) throw new TypeError('Opaque capabilities cannot be passed as JSON data');
+    if (types.isProxy(item)) throw new TypeError('Rust service values cannot contain proxies');
+    if (seen.has(item)) throw new TypeError('Rust service values cannot contain cycles');
+    if (!Array.isArray(item) && ![Object.prototype, null].includes(Object.getPrototypeOf(item))) throw new TypeError('Rust service values must be plain JSON objects');
+    if (Reflect.ownKeys(item).some(key => typeof key === 'symbol')) throw new TypeError('Rust service values cannot contain symbol keys');
+    seen.add(item);
+    const result = Array.isArray(item) ? [] : Object.create(null);
+    const keys = Array.isArray(item) ? Array.from({length:item.length},(_,i)=>String(i)) : Object.keys(item);
+    const allowed = new Set(Array.isArray(item) ? [...keys,'length'] : keys);
+    if (Reflect.ownKeys(item).some(key => !allowed.has(key))) throw new TypeError('Rust service values cannot contain hidden or extra properties');
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(item,key);
+      if (!descriptor || !('value' in descriptor)) throw new TypeError('Rust service values cannot contain holes or accessors');
+      result[key] = visit(descriptor.value);
+    }
+    seen.delete(item);
+    return result;
+  };
+  return visit(value);
+}
+
+export class RustHost {
+  constructor(domain, hooks) {
+    this.domain = domain;
+    this.hooks = hooks;
+    this.sessions = new Map();
+    this.jobs = new Map();
+    this.results = new Map();
+    this.factories = new Map();
+    this.scheduled = false;
+    this.streams = new JavaScriptStreams(this, jsonValue);
+    this.objects = new JavaScriptObjects(this, jsonValue);
+    this.jsonValue = jsonValue;
+    const driver = domain.driver;
+    if (typeof driver.rustInfo !== 'function') return;
+    const info = JSON.parse(driver.rustInfo());
+    if (info.abi !== 1) throw new Error('Unsupported Rust plugin ABI');
+    for (const factory of info.factories) {
+      if (this.factories.has(factory.name)) throw new Error('Duplicate Rust factory');
+      this.factories.set(factory.name,{...factory,plugin:undefined});
+    }
+    if (this.factories.size) {
+      const weak = new WeakRef(this);
+      driver.rustWake(() => weak.deref()?.schedule());
+    }
+  }
+  command(command) {
+    if (this.fault) throw this.fault;
+    try {
+      const reply = JSON.parse(this.domain.driver.rustCommand(JSON.stringify(command)));
+      if (reply?.error) throw new Error(reply.error);
+      return reply;
+    } catch (error) {
+      if (/DomainFaulted/.test(errorText(error))) this.fail(error);
+      throw error;
+    }
+  }
+  fail(error) {
+    if (this.fault) return;
+    this.fault = error;
+    for (const waiter of this.jobs.values()) waiter.reject(error);
+    this.jobs.clear();
+    activeHosts.delete(this);
+    this.results.clear();
+    this.domain.diagnostics?.push({kind:'rust-domain-fault',cleanup:'unconfirmed',error:errorText(error)});
+    this.domain.errors.push(error);
+    this.domain.wake();
+  }
+  schedule() {
+    if (this.scheduled || this.fault) return;
+    this.scheduled = true;
+    queueMicrotask(() => {
+      this.scheduled = false;
+      try { this.poll(); } catch (error) { this.fail(error); }
+    });
+  }
+  poll() {
+    const reply = this.command({op:'poll'});
+    for (const request of reply.calls ?? []) {
+      // This promise boundary releases all Rust borrows before arbitrary JS.
+      Promise.resolve().then(() => this.dispatch(request)).then(
+        value => this.command({op:'reply',request:request.request,success:true,value:jsonValue(value ?? null)}),
+        error => this.command({op:'reply',request:request.request,success:false,error:errorText(error)}),
+      ).then(() => this.schedule(),error => { if (!this.fault) { this.domain.errors.push(error); this.domain.wake(); } });
+    }
+    for (const result of reply.jobs ?? []) {
+      const waiter = this.jobs.get(result.job);
+      if (waiter) { this.jobs.delete(result.job); this.finish(waiter,result); }
+      else this.results.set(result.job,result);
+    }
+    this.domain.wake();
+  }
+  finish(waiter,result) {
+    if (result.success) waiter.resolve(result.value);
+    else waiter.reject(new Error(result.error ?? 'Rust job failed'));
+  }
+  wait(job, session, kind, caller, resource) {
+    if (this.fault) return Promise.reject(this.fault);
+    const waiter = Promise.withResolvers();
+    const result = this.results.get(job);
+    if (result) { this.results.delete(job); this.finish(waiter,result); }
+    else { this.jobs.set(job,waiter); activeHosts.add(this); }
+    const token = this.hooks.invocation();
+    const ancestors = token?.rustResources ?? (token?.rustResource ? [token.rustResource] : []);
+    const record = {job,kind,resource,ancestors,promise:waiter.promise,cancel:()=>['stream-close','object-close'].includes(kind) ? undefined : this.command({op:'cancel_job',job})};
+    session.jobs.add(record);
+    if (caller) (caller._rustCalls ??= new Set()).add(record);
+    const finish = () => {session.jobs.delete(record); caller?._rustCalls?.delete(record); if (!this.jobs.size) activeHosts.delete(this); this.domain.wake();};
+    waiter.promise.then(finish,finish);
+    this.schedule();
+    return waiter.promise;
+  }
+  plugin(name) {
+    const factory = this.factories.get(name);
+    if (!factory) throw new Error(`Rust factory is not registered in this addon: ${name}`);
+    return factory.plugin ??= {
+      name:`rust:${name}`, inject:[...factory.inject],
+      apply:async (ctx,config) => {
+        const token = this.hooks.invocation();
+        const ports = Object.fromEntries([...factory.inject,...factory.services.map(service => service.name)].map(name => [name,this.domain.port(ctx,name)]));
+        // A rejected start can still have created a persistent typed definition.
+        token.fiber._rustDefinition = true;
+        const reply = this.command({op:'start',ticket:token.ticket,factory:name,config:jsonValue(config ?? null),ports});
+        const session = {id:reply.session,ctx,factory,token:{...token},jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
+        this.sessions.set(session.id,session);
+        // Own teardown before polling setup, including partially failing setup.
+        // Rust instances remain available through every ordinary JS inverse and
+        // object release. Failed inverses must not destroy a retry dependency.
+        (token.fiber._rustSessions ??= new Set()).add(session);
+        session.close = async () => {
+          this.cancel(session);
+          await this.closeResources(session.resources);
+          await this.closeObjects(session.objects);
+          await Promise.allSettled([...session.jobs].map(job => job.promise));
+          session.cleaning = true;
+          session.cleanupToken = {...this.hooks.invocation()};
+          const ticket = session.cleanupToken.ticket;
+          if (!session.cleanupDone) {
+            const cleanup = this.command({op:'cleanup',session:session.id,ticket});
+            await this.wait(cleanup.job,session,'cleanup');
+            session.cleanupDone = true;
+          }
+          this.command({op:'release',session:session.id});
+          session.closed = true;
+          this.sessions.delete(session.id);
+          token.fiber._rustSessions.delete(session);
+        };
+        await this.wait(reply.job,session,'setup');
+      },
+    };
+  }
+  removed(fiber) {
+    if (fiber._rustDefinition) {
+      this.command({op:'forget',id:fiber.id});
+      fiber._rustDefinition = false;
+    }
+  }
+  close() {
+    if (typeof this.domain.driver.rustCommand !== 'function') return;
+    this.command({op:'close'});
+    activeHosts.delete(this);
+  }
+  cancel(session) {
+    if (session.cancelled || session.closed) return;
+    session.cancelled = true;
+    this.command({op:'cancel',session:session.id});
+    for (const resource of session.resources ?? []) resource.close().catch(() => {});
+    this.schedule();
+  }
+  sync(item) {
+    if (item.retired || String(item.state).toLowerCase() === 'unloading') {
+      for (const session of this.sessions.values()) if (session.token.fiber.id === item.id) this.cancel(session);
+      for (const resource of this.domain.fibers?.get(item.id)?._rustResources ?? []) {
+        if (!resource.closing) resource.close().catch(() => {});
+      }
+    }
+  }
+  dispatch(request) {
+    const session = this.sessions.get(request.session);
+    if (!session || session.closed) throw new Error('Rust session is closed');
+    const job = [...session.jobs].find(job => job.job === request.job);
+    if (!job) throw new Error('Rust request belongs to an unknown or completed job');
+    const token = {...(job.kind === 'cleanup' ? session.cleanupToken : {...session.token,kind:'rust-call'}),rustAuthority:{session:session.id,job:job.job,request:request.request},rustResource:job.resource,rustResources:[...new Set([...(job.ancestors ?? []),...(job.resource ? [job.resource] : [])])]};
+    return this.hooks.run(token,() => {
+      if (request.kind === 'provide') {
+        const descriptor = session.factory.services.find(service => service.name === request.service);
+        if (!descriptor) throw new Error(`Undeclared Rust service: ${request.service}`);
+        const host = this;
+        const service = Object.create(null);
+        Object.defineProperty(service,'ctx',{value:session.ctx,configurable:true});
+        Object.defineProperty(service,symbols.tracker,{value:{property:'ctx',associate:descriptor.name}});
+        for (const method of descriptor.methods) {
+          if (['ctx','then','__proto__','constructor'].includes(method.name)) throw new Error(`Reserved Rust method name: ${method.name}`);
+          Object.defineProperty(service,method.name,{enumerable:true,get() {
+            const ctx = this[symbols.caller] ?? this.ctx;
+            const fiber = ctx.fiber;
+            const generation = fiber._generation;
+            return (...args) => host.call(session,service,descriptor,method,ctx,fiber,generation,args);
+          }});
+        }
+        session.ctx.provide(descriptor.name,service);
+        session.services.set(descriptor.name,service);
+        const port = this.domain.port(session.ctx,descriptor.name);
+        const publication = session.ctx.fiber._publications.get(JSON.stringify(port)).publication;
+        return {publication,port};
+      }
+      if (request.kind === 'close_orphans') return this.streams.closeOrphans(session).then(()=>this.objects.closeOrphans(session));
+      if (request.kind === 'stream_next') return this.streams.next(this.streams.get(session,request));
+      if (request.kind === 'stream_close') return this.streams.close(this.streams.get(session,request,true));
+      if (request.kind === 'object_call') return this.objects.call(this.objects.get(session,request),request.method,request.args);
+      if (request.kind === 'object_close') return this.objects.close(this.objects.get(session,request,true));
+      if (!['call','stream_open','object_open'].includes(request.kind)) throw new Error(`Unsupported Rust host operation: ${request.kind}`);
+      if (!session.factory.inject.includes(request.service)) throw new Error('Rust call requires a declared dependency');
+      if (!Array.isArray(request.args)) throw new TypeError('Rust call arguments must be a JSON array');
+      const service = session.ctx[request.service];
+      const method = service?.[request.method];
+      if (typeof method !== 'function') throw new TypeError(`Unknown JS method: ${request.service}.${request.method}`);
+      if (request.kind === 'stream_open') return this.streams.open(session,request,service,method);
+      if (request.kind === 'object_open') return this.objects.open(session,request,service,method);
+      return Promise.resolve(Reflect.apply(method,service,request.args)).then(value => jsonValue(value ?? null));
+    });
+  }
+  caller(fiber,generation) {
+    const token = this.hooks.invocation();
+    const authority = token?.fiber?._domain === this.domain ? token.rustAuthority : undefined;
+    return {id:fiber.id,generation,...(authority ? {authority} : {}),...(token?.fiber === fiber && token.kind === 'cleanup' ? {ticket:token.ticket} : {})};
+  }
+  async closeResources(resources) {
+    const results = await Promise.allSettled([...(resources ?? [])].map(resource => resource.close()));
+    const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
+    if (errors.length) throw new AggregateError(errors,'Rust stream cleanup failed');
+  }
+  async closeSessions(fiber) {
+    for (const session of [...(fiber._rustSessions ?? [])].reverse()) await session.close();
+  }
+  async closeObjects(objects) {
+    // Retain earlier objects when a later acquisition cannot be released yet.
+    for (const object of [...(objects ?? [])].reverse()) await object.close();
+  }
+  call(session,service,descriptor,method,ctx,fiber,generation,args) {
+    this.hooks.assertCurrent(this.domain);
+    if (session.closed || session.cleaning || fiber._removedFlag || fiber._generation !== generation) throw this.hooks.stale();
+    const current = ctx[descriptor.name];
+    if ((current?.[symbols.original] ?? current) !== service) throw this.hooks.stale();
+    if (['stream','object'].includes(method.kind) && (session.cancelled || fiber.state === 5 || this.hooks.invocation()?.kind === 'cleanup')) throw new Error(method.kind === 'stream' ? 'StreamAdmissionClosed' : 'ObjectAdmissionClosed');
+    const caller = this.caller(fiber,generation);
+    const reply = this.command({op:'call',session:session.id,service:descriptor.name,method:method.name,args:jsonValue(args),caller});
+    if (method.kind === 'sync') {
+      if (!Object.hasOwn(reply,'value')) throw new Error('Rust sync method returned no value');
+      return reply.value;
+    }
+    if (method.kind === 'stream') {
+      if (typeof reply.stream !== 'string') throw new Error('Rust stream method returned no resource');
+      return rustStream(this,session,reply.stream,fiber,generation);
+    }
+    if (method.kind === 'object') {
+      if (typeof reply.object !== 'string' || !reply.descriptor) throw new Error('Rust object method returned no capability');
+      return rustObject(this,session,reply.object,reply.descriptor,fiber,generation);
+    }
+    return this.wait(reply.job,session,'call',fiber);
+  }
+}

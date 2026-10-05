@@ -1,6 +1,6 @@
 # Cordis 与 DeepSeek Harness 功能对照
 
-本项目以 Rust 重现 Cordis 的生命周期、依赖和效果组合接口，DeepSeek Harness 提供真实使用场景。它不直接运行 TypeScript 插件，也不重写 Harness 的 UI、AgentLoop 业务、模型 API、持久化、权限或工具执行。论文安全语义用于约束恢复顺序；上游运行结果和 Rust 行为测试不能代替证明。[upstream.lock.json](../upstream.lock.json) 记录官方源码快照。
+本项目以 Rust 重现 Cordis 的生命周期、依赖和效果组合接口，DeepSeek Harness 提供真实使用场景。新增实验性 Node facade 可运行限定范围内的原版 JS/TS 插件；它不重写 Harness 的 UI、AgentLoop 业务、模型 API、持久化、权限或工具执行。论文安全语义用于约束恢复顺序；上游运行结果和 Rust 行为测试不能代替证明。[upstream.lock.json](../upstream.lock.json) 记录官方源码快照。
 
 | 官方仓库 | 锁定 revision | 用途 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ Verus 内核的 `wf` 包含 registry 结构、provision 唯一性、live binding
 | 父依赖继承 | 子节点继承父实际 ports 与子 context 对应 realm 的 ports，排除自身 provisions | 宿主扩展为真实 kernel dependencies；parent 字段本身不添加服务依赖 |
 | service provider | provides/provide，Active 后才参与新解析 | 唯一 provision 是已证明不变量；Loading payload 不提前发布由宿主保证 |
 | provider identity | committed 保存具体 provider ID，贯穿 setup 与 cleanup | 内核；相同 payload 不能掩盖 provider revision |
-| 四态与 reactive reload | Inactive、Loading、Active、Unloading；target 变化驱动撤回/恢复 | Loading 对应上游 Reloading；允许 Active 与 target 暂时不一致 |
+| 生命周期与 reactive reload | Inactive、Loading、Active、Unloading；target 变化驱动撤回/恢复 | 上游暴露 PENDING/LOADING/ACTIVE/FAILED/DISPOSED/UNLOADING；Rust 将失败、退休和是否存在另行表示，允许 Active 与 target 暂时不一致 |
 | 异步 Service.init | Plugin::new_async，owned AsyncSetup，跨 await 初始化 | 行为测试；在途 setup 先完成可收集 inverse 的边界，再恢复 |
 | effect iterator | Effect::step、EffectIterator、Inverse、EffectHandle | stage 前检查依赖；组内 LIFO，独立组可以并发恢复；调度和任意回调未证明 |
 | effect cancel/join | handle cancel/dispose、initialized/finished/errors/join | 幂等取消；当前 stage 落地、后续 stage 停止；join 需要 runtime 持续驱动 |
@@ -30,27 +30,29 @@ Verus 内核的 `wf` 包含 registry 结构、provision 唯一性、live binding
 | 失败与 panic | setup/stage 失败锁存并回滚，cleanup 错误/panic 记录后继续 | 宿主测试；未登记或不正确的 inverse 不会自动得到修复 |
 | quiescence | Runtime::settle、目标化 Runtime::join，缺失依赖可保持 Inactive | join 驱动目标并避开无关 Pending；没有后台 executor 或全局 liveness 证明 |
 | isolation 与 sharing | Context::isolate/share，固定 realm ports | 内核按 key/realm 区分；修改接口/realm 采用 fresh revision |
-| typed service access/update | Setup/AsyncSetup::get/provide/set，Runtime::set，owner_context | Rust typed key/payload；外部 Arc 不形成 lifecycle consumer，旧 handle 不可写新 episode |
+| typed service access/update | get/provide/set 与共享 provider 槽 | 后续 get 看到同一 provider 的新值，已返回 Arc 保留旧值；外部 Arc 不形成 lifecycle consumer |
+| 动态 service / Service.check | publish/publish_checked、ServiceHandle 撤销、provide_checked、requires_with_config | 动态 provider 使用有显式 owner anchor 依赖的子节点；check 是宿主纯谓词，false/panic 触发依赖失效 |
+| 原地配置更新 | on_config_update、ConfigUpdatePlan、Loader updated 报告 | apply 前登记 inverse；可取消和重试恢复；结构/依赖变动采用普通替换；提交后的依赖传播错误单独报告 |
 | plugin revision | Runtime::replace；Loader 差分配置/factory revision | 退休、清理、删除后 fresh ID；restart/update/update_async 保留 ID，属于宿主扩展 |
 | 同步/异步事件 | Event/AsyncEvent，on/once/prepend/off，emit/bail/parallel/serial | 注册快照、once 原子 claim；parallel 等全部结果并汇总错误，serial 遇 Some/error 停止 |
 | waterfall 与 scope filter | Waterfall/AsyncWaterfall，around next，EventScope 与 filtered predicates | next 最多一次，支持前后处理/短路；回调正确性及进行中 dispatch 不受 kernel 自动 drain 保护 |
 | schema/context interception | Schema、ConfigScope::intercept/extend/extend_json | 默认值和严格字段校验；继承 patch 与 typed metadata 替代动态反射 |
 | Loader/Group/Include | ConfigTree、Entry、FactoryRegistry、JSON 文件、group 启停、递归 Include | 全树预检、最小重建、include cycle 检查；取消与失败有显式 recover 协议 |
-| 配置/代码 HMR | poll_reload 检查文件内容，register + reload 替换 Rust factory | 未变化节点不重启；旧 factory 快照支持回滚；不装载 JS/共享库或操作 Node cache |
+| 配置/代码 HMR | poll_reload、factory revision；ProcessPluginWatcher 检测外部可执行文件及显式依赖变化 | 独立进程 JSON-RPC；保存旧代码快照供回滚，需应用主动轮询；不装载共享库或操作 Node cache |
 | timer | timeout/interval/sleep/ticks/debounce/throttle，真实/手动 clock，owner bind | 普通 Rust worker 与取消/join；同 service callback 内 shutdown 只取消，外部 join 才是完成屏障 |
 | 维护与诊断 | 稳定回收失效 binding/删除声明、snapshot JSON/DOT、shutdown 错误汇总 | 回收 primitive 经过 Verus；diagnostic/driver 是普通 Rust；identity tombstone 保留 |
 | 具体 reversible resource | ReversibleStore、owner transaction、write/rollback、Setup::reversible | 实际调用已证明的 Store；Mutex/journal/owner 编排仍为宿主测试 |
 | 观测恢复与独立性 | calculus 的 sequence recovery、interference recovery、independent groups | 条件定理；需要每一步 inverse witness、观测等价及交换前提，不是任意 plugin 的自动证明 |
 
-使用方式与完整取消/错误边界见 [runtime.md](runtime.md) 和 [loader.md](loader.md)。
+使用方式与完整取消/错误边界见 [runtime.md](runtime.md)、[loader.md](loader.md) 和 [process-plugins.md](process-plugins.md)。Rust 外部进程插件须实现进程协议；原版 JS/TS 插件使用单独的 [Node 原生兼容入口](node-compatibility.md)。下表描述 Rust 宿主，不能将它的全部能力归入尚在实现中的 Node facade。
 
 ## Rust 接口选择及尚未覆盖的上游特性
 
-Rust 类型和显式资源所有权构成这一版本的应用接口。`ServiceKey<T>`、Plugin builder、ConfigScope、EffectIterator、typed event 和 factory registry 分别承担动态 service、decorator、context 扩展、JS iterator、动态事件和 module import 的对应职责。JS Proxy/shadow、对象属性 reflection、npm/ESM/CJS 解析与模块缓存不在执行环境中；现有 TypeScript plugin 需要按这些接口迁移。
+Rust 类型和显式资源所有权构成这一版本的应用接口。`ServiceKey<T>`、Plugin builder、ConfigScope、EffectIterator、typed event、factory registry 和外部进程协议提供相应 Rust 接口。这些 Rust API 不实现 JS Proxy/shadow 或 Node 模块缓存。Node facade 单独实现语言层与显式导入入口，但尚未提供完整 npm profile/模块缓存/HMR 兼容。
 
 Include 支持 JSON 与显式 ID、继承 scope、递归来源和内容 polling。YAML/JS 表达式、匿名 ID 自动回写、上游 YAML/JS patch journal 不兼容；Rust JSON 已提供显式保存计划、按 ID/字段三方合并、Include 拓扑保留和部分失败重试。程序内 apply/set_enabled 默认只修改内存配置，显式 save 才写文件；保存不自动将外部合并内容应用到 runtime，后续 file polling 以文件内容为准。group 的 enabled=false 会禁用整个拥有的子树，这个明确的 Rust 接口不复刻上游内部 group marker 始终 enabled 的表达方式。
 
-服务 payload 使用 Arc 快照与显式可变状态，不复刻 JS 同一对象的任意属性修改。事件的 off/dispose 只影响未来快照：已经捕获的普通 listener/future 可以继续，owner cleanup 不自动等待它们。普通 subscription 仍需应用自行协调；显式 on_owned/on_in 在实际调用前获取 admission，owner cleanup 等待已启动 handler、capture/future 析构与 continuation lease drain。它通过普通 Rust 测试保障协议，不把任意 callback 变成已证明的 kernel consumer。
+服务 payload 使用共享 provider 槽；set 后同一 episode 再次 get 可以看到新值，先前返回的 Arc 仍是快照，不复刻 JS 同一对象的任意属性修改。inject 对象配置可传给服务检查；ConfigScope::intercept 仍是工厂输入覆盖，不是 JS traced service 调用时的自动配置合并。事件的 off/dispose 只影响未来快照：已经捕获的普通 listener/future 可以继续，owner cleanup 不自动等待它们。普通 subscription 仍需应用自行协调；显式 on_owned/on_in 在实际调用前获取 admission，owner cleanup 等待已启动 handler、capture/future 析构与 continuation lease drain。它通过普通 Rust 测试保障协议，不把任意 callback 变成已证明的 kernel consumer。
 
 Timer 提供自己的 std worker，不是 Node event loop 或 Tokio 全 API 兼容层。callback 内停止自己的 service 不等待其他 callback，避免互相 join；从 callback 外调用 shutdown/cancel_and_join 才提供结束屏障。异步执行、线程锁、调度公平性和任意外部 I/O 都不在当前形式证明的直接范围中。
 

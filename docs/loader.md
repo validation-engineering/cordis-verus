@@ -36,7 +36,7 @@ factory 必须只构造插件，不应在 factory 中登记外部资源。资源
 
 根节点可以是上述对象，也可以直接是 entries 数组。未知字段报错；`enabled` 默认为 true。没有 `name` 的节点是拥有实际 fiber 的 group，可以整体启用或禁用。子节点继承 enabled、metadata、interception、realm 与注入声明。`id` 在同一个父节点内唯一且不能包含 `/` 或 `:`；路径写作 `workspace/agent`。不同 group 可以有同名子节点。
 
-`register_service("model", typed_key)` 将配置中的字符串映射到一个真实的 `ServiceKey<T>`。`inject` 建立实际依赖，缺失服务时节点保持 Inactive；服务出现后由 runtime 激活。`isolate` 为该服务建立新 realm，子树继承。未变化的 group 会保留其 realm；被替换的隔离 group 获得新 realm。父子关系仍不等于服务依赖，显式注入与 runtime 的父依赖继承决定 committed bindings。
+`register_service("model", typed_key)` 将配置中的字符串映射到一个真实的 `ServiceKey<T>`。`inject` 建立实际依赖，缺失服务时节点保持 Inactive；服务出现后由 runtime 激活。它同时接受数组 `["model"]` 和对象 `{"model":{"capability":"chat"}}`：数组表示配置为 null 的必需依赖，对象值直接作为该服务的消费者配置，不另设 `required/config` 包装。子节点同名声明覆盖继承值；服务的 `provide_checked`/`publish_checked` 检查接收该值，factory 可通过 `scope.injection("model")` 读取。Rust builder 使用 `entry.inject.push("model".into())` 或 `entry.inject.insert("model", value)`。`isolate` 为该服务建立新 realm，子树继承。未变化的 group 会保留其 realm；被替换的隔离 group 获得新 realm。父子关系仍不等于服务依赖，显式注入与 runtime 的父依赖继承决定 committed bindings。
 
 直接修改 `loader.tree().clone()` 后 `apply(tree).await` 可以增加、移动、删除或修改配置节点。节点移动到另一父路径会按新节点建立。`set_enabled(path, enabled).await` 是启用/禁用的便利入口。不同 mutation 通过 `&mut Loader` 串行化，单次操作内部的多个独立 cleanup 可以同时处于 Pending；完成返回前等待全部清理。
 
@@ -53,13 +53,34 @@ factory 必须只构造插件，不应在 factory 中登记外部资源。资源
 一次有效配置更新按以下顺序执行：
 
 1. 检查整个目标树，解析继承、interception、schema 和 factory revision，预构造插件。
-2. 仅退休变化或删除的旧节点；配置未变化的节点保留 ID。变更父节点会重建其子树。
-3. 等待旧 cleanup 和 committed-dependent barrier 完成，再以新 ID 挂载替代节点。
-4. 等待 setup/cleanup 达到 quiescence，随后提交配置快照。
+2. 配置之外的声明、factory、作用域或父子结构改变时，使用正常替换；仅 config 改变且仍 Active 的节点可以请求原地更新。
+3. 仅退休需要替换或删除的旧节点，等待 cleanup 和 committed-dependent barrier，再以新 ID 挂载替代节点。
+4. setup 达到 quiescence 后执行已经登记逆操作的原地更新计划；全部成功后原子安装以后重启所用的 setup recipe，提交配置快照和 revision。
+5. 驱动新服务值或检查结果造成的依赖者状态变化，并重建因此退休的配置子节点。
 
-setup 或 mount 失败会清理本次新建节点并用捕获的旧 factory、配置和 scope 恢复上一个已提交树。已经退休的旧节点以新 ID 恢复；不受影响且仍存在的节点保留 ID。`LoaderError::Apply { rollback: None, .. }` 表示旧配置恢复成功；`rollback: Some(error)` 表示恢复也失败并且仍有待恢复事务。`recover().await` 可以稍后重试。错误不会伪装成已经原子恢复；恢复是否成功取决于插件 setup、factory 和外部环境。
+插件通过 `Plugin::on_config_update(|setup, previous, next| ...)` 选择 `ConfigUpdate::Restart`，或者返回 `ConfigUpdate::Apply(ConfigUpdatePlan)`。`previous/next` 都是经过 schema/default/interception 处理的配置。默认没有 hook，仍执行正常替换。`ApplyReport::updated` 列出成功保留实例的原地更新节点；这些路径也属于 `changed`。
 
-取消（drop）apply、disable、reload 或 recover 的 future 只暂停驱动，pending transaction 仍保存旧快照、新建 ID 和已恢复 ID。`recovery_pending()` 可检查；后续 mutation 或 `recover().await` 先恢复旧配置。`tree()` 表示上次已提交配置，取消后可能与正在退休的物理 runtime 暂时不同；`runtime()` 可以检查实际 phases/IDs。调用者仍需驱动恢复，loader 不会偷偷生成后台任务。
+```rust,ignore
+use cordis::config::{ConfigUpdate, ConfigUpdatePlan};
+
+plugin.on_config_update(move |setup, previous, next| {
+    let forward = setup.clone();
+    Ok(ConfigUpdate::Apply(ConfigUpdatePlan::new(
+        move || forward.set(settings_key, next),
+        move || setup.set(settings_key, previous.clone()),
+    )))
+});
+```
+
+`ConfigUpdatePlan::new_async(apply, rollback)` 支持异步操作。**规划 hook 必须没有外部副作用**，因为 fallback 可能重新规划；实际修改放入 `apply`。逆操作在第一次 apply poll 之前登记，必须能够撤销部分执行、错误或 panic，并允许失败后的重试。Loader 不推断任意业务回调的可逆性；这些是插件作者的契约，不是 Verus 证明。正在运行的实例保留自己的 hook，新 factory 的 hook 只在下一次激活采用，避免连续原地更新误操作预构造的新实例状态。
+
+如果同一批结构/factory/服务变化会通过 ownership 或 committed dependency 传递到候选节点，Loader 保守地改为正常替换。config 影响了 factory 生成的服务声明时也替换；不会在声明变化时强行保留 ID。执行前再次检查 activation generation，拒绝使用已经失效的更新计划。
+
+提交前 setup、mount 或 apply 失败，会按逆序回滚已经开始的更新，再清理本次新建节点，并用捕获的旧 factory、配置和 scope 恢复上一个已提交树。未开始的 update 不执行 apply 或 rollback。已经退休的旧节点以新 ID 恢复；不受影响的节点保留 ID。`LoaderError::Apply { rollback: None, .. }` 表示恢复成功；`rollback: Some(error)` 表示恢复也失败、事务仍待恢复，之后可重试 `recover().await`。
+
+提交前取消（drop）mutation 或 recover 的 future 只暂停驱动；pending transaction 保留旧快照、新建 ID、已经开始的 apply future 和逆操作。恢复先让已经开始的 forward future 落地，再执行逆操作，不会丢弃它的中途副作用。`recovery_pending()` 可检查状态；后续 mutation 先恢复旧配置。没有后台任务，无法保证一个永远 Pending 的插件操作完成。
+
+**提交后传播失败使用不同结果：** `LoaderError::PostCommit { revision, cause }` 表示配置已经接受，但依赖者的生命周期传播失败，不能宣称配置已回滚。这时检查 `tree()/runtime()`，修复业务错误并继续驱动 `reload()` 或 runtime。提交后取消同样保留新配置；`recover()` 不会撤销已经提交的更新。文件来源的跟踪在此等待之前同步提交，因此取消 `load_json/load_file/dispose` 不会留下来源与已提交配置不一致的状态。传播引起的子节点修复有自己的可恢复事务；即使修复失败，已接受的配置仍是恢复目标。
 
 配置不变的节点不会主动重新 setup；服务 provider 的变化仍可能触发其依赖者由 runtime 卸载/重新激活，这是依赖语义所要求的行为。仅持有一个外部 `Arc` 不延长 provider 的 lifecycle，也不能构成证明过的资源使用权限。
 
@@ -104,4 +125,4 @@ setup 或 mount 失败会清理本次新建节点并用捕获的旧 factory、�
 
 对照固定快照的 `packages/loader/src/config/{entry,tree,group}.ts`、`packages/include/src/index.ts`、`packages/hmr/src/index.ts`、`packages/core/src/context.ts` 与 Harness `packages/core/scope/src/index.ts`。配置分组、作用域注入、quiescent disposal 与 factory 替换能够表达 Harness 风格组合，不表示重写了 Harness 应用。
 
-`cargo test -p cordis --test config --test loader --test persistence` 覆盖 schema/default、metadata/interception、realm/inject、最小变更、setup 回滚、旧 factory 恢复、恢复失败后重试、并发 cleanup 屏障、取消期间恢复、Include 环/重复来源/源文件错误、文件 reload、include 拓扑保存、并发编辑冲突、部分提交重试、旧计划拒绝、权限与临时文件处理。正式验证及其他 runtime 检查通过项目根目录的 `./scripts/check.sh` 运行。
+`cargo test -p cordis --test config --test loader --test loader_update --test service_configuration --test persistence` 覆盖 schema/default、metadata/interception、realm/inject、最小变更、setup 回滚、旧 factory 恢复、恢复失败后重试、并发 cleanup 屏障、取消期间恢复、Include 环/重复来源/源文件错误、文件 reload、include 拓扑保存、并发编辑冲突、部分提交重试、旧计划拒绝、权限与临时文件处理。正式验证及其他 runtime 检查通过项目根目录的 `./scripts/check.sh` 运行。

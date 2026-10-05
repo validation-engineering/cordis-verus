@@ -4,10 +4,13 @@
 //! callbacks, shared values and the host scheduler are ordinary Rust, not proofs
 //! of arbitrary effects. An in-flight setup stage is always allowed to land so
 //! its inverse can be collected; cancellation stops subsequent stages.
+pub mod static_host;
+
 use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, StorageStats};
 use crate::future_support::poll_catching_unwind;
+use cordis_driver::shared::{Decision, HostStatus, LifecycleDriver};
 use cordis_kernel::episode::StageProtocol;
-use cordis_kernel::{Binding, Error as KernelError, Kernel, Phase, Port};
+use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -25,7 +28,55 @@ pub type CallbackResult = Result<(), String>;
 /// the owner/group is cancelled; an active callback returning it still fails.
 pub const CANCELLED: &str = "owner episode cancelled";
 type Value = Arc<dyn Any + Send + Sync>;
-type Values = BTreeMap<(PluginId, u64, u64), Value>;
+type ServiceCheck = Arc<dyn Fn(&Value, &Context, &serde_json::Value) -> bool + Send + Sync>;
+struct ServiceSlot {
+    value: Mutex<Value>,
+    check: Option<ServiceCheck>,
+}
+type SharedSlot = Arc<ServiceSlot>;
+type Values = BTreeMap<(PluginId, u64, u64), SharedSlot>;
+type ConfigUpdateCallback = Box<
+    dyn FnMut(
+            AsyncSetup,
+            serde_json::Value,
+            serde_json::Value,
+        ) -> Result<crate::config::ConfigUpdate, String>
+        + Send,
+>;
+
+impl ServiceSlot {
+    fn new(value: Value, check: Option<ServiceCheck>) -> SharedSlot {
+        Arc::new(Self {
+            value: Mutex::new(value),
+            check,
+        })
+    }
+    fn get<T: Any + Send + Sync>(&self) -> Option<Arc<T>> {
+        lock(&self.value).clone().downcast::<T>().ok()
+    }
+    fn accepts(&self, context: &Context, config: &serde_json::Value) -> bool {
+        let Some(check) = &self.check else {
+            return true;
+        };
+        let value = lock(&self.value).clone();
+        // A user availability predicate never runs under host bookkeeping locks.
+        catch_unwind(AssertUnwindSafe(|| check(&value, context, config))).unwrap_or(false)
+    }
+    fn replace(&self, value: Value) -> Value {
+        // Callers serialize episode/handle liveness with this swap, then drop
+        // the previous payload after releasing every bookkeeping lock.
+        std::mem::replace(&mut *lock(&self.value), value)
+    }
+}
+fn typed_check<T: Any + Send + Sync>(
+    check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
+) -> ServiceCheck {
+    Arc::new(move |value, context, config| {
+        value
+            .downcast_ref::<T>()
+            .is_some_and(|value| check(value, context, config))
+    })
+}
 type CleanupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
 type Cleanup = Box<dyn FnOnce() -> CleanupFuture + Send>;
 type SetupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
@@ -184,6 +235,15 @@ fn wake_waiters(wakers: BTreeMap<u64, Waker>) {
         waker.wake();
     }
 }
+fn finish_service(service: &EffectHandle) {
+    let (waiters, driver) = {
+        let mut status = lock(&service.status);
+        status.finished = true;
+        (std::mem::take(&mut status.wakers), status.driver.take())
+    };
+    drop(driver);
+    wake_waiters(waiters);
+}
 /// A cancellation/join handle for one owner-bound effect group. Cancellation is
 /// idempotent; join completes after the in-flight stage and every inverse land.
 #[derive(Clone)]
@@ -285,6 +345,7 @@ impl ChildHandle {
 
 static NEXT_KEY: AtomicU64 = AtomicU64::new(1);
 static NEXT_REALM: AtomicU64 = AtomicU64::new(1);
+static NEXT_EPISODE: AtomicU64 = AtomicU64::new(1);
 fn fresh(counter: &AtomicU64) -> u64 {
     counter
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
@@ -326,6 +387,13 @@ pub struct Context {
     realms: BTreeMap<u64, u64>,
 }
 impl Context {
+    /// Explicit realm mapping for an externally driven typed episode. The host
+    /// must validate these identities in its own graph before constructing it.
+    pub fn with_realms(realms: impl IntoIterator<Item = (u64, u64)>) -> Self {
+        Self {
+            realms: realms.into_iter().collect(),
+        }
+    }
     pub fn new() -> Self {
         Self::default()
     }
@@ -356,6 +424,8 @@ pub struct Plugin {
     dependencies: Vec<u64>,
     provisions: Vec<u64>,
     setup: Callback,
+    injection_config: BTreeMap<u64, serde_json::Value>,
+    config_update: Option<ConfigUpdateCallback>,
 }
 impl Plugin {
     pub fn new(
@@ -366,6 +436,8 @@ impl Plugin {
             name: name.into(),
             dependencies: Vec::new(),
             provisions: Vec::new(),
+            injection_config: BTreeMap::new(),
+            config_update: None,
             setup: Callback::Sync(Box::new(setup)),
         }
     }
@@ -378,6 +450,8 @@ impl Plugin {
             name: name.into(),
             dependencies: Vec::new(),
             provisions: Vec::new(),
+            injection_config: BTreeMap::new(),
+            config_update: None,
             setup: Callback::Async(Box::new(move |ctx| Box::pin(setup(ctx)))),
         }
     }
@@ -385,6 +459,31 @@ impl Plugin {
         if !self.dependencies.contains(&key.id) {
             self.dependencies.push(key.id);
         }
+        self
+    }
+    /// Require a service with configuration passed to its availability predicate.
+    pub fn requires_with_config<T>(
+        mut self,
+        key: ServiceKey<T>,
+        config: serde_json::Value,
+    ) -> Self {
+        self = self.requires(key);
+        self.injection_config.insert(key.id, config);
+        self
+    }
+    /// Plan a reversible in-place configuration update. Planning must not mutate
+    /// resources; the loader runs the returned apply/rollback operations.
+    pub fn on_config_update(
+        mut self,
+        handler: impl FnMut(
+                AsyncSetup,
+                serde_json::Value,
+                serde_json::Value,
+            ) -> Result<crate::config::ConfigUpdate, String>
+            + Send
+            + 'static,
+    ) -> Self {
+        self.config_update = Some(Box::new(handler));
         self
     }
     pub fn provides<T>(mut self, key: ServiceKey<T>) -> Self {
@@ -406,6 +505,7 @@ struct ChildRequest {
     context: Context,
     plugin: Plugin,
     handle: ChildHandle,
+    service: Option<EffectHandle>,
 }
 struct GroupRequest {
     group: usize,
@@ -421,20 +521,37 @@ struct Episode {
     next_group: usize,
     cancelled_groups: std::collections::BTreeSet<usize>,
     driver: Option<Waker>,
+    static_only: bool,
+    unsupported: Option<String>,
 }
-/// Owned setup context suitable for futures. Dependency values are snapshots of
-/// the episode's committed providers; cloning never changes those identities.
+/// Owned setup context suitable for futures. Dependency slots belong to the
+/// episode's committed providers; cloning never changes those identities.
+/// Subsequent reads see payload updates within each committed provider slot.
 /// A context from a completed episode rejects further mutation.
 #[derive(Clone)]
 pub struct AsyncSetup {
+    generation: u64,
     owner: PluginId,
     context: Context,
     bindings: Vec<Binding>,
     provisions: Vec<Port>,
+    anchor: Port,
     state: Arc<Mutex<Episode>>,
     group: usize,
 }
 impl AsyncSetup {
+    fn require_dynamic(&self, feature: &str) -> CallbackResult {
+        let mut state = lock(&self.state);
+        Self::check_live(&state)?;
+        if !state.static_only {
+            return Ok(());
+        }
+        let message = format!("UnsupportedStaticFeature: {feature}");
+        if state.unsupported.is_none() {
+            state.unsupported = Some(message.clone());
+        }
+        Err(message)
+    }
     /// Check whether this episode still accepts new effects (Loading or Active).
     /// In-flight setup may register its inverse after cancellation, but new
     /// timer, event or child resource acquisition should use this guard first.
@@ -482,11 +599,10 @@ impl AsyncSetup {
                 .map(|b| b.provider)
                 .ok_or_else(|| format!("undeclared dependency: {}", key.name))?
         };
-        state
-            .values
-            .get(&(provider, port.key, port.realm))
-            .cloned()
-            .and_then(|value| value.downcast::<T>().ok())
+        let value = state.values.get(&(provider, port.key, port.realm)).cloned();
+        drop(state);
+        value
+            .and_then(|slot| slot.get::<T>())
             .ok_or_else(|| format!("service has no value: {}", key.name))
     }
     pub fn provide<T: Any + Send + Sync>(
@@ -494,6 +610,31 @@ impl AsyncSetup {
         key: ServiceKey<T>,
         value: T,
     ) -> Result<Arc<T>, String> {
+        self.provide_inner(key, value, None)
+    }
+    /// Publish a declared service with a pure per-consumer availability check.
+    /// Panics make the dependency unavailable. Call `refresh` after external
+    /// predicate state changes to wake a pending lifecycle driver.
+    pub fn provide_checked<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+        value: T,
+        check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
+    ) -> Result<Arc<T>, String> {
+        self.require_dynamic("provide_checked")?;
+        self.provide_inner(key, value, Some(typed_check(check)))
+    }
+    fn provide_inner<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+        value: T,
+        check: Option<ServiceCheck>,
+    ) -> Result<Arc<T>, String> {
+        let value = Arc::new(value);
+        self.provide_slot(key, ServiceSlot::new(value.clone(), check))?;
+        Ok(value)
+    }
+    fn provide_slot<T>(&self, key: ServiceKey<T>, value: SharedSlot) -> CallbackResult {
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
         let port = self.context.port(key);
@@ -504,25 +645,29 @@ impl AsyncSetup {
         if state.values.contains_key(&slot) {
             return Err(format!("duplicate value: {}", key.name));
         }
-        let value = Arc::new(value);
-        state.values.insert(slot, value.clone());
+        state.values.insert(slot, value);
         let waker = state.driver.take();
         drop(state);
         if let Some(waker) = waker {
             waker.wake();
         }
-        Ok(value)
+        Ok(())
     }
     pub fn set<T: Any + Send + Sync>(&self, key: ServiceKey<T>, value: T) -> CallbackResult {
+        self.require_dynamic("set")?;
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
         let port = self.context.port(key);
         let slot = (self.owner, port.key, port.realm);
-        if !self.provisions.contains(&port) || !state.values.contains_key(&slot) {
+        if !self.provisions.contains(&port) {
             return Err(format!("service is not owned here: {}", key.name));
         }
-        // A service's destructor may call back into its own context.
-        let previous = state.values.insert(slot, Arc::new(value));
+        let slot = state
+            .values
+            .get(&slot)
+            .cloned()
+            .ok_or_else(|| format!("service is not owned here: {}", key.name))?;
+        let previous = slot.replace(Arc::new(value));
         let waker = state.driver.take();
         drop(state);
         drop(previous);
@@ -530,6 +675,62 @@ impl AsyncSetup {
             waker.wake();
         }
         Ok(())
+    }
+    /// Notify the driver after changing external service-check state.
+    pub fn refresh(&self) -> CallbackResult {
+        self.require_dynamic("refresh")?;
+        let mut state = lock(&self.state);
+        Self::check_live(&state)?;
+        let waker = state.driver.take();
+        drop(state);
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+        Ok(())
+    }
+    /// Dynamically publish a service through an owned provider child. Its
+    /// explicit owner-anchor dependency keeps owner resources alive until all
+    /// consumers drain. It becomes available after owner initialization lands.
+    pub fn publish<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+        value: T,
+    ) -> Result<ServiceHandle<T>, String> {
+        self.publish_inner(key, value, None)
+    }
+    pub fn publish_checked<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+        value: T,
+        check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
+    ) -> Result<ServiceHandle<T>, String> {
+        self.publish_inner(key, value, Some(typed_check(check)))
+    }
+    fn publish_inner<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+        value: T,
+        check: Option<ServiceCheck>,
+    ) -> Result<ServiceHandle<T>, String> {
+        self.require_dynamic("publish")?;
+        self.ensure_active()?;
+        let slot = ServiceSlot::new(Arc::new(value), check);
+        let supplied = slot.clone();
+        let mut plugin = Plugin::new(format!("service:{}", key.name), move |setup| {
+            setup.inner.provide_slot(key, supplied.clone())
+        })
+        .provides(key);
+        plugin.dependencies.push(self.anchor.key);
+        let status = EffectHandle {
+            status: Arc::new(Mutex::new(EffectStatus::default())),
+        };
+        let child = self.mount_request(&self.context, plugin, Some(status.clone()))?;
+        Ok(ServiceHandle {
+            child,
+            slot,
+            status,
+            marker: PhantomData,
+        })
     }
     pub fn on_cleanup(
         &self,
@@ -562,6 +763,15 @@ impl AsyncSetup {
         self.mount_in(&self.context, plugin)
     }
     pub fn mount_in(&self, context: &Context, plugin: Plugin) -> Result<ChildHandle, String> {
+        self.mount_request(context, plugin, None)
+    }
+    fn mount_request(
+        &self,
+        context: &Context,
+        plugin: Plugin,
+        service: Option<EffectHandle>,
+    ) -> Result<ChildHandle, String> {
+        self.require_dynamic("mount")?;
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
         if state.phase == EpisodePhase::Restoring || state.cancelled_groups.contains(&self.group) {
@@ -579,6 +789,7 @@ impl AsyncSetup {
             context: context.clone(),
             plugin,
             handle: handle.clone(),
+            service,
         });
         let waker = state.driver.take();
         drop(state);
@@ -588,6 +799,7 @@ impl AsyncSetup {
         Ok(handle)
     }
     pub fn effect(&self, effect: impl EffectIterator) -> Result<EffectHandle, String> {
+        self.require_dynamic("effect")?;
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
         if state.phase == EpisodePhase::Restoring || state.cancelled_groups.contains(&self.group) {
@@ -617,6 +829,70 @@ impl AsyncSetup {
         Ok(handle)
     }
 }
+/// A dynamically published service. Dropping a handle does not revoke it;
+/// owner cleanup or explicit `dispose` does. `join` observes cleanup and must be
+/// polled alongside the runtime driver, like an effect join.
+pub struct ServiceHandle<T> {
+    child: ChildHandle,
+    slot: SharedSlot,
+    status: EffectHandle,
+    marker: PhantomData<fn() -> T>,
+}
+impl<T> Clone for ServiceHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            child: self.child.clone(),
+            slot: self.slot.clone(),
+            status: self.status.clone(),
+            marker: PhantomData,
+        }
+    }
+}
+impl<T: Any + Send + Sync> ServiceHandle<T> {
+    pub fn id(&self) -> Option<PluginId> {
+        self.child.id()
+    }
+    pub fn initialized(&self) -> bool {
+        self.status.initialized()
+    }
+    pub fn finished(&self) -> bool {
+        self.status.finished()
+    }
+    pub fn errors(&self) -> Vec<String> {
+        self.status.errors()
+    }
+    pub fn get(&self) -> Result<Arc<T>, String> {
+        self.slot
+            .get()
+            .ok_or_else(|| "service value type mismatch".into())
+    }
+    pub fn set(&self, value: T) -> CallbackResult {
+        let mut status = lock(&self.status.status);
+        if status.cancelled || status.finished {
+            return Err(CANCELLED.into());
+        }
+        let previous = self.slot.replace(Arc::new(value));
+        let driver = status.driver.take();
+        drop(status);
+        drop(previous);
+        if let Some(driver) = driver {
+            driver.wake();
+        }
+        Ok(())
+    }
+    pub fn refresh(&self) {
+        let driver = lock(&self.status.status).driver.take();
+        if let Some(driver) = driver {
+            driver.wake();
+        }
+    }
+    pub fn dispose(&self) {
+        self.status.cancel();
+    }
+    pub fn join(&self) -> EffectJoin {
+        self.status.join()
+    }
+}
 /// Borrowed synchronous context. `to_async` is an episode-bound owned handle.
 pub struct Setup<'a> {
     inner: &'a AsyncSetup,
@@ -640,6 +916,32 @@ impl Setup<'_> {
         value: T,
     ) -> Result<Arc<T>, String> {
         self.inner.provide(key, value)
+    }
+    pub fn provide_checked<T: Any + Send + Sync>(
+        &mut self,
+        key: ServiceKey<T>,
+        value: T,
+        check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
+    ) -> Result<Arc<T>, String> {
+        self.inner.provide_checked(key, value, check)
+    }
+    pub fn publish<T: Any + Send + Sync>(
+        &mut self,
+        key: ServiceKey<T>,
+        value: T,
+    ) -> Result<ServiceHandle<T>, String> {
+        self.inner.publish(key, value)
+    }
+    pub fn publish_checked<T: Any + Send + Sync>(
+        &mut self,
+        key: ServiceKey<T>,
+        value: T,
+        check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
+    ) -> Result<ServiceHandle<T>, String> {
+        self.inner.publish_checked(key, value, check)
+    }
+    pub fn refresh(&self) -> CallbackResult {
+        self.inner.refresh()
     }
     pub fn set<T: Any + Send + Sync>(&mut self, key: ServiceKey<T>, value: T) -> CallbackResult {
         self.inner.set(key, value)
@@ -715,7 +1017,36 @@ impl RootSetup {
         }
     }
 }
+fn initialize_callback(callback: &mut Callback, episode: &AsyncSetup) -> Result<RootSetup, String> {
+    catch_unwind(AssertUnwindSafe(|| match callback {
+        Callback::Sync(callback) => {
+            callback(&mut Setup { inner: episode })?;
+            Ok(RootSetup::Done)
+        }
+        Callback::Async(callback) => Ok(RootSetup::Queued(callback(episode.clone()))),
+    }))
+    .unwrap_or_else(|panic| Err(panic_message(panic)))
+}
+fn initialize_cleanup(cleanup: Cleanup) -> Result<CleanupFuture, String> {
+    catch_unwind(AssertUnwindSafe(cleanup)).map_err(panic_message)
+}
+fn poll_cleanup_callback(
+    future: &mut CleanupFuture,
+    cx: &mut TaskContext<'_>,
+) -> Poll<CallbackResult> {
+    match poll_catching_unwind(future.as_mut(), cx) {
+        Ok(result) => result,
+        Err(panic) => Poll::Ready(Err(panic_message(panic))),
+    }
+}
 struct Mounted {
+    next_config_update: Option<Option<ConfigUpdateCallback>>,
+    anchor: Port,
+    service: Option<EffectHandle>,
+    injection_config: BTreeMap<u64, serde_json::Value>,
+    config_update: Option<ConfigUpdateCallback>,
+    declared_dependencies: Vec<u64>,
+    declared_injection_config: BTreeMap<u64, serde_json::Value>,
     name: String,
     parent: Option<PluginId>,
     context: Context,
@@ -781,7 +1112,7 @@ fn kernel_error(error: impl fmt::Debug) -> RuntimeError {
 }
 
 pub struct Runtime {
-    kernel: Kernel,
+    kernel: LifecycleDriver,
     mounted: BTreeMap<PluginId, Mounted>,
     values: Values,
     cleanup_errors: Vec<RuntimeError>,
@@ -796,7 +1127,7 @@ impl Default for Runtime {
 impl Runtime {
     pub fn new() -> Self {
         Self {
-            kernel: Kernel::new(),
+            kernel: LifecycleDriver::new().expect("lifecycle domain identity exhausted"),
             mounted: BTreeMap::new(),
             values: BTreeMap::new(),
             cleanup_errors: Vec::new(),
@@ -942,6 +1273,12 @@ impl Runtime {
             key,
             realm: context.realms.get(&key).copied().unwrap_or(0),
         };
+        let declared_dependencies = plugin.dependencies.clone();
+        let declared_injection_config = plugin.injection_config.clone();
+        let mut injection_config = parent
+            .map(|parent| self.mounted[&parent].injection_config.clone())
+            .unwrap_or_default();
+        injection_config.extend(plugin.injection_config);
         let mut dependencies: Vec<_> = plugin.dependencies.into_iter().map(port).collect();
         let provisions: Vec<_> = plugin.provisions.into_iter().map(port).collect();
         // Inherit the parent's *actual ports*, including realms. This adds real
@@ -958,13 +1295,26 @@ impl Runtime {
                 }
             }
         }
+        let anchor = Port {
+            key: fresh(&NEXT_KEY),
+            realm: 0,
+        };
+        let mut kernel_provisions = provisions.clone();
+        kernel_provisions.push(anchor);
         let id = self
             .kernel
-            .insert(parent, dependencies.clone(), provisions.clone())
+            .insert(parent, dependencies.clone(), kernel_provisions)
             .map_err(kernel_error)?;
         self.mounted.insert(
             id,
             Mounted {
+                next_config_update: None,
+                anchor,
+                service: None,
+                injection_config,
+                config_update: plugin.config_update,
+                declared_dependencies,
+                declared_injection_config,
                 name: plugin.name,
                 parent,
                 context: context.clone(),
@@ -1022,6 +1372,14 @@ impl Runtime {
     pub fn committed(&self, id: PluginId) -> Vec<Binding> {
         self.kernel.committed(id)
     }
+    /// Identity of the current activation, for rejecting stale update plans.
+    pub fn episode_generation(&self, id: PluginId) -> Option<u64> {
+        self.mounted
+            .get(&id)?
+            .episode
+            .as_ref()
+            .map(|episode| episode.generation)
+    }
     pub fn cleanup_started(&self, id: PluginId) -> bool {
         self.kernel.cleanup_started(id)
     }
@@ -1032,11 +1390,8 @@ impl Runtime {
     ) -> Option<Arc<T>> {
         let port = context.port(key);
         let provider = self.kernel.resolve(port)?;
-        self.values
-            .get(&(provider, port.key, port.realm))?
-            .clone()
-            .downcast::<T>()
-            .ok()
+        let slot = self.values.get(&(provider, port.key, port.realm))?;
+        slot.get::<T>()
     }
     /// Dynamic owner API; stale/retired owners cannot acquire more resources.
     pub fn owner_context(&self, id: PluginId) -> Result<AsyncSetup, RuntimeError> {
@@ -1112,6 +1467,9 @@ impl Runtime {
             return Ok(());
         }
         self.kernel.retire(id).map_err(kernel_error)?;
+        if let Some(service) = &self.mounted[&id].service {
+            lock(&service.status).cancelled = true;
+        }
         if let Some(episode) = &self.mounted[&id].episode {
             lock(&episode.state).phase = EpisodePhase::Restoring;
         }
@@ -1211,6 +1569,71 @@ impl Runtime {
             .setup = Callback::Async(Box::new(move |ctx| Box::pin(setup(ctx))));
         self.restart(id)
     }
+    /// Ask a live plugin to plan an in-place update without applying it.
+    pub fn prepare_config_update(
+        &mut self,
+        id: PluginId,
+        previous: serde_json::Value,
+        next: serde_json::Value,
+    ) -> Result<crate::config::ConfigUpdate, RuntimeError> {
+        let context = self.owner_context(id)?;
+        if self.phase(id) != Some(Phase::Active) || !self.coherent(id) {
+            return Ok(crate::config::ConfigUpdate::Restart);
+        }
+        let Some(handler) = self.mounted.get_mut(&id).unwrap().config_update.as_mut() else {
+            return Ok(crate::config::ConfigUpdate::Restart);
+        };
+        catch_unwind(AssertUnwindSafe(|| handler(context, previous, next)))
+            .unwrap_or_else(|panic| Err(panic_message(panic)))
+            .map_err(|message| RuntimeError::Setup {
+                plugin: id,
+                message,
+            })
+    }
+    pub(crate) fn config_recipe_compatible(&self, id: PluginId, plugin: &Plugin) -> bool {
+        let Some(mounted) = self.mounted.get(&id) else {
+            return false;
+        };
+        let provisions: Vec<_> = plugin
+            .provisions
+            .iter()
+            .map(|key| Port {
+                key: *key,
+                realm: mounted.context.realms.get(key).copied().unwrap_or(0),
+            })
+            .collect();
+        mounted.declared_dependencies == plugin.dependencies
+            && mounted.provisions == provisions
+            && mounted.declared_injection_config == plugin.injection_config
+    }
+    /// Adopt accepted configurations atomically after validating every target.
+    /// Live hooks retain their current episode's captured state; new hooks are
+    /// promoted together with the new setup recipe at the next activation.
+    pub(crate) fn adopt_config_recipes(
+        &mut self,
+        recipes: Vec<(PluginId, Plugin)>,
+    ) -> Result<(), RuntimeError> {
+        for (id, plugin) in &recipes {
+            self.owner_context(*id)?;
+            if !self.config_recipe_compatible(*id, plugin) {
+                return Err(RuntimeError::Setup {
+                    plugin: *id,
+                    message: "in-place update changed service declarations".into(),
+                });
+            }
+        }
+        let mut previous = Vec::new();
+        for (id, plugin) in recipes {
+            let mounted = self.mounted.get_mut(&id).unwrap();
+            mounted.name = plugin.name;
+            let setup = std::mem::replace(&mut mounted.setup, plugin.setup);
+            let handler = mounted.next_config_update.replace(plugin.config_update);
+            previous.push((setup, handler));
+        }
+        // Drop captured user state only after every recipe is installed.
+        drop(previous);
+        Ok(())
+    }
     pub async fn replace(
         &mut self,
         id: PluginId,
@@ -1235,13 +1658,57 @@ impl Runtime {
         std::mem::take(&mut self.cleanup_errors)
     }
 
-    fn coherent(&self, id: PluginId) -> bool {
-        if self.phase(id) == Some(Phase::Loading) && self.kernel.check_iteration(id).is_err() {
+    fn services_available(&self, id: PluginId) -> bool {
+        let Some(bindings) = self.kernel.target(id) else {
             return false;
-        }
-        !self.retired(id)
-            && !self.mounted[&id].restart
-            && self.kernel.target(id).as_ref() == Some(&self.kernel.committed(id))
+        };
+        let plugin = &self.mounted[&id];
+        bindings.iter().all(|binding| {
+            // Anchors carry lifecycle identity, not user service values.
+            if self
+                .mounted
+                .get(&binding.provider)
+                .is_some_and(|provider| provider.anchor.key == binding.key)
+            {
+                return true;
+            }
+            self.values
+                .get(&(binding.provider, binding.key, binding.realm))
+                .is_some_and(|slot| {
+                    slot.accepts(
+                        &plugin.context,
+                        plugin
+                            .injection_config
+                            .get(&binding.key)
+                            .unwrap_or(&serde_json::Value::Null),
+                    )
+                })
+        })
+    }
+    fn coherent(&self, id: PluginId) -> bool {
+        self.kernel.coherent(id, self.mounted[&id].restart)
+    }
+    fn decision(&self, id: PluginId) -> Option<Decision> {
+        let plugin = &self.mounted[&id];
+        // Keep availability predicates at the executor's existing observation
+        // points: arbitrary checks must not run while removing retired nodes.
+        let available = match self.phase(id) {
+            Some(Phase::Loading | Phase::Active) if self.coherent(id) => {
+                self.services_available(id)
+            }
+            Some(Phase::Inactive) if !self.retired(id) && plugin.failed.is_none() => {
+                self.services_available(id)
+            }
+            _ => false,
+        };
+        self.kernel.decision(
+            id,
+            HostStatus {
+                available,
+                failed: plugin.failed.is_some(),
+                restart: plugin.restart,
+            },
+        )
     }
     fn leave(&mut self, id: PluginId) -> Result<(), RuntimeError> {
         self.kernel.leave(id).map_err(kernel_error)?;
@@ -1307,6 +1774,9 @@ impl Runtime {
             })
             .collect();
         let plugin = self.mounted.get_mut(&id).unwrap();
+        if let Some(handler) = plugin.next_config_update.take() {
+            plugin.config_update = handler;
+        }
         let mut state = Episode {
             phase: EpisodePhase::Loading,
             // Retain precisely the committed dependencies until restoration
@@ -1318,6 +1788,8 @@ impl Runtime {
             next_group: 1,
             cancelled_groups: Default::default(),
             driver: Some(cx.waker().clone()),
+            static_only: false,
+            unsupported: None,
         };
         let mut root = Cleanups::new();
         for child in plugin.owned.drain(..) {
@@ -1327,25 +1799,20 @@ impl Runtime {
         }
         state.cleanups.insert(0, root);
         let episode = AsyncSetup {
+            generation: fresh(&NEXT_EPISODE),
             owner: id,
             context: plugin.context.clone(),
             bindings,
             provisions: plugin.provisions.clone(),
+            anchor: plugin.anchor,
             state: Arc::new(Mutex::new(state)),
             group: 0,
         };
         plugin.episode = Some(episode.clone());
         plugin.root_setup = RootSetup::Done;
-        let result = catch_unwind(AssertUnwindSafe(|| match &mut plugin.setup {
-            Callback::Sync(callback) => callback(&mut Setup { inner: &episode }),
-            Callback::Async(callback) => {
-                plugin.root_setup = RootSetup::Queued(callback(episode));
-                Ok(())
-            }
-        }))
-        .unwrap_or_else(|panic| Err(panic_message(panic)));
-        if let Err(message) = result {
-            self.latch(id, message);
+        match initialize_callback(&mut plugin.setup, &episode) {
+            Ok(root) => plugin.root_setup = root,
+            Err(message) => self.latch(id, message),
         }
     }
     fn drain_requests(&mut self, id: PluginId) -> Result<bool, RuntimeError> {
@@ -1361,13 +1828,31 @@ impl Runtime {
         };
         let progress = !children.is_empty() || !groups.is_empty();
         for request in children {
+            if request
+                .service
+                .as_ref()
+                .is_some_and(|service| lock(&service.status).cancelled)
+            {
+                if let Some(service) = &request.service {
+                    finish_service(service);
+                }
+                continue;
+            }
             let result = self.mount_inner(&request.context, Some(id), request.plugin, false);
             match result {
-                Ok(child) => *lock(&request.handle.state) = Ok(Some(child)),
+                Ok(child) => {
+                    *lock(&request.handle.state) = Ok(Some(child));
+                    self.mounted.get_mut(&child).unwrap().service = request.service;
+                }
                 Err(error) => {
                     let message = error.to_string();
                     *lock(&request.handle.state) = Err(message.clone());
-                    self.latch(id, message);
+                    if let Some(service) = &request.service {
+                        lock(&service.status).errors.push(message);
+                        finish_service(service);
+                    } else {
+                        self.latch(id, message);
+                    }
                 }
             }
         }
@@ -1420,29 +1905,22 @@ impl Runtime {
                             }
                         }
                     }
-                    CleanupAction::Callback(cleanup) => {
-                        match catch_unwind(AssertUnwindSafe(cleanup)) {
-                            Ok(future) => *running = Some(future),
-                            Err(panic) => self.record_cleanup(id, handle, panic_message(panic)),
-                        }
-                    }
+                    CleanupAction::Callback(cleanup) => match initialize_cleanup(cleanup) {
+                        Ok(future) => *running = Some(future),
+                        Err(message) => self.record_cleanup(id, handle, message),
+                    },
                 }
             }
         }
         if let Some(future) = running {
-            match poll_catching_unwind(future.as_mut(), cx) {
-                Ok(Poll::Pending) => return (progress, true),
-                Ok(Poll::Ready(result)) => {
+            match poll_cleanup_callback(future, cx) {
+                Poll::Pending => return (progress, true),
+                Poll::Ready(result) => {
                     *running = None;
                     progress = true;
                     if let Err(message) = result {
                         self.record_cleanup(id, handle, message);
                     }
-                }
-                Err(panic) => {
-                    *running = None;
-                    progress = true;
-                    self.record_cleanup(id, handle, panic_message(panic));
                 }
             }
         }
@@ -1463,6 +1941,7 @@ impl Runtime {
             // pass. Recheck immediately before a fresh iterator stage.
             let can_start = matches!(self.phase(id), Some(Phase::Active | Phase::Loading))
                 && self.coherent(id)
+                && self.services_available(id)
                 && self.mounted[&id].failed.is_none();
             let mut group = self
                 .mounted
@@ -1612,11 +2091,26 @@ impl Runtime {
             }
             let mut progress = false;
             let mut pending = false;
+            // Dynamic service disposal is a normal verified provider retirement.
+            for id in self.kernel.ids() {
+                if let Some(service) = self.mounted[&id].service.clone() {
+                    let driver = cx.waker().clone();
+                    let (cancelled, previous) = {
+                        let mut status = lock(&service.status);
+                        (status.cancelled, status.driver.replace(driver))
+                    };
+                    drop(previous);
+                    if cancelled && !self.retired(id) {
+                        if let Err(error) = self.dispose(id) {
+                            return Poll::Ready(Err(error));
+                        }
+                        progress = true;
+                    }
+                }
+            }
             // Withdraw stale services before allowing any inverse to start.
             for id in self.kernel.ids() {
-                if matches!(self.phase(id), Some(Phase::Active | Phase::Loading))
-                    && (!self.coherent(id) || self.mounted[&id].failed.is_some())
-                {
+                if self.decision(id) == Some(Decision::Withdraw) {
                     if let Err(error) = self.leave(id) {
                         return Poll::Ready(Err(error));
                     }
@@ -1624,9 +2118,7 @@ impl Runtime {
                 }
             }
             for id in self.kernel.ids() {
-                if matches!(self.phase(id), Some(Phase::Loading | Phase::Active))
-                    && (!self.coherent(id) || self.mounted[&id].failed.is_some())
-                {
+                if self.decision(id) == Some(Decision::Withdraw) {
                     if let Err(error) = self.leave(id) {
                         return Poll::Ready(Err(error));
                     }
@@ -1676,6 +2168,9 @@ impl Runtime {
                         .values()
                         .any(|group| group.protocol.is_pending());
                     if !in_flight {
+                        if let Err(error) = self.kernel.settle_setup(id) {
+                            return Poll::Ready(Err(kernel_error(error)));
+                        }
                         match self.kernel.begin_cleanup(id) {
                             Ok(()) => progress = true,
                             Err(KernelError::Relied) => {}
@@ -1708,6 +2203,14 @@ impl Runtime {
                         && root_empty
                         && self.mounted[&id].groups.is_empty()
                     {
+                        let ticket = self
+                            .kernel
+                            .pending_action(id)
+                            .cloned()
+                            .expect("restoration owns its cleanup action");
+                        if let Err(error) = self.kernel.complete_action(&ticket) {
+                            return Poll::Ready(Err(kernel_error(error)));
+                        }
                         if let Err(error) = self.kernel.finish_cleanup(id) {
                             return Poll::Ready(Err(kernel_error(error)));
                         }
@@ -1768,13 +2271,21 @@ impl Runtime {
                         self.latch(id, format!("declared service {} has no value", port.key));
                         progress = true;
                     } else {
+                        if let Err(error) = self.kernel.settle_setup(id) {
+                            return Poll::Ready(Err(kernel_error(error)));
+                        }
                         let finished = self.kernel.finish(id);
                         if finished.is_ok() {
                             state.phase = EpisodePhase::Active;
                         }
                         drop(state);
                         match finished {
-                            Ok(()) => self.publish(id),
+                            Ok(()) => {
+                                self.publish(id);
+                                if let Some(service) = &self.mounted[&id].service {
+                                    lock(&service.status).initialized = true;
+                                }
+                            }
                             Err(KernelError::Changed) => {
                                 if let Err(error) = self.leave(id) {
                                     return Poll::Ready(Err(error));
@@ -1791,12 +2302,15 @@ impl Runtime {
             for id in self.kernel.ids().into_iter().rev() {
                 if self.retired(id)
                     && self.phase(id) == Some(Phase::Inactive)
-                    && self.kernel.children(id).is_empty()
+                    && self.decision(id) == Some(Decision::Remove)
                 {
                     if let Err(error) = self.kernel.remove(id) {
                         return Poll::Ready(Err(kernel_error(error)));
                     }
                     self.maintenance_changes += 1;
+                    if let Some(service) = &self.mounted[&id].service {
+                        finish_service(service);
+                    }
                     self.mounted.remove(&id);
                     self.values.retain(|(owner, _, _), _| *owner != id);
                     progress = true;
@@ -1804,16 +2318,7 @@ impl Runtime {
             }
             for id in self.kernel.ids() {
                 if self.phase(id) != Some(Phase::Inactive)
-                    || self.retired(id)
-                    || self.mounted[&id].failed.is_some()
-                {
-                    continue;
-                }
-                if self
-                    .kernel
-                    .children(id)
-                    .iter()
-                    .any(|child| self.retired(*child))
+                    || self.decision(id) != Some(Decision::Begin)
                 {
                     continue;
                 }

@@ -1,9 +1,9 @@
 //! Declarative JSON trees, include files and explicit Rust factory HMR.
 //! These host operations are behavior-tested, not Verus-proved callbacks.
 
-use crate::config::{ConfigError, ConfigScope, Schema};
+use crate::config::{ConfigError, ConfigScope, ConfigUpdate, ConfigUpdatePlan, Schema};
 use crate::persistence::{SaveError, SaveErrorKind, SavePlan, SaveReport};
-use crate::{Context, Plugin, PluginId, Runtime, RuntimeError, ServiceKey};
+use crate::{Context, Phase, Plugin, PluginId, Runtime, RuntimeError, ServiceKey};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -20,6 +20,44 @@ fn empty_config() -> Value {
     Value::Object(Map::new())
 }
 
+/// Required services with per-consumer configuration. JSON accepts either
+/// `["model"]` or `{ "model": { "capability": "chat" } }`; arrays use null config.
+#[derive(Clone, Debug, Default, Serialize, PartialEq)]
+#[serde(transparent)]
+pub struct Inject(BTreeMap<String, Value>);
+impl Inject {
+    pub fn push(&mut self, name: String) {
+        self.0.insert(name, Value::Null);
+    }
+    pub fn insert(&mut self, name: impl Into<String>, config: Value) -> Option<Value> {
+        self.0.insert(name.into(), config)
+    }
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.0.get(name)
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
+        self.0.iter()
+    }
+}
+impl<'de> Deserialize<'de> for Inject {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Declaration {
+            Names(Vec<String>),
+            Config(BTreeMap<String, Value>),
+            Empty(()),
+        }
+        Ok(Self(match Declaration::deserialize(deserializer)? {
+            Declaration::Names(names) => {
+                names.into_iter().map(|name| (name, Value::Null)).collect()
+            }
+            Declaration::Config(config) => config,
+            Declaration::Empty(()) => BTreeMap::new(),
+        }))
+    }
+}
+
 /// IDs are configuration keys local to a parent. Runtime IDs change on revision.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -33,7 +71,7 @@ pub struct Entry {
     #[serde(default = "empty_config")]
     pub config: Value,
     #[serde(default)]
-    pub inject: Vec<String>,
+    pub inject: Inject,
     #[serde(default)]
     pub isolate: Vec<String>,
     #[serde(default)]
@@ -88,7 +126,7 @@ impl Entry {
             name: Some(name.into()),
             enabled: true,
             config,
-            inject: Vec::new(),
+            inject: Inject::default(),
             isolate: Vec::new(),
             intercept: BTreeMap::new(),
             metadata: Map::new(),
@@ -139,7 +177,7 @@ impl ConfigTree {
     }
 }
 type Factory = Arc<dyn Fn(&Value, &ConfigScope) -> Result<Plugin, String> + Send + Sync>;
-type Require = Arc<dyn Fn(Plugin) -> Plugin + Send + Sync>;
+type Require = Arc<dyn Fn(Plugin, Value) -> Plugin + Send + Sync>;
 type Isolate = Arc<dyn Fn(&Context) -> Context + Send + Sync>;
 #[derive(Clone)]
 struct RegisteredFactory {
@@ -196,7 +234,7 @@ impl FactoryRegistry {
             name.into(),
             RegisteredService {
                 revision,
-                require: Arc::new(move |plugin| plugin.requires(key)),
+                require: Arc::new(move |plugin, config| plugin.requires_with_config(key, config)),
                 isolate: Arc::new(move |context| context.isolate(key)),
             },
         );
@@ -221,6 +259,11 @@ pub enum LoaderError {
         message: String,
     },
     Runtime(RuntimeError),
+    /// The configuration was committed, but dependent lifecycle propagation failed.
+    PostCommit {
+        revision: u64,
+        cause: Box<LoaderError>,
+    },
     /// No rollback error means the previous configuration was restored.
     Apply {
         cause: Box<LoaderError>,
@@ -253,6 +296,7 @@ impl fmt::Display for LoaderError {
             ),
             Self::Factory { entry, message } => write!(f, "factory at {entry}: {message}"),
             Self::Runtime(error) => write!(f, "{error}"),
+            Self::PostCommit { revision, cause } => write!(f, "configuration revision {revision} committed; lifecycle propagation failed: {cause}"),
             Self::Apply {
                 cause,
                 rollback: None,
@@ -279,6 +323,16 @@ struct Signature {
     factory: Option<u64>,
     enabled: bool,
 }
+impl Signature {
+    fn only_config_changed(&self, previous: &Self) -> bool {
+        if self.entry.config == previous.entry.config {
+            return false;
+        }
+        let mut normalized = self.clone();
+        normalized.entry.config = previous.entry.config.clone();
+        normalized == *previous
+    }
+}
 #[derive(Clone)]
 struct Node {
     path: String,
@@ -286,7 +340,7 @@ struct Node {
     scope: ConfigScope,
     signature: Signature,
     factory: Option<Arc<RegisteredFactory>>,
-    inject: Vec<RegisteredService>,
+    inject: Vec<(RegisteredService, Value)>,
     id: Option<PluginId>,
 }
 impl Node {
@@ -304,8 +358,8 @@ impl Node {
                 entry: self.path.clone(),
                 message,
             })?;
-        for service in &self.inject {
-            plugin = (service.require)(plugin);
+        for (service, config) in &self.inject {
+            plugin = (service.require)(plugin, config.clone());
         }
         Ok(plugin)
     }
@@ -336,9 +390,17 @@ struct SourceTracking {
     resolutions: BTreeMap<PathBuf, PathBuf>,
 }
 
+struct PlannedUpdate {
+    path: String,
+    id: PluginId,
+    generation: u64,
+    plan: ConfigUpdatePlan,
+    started: bool,
+}
 struct Transaction {
     before: Snapshot,
     created: Vec<PluginId>,
+    updates: Vec<PlannedUpdate>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ApplyReport {
@@ -346,6 +408,8 @@ pub struct ApplyReport {
     pub changed: Vec<String>,
     pub removed: Vec<String>,
     pub retained: usize,
+    /// Config-only changes accepted without replacing the active instance.
+    pub updated: Vec<String>,
 }
 impl ApplyReport {
     pub fn is_unchanged(&self) -> bool {
@@ -419,9 +483,14 @@ impl Loader {
         self.source.contents.keys().map(PathBuf::as_path)
     }
 
-    fn prepare(&self, tree: ConfigTree) -> Result<Snapshot, LoaderError> {
+    fn prepare(
+        &self,
+        tree: ConfigTree,
+        restart: &BTreeSet<String>,
+    ) -> Result<Snapshot, LoaderError> {
         struct Planner<'a> {
             loader: &'a Loader,
+            restart: &'a BTreeSet<String>,
             plan: Snapshot,
         }
         impl Planner<'_> {
@@ -431,7 +500,7 @@ impl Loader {
                 entries: &[Entry],
                 parent: Option<&str>,
                 scope: &ConfigScope,
-                inherited: &[String],
+                inherited: &BTreeMap<String, Value>,
                 parent_enabled: bool,
                 parent_retained: bool,
                 depth: usize,
@@ -471,13 +540,14 @@ impl Loader {
                     for (name, patch) in &entry.intercept {
                         scope = scope.intercept(name, patch.clone());
                     }
-                    let mut inject = inherited.to_vec();
-                    for name in &entry.inject {
-                        if !inject.contains(name) {
-                            inject.push(name.clone());
-                        }
-                    }
-                    inject.sort();
+                    let mut inject = inherited.clone();
+                    inject.extend(
+                        entry
+                            .inject
+                            .iter()
+                            .map(|(name, config)| (name.clone(), config.clone())),
+                    );
+                    scope = scope.with_injections(&inject);
                     let service = |name: &str| {
                         self.loader
                             .registry
@@ -490,7 +560,9 @@ impl Loader {
                     };
                     let services = inject
                         .iter()
-                        .map(|name| service(name))
+                        .map(|(name, config)| {
+                            service(name).map(|service| (service, config.clone()))
+                        })
                         .collect::<Result<Vec<_>, _>>()?;
                     let isolates = entry
                         .isolate
@@ -528,7 +600,7 @@ impl Loader {
                         inject: inject
                             .iter()
                             .zip(&services)
-                            .map(|(name, service)| (name.clone(), service.revision))
+                            .map(|((name, _), (service, _))| (name.clone(), service.revision))
                             .collect(),
                         isolate: entry
                             .isolate
@@ -541,7 +613,12 @@ impl Loader {
                     };
                     let retained = parent_retained
                         && self.loader.current.nodes.get(&path).is_some_and(|old| {
-                            old.signature == signature
+                            (old.signature == signature
+                                || (!self.restart.contains(&path)
+                                    && signature.only_config_changed(&old.signature)
+                                    && old.id.is_some_and(|id| {
+                                        self.loader.runtime.phase(id) == Some(Phase::Active)
+                                    })))
                                 && match old.id {
                                     Some(id) => {
                                         self.loader.runtime.contains(id)
@@ -588,26 +665,76 @@ impl Loader {
         }
         let mut planner = Planner {
             loader: self,
+            restart,
             plan: Snapshot {
                 tree: tree.clone(),
                 ..Snapshot::default()
             },
         };
-        planner.visit(&tree.entries, None, &self.root, &[], true, true, 0)?;
+        planner.visit(
+            &tree.entries,
+            None,
+            &self.root,
+            &BTreeMap::new(),
+            true,
+            true,
+            0,
+        )?;
         Ok(planner.plan)
     }
 
     pub async fn load_json(&mut self, json: &str) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
-        let report = self.apply(ConfigTree::from_json(json)?).await?;
+        let report = self.apply_transaction(ConfigTree::from_json(json)?).await?;
         self.source = SourceTracking::default();
-        Ok(report)
+        self.settle_committed(report).await
     }
     pub async fn apply(&mut self, tree: ConfigTree) -> Result<ApplyReport, LoaderError> {
+        let report = self.apply_transaction(tree).await?;
+        self.settle_committed(report).await
+    }
+    async fn settle_committed(
+        &mut self,
+        mut report: ApplyReport,
+    ) -> Result<ApplyReport, LoaderError> {
+        self.runtime
+            .settle()
+            .await
+            .map_err(|error| LoaderError::PostCommit {
+                revision: self.revision,
+                cause: Box::new(error.into()),
+            })?;
+        // New service availability can restart consumers and retire their owned
+        // config children. Reinstall missing entries from the accepted tree.
+        if self.current.nodes.values().any(|node| {
+            node.signature.enabled
+                && node
+                    .id
+                    .is_none_or(|id| !self.runtime.contains(id) || self.runtime.retired(id))
+        }) {
+            let repaired = self
+                .apply_transaction(self.current.tree.clone())
+                .await
+                .map_err(|cause| LoaderError::PostCommit {
+                    revision: self.revision,
+                    cause: Box::new(cause),
+                })?;
+            report.revision = repaired.revision;
+            for path in repaired.changed {
+                if !report.changed.contains(&path) {
+                    report.changed.push(path);
+                }
+            }
+            report.retained = self.current.nodes.len() - report.changed.len();
+        }
+        Ok(report)
+    }
+    async fn apply_transaction(&mut self, tree: ConfigTree) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
         let mut settled = false;
+        let mut restart = BTreeSet::new();
         let (mut plan, mut report) = loop {
-            let plan = self.prepare(tree.clone())?;
+            let plan = self.prepare(tree.clone(), &restart)?;
             let mut report = ApplyReport {
                 revision: self.revision,
                 ..ApplyReport::default()
@@ -644,19 +771,117 @@ impl Loader {
             self.runtime.settle().await?;
             settled = true;
         };
-        // A dependency revision can indirectly retire a retained owner's children.
-        // Preconstruct standby plugins so their factory errors are also detected
-        // before retiring any old resource.
-        let mut plugins = BTreeMap::new();
-        for path in &plan.order {
-            let node = &plan.nodes[path];
-            if node.signature.enabled {
-                plugins.insert(path.clone(), node.build()?);
+        // A config update retains its episode only when structural changes cannot
+        // restart it through ownership or the transitive committed dependency graph.
+        let (plugins, updates) = loop {
+            let mut affected = self
+                .current
+                .nodes
+                .iter()
+                .filter_map(|(path, old)| {
+                    old.id
+                        .filter(|id| plan.nodes.get(path).and_then(|node| node.id) != Some(*id))
+                })
+                .collect::<BTreeSet<_>>();
+            let runtime_snapshot = self.runtime.snapshot();
+            loop {
+                let before = affected.len();
+                // Include programmatically mounted children and dynamic service
+                // providers, not just nodes directly represented in the config.
+                for node in &runtime_snapshot.plugins {
+                    if node.parent.is_some_and(|parent| affected.contains(&parent))
+                        || node
+                            .committed
+                            .iter()
+                            .any(|binding| affected.contains(&binding.provider))
+                    {
+                        affected.insert(node.id);
+                    }
+                }
+                if affected.len() == before {
+                    break;
+                }
             }
-        }
+            let candidates =
+                plan.order
+                    .iter()
+                    .filter(|path| {
+                        let node = &plan.nodes[*path];
+                        node.id.is_some()
+                            && self.current.nodes.get(*path).is_some_and(|old| {
+                                node.signature.only_config_changed(&old.signature)
+                            })
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+            let mut replan = false;
+            for path in &candidates {
+                let id = plan.nodes[path].id.unwrap();
+                let prefix = format!("{path}/");
+                let child_affected = self.current.nodes.iter().any(|(child, node)| {
+                    child.starts_with(&prefix) && node.id.is_some_and(|id| affected.contains(&id))
+                });
+                if affected.contains(&id) || child_affected {
+                    restart.insert(path.clone());
+                    replan = true;
+                }
+            }
+            if replan {
+                plan = self.prepare(tree.clone(), &restart)?;
+                continue;
+            }
+            // All candidate and standby factories are checked before user update
+            // planning or resource retirement. Planning itself must be side-effect free.
+            let mut plugins = BTreeMap::new();
+            for path in &plan.order {
+                let node = &plan.nodes[path];
+                if node.signature.enabled {
+                    plugins.insert(path.clone(), node.build()?);
+                }
+            }
+            let mut updates = Vec::new();
+            for path in candidates {
+                let node = &plan.nodes[&path];
+                let id = node.id.unwrap();
+                if !self.runtime.config_recipe_compatible(id, &plugins[&path]) {
+                    restart.insert(path);
+                    replan = true;
+                    break;
+                }
+                let generation = self
+                    .runtime
+                    .episode_generation(id)
+                    .ok_or(RuntimeError::InactiveOwner(id))?;
+                let previous = self.current.nodes[&path].signature.entry.config.clone();
+                match self.runtime.prepare_config_update(
+                    id,
+                    previous,
+                    node.signature.entry.config.clone(),
+                )? {
+                    ConfigUpdate::Restart => {
+                        restart.insert(path);
+                        replan = true;
+                        break;
+                    }
+                    ConfigUpdate::Apply(update) => updates.push(PlannedUpdate {
+                        path,
+                        id,
+                        generation,
+                        plan: update,
+                        started: false,
+                    }),
+                }
+            }
+            if replan {
+                plan = self.prepare(tree.clone(), &restart)?;
+                continue;
+            }
+            break (plugins, updates);
+        };
         self.pending = Some(Transaction {
             before: self.current.clone(),
             created: Vec::new(),
+            updates,
         });
         let result = self.apply_prepared(&mut plan, plugins).await;
         match result {
@@ -673,6 +898,14 @@ impl Loader {
                         .cloned()
                         .collect();
                 report.retained = plan.nodes.len() - report.changed.len();
+                report.updated = self
+                    .pending
+                    .as_ref()
+                    .unwrap()
+                    .updates
+                    .iter()
+                    .map(|update| update.path.clone())
+                    .collect();
                 self.current = plan;
                 self.pending = None;
                 self.revision = self
@@ -727,15 +960,78 @@ impl Loader {
             plan.nodes.get_mut(path).unwrap().id = Some(id);
         }
         self.runtime.settle().await?;
+        for update in &mut self.pending.as_mut().unwrap().updates {
+            if self.runtime.episode_generation(update.id) != Some(update.generation)
+                || self.runtime.phase(update.id) != Some(Phase::Active)
+            {
+                return Err(LoaderError::Factory {
+                    entry: update.path.clone(),
+                    message: "configuration update owner changed activation".into(),
+                });
+            }
+            update.started = true;
+            update
+                .plan
+                .apply()
+                .await
+                .map_err(|message| LoaderError::Factory {
+                    entry: update.path.clone(),
+                    message,
+                })?;
+        }
+        // Adoption only changes future setup recipes, after all reversible work
+        // and all newly mounted nodes have succeeded.
+        for update in &self.pending.as_ref().unwrap().updates {
+            if self.runtime.episode_generation(update.id) != Some(update.generation)
+                || self.runtime.phase(update.id) != Some(Phase::Active)
+            {
+                return Err(LoaderError::Factory {
+                    entry: update.path.clone(),
+                    message: "configuration update owner changed activation".into(),
+                });
+            }
+        }
+        let recipes = self
+            .pending
+            .as_ref()
+            .unwrap()
+            .updates
+            .iter()
+            .map(|update| {
+                (
+                    update.id,
+                    plugins
+                        .remove(&update.path)
+                        .expect("preconstructed retained configuration update recipe"),
+                )
+            })
+            .collect();
+        self.runtime.adopt_config_recipes(recipes)?;
         Ok(())
     }
 
     /// Restore interrupted/failed revisions using captured old factories. Newly
     /// restored IDs are recorded before awaiting, so recovery can also be dropped.
     pub async fn recover(&mut self) -> Result<(), LoaderError> {
-        let Some(transaction) = &self.pending else {
+        if self.pending.is_none() {
             return Ok(());
-        };
+        }
+        // Undo in-place mutations while the old owner and its services still live.
+        // Keep the current inverse/future in the transaction when recovery is dropped.
+        while let Some(update) = self.pending.as_mut().unwrap().updates.last_mut() {
+            if update.started {
+                update
+                    .plan
+                    .rollback()
+                    .await
+                    .map_err(|message| LoaderError::Factory {
+                        entry: update.path.clone(),
+                        message,
+                    })?;
+            }
+            self.pending.as_mut().unwrap().updates.pop();
+        }
+        let transaction = self.pending.as_ref().unwrap();
         for id in &transaction.created {
             self.runtime.dispose(*id)?;
         }
@@ -797,14 +1093,14 @@ impl Loader {
         self.apply(tree).await
     }
     pub async fn dispose(&mut self) -> Result<ApplyReport, LoaderError> {
-        let report = self.apply(ConfigTree::default()).await?;
+        let report = self.apply_transaction(ConfigTree::default()).await?;
         self.source = SourceTracking::default();
-        Ok(report)
+        self.settle_committed(report).await
     }
     pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
         let loaded = read_tree(path.as_ref())?;
-        let report = self.apply(loaded.tree).await?;
+        let report = self.apply_transaction(loaded.tree).await?;
         self.source.root = Some(loaded.root);
         self.source.resolutions = loaded.resolutions;
         self.source.checkpoints = loaded
@@ -822,7 +1118,7 @@ impl Loader {
         self.source
             .pending_sync
             .retain(|path| self.source.contents.contains_key(path));
-        Ok(report)
+        self.settle_committed(report).await
     }
     /// Prepare an explicit, inspectable three-way save without writing files.
     /// Include boundaries are retained. New children directly beside an include
@@ -859,12 +1155,13 @@ impl Loader {
                 SaveErrorKind::InvalidMergedConfiguration(error.to_string()),
             )
         })?;
-        self.prepare(merged.tree).map_err(|error| {
-            SaveError::new(
-                None,
-                SaveErrorKind::InvalidMergedConfiguration(error.to_string()),
-            )
-        })?;
+        self.prepare(merged.tree, &BTreeSet::new())
+            .map_err(|error| {
+                SaveError::new(
+                    None,
+                    SaveErrorKind::InvalidMergedConfiguration(error.to_string()),
+                )
+            })?;
         Ok(plan)
     }
     /// Commit a reviewed plan. Errors contain exact per-file progress; completed

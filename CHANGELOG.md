@@ -4,6 +4,79 @@ Changes are recorded before release. There is no published release yet.
 
 ## Unreleased — 0.1.0
 
+- Distinguish an active owned action from its later asynchronous continuations.
+  Completed startup callbacks no longer block the official headless runner's
+  shutdown; pending effects, inverses and owned tasks retain self-wait guards.
+  Stale continuations may emit existing logger diagnostics, while service and
+  resource access still requires their original, valid episode authority.
+
+- Expose real per-Fiber lifecycle inertia for the unmodified upstream Loader.
+  Startup and cleanup observers join native-admitted transitions, including
+  restart and failed-setup cleanup, without waiting on their own parent domain.
+
+- Keep native cleanup failures observable after settlement consumes transient errors.
+  Disposal rejects on failed owned descendants or committed consumers, preserves
+  the setup-error cause, and requires real explicit recovery before removal.
+
+- Adapt real static `cordis::Plugin` definitions into the existing Node graph,
+  using committed publication bindings and original shared typed slots.
+  Preserve per-Fiber FnMut state across restart and reject implicit name/type
+  conversions, unsupported dynamic operations and changed mount definitions.
+- Share setup/cleanup execution helpers with the Rust Runtime. Keep failed
+  legacy FnOnce cleanup permanently unconfirmed instead of accepting an empty
+  retry; synchronize withdrawal with escaped AsyncSetup capabilities.
+- Include the typed Runtime source closure in native build, npm installation
+  and benchmark freshness checks.
+
+- Add bidirectional explicit opaque object and callback adapters with fixed method
+  interfaces, borrowed/owned leases and retryable asynchronous owned disposal.
+  Acquire capabilities through declared factory methods; reject handles and
+  callbacks embedded in ordinary JSON arguments or results.
+- Retain objects and Rust sessions until ordinary JS inverses succeed, then
+  release consumer objects in acquisition LIFO order before session teardown.
+  Preserve failed cleanup dependencies, including nested effects and partial setup.
+- Keep reverse `JsObject`/`JsCallback`/`JsStream` capabilities action-scoped. Explicit
+  close rejects pending methods/pulls as Busy without changing admission; automatic
+  journals still join completion and stream cancellation still issues return first.
+  Reject observable ancestor-resource close cycles and stale request authority.
+- Add source/build-bound performance measurement and explicit baseline comparison
+  tools with raw batch samples and separate measurement-failure/regression outcomes.
+  No performance numbers or accepted platform budgets are claimed by this entry.
+
+- Add bidirectional Rust/JS pull streams with single-flight backpressure, idle
+  resource ownership, real cancellation/return draining and retryable close.
+  Bind restoration authority to individual pending requests; retain failed and
+  malformed acquisitions through cleanup instead of treating drop as completion.
+- Select and verify native artifacts by platform, architecture, libc and Node-API;
+  record source-bound manifests and assemble existing host artifacts offline.
+  Multi-platform execution and complete release acceptance remain separate.
+
+- Add a user-extensible same-graph Rust factory SDK with explicit JSON service
+  methods, event-driven Futures, reverse JS calls, caller-owned cancellation,
+  cleanup retry and separately compiled addon acceptance.
+- Preserve unchanged Loader fibers during configuration updates and accept
+  prepared factory revisions through an explicit ModuleHost adapter; retain
+  fresh-Worker restart for actual module-environment replacement.
+
+- Share lifecycle control and the verified action ledger between Rust and Node.
+- Add versioned Service.check, dynamic declaration transfer, reserve/seal ownership,
+  callable logging, method decorators and separate Cordis/Harness profile policies.
+- Add explicit owned-task draining, JSON Include/group loading, serialized update
+  recovery and fresh-Worker artifact restart/rollback with abandoned-exit diagnosis.
+- Execute all 87 unchanged upstream core tests, preserve known safety differences,
+  and add strict profile differential evidence and extracted npm installation checks.
+
+- Add an experimental native Node compatibility path: a value-independent Rust
+  Driver, Node-API binding, JS object table and Cordis language facade. Original
+  Timer source is exercised without modification in optional differential tests.
+- Verify dynamic logical-provider declaration and a PublicationRegistry with
+  exact cleanup leases, revocation, retained slots and reclamation guards.
+- Retain action ownership across asynchronous cancellation and cleanup failure,
+  reject stale/cross-domain completions, and allow explicit failed-inverse retry.
+- Add native build fingerprints, Node behavioral evidence and a third extracted
+  crate check. This is not complete Cordis/Harness compatibility or paper refinement.
+
+
 - Pin Verus to the official `0.2026.10.04.1687598` rolling release, with platform
   archive checksums and the matching source revision in the upstream lock.
 - Represent closed-driver transitions as operation-specific enums, carrying

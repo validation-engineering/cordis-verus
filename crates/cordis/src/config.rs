@@ -3,12 +3,17 @@
 //! These are host-side facilities. Their validators and interceptors are not
 //! part of the Verus lifecycle proof.
 
+use crate::future_support::poll_catching_unwind;
 use crate::Context;
 use serde_json::{Map, Value};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use std::future::{poll_fn, Future};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context as TaskContext, Poll};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConfigError {
@@ -198,6 +203,7 @@ pub struct ConfigScope {
     typed: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
     metadata: Map<String, Value>,
     interceptors: BTreeMap<String, Value>,
+    injections: BTreeMap<String, Value>,
 }
 
 impl ConfigScope {
@@ -207,6 +213,7 @@ impl ConfigScope {
             typed: HashMap::new(),
             metadata: Map::new(),
             interceptors: BTreeMap::new(),
+            injections: BTreeMap::new(),
         }
     }
     pub fn context(&self) -> &Context {
@@ -245,6 +252,15 @@ impl ConfigScope {
         next.interceptors.insert(name, patch);
         next
     }
+    /// Configuration attached to this consumer's required service declaration.
+    pub fn injection(&self, service: &str) -> Option<&Value> {
+        self.injections.get(service)
+    }
+    pub(crate) fn with_injections(&self, injections: &BTreeMap<String, Value>) -> Self {
+        let mut next = self.clone();
+        next.injections = injections.clone();
+        next
+    }
     pub fn resolve(&self, plugin: &str, config: &Value) -> Value {
         self.interceptors
             .get(plugin)
@@ -263,7 +279,99 @@ impl fmt::Debug for ConfigScope {
             .field("context", &self.context)
             .field("metadata", &self.metadata)
             .field("interceptors", &self.interceptors)
+            .field("injections", &self.injections)
             .field("typed_metadata_count", &self.typed.len())
             .finish()
+    }
+}
+
+/// An update hook may retain the active instance or request normal replacement.
+/// Hook invocation only constructs a plan: it must not mutate external state.
+pub enum ConfigUpdate {
+    Restart,
+    Apply(ConfigUpdatePlan),
+}
+
+type UpdateFuture = Pin<Box<dyn Future<Output = Result<(), String>> + Send>>;
+type UndoFactory = Box<dyn FnMut() -> UpdateFuture + Send>;
+
+/// A reversible configuration update whose inverse is registered before apply.
+///
+/// `apply` can be asynchronous. Dropping the loader operation retains its future;
+/// recovery first lets that future land, then runs `rollback`. Rollback must undo
+/// partial application, including an apply error/panic, and must be safe to retry
+/// after a rollback error. These are plugin contracts, not Verus-proved effects.
+/// Neither callback runs while constructing this value.
+pub struct ConfigUpdatePlan {
+    apply: Option<UpdateFuture>,
+    applied: Option<Result<(), String>>,
+    started: bool,
+    rollback: UndoFactory,
+    restoring: Option<UpdateFuture>,
+}
+impl ConfigUpdatePlan {
+    pub fn new(
+        apply: impl FnOnce() -> Result<(), String> + Send + 'static,
+        mut rollback: impl FnMut() -> Result<(), String> + Send + 'static,
+    ) -> Self {
+        Self::new_async(
+            move || async move { apply() },
+            move || std::future::ready(rollback()),
+        )
+    }
+    pub fn new_async<A, AF, R, RF>(apply: A, mut rollback: R) -> Self
+    where
+        A: FnOnce() -> AF + Send + 'static,
+        AF: Future<Output = Result<(), String>> + Send + 'static,
+        R: FnMut() -> RF + Send + 'static,
+        RF: Future<Output = Result<(), String>> + Send + 'static,
+    {
+        Self {
+            // Constructing the user's future is inside the guarded poll boundary.
+            apply: Some(Box::pin(async move { apply().await })),
+            applied: None,
+            started: false,
+            rollback: Box::new(move || Box::pin(rollback())),
+            restoring: None,
+        }
+    }
+    fn poll_apply(&mut self, cx: &mut TaskContext<'_>) -> Poll<Result<(), String>> {
+        if let Some(result) = &self.applied {
+            return Poll::Ready(result.clone());
+        }
+        self.started = true;
+        let result = match poll_catching_unwind(self.apply.as_mut().unwrap().as_mut(), cx) {
+            Ok(Poll::Pending) => return Poll::Pending,
+            Ok(Poll::Ready(result)) => result,
+            Err(_) => Err("configuration update panicked".into()),
+        };
+        self.apply = None;
+        self.applied = Some(result.clone());
+        Poll::Ready(result)
+    }
+    pub(crate) async fn apply(&mut self) -> Result<(), String> {
+        poll_fn(|cx| self.poll_apply(cx)).await
+    }
+    pub(crate) async fn rollback(&mut self) -> Result<(), String> {
+        if !self.started {
+            return Ok(());
+        }
+        // A started forward operation must land before its registered inverse.
+        let _ = poll_fn(|cx| self.poll_apply(cx)).await;
+        if self.restoring.is_none() {
+            self.restoring = Some(
+                catch_unwind(AssertUnwindSafe(|| (self.rollback)()))
+                    .map_err(|_| "configuration rollback construction panicked".to_owned())?,
+            );
+        }
+        let result = poll_fn(|cx| {
+            match poll_catching_unwind(self.restoring.as_mut().unwrap().as_mut(), cx) {
+                Ok(result) => result,
+                Err(_) => Poll::Ready(Err("configuration rollback panicked".into())),
+            }
+        })
+        .await;
+        self.restoring = None;
+        result
     }
 }

@@ -67,9 +67,19 @@ runtime 将父节点的实际依赖 ports 加入子节点声明，同时将相�
 
 子组件创建登记一个位于对应 effect 组中的 inverse。该 inverse 执行到自身的 LIFO 位置时只请求 retire child，不等待 child 完成，符合论文 Def. 52 的注册逆操作。父节点可以继续其后的 inverse；child 的资源顺序由真实依赖守卫约束。父节点从 registry 删除仍须等待全部子节点删除，`settle()`/退休后的 `join(parent)` 提供完整子树完成边界。父节点 Unloading/已退休，或旧 episode/group 已取消时，拒绝新建子插件。
 
+## 动态服务与适用性检查
+
+固定 `.provides(key)` 仍在挂载时声明端口，setup 结束前必须为全部声明提供值。需要在运行中发布或单独撤销服务时，调用 `Setup::publish` 或 `AsyncSetup::publish`，取得 `ServiceHandle<T>`。`handle.set(value)` 更新服务值，`handle.dispose()` 请求撤销；调用方继续驱动 runtime，`handle.join()` 等待撤销完成。仅丢弃 handle 不等于撤销，owner 的退出仍会回收服务。
+
+动态服务由一个只提供该 key 的 owned child 实现。它显式依赖 owner 的内部 anchor，因而撤销 owner 时必须先等待动态服务及其消费者清理，不能只依赖 parent 关系推断资源顺序。anchor 不承载业务值。动态 provider 有自己的 ID；这与原版把服务直接登记到当前 Fiber 的表示不同。owner 初始化完成后服务才会发布，因此不要在 owner setup 中等待自己刚创建的动态服务就绪。相同端口的旧 provider 删除后才能重新发布。
+
+`provide_checked(key, value, check)` 和 `publish_checked` 接受纯检查函数 `Fn(&T, &Context, &serde_json::Value) -> bool`。最后一个参数来自消费者的 `.requires_with_config(key, config)` 或 Loader 的 `inject` 对象。检查为 false 或 panic 时，该消费者不能激活；已激活者会进入正常卸载。`set` 通知驱动重新检查；检查依赖的外部状态变化后调用 owner 的 `refresh()` 或动态服务 handle 的 `refresh()`，并继续驱动 runtime。检查函数在 bookkeeping 锁外执行，但必须无副作用且快速返回；不提供任意谓词的终止或纯度证明。
+
+动态服务、共享槽和 check 都是宿主协议，仍调用原有已验证的声明、binding 和 cleanup 守卫。没有修改内核来绕过依赖完整性，也没有把普通 Rust check 提升为 Verus 定理。
+
 ## 更新、替换与配置树
 
-`Setup::set`、`AsyncSetup::set` 和 `Runtime::set(owner, key, value)` 只替换该 owner 已提供的 payload，provider ID 不变。先前返回的 `Arc<T>` 是旧值快照；需要共享可变状态时，服务类型应明确采用锁或原子字段。`Runtime::get` 返回的外部 Arc 没有登记 consumer，不能延长 provider 的资源生命周期。
+`Setup::set`、`AsyncSetup::set` 和 `Runtime::set(owner, key, value)` 更新该 provider 的共享服务槽，provider ID 不变。已经激活的消费者下一次 `get` 可以读到新值；此前已返回的 `Arc<T>` 仍是旧值快照。旧 episode 持有的是原 committed provider 的槽，不会误读替代 provider。`Runtime::get` 返回的外部 Arc 没有登记 consumer，不能延长 provider 的资源生命周期。
 
 `restart(id)`、`update(id, callback)` 和 `update_async(id, callback)` 保留 ID，并清理旧 activation 后启动新 activation。它们是额外宿主操作。`replace(id, plugin).await` 按退休、清理、删除、重新挂载执行论文配置 revision，返回永不复用的新 ID；直接替换不会重建旧子树。
 

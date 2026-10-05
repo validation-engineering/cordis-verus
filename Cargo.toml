@@ -1,5 +1,6 @@
 [workspace]
-members = ["crates/cordis-kernel", "crates/cordis"]
+members = ["crates/cordis-kernel", "crates/cordis-driver", "crates/cordis", "crates/cordis-node"]
+default-members = ["crates/cordis-kernel", "crates/cordis-driver", "crates/cordis"]
 resolver = "2"
 
 [workspace.package]

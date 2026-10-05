@@ -22,3 +22,10 @@ __pycache__/
 .vscode/
 *.log
 *.crate
+
+# Node native compatibility development artifacts.
+node_modules/
+*.node
+
+# Generated native distribution manifest, provenance and binary artifacts.
+/packages/compat-cordis/native/

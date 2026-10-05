@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": [],
+    "paths": {
+      "cordis": [
+        "../../../packages/compat-cordis/index.d.ts"
+      ],
+      "@deepseek-ai/cordis": [
+        "../../../packages/compat-harness/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "basic.ts",
+    "harness.ts"
+  ]
+}

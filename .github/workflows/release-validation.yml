@@ -28,10 +28,18 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+      - name: Install pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - name: Install locked JavaScript dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
       - name: Install checksum-locked Verus and Rust
         run: ./scripts/install-verus.sh
       - name: Complete full-crate negative and release-quality gate
         run: python3 scripts/record-verification.py
+      - name: Assemble this host's audited native bundle
+        run: node scripts/package-native.mjs --output target/release-artifacts/native packages/compat-cordis/native
       - name: Retain full validation evidence, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -44,5 +52,8 @@ jobs:
             target/proof-negative/*.txt
             target/release-artifacts/*.crate
             target/release-artifacts/package-report.json
+            target/node-compat/build.json
+            target/release-artifacts/npm/
+            target/release-artifacts/native/
           if-no-files-found: warn
           retention-days: 14

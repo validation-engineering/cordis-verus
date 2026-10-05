@@ -1,0 +1,39 @@
+{
+  "name": "@cordis-verus/compat-cordis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Experimental Cordis language facade over the Rust lifecycle driver",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    },
+    "./utils": "./utils.js",
+    "./register": "./register.js",
+    "./bootstrap": "./bootstrap.js",
+    "./native-artifacts": {
+      "types": "./native-artifacts.d.ts",
+      "import": "./native-artifacts.js",
+      "require": "./native-artifacts.js"
+    }
+  },
+  "license": "MIT",
+  "files": [
+    "*.js",
+    "*.cjs",
+    "*.d.ts",
+    "README.md",
+    "LICENSE",
+    "LICENSE.upstream",
+    "NOTICE",
+    "native/cordis.node",
+    "native/manifest.json",
+    "native/provenance/*.json",
+    "native/prebuilds/*/cordis.node"
+  ]
+}

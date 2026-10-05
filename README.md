@@ -4,7 +4,7 @@
 
 用带 [Verus](https://github.com/verus-lang/verus) 契约与证明的可执行 Rust 实现 Cordis 的生命周期与可逆效果。内核的同一份源码接受 Verus 验证和 Cargo 编译；上层 Rust runtime 提供 typed services、异步插件、事件、定时器及配置加载。
 
-这是独立于原 TLA+ 研究的新项目，以 [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1) 为语义来源，以 Cordis 和 DeepSeek Harness 的锁定官方快照为功能参考。项目提供 Rust 对应接口，不运行 TypeScript 插件，也不实现 Harness 的模型 API、权限系统或 UI。
+这是独立于原 TLA+ 研究的新项目，以 [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1) 为语义来源，以 Cordis 和 DeepSeek Harness 的锁定官方快照为功能参考。项目提供 Rust 对应接口，以及可运行部分原版 JS/TS 插件的实验性 Node 原生兼容层；不实现 Harness 的模型 API、权限系统或 UI。
 
 **这是私有研究开发项目（实验性 0.1.0），尚未发布到 crates.io，完整发布质量门槛尚未通过。** 公共 API 和证明边界仍在演进；实现优先对齐 Cordis 行为和论文语义。
 
@@ -24,14 +24,19 @@
 
 - 生命周期内核：四态转换、真实 provider identity、target／committed bindings、retire／remove 分离和恢复次序守卫。
 - 已验证闭合程序：实际服务值、Provision、跨 provider 操作、动态 Child、真实 LIFO inverse journal、在途准入和目标变化后的 Divert。
-- Rust 宿主：同步／异步 setup、typed services、realm、动态子插件、取消和清理、事件及 owner 定时器。
-- 配置与维护：JSON 配置树、Include、热更新、显式配置保存、状态诊断及 shutdown。
+- Rust 宿主：同步／异步 setup、动态服务发布／撤销、服务检查与共享值更新、realm、子插件、取消和清理、事件及 owner 定时器。
+- 原版插件实验入口：Cordis/Harness 两个 Node profile、Service.check、owned task、增量 JSON Loader 与 Worker 制品恢复；Rust/Node 共用生命周期 Driver，JS 服务保留对象语义；[用户 Rust factory](docs/rust-node-plugins.md) 可通过显式 JSON、双向背压流和 opaque object/callback adapter 加入同一图；范围见[Node 兼容指南](docs/node-compatibility.md)。
+- 配置与维护：JSON 配置树、可回滚的原地更新、Include、显式保存、状态诊断及 shutdown；外部可执行插件通过 JSON-RPC 加载，代码快照支持更新失败后的恢复。
 
 宿主功能由行为与集成测试支撑；任意 Rust callback、Future、锁和文件 I/O 尚未获得完整形式化 refinement。功能对应与差异见[上游对照](docs/upstream-parity.md)，使用限制见[语义边界](docs/semantics.md)。
 
+跨语言对象和回调通过 factory 方法取得，方法参数与结果仍是 JSON。borrowed 引用和 owned 析构有不同合同；普通 inverse 成功后才按 LIFO 释放对象，再清理 Rust session，失败资源保留供重试。既有 `cordis::Plugin` 的[静态 typed 服务](docs/typed-rust-plugins.md)也可加入同一图，保留原 `Arc` 与跨重启闭包。typed Runtime 的动态能力迁移、更广接口/ABI 与生态验收、平台发布和 host refinement 仍未完成。
+
+[性能工具](docs/benchmarks.md)提供源码与实际构建绑定的测量和基线比较；工具存在不代表已有性能实测结论或已通过性能预算。
+
 ## 快速开始
 
-需要 Git、Rustup、Python 3 和 curl。安装脚本下载并校验锁定的 Verus／Rust 工具链，支持 macOS ARM/Intel 与 Linux x86_64，不修改 Rustup 默认工具链。首次运行需要网络和 Cargo 依赖；后续可使用本地缓存。
+Rust 路径需要 Git、Rustup、Python 3 和 curl；完整开发检查另需 Node 22.22.0 和 `npm ci --ignore-scripts`。安装脚本下载并校验锁定的 Verus／Rust 工具链，支持 macOS ARM/Intel 与 Linux x86_64，不修改 Rustup 默认工具链。首次运行需要网络和 Cargo 依赖；后续可使用本地缓存。
 
 ```bash
 git clone https://github.com/Stool233/cordis-verus.git

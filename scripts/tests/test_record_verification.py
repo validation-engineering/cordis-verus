@@ -3,6 +3,8 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "record-verification.py"
 SPEC = importlib.util.spec_from_file_location("verification_record", SCRIPT)
@@ -56,6 +58,36 @@ class CompleteRecordTests(unittest.TestCase):
         for expected in [[], ["same", "same"]]:
             with self.subTest(expected=expected), self.assertRaisesRegex(RuntimeError, "manifest"):
                 RECORD.validate_negative_report(report(expected), expected)
+
+
+class NativeEvidenceInputTests(unittest.TestCase):
+    def test_hashes_javascript_types_and_locks_but_not_node_modules_or_binaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixtures = ["packages/compat-cordis/runtime.js", "packages/compat-cordis/index.cjs",
+                        "packages/compat-cordis/index.d.ts", "scripts/build-node.mjs",
+                        "tests/node-compat/lifecycle.test.mjs", "tests/node-compat/types.tsx",
+                        "package-lock.json", "node_modules/vendor/index.js",
+                        "packages/compat-cordis/node_modules/vendor/index.js",
+                        "packages/compat-cordis/native/cordis.node", "target/node-compat/build.json",
+                        "packages/compat-cordis/native/manifest.json",
+                        "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json"]
+            for name in fixtures:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+            with patch.object(RECORD, "ROOT", root):
+                hashes = RECORD.source_hashes()
+            self.assertEqual(set(hashes), set(fixtures[:7]))
+
+    def test_unit_test_counts_keep_all_workspace_crates_separate(self):
+        lines = []
+        for name, count in (("cordis", 2), ("cordis_kernel", 3), ("cordis_driver", 5), ("cordis_node", 7)):
+            lines.extend([f"Running unittests src/lib.rs (target/debug/deps/{name}-abc012)",
+                          f"test result: ok. {count} passed; 0 failed;"])
+        counts = RECORD.test_counts("\n".join(lines))
+        self.assertEqual(counts["suites"], {"host_unit": 2, "kernel_unit": 3, "cordis_driver_unit": 5, "cordis_node_unit": 7})
+        self.assertEqual(counts["total"], 17)
 
 
 if __name__ == "__main__":

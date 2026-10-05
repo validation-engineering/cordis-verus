@@ -3,7 +3,8 @@
 An independent Rust Cordis runtime backed by the executable, Verus-verified
 `cordis-kernel`. It provides typed services, plugin lifecycle management,
 asynchronous setup and effects, dynamic children, scoped events and timers,
-JSON configuration, and reloadable plugin factories.
+JSON configuration, reversible in-place updates, dynamic service publication,
+and external executable plugins with snapshot-backed code reload.
 
 ```rust
 use cordis::{Context, Plugin, Runtime};

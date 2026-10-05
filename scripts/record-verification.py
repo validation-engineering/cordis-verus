@@ -18,7 +18,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 RECORD = ROOT / "docs/verification-report.json"
-EXCLUDED = {".git", ".tools", "target", "upstream", "reference", "__pycache__"}
+EXCLUDED = {".git", ".tools", "target", "upstream", "reference", "__pycache__", "node_modules"}
 
 
 def required_negative_names():
@@ -58,9 +58,10 @@ def source_hashes():
         for name in files:
             path = Path(directory) / name
             rel = path.relative_to(ROOT).as_posix()
-            if path == RECORD or path.is_symlink() or name in {"verus-release.json", ".DS_Store"}:
+            if (path == RECORD or path.is_symlink() or name in {"verus-release.json", ".DS_Store"}
+                    or rel.startswith("packages/compat-cordis/native/")):
                 continue
-            if path.suffix not in {".rs", ".toml", ".lock", ".md", ".json", ".py", ".sh", ".yml", ".yaml"} and name not in {"LICENSE", "NOTICE", ".gitignore", ".gitattributes", ".editorconfig"}:
+            if path.suffix not in {".rs", ".toml", ".lock", ".md", ".json", ".py", ".sh", ".yml", ".yaml", ".js", ".mjs", ".cjs", ".ts", ".tsx"} and name not in {"LICENSE", "LICENSE.upstream", "NOTICE", ".gitignore", ".gitattributes", ".editorconfig"}:
                 continue
             result[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
     return dict(sorted(result.items()))
@@ -78,7 +79,10 @@ def test_counts(log):
         if match:
             current = (suites, "kernel" if match[1] == "lifecycle" else match[1])
         elif "Running unittests src/lib.rs" in line:
-            current = (suites, "kernel_unit" if "cordis_kernel-" in line else "host_unit")
+            crate_match = re.search(r"/(cordis(?:_[a-z]+)*)-[0-9a-f]+", line)
+            crate = crate_match[1] if crate_match else "cordis"
+            label = {"cordis_kernel": "kernel_unit", "cordis": "host_unit"}.get(crate, crate + "_unit")
+            current = (suites, label)
         elif "Doc-tests " in line:
             current = (doctests, line.split("Doc-tests ", 1)[1].strip())
         match = re.search(r"test result: ok\. (\d+) passed; 0 failed;", line)

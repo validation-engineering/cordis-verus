@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build and test extracted crate archives without uploading or using source paths.
 
-The kernel is unpublished, so a command-local Cargo patch resolves the host's
-versioned dependency to the *extracted kernel artifact*. This checks package
+The local crates are unpublished, so command-local Cargo patches resolve each
+dependent to already extracted artifacts in dependency order. This checks package
 contents, not registry name availability or crates.io publish eligibility.
 """
 
@@ -17,6 +17,13 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE_ORDER = ("cordis-kernel", "cordis-driver", "cordis")
+
+
+def cargo_patches(paths):
+    """Build command-local patches without writing repository Cargo configuration."""
+    return [argument for name, path in paths.items()
+            for argument in ("--config", "patch.crates-io." + name + ".path=" + json.dumps(str(path)))]
 
 
 def run(args, cwd=ROOT, capture=False):
@@ -82,14 +89,13 @@ def main():
         "registry_publish_checked": False,
         "inputs": {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in ("Cargo.lock", "toolchain.lock.json")},
         "packages": [],
+        "excluded": [{"name": "cordis-node", "reason": "Native binding is not a public Rust crate; validate its packed Node distribution with scripts/check-npm-package.mjs."}],
     }
     with tempfile.TemporaryDirectory(prefix="cordis-artifacts-") as temporary:
         extracted = Path(temporary).resolve()
-        kernel = packages["cordis-kernel"]
-        kernel_path = extracted / f"cordis-kernel-{kernel['version']}"
-        patch = ["--config", "patch.crates-io.cordis-kernel.path=" + json.dumps(str(kernel_path))]
-        assembly_patch = ["--config", "patch.crates-io.cordis-kernel.path=" + json.dumps(str(Path(kernel["manifest_path"]).parent))]
-        for name in ("cordis-kernel", "cordis"):
+        extracted_paths = {}
+        assembly_paths = {}
+        for name in PACKAGE_ORDER:
             package = packages[name]
             version = package["version"]
             for required in ("description", "license", "readme", "rust_version"):
@@ -98,9 +104,9 @@ def main():
             for filename in ("LICENSE", "NOTICE"):
                 if (Path(package["manifest_path"]).parent / filename).read_bytes() != (ROOT / filename).read_bytes():
                     raise RuntimeError(f"{name}: {filename} differs from project notice")
-            local_patch = patch if name == "cordis" else []
+            local_patch = cargo_patches(extracted_paths)
             # Assembly and verification are separate: --no-verify is NOT a pass.
-            run(["cargo", "package", "-p", name, "--allow-dirty", "--locked", "--no-verify", *network, *(assembly_patch if name == "cordis" else [])])
+            run(["cargo", "package", "-p", name, "--allow-dirty", "--locked", "--no-verify", *network, *cargo_patches(assembly_paths)])
             archive_name = f"{name}-{version}.crate"
             archive = ROOT / "target" / "package" / archive_name
             prefix = f"{name}-{version}"
@@ -115,9 +121,11 @@ def main():
             run(["cargo", "test", "--doc", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
             run(["cargo", "build", "--release", "--lib", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
             shutil.copyfile(archive, output / archive_name)
+            extracted_paths[name] = artifact_root
+            assembly_paths[name] = Path(package["manifest_path"]).parent
             report["packages"].append({"name": name, "version": version, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(), "files": files, "tests": "passed", "doctests": "passed", "release_build": "passed"})
     report_path.write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Both extracted artifacts tested and release-built. Report: {report_path}")
+    print(f"{len(report['packages'])} extracted artifacts tested and release-built. Report: {report_path}")
     print("No package was uploaded. Registry namespace and publish eligibility remain release-time checks.")
 
 

@@ -4,7 +4,7 @@
 
 A Rust implementation of Cordis lifecycle and reversible effects, with executable contracts and proofs in [Verus](https://github.com/verus-lang/verus). The kernel uses the same source for Verus verification and Cargo compilation. A Rust runtime adds typed services, asynchronous plugins, events, timers, and configuration loading.
 
-This is a separate project from the earlier TLA+ study. Its semantic reference is [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1), with pinned official Cordis and DeepSeek Harness snapshots as implementation references. It offers corresponding Rust interfaces; it does not execute TypeScript plugins or implement Harness's model APIs, permission system, or UI.
+This is a separate project from the earlier TLA+ study. Its semantic reference is [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1), with pinned official Cordis and DeepSeek Harness snapshots as implementation references. It offers corresponding Rust interfaces and an experimental native Node facade that runs a tested subset of original JS/TS plugins. It does not implement Harness's model APIs, permission system, or UI.
 
 **This is a private research/development project: experimental version 0.1.0, not published on crates.io, and not through the complete release quality gate.** Public APIs and proof coverage are still evolving, with Cordis behavior and paper semantics guiding implementation changes.
 
@@ -24,10 +24,16 @@ These counts describe a frozen source snapshot, not a proof of the whole paper. 
 
 - Lifecycle kernel: four-state transitions, actual provider identities, target and committed bindings, separate retirement/removal, and guarded recovery ordering.
 - Verified closed programs: real service values, Provision, cross-provider operations, dynamic Child creation, actual LIFO inverse journals, pending admission, and Divert after target drift.
-- Rust host: synchronous/asynchronous setup, typed services, realms, child plugins, cancellation and cleanup, events, and owner-scoped timers.
-- Configuration and maintenance: JSON trees, Include, hot reload, explicit persistence, diagnostics, and shutdown.
+- Rust host: synchronous/asynchronous setup, dynamic service publication and withdrawal, consumer-specific service checks, shared payload updates, realms, child plugins, events, and owner-scoped timers.
+- Configuration and maintenance: JSON trees, reversible in-place updates, Include, explicit persistence, diagnostics, and shutdown. External executables run through JSON-RPC; captured code revisions support rollback after a failed update.
 
 The host is covered by behavior and integration tests. Arbitrary Rust callbacks, Futures, locks, and file I/O do not yet have a complete formal refinement. See [upstream parity](docs/upstream-parity.md) and [semantic boundaries](docs/semantics.md).
+
+See the [native Node compatibility guide](docs/node-compatibility.md) for plugin loading, the two profiles, incremental JSON Loader/Worker recovery and remaining architecture milestones. The [Rust plugin SDK](docs/rust-node-plugins.md) also mounts user-compiled factories in the same graph through explicit JSON services, bidirectional pull streams and opaque object/callback adapters. The complete development gate also requires Node 22.22.0 and `npm ci --ignore-scripts`.
+
+Objects and callbacks are acquired through declared factory methods; method arguments and results remain JSON. Borrowed references and owned disposal have distinct contracts. Ordinary inverses must succeed before objects are released in LIFO order and Rust sessions are torn down; failed cleanup retains retry resources. Existing `cordis::Plugin` static typed services can join the same Node graph through [explicit typed bindings](docs/typed-rust-plugins.md), retaining the original `Arc` and restart closure. Dynamic Runtime migration and host refinement remain open. Broader interface/ABI and ecosystem coverage and platform release acceptance remain open.
+
+[Performance tools](docs/benchmarks.md) bind measurements and baseline comparisons to source and actual build artifacts. Having these tools does not establish measured performance or an accepted budget.
 
 ## Quick start
 

@@ -1,0 +1,22 @@
+{
+  "name": "@cordis-verus/compat-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Harness Cordis profile over the shared native lifecycle driver",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    },
+    "./register": "./register.js"
+  },
+  "peerDependencies": {
+    "@cordis-verus/compat-cordis": "0.1.0"
+  },
+  "license": "MIT"
+}

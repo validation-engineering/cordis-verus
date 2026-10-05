@@ -8,7 +8,12 @@
 | --- | --- |
 | [Runtime](runtime.md) | typed service、同步／异步插件、stage 与清理 |
 | [Events](events.md) | 事件模式、owner admission 与 drain |
-| [Loader](loader.md) | 配置树、Include、热更新和持久化 |
+| [Loader](loader.md) | 配置树、原地更新、Include、热更新和持久化 |
+| [Rust/JS plugins](rust-node-plugins.md) | 同图 Rust factory、JSON/流/显式对象与回调、borrowed/owned 及 action/cleanup 合同 |
+| [Typed Rust plugins](typed-rust-plugins.md) | 既有静态 Plugin 接入 Node、共享 typed slot、重启与清理失败合同 |
+| [Node compatibility](node-compatibility.md) | 原版 JS/TS 插件的实验性原生运行路径、构建、加载、差分测试与范围 |
+| [Native distribution](native-distribution.md) | 原生产物 manifest、平台选择、校验和离线合包 |
+| [Process plugins](process-plugins.md) | 外部可执行插件、JSON-RPC、代码快照与失败恢复 |
 | [Diagnostics](diagnostics.md) | JSON/DOT 诊断、回收与 shutdown |
 | [Upstream parity](upstream-parity.md) | Cordis／Harness 功能对应、差异及非目标 |
 | [Verified programs](verified-programs.md) | ProgramDriver、MixedDriver、FreshDriver 的可运行接口及证明边界 |
@@ -18,7 +23,8 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [Architecture](architecture.md) | 两个 crate、证明层次、源码导航与信任边界 |
+| [Architecture](architecture.md) | Rust/Node 分层、证明层次、源码导航与信任边界 |
+| [Node compatibility architecture](node-compatibility-architecture.md) | 原版插件运行于 Rust 内核的长期架构、实施状态、兼容合同和交付门槛 |
 | [Semantics](semantics.md) | 实现规则、依赖与所有权、retire/remove 等关键区别 |
 | [Refinement](refinement.md) | 已建立的桥接、真实恢复与轨迹变换及其前提 |
 | [Paper coverage](paper-coverage.md) | 81 个编号条目的生成视图和 4 项整体连接义务 |
@@ -34,6 +40,7 @@
 | --- | --- |
 | [Status](status.md) | 冻结快照结果、尚未通过的检查和当前工作 |
 | [Validation](validation.md) | 重现验证、规范负控、实验性 scoped 检查和证据判定 |
+| [Benchmarks](benchmarks.md) | 性能测量方法、源码/构建绑定、原始批次数据、显式基线与未验收预算 |
 | [Roadmap](roadmap.md) | 后续工作顺序、交付物和验收条件 |
 | [Contributing](../CONTRIBUTING.md) | 开发环境、提交约定与变更检查 |
 | [Releasing](releasing.md) | 完整质量门槛、打包与发布流程 |

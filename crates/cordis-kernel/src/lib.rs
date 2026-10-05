@@ -1,6 +1,7 @@
 //! Executable lifecycle safety kernel. All state-changing methods are verified.
 //! Host callbacks are deliberately outside this crate's proof boundary.
 use vstd::prelude::*;
+pub mod action_ledger;
 pub mod administrative_orchestration;
 pub mod alpha;
 pub mod calculus;
@@ -58,6 +59,7 @@ pub mod program_refinement;
 pub mod program_trace;
 pub mod progress;
 pub mod projection;
+pub mod publication;
 pub mod quotient;
 pub mod recovery_examples;
 pub mod recursive_context;
@@ -938,6 +940,386 @@ impl Kernel {
         Ok(())
     }
 
+    pub closed spec fn same_control(&self, prior: &Self) -> bool {
+        self.nodes@ == prior.nodes@
+    }
+    pub closed spec fn declares_provision(&self, owner: usize, port: Port) -> bool {
+        Self::declares(self.declarations@, owner, port, true)
+    }
+
+    /// Extend a live logical fiber's service interface, including its initial
+    /// inactive reservation before the first Begin. Admission of host effects
+    /// to that reservation is the host's responsibility. This is a host extension
+    /// beyond the paper's fixed-interface Insert rule. It preserves the kernel
+    /// resource invariant and does not allocate an artificial provider fiber.
+    /// Revoking a host value does not release this reservation. The host may
+    /// release it explicitly after all committed references to this port drain.
+    pub fn declare_provision(&mut self, owner: usize, port: Port) -> (r: Result<(), Error>)
+        requires old(self).wf(),
+        ensures final(self).wf(), final(self).generations_preserved(old(self)),
+            final(self).same_control(old(self)),
+            final(self).same_bindings(old(self)),
+            r.is_ok() ==> final(self).declares_provision(owner, port),
+            r.is_err() ==> final(self).unchanged(old(self)),
+    {
+        if !self.contains(owner) { return Err(Error::Unknown); }
+        if self.nodes[owner].retired { return Err(Error::Retired); }
+        if self.nodes[owner].phase != Phase::Loading && self.nodes[owner].phase != Phase::Active
+            && !(self.nodes[owner].phase == Phase::Inactive && self.nodes[owner].generation == 0) {
+            return Err(Error::InvalidState);
+        }
+        let mut i = 0;
+        while i < self.declarations.len()
+            invariant i <= self.declarations.len(), self.wf(), self == old(self),
+                owner < self.nodes.len(),
+                forall|j: int| 0 <= j < i && self.declarations[j].provides
+                    && self.nodes[self.declarations[j].owner as int].present
+                    && self.declarations[j].port == port ==> self.declarations[j].owner == owner,
+            decreases self.declarations.len() - i,
+        {
+            let declaration = self.declarations[i];
+            if declaration.provides && declaration.port == port
+                && self.nodes[declaration.owner].present {
+                if declaration.owner == owner { return Ok(()); }
+                return Err(Error::Conflict);
+            }
+            i += 1;
+        }
+        if self.declarations.len() == usize::MAX { return Err(Error::Capacity); }
+        let ghost previous = self.declarations@;
+        self.declarations.push(Declaration { owner, port, provides: true });
+        proof {
+            assert(self.declarations[previous.len() as int] == Declaration { owner, port, provides: true });
+            assert(Self::declares(self.declarations@, owner, port, true));
+            Self::typing_extends(previous, self.declarations@, self.links@);
+            assert forall|a: int, b: int| 0 <= a < self.declarations.len() && 0 <= b < self.declarations.len()
+                && self.declarations[a].provides && self.declarations[b].provides
+                && self.nodes[self.declarations[a].owner as int].present
+                && self.nodes[self.declarations[b].owner as int].present
+                && self.declarations[a].port == self.declarations[b].port
+                implies self.declarations[a].owner == self.declarations[b].owner by {
+                if a < previous.len() && b < previous.len() {
+                    assert(previous[a] == self.declarations[a]);
+                    assert(previous[b] == self.declarations[b]);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether this logical fiber still reserves a port, in any control phase.
+    pub fn provision_reserved(&self, owner: usize, port: Port) -> (reserved: bool)
+        ensures reserved == self.declares_provision(owner, port),
+    {
+        let mut i = 0;
+        while i < self.declarations.len()
+            invariant i <= self.declarations.len(),
+                forall|j: int| 0 <= j < i ==> !(self.declarations[j].provides
+                    && self.declarations[j].owner == owner && self.declarations[j].port == port),
+            decreases self.declarations.len() - i,
+        {
+            let d = self.declarations[i];
+            if d.provides && d.owner == owner && d.port == port { return true; }
+            i += 1;
+        }
+        false
+    }
+
+    pub closed spec fn provision_released_from(&self, prior: &Self, owner: usize, port: Port) -> bool {
+        self.nodes@ == prior.nodes@ && self.links@ == prior.links@
+            && self.declarations@ == prior.declarations@.filter(
+                |d: Declaration| !(d.provides && d.owner == owner && d.port == port))
+    }
+
+    pub closed spec fn other_interfaces_preserved(&self, prior: &Self, owner: usize, port: Port) -> bool {
+        forall|n: usize, p: Port, provides: bool| !(provides && n == owner && p == port)
+            ==> Self::declares(self.declarations@, n, p, provides) == Self::declares(prior.declarations@, n, p, provides)
+    }
+
+    /// Release a port reservation without removing the logical fiber. This is
+    /// a host extension of the paper's fixed interfaces, not a paper Step.
+    /// Every committed reference to this owner/port must have finished cleanup
+    /// first. Other ports, all commitments and the owner's episode are unchanged.
+    /// Publication revocation and value leases remain the host registry's duty.
+    pub fn release_provision(&mut self, owner: usize, port: Port) -> (r: Result<(), Error>)
+        requires old(self).wf(),
+        ensures final(self).wf(), final(self).generations_preserved(old(self)),
+            final(self).same_control(old(self)), final(self).same_bindings(old(self)),
+            r.is_err() ==> final(self).unchanged(old(self)),
+            r.is_ok() ==> final(self).provision_released_from(old(self), owner, port)
+                && !final(self).declares_provision(owner, port),
+            r.is_ok() ==> final(self).other_interfaces_preserved(old(self), owner, port),
+    {
+        if !self.contains(owner) { return Err(Error::Unknown); }
+        let mut k = 0;
+        while k < self.links.len()
+            invariant k <= self.links.len(), self.wf(), self == old(self),
+                forall|j: int| 0 <= j < k ==> !(self.links[j].live
+                    && self.links[j].binding.provider == owner
+                    && self.links[j].binding.key == port.key && self.links[j].binding.realm == port.realm),
+            decreases self.links.len() - k,
+        {
+            let l = self.links[k];
+            if l.live && l.binding.provider == owner && l.binding.key == port.key && l.binding.realm == port.realm {
+                return Err(Error::Relied);
+            }
+            k += 1;
+        }
+        let ghost keep = |d: Declaration| !(d.provides && d.owner == owner && d.port == port);
+        proof { reveal(Seq::filter); }
+        let mut kept: Vec<Declaration> = Vec::new();
+        let ghost mut positions: Seq<int> = Seq::empty();
+        let mut i = 0;
+        while i < self.declarations.len()
+            invariant i <= self.declarations.len(), self.wf(), self == old(self),
+                forall|j: int| 0 <= j < self.links.len() ==> !(self.links[j].live
+                    && self.links[j].binding.provider == owner
+                    && self.links[j].binding.key == port.key && self.links[j].binding.realm == port.realm),
+                kept.len() <= i, positions.len() == kept.len(),
+                kept@ == self.declarations@.subrange(0, i as int).filter(keep),
+                forall|d: Declaration| #[trigger] keep(d) == !(d.provides && d.owner == owner && d.port == port),
+                forall|a: int| 0 <= a < kept.len() ==> 0 <= #[trigger] positions[a] < i
+                    && kept[a] == self.declarations[positions[a]] && keep(kept[a]),
+                forall|a: int| 0 <= a < i && keep(self.declarations[a]) ==> positions.contains(a),
+            decreases self.declarations.len() - i,
+        {
+            proof {
+                let prefix = self.declarations@.subrange(0, i as int);
+                assert(self.declarations@.subrange(0, i + 1) =~= prefix.push(self.declarations[i as int]));
+                prefix.lemma_filter_push(self.declarations[i as int], keep);
+            }
+            let ghost prior_positions = positions;
+            let d = self.declarations[i];
+            if !(d.provides && d.owner == owner && d.port == port) {
+                kept.push(d);
+                proof { positions = positions.push(i as int); }
+            }
+            proof {
+                assert forall|a: int| 0 <= a < i + 1 && keep(self.declarations[a]) implies positions.contains(a) by {
+                    if a < i {
+                        assert(prior_positions.contains(a));
+                        let b = choose|b: int| 0 <= b < prior_positions.len() && prior_positions[b] == a;
+                        assert(positions[b] == a);
+                    } else { assert(positions[positions.len() - 1] == a); }
+                }
+            }
+            i += 1;
+        }
+        proof { assert(self.declarations@.subrange(0, i as int) =~= self.declarations@); }
+        let ghost before = self.declarations@;
+        self.declarations = kept;
+        proof {
+            assert forall|a: int| 0 <= a < self.declarations.len() implies self.declarations[a].owner < self.nodes.len() by {
+                assert(self.declarations[a] == before[positions[a]]);
+            }
+            assert forall|n: usize, p: Port, provides: bool| !(provides && n == owner && p == port)
+                implies Self::declares(self.declarations@, n, p, provides) == Self::declares(before, n, p, provides) by {
+                if Self::declares(before, n, p, provides) {
+                    let a = choose|a: int| 0 <= a < before.len() && before[a].owner == n && before[a].port == p && before[a].provides == provides;
+                    assert(positions.contains(a));
+                    let b = choose|b: int| 0 <= b < positions.len() && positions[b] == a;
+                    assert(self.declarations[b] == before[a]);
+                }
+                if Self::declares(self.declarations@, n, p, provides) {
+                    let b = choose|b: int| 0 <= b < self.declarations.len() && self.declarations[b].owner == n && self.declarations[b].port == p && self.declarations[b].provides == provides;
+                    assert(before[positions[b]] == self.declarations[b]);
+                }
+            }
+            assert forall|a: int, b: int| 0 <= a < self.declarations.len() && 0 <= b < self.declarations.len()
+                && self.declarations[a].provides && self.declarations[b].provides
+                && self.nodes[self.declarations[a].owner as int].present && self.nodes[self.declarations[b].owner as int].present
+                && self.declarations[a].port == self.declarations[b].port implies self.declarations[a].owner == self.declarations[b].owner by {
+                assert(before[positions[a]] == self.declarations[a]);
+                assert(before[positions[b]] == self.declarations[b]);
+            }
+            assert forall|j: int| 0 <= j < self.links.len() implies Self::typed_link(self.declarations@, self.links[j]) by {
+                let l = self.links[j];
+                if l.live {
+                    let p = Port { key: l.binding.key, realm: l.binding.realm };
+                    assert(Self::declares(self.declarations@, l.consumer, p, false));
+                    assert(Self::declares(self.declarations@, l.binding.provider, p, true));
+                }
+            }
+            assert forall|a: int| 0 <= a < self.declarations.len() && !self.declarations[a].provides
+                && self.nodes[self.declarations[a].owner as int].present && self.nodes[self.declarations[a].owner as int].phase != Phase::Inactive
+                implies exists|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == self.declarations[a].owner
+                    && self.links[j].binding.key == self.declarations[a].port.key && self.links[j].binding.realm == self.declarations[a].port.realm by {
+                assert(before[positions[a]] == self.declarations[a]);
+            }
+        }
+        Ok(())
+    }
+
+    pub closed spec fn pending_dependencies_configured(&self, prior: &Self, id: usize, dependencies: Seq<Port>) -> bool {
+        &&& self.nodes@ == prior.nodes@ && self.links@ == prior.links@
+        &&& forall|p: Port| Self::declares(self.declarations@, id, p, false) == dependencies.contains(p)
+        &&& forall|n: usize, p: Port, provides: bool| n != id || provides
+            ==> Self::declares(self.declarations@, n, p, provides) == Self::declares(prior.declarations@, n, p, provides)
+    }
+
+    /// Seal-time dependency configuration for a reserved, never-started fiber.
+    /// This preserves its stable identity so synchronous mount observers can
+    /// change injection before admission. Configuration after begin is rejected.
+    /// The host extension preserves safety but is not the paper's Insert rule.
+    pub fn configure_pending_dependencies(&mut self, id: usize, dependencies: Vec<Port>) -> (r: Result<(), Error>)
+        requires old(self).wf(),
+        ensures final(self).wf(), final(self).generations_preserved(old(self)),
+            final(self).same_control(old(self)), final(self).same_bindings(old(self)),
+            r.is_err() ==> final(self).unchanged(old(self)),
+            r.is_ok() ==> final(self).pending_dependencies_configured(old(self), id, dependencies@),
+    {
+        if !self.contains(id) { return Err(Error::Unknown); }
+        if self.nodes[id].retired { return Err(Error::Retired); }
+        if self.nodes[id].phase != Phase::Inactive || self.nodes[id].generation != 0 {
+            return Err(Error::InvalidState);
+        }
+        if dependencies.len() > usize::MAX - self.declarations.len() { return Err(Error::Capacity); }
+        let mut a = 0;
+        while a < dependencies.len()
+            invariant a <= dependencies.len(), self.wf(), self == old(self),
+            decreases dependencies.len() - a,
+        {
+            let mut b = 0;
+            while b < a
+                invariant b <= a, a < dependencies.len(), self.wf(), self == old(self),
+                decreases a - b,
+            {
+                if dependencies[a] == dependencies[b] { return Err(Error::Conflict); }
+                b += 1;
+            }
+            a += 1;
+        }
+        let mut kept: Vec<Declaration> = Vec::new();
+        let ghost mut positions: Seq<int> = Seq::empty();
+        let mut i = 0;
+        while i < self.declarations.len()
+            invariant i <= self.declarations.len(), self.wf(), self == old(self),
+                id < self.nodes.len(), self.nodes[id as int].phase == Phase::Inactive,
+                kept.len() <= i, positions.len() == kept.len(),
+                forall|a: int| 0 <= a < kept.len() ==> 0 <= #[trigger] positions[a] < i
+                    && kept[a] == self.declarations[positions[a]] && (kept[a].owner != id || kept[a].provides),
+                forall|a: int| 0 <= a < i && (self.declarations[a].owner != id || self.declarations[a].provides) ==> positions.contains(a),
+            decreases self.declarations.len() - i,
+        {
+            let ghost prior_positions = positions;
+            let d = self.declarations[i];
+            if d.owner != id || d.provides {
+                kept.push(d);
+                proof { positions = positions.push(i as int); }
+            }
+            proof {
+                assert forall|a: int| 0 <= a < i + 1 && (self.declarations[a].owner != id || self.declarations[a].provides)
+                    implies positions.contains(a) by {
+                    if a < i {
+                        assert(prior_positions.contains(a));
+                        let b = choose|b: int| 0 <= b < prior_positions.len() && prior_positions[b] == a;
+                        assert(positions[b] == a);
+                    } else { assert(positions[positions.len() - 1] == a); }
+                }
+            }
+            i += 1;
+        }
+        let ghost before = self.declarations@;
+        self.declarations = kept;
+        proof {
+            assert forall|a: int| 0 <= a < self.declarations.len() implies self.declarations[a].owner < self.nodes.len() by {
+                assert(self.declarations[a] == before[positions[a]]);
+            }
+            assert forall|n: usize, p: Port, provides: bool| n != id || provides
+                implies Self::declares(self.declarations@, n, p, provides) == Self::declares(before, n, p, provides) by {
+                if Self::declares(before, n, p, provides) {
+                    let a = choose|a: int| 0 <= a < before.len() && before[a].owner == n && before[a].port == p && before[a].provides == provides;
+                    assert(positions.contains(a));
+                    let b = choose|b: int| 0 <= b < positions.len() && positions[b] == a;
+                    assert(self.declarations[b] == before[a]);
+                }
+                if Self::declares(self.declarations@, n, p, provides) {
+                    let b = choose|b: int| 0 <= b < self.declarations.len() && self.declarations[b].owner == n && self.declarations[b].port == p && self.declarations[b].provides == provides;
+                    assert(before[positions[b]] == self.declarations[b]);
+                }
+            }
+            assert forall|a: int, b: int| 0 <= a < self.declarations.len() && 0 <= b < self.declarations.len()
+                && self.declarations[a].provides && self.declarations[b].provides
+                && self.nodes[self.declarations[a].owner as int].present && self.nodes[self.declarations[b].owner as int].present
+                && self.declarations[a].port == self.declarations[b].port implies self.declarations[a].owner == self.declarations[b].owner by {
+                assert(before[positions[a]] == self.declarations[a]);
+                assert(before[positions[b]] == self.declarations[b]);
+            }
+            assert forall|j: int| 0 <= j < self.links.len() implies Self::typed_link(self.declarations@, self.links[j]) by {
+                let l = self.links[j];
+                if l.live {
+                    assert(Self::link_ok(self.nodes@, l));
+                    assert(l.consumer != id);
+                    let p = Port { key: l.binding.key, realm: l.binding.realm };
+                    assert(Self::declares(self.declarations@, l.consumer, p, false));
+                    assert(Self::declares(self.declarations@, l.binding.provider, p, true));
+                }
+            }
+            assert forall|a: int| 0 <= a < self.declarations.len() && !self.declarations[a].provides
+                && self.nodes[self.declarations[a].owner as int].present && self.nodes[self.declarations[a].owner as int].phase != Phase::Inactive
+                implies exists|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == self.declarations[a].owner
+                    && self.links[j].binding.key == self.declarations[a].port.key && self.links[j].binding.realm == self.declarations[a].port.realm by {
+                assert(before[positions[a]] == self.declarations[a]);
+            }
+            assert(self.wf());
+        }
+        proof {
+            assert forall|a: int| 0 <= a < self.declarations.len()
+                implies self.declarations[a].owner != id || self.declarations[a].provides by {
+                assert(self.declarations[a] == before[positions[a]]);
+            }
+        }
+        let ghost retained = self.declarations@;
+        let mut i = 0;
+        while i < dependencies.len()
+            invariant i <= dependencies.len(), self.wf(), self.nodes@ == old(self).nodes@, self.links@ == old(self).links@,
+                id < self.nodes.len(), self.nodes[id as int].phase == Phase::Inactive,
+                self.declarations.len() == retained.len() + i,
+                forall|a: int| 0 <= a < retained.len() ==> self.declarations[a] == retained[a]
+                    && (retained[a].owner != id || retained[a].provides),
+                forall|a: int| 0 <= a < i ==> self.declarations[retained.len() + a] == (Declaration { owner: id, port: dependencies[a], provides: false }),
+                forall|n: usize, p: Port, provides: bool| n != id || provides
+                    ==> Self::declares(self.declarations@, n, p, provides) == Self::declares(old(self).declarations@, n, p, provides),
+            decreases dependencies.len() - i,
+        {
+            let ghost previous = self.declarations@;
+            self.declarations.push(Declaration { owner: id, port: dependencies[i], provides: false });
+            proof {
+                Self::typing_extends(previous, self.declarations@, self.links@);
+                assert forall|n: usize, p: Port, provides: bool| n != id || provides
+                    implies Self::declares(self.declarations@, n, p, provides) == Self::declares(old(self).declarations@, n, p, provides) by {
+                    if Self::declares(self.declarations@, n, p, provides) {
+                        let j = choose|j: int| 0 <= j < self.declarations.len() && self.declarations[j].owner == n && self.declarations[j].port == p && self.declarations[j].provides == provides;
+                        assert(j < previous.len());
+                    }
+                    if Self::declares(old(self).declarations@, n, p, provides) {
+                        let j = choose|j: int| 0 <= j < previous.len() && previous[j].owner == n && previous[j].port == p && previous[j].provides == provides;
+                        assert(self.declarations[j] == previous[j]);
+                    }
+                }
+            }
+            i += 1;
+        }
+        proof {
+            assert forall|p: Port| Self::declares(self.declarations@, id, p, false) == dependencies@.contains(p) by {
+                if Self::declares(self.declarations@, id, p, false) {
+                    let j = choose|j: int| 0 <= j < self.declarations.len() && self.declarations[j].owner == id && self.declarations[j].port == p && !self.declarations[j].provides;
+                    if j < retained.len() {
+                        assert(self.declarations[j] == retained[j]);
+                        assert(retained[j].owner != id || retained[j].provides);
+                    }
+                    assert(j >= retained.len());
+                    assert(dependencies[j - retained.len()] == p);
+                }
+                if dependencies@.contains(p) {
+                    let j = choose|j: int| 0 <= j < dependencies.len() && dependencies[j] == p;
+                    assert(self.declarations[retained.len() + j] == (Declaration { owner: id, port: p, provides: false }));
+                }
+            }
+        }
+        Ok(())
+    }
+
     #[verifier::rlimit(30)]
     pub fn insert(&mut self, parent: Option<usize>, dependencies: Vec<Port>, provisions: Vec<Port>) -> (r: Result<usize, Error>)
         requires old(self).wf(),
@@ -956,8 +1338,10 @@ impl Kernel {
         if let Some(p) = parent {
             if !self.contains(p) { return Err(Error::Unknown); }
         }
-        // Ports are declarations, not effect values. They stay fixed for the
-        // entire fiber lifetime, including inactive and retired states.
+        // Ports are reservations, not effect values. Existing reservations
+        // persist through inactivity and retirement. Native hosts may extend
+        // this interface using declare_provision and release drained ports with
+        // release_provision. Registry removal also releases reservations.
         if !self.check_provisions(provisions.as_slice()) { return Err(Error::Conflict); }
         let ghost initial_declarations = self.declarations@;
         let ghost initial_nodes = self.nodes@;

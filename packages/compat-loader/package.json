@@ -1,0 +1,11 @@
+{
+  "name": "@cordis-verus/compat-loader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Experimental JSON module loader over the native Cordis facade",
+  "engines": { "node": ">=22.22.0" },
+  "exports": { ".": { "types": "./index.d.ts", "import": "./index.js" }, "./worker": { "types": "./worker.d.ts", "import": "./worker.js" } },
+  "peerDependencies": { "@cordis-verus/compat-cordis": "0.1.0" },
+  "license": "MIT"
+}

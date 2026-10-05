@@ -12,3 +12,12 @@ The reference paper is not covered by this project's MIT license.
 Verus binaries and vstd retain their upstream licenses. Binary archives are
 downloaded into the ignored .tools directory; they are not redistributed here.
 
+The experimental JavaScript compatibility package adapts language-layer code
+from Cordis (Copyright (c) 2021-present Shigma, MIT). The original MIT notice
+is preserved in packages/compat-cordis/LICENSE.upstream. It does not embed the
+upstream Fiber lifecycle scheduler. Node-API dependencies retain their own licenses.
+
+The compatibility logger in packages/compat-cordis/logger.js is adapted from
+Cordis packages/core/src/logger.ts at the locked Cordis revision. Its formatting,
+exporter and traceable-caller behavior are ordinary JavaScript, outside the
+Verus proof boundary, and retain the same MIT attribution above.
