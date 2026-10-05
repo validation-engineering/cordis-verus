@@ -12,3 +12,8 @@ repository = "https://github.com/Stool233/cordis-verus"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# Optimize distributed native bindings without dropping runtime diagnostics.
+[profile.release]
+debug-assertions = true
+overflow-checks = true

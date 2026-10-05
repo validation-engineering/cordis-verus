@@ -514,21 +514,19 @@ impl Driver {
                         key: binding.key,
                         realm: binding.realm,
                     })
-                    .and_then(|publication| self.publications.entry(publication))
-                    .is_some_and(|entry| {
-                        entry.owner == binding.provider
-                            && !self.kernel.retired(entry.owner)
-                            && self
-                                .publications
-                                .resolve(entry.port)
-                                .is_some_and(|publication| {
-                                    !self.checked.contains_key(&publication.0)
-                                        || self.availability.available(
-                                            id,
-                                            entry.port.into(),
-                                            publication.0,
-                                        )
-                                })
+                    .is_some_and(|publication| {
+                        // No callback or mutation can interleave these observations.
+                        // Keep the resolved identity instead of rescanning visibility.
+                        self.publications.entry(publication).is_some_and(|entry| {
+                            entry.owner == binding.provider
+                                && !self.kernel.retired(entry.owner)
+                                && (!self.checked.contains_key(&publication.0)
+                                    || self.availability.available(
+                                        id,
+                                        entry.port.into(),
+                                        publication.0,
+                                    ))
+                        })
                     })
             })
         })
@@ -590,7 +588,13 @@ impl Driver {
             loop {
                 let mut withdrew = false;
                 for id in self.kernel.ids() {
-                    if self.kernel.decision(id, self.host_status(id)) == Some(Decision::Withdraw) {
+                    // Availability resolves the complete dependency interface.
+                    // Consult it only in phases that can take this transition;
+                    // the shared decision still authorizes every eligible node.
+                    if matches!(self.kernel.phase(id), Some(Phase::Loading | Phase::Active))
+                        && self.kernel.decision(id, self.host_status(id))
+                            == Some(Decision::Withdraw)
+                    {
                         self.withdraw(id)?;
                         withdrew = true;
                         progress = true;
@@ -602,7 +606,9 @@ impl Driver {
             }
             for id in self.kernel.ids() {
                 let node = &self.nodes[&id];
-                if self.kernel.decision(id, self.host_status(id)) == Some(Decision::BeginCleanup)
+                if self.kernel.phase(id) == Some(Phase::Unloading)
+                    && self.kernel.decision(id, self.host_status(id))
+                        == Some(Decision::BeginCleanup)
                     && node.pending.is_none()
                     && !node.cleanup_failed
                 {
@@ -636,7 +642,8 @@ impl Driver {
                 }
             }
             for id in self.kernel.ids().into_iter().rev() {
-                if !self.nodes[&id].prepared
+                if self.kernel.phase(id) == Some(Phase::Inactive)
+                    && !self.nodes[&id].prepared
                     && !self.nodes[&id].prepared_cleanup
                     && self.kernel.decision(id, self.host_status(id)) == Some(Decision::Remove)
                 {
@@ -649,7 +656,9 @@ impl Driver {
                 }
             }
             for id in self.kernel.ids() {
-                if self.kernel.decision(id, self.host_status(id)) != Some(Decision::Begin) {
+                if self.kernel.phase(id) != Some(Phase::Inactive)
+                    || self.kernel.decision(id, self.host_status(id)) != Some(Decision::Begin)
+                {
                     continue;
                 }
                 // Initial observer publications are adopted without changing

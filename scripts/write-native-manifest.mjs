@@ -50,7 +50,7 @@ export function writeNativeManifest(root, buildPath) {
     artifactSha256:sha256,binding:info,factories:[],
     build:{reportSha256:digest(reportBytes),sourceHashes:build.sourceHashes,sourceDigest:sourceDigest(build.sourceHashes),
       cargoLockSha256:build.cargoLockSha256,toolchainLockSha256:build.toolchainLockSha256,
-      profile:build.compilerProfile??null,command:['cargo','build','--locked','-p','cordis-node','--lib','--examples']},
+      profile:build.compilerProfile??null,command:['cargo','build','--release','--locked','-p','cordis-node','--lib','--examples']},
     validation:{platform:target.platform,architecture:target.architecture,libc:target.libc,node:process.version,
       nodeApi:target.nodeApi,nodeModuleAbi:Number(process.versions.modules),osRelease:release(),checkedAt:new Date().toISOString(),
       otherTargets:'not validated',uploaded:false},

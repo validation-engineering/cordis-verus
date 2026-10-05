@@ -38,6 +38,10 @@ const messages = result.stdout.trim().split('\n').filter(Boolean).map(line => JS
 const artifacts = messages.filter(item => item.reason === 'compiler-artifact' && item.target?.name === 'cordis_node' && item.target.kind.includes('cdylib'));
 const candidates = artifacts.flatMap(item => item.filenames).filter(name => name.endsWith(filenames[process.platform]));
 if (candidates.length !== 1) throw new Error('Cargo did not emit exactly one compatible cordis_node cdylib');
+const compilerProfile = artifacts[0].profile;
+if (compilerProfile?.opt_level !== '3' || compilerProfile.debug_assertions !== true || compilerProfile.overflow_checks !== true) {
+  throw new Error('Native artifacts require optimization level 3 with debug assertions and overflow checks enabled');
+}
 const source = candidates[0];
 const output = join(root, 'packages/compat-cordis/native/cordis.node');
 mkdirSync(dirname(output), { recursive: true });

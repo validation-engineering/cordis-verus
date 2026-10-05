@@ -179,6 +179,8 @@ npm run test:types
 npm run test:distribution
 ```
 
+native addon 默认使用 Cargo release 的优化级别 3，同时保留 debug assertions 与 overflow checks；构建根据 Cargo 实际报告核对这些设置，避免把未优化的调试制品当作分发制品。性能方法见 [benchmarks](benchmarks.md)。
+
 开发 gate 包括全内核证明、Rust 回归、Node runtime/Loader/Worker/types、三个 Rust crate 的独立解包测试与三个 npm 包的离线独立安装。npm 验收不上传包，只记录实际执行的 OS/arch/Node/ABI。`--check` 要求保留本地默认 addon、interop-fixture.node、build.json、npm report 和三个 tgz；仅从 Git 克隆旧报告不能当作本机成功验收。包仍为 private；manifest、严格产物选择与本地合包已有工具，多平台实际构建结果、发布和完整 release gate 仍是另外的门槛。
 
 需要本地锁定上游源码的额外验收：

@@ -41,6 +41,16 @@ These are host behavior changes, not new kernel theorems or TypeScript plugin
 compatibility. See [runtime](runtime.md), [loader](loader.md), and
 [process plugins](process-plugins.md) for the operational boundaries.
 
+## Local performance checkpoint
+
+Native distribution builds now use optimization level 3 while retaining debug
+assertions and overflow checks. The driver filters impossible phases before
+resolving readiness, and the facade reuses a confirmed quiescent pump until any
+potential mutation or failure. Repeated settled reads no longer scan the whole
+graph. Source-bound local measurements and their limited scope are documented in
+[benchmarks](benchmarks.md); lifecycle correctness and paper completion claims
+remain unchanged.
+
 ## Native Node compatibility slice
 
 The new `cordis-driver`, Node-API binding and JS facade run a tested subset of

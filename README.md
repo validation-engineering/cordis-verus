@@ -100,7 +100,7 @@ The last recorded local development run includes:
 | Whole-kernel Verus verification, with `--no-cheating --compile` | 2,290 verified obligations; 0 errors |
 | Rust workspace behavior tests | 399 passed |
 | Rust documentation tests | 2 passed |
-| Node behavior tests | 349 passed |
+| Node behavior tests | 364 passed |
 | Extracted crate builds and npm installation checks | Passed on macOS ARM64 / Node 22.22.0 |
 
 The [development report](docs/development-report.json) binds results to source and artifact hashes. These are verification obligations and tests, not a count of proved paper theorems. Other platforms require their own execution evidence.

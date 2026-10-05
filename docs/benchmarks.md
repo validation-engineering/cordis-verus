@@ -12,10 +12,15 @@ node scripts/benchmark.mjs --output target/benchmarks/baseline.json
 node --test tests/benchmarks/*.test.mjs
 ```
 
-The last command only tests statistics, report validation and baseline policy; it
-does not run the benchmark. The measurement CLI does not compile or verify Rust.
+The last command tests statistics, report validation, baseline policy, and a small
+native worker smoke case. The measurement CLI does not compile or verify Rust.
 It rejects stale native source/build evidence and a stale Rust SDK fixture. Reports
 are local JSON, defaulting to `target/benchmarks/latest.json`.
+
+Native bindings use Cargo's optimized release profile (optimization level 3).
+Debug assertions and overflow checks remain enabled, and the build verifies
+Cargo's reported profile before copying the artifact. This improves execution
+without removing the runtime checks used during development.
 
 ## Method
 
@@ -36,6 +41,7 @@ provider withdrawal always measures one prepared group per sample.
 | `rust.pullStream` | 2 streams × 16 items | Rust stream open, sequential pulls, reverse record calls, EOF and close, amortized per item |
 | `facade.mountDispose` | 5 cycles | Awaited plugin activation and journaled effect cleanup |
 | `facade.providerWithdrawal` | 1 group with 16 consumers | Retire provider and drain dependent cleanup; preparation and final graph disposal are outside the timer |
+| `facade.settledReadiness` | 1 sweep of 16 consumers, each with 8 providers | Harness-profile readiness reads on a settled graph; construction, activation and final cleanup are outside the timer |
 
 The native lifecycle measurement includes JSON encoding/decoding, N-API and the
 ordinary Rust driver. It is **not an isolated Rust kernel benchmark**. The stream
@@ -103,3 +109,32 @@ Upstream performance comparisons, isolated kernel-only measurements, long-runnin
 soak/leak tests, production workload profiles and accepted platform-specific budgets
 remain separate work. Lifecycle correctness guards must not be disabled to improve
 benchmark results.
+
+## 2026-10-05 settled-readiness checkpoint
+
+A local Apple M4 / macOS arm64 / Node 22.22.0 run compared the facade before and
+after quiescent-pump reuse. Both runs used the same optimized native artifact,
+with assertions and overflow checks enabled, the same harness, 128 consumers
+with eight committed providers each, three warmup sweeps and 15 measured sweeps.
+
+| Batch-amortized time per readiness read | Before reuse | After reuse |
+| --- | ---: | ---: |
+| p50 | 710.06 µs | 0.95 µs |
+| p95 | 730.71 µs | 1.11 µs |
+
+The [before report](performance/2026-10-05-readiness-before.json) and
+[after report](performance/2026-10-05-readiness-after.json) retain raw samples,
+source maps, artifact hashes and the explicit baseline comparison. This isolates
+quiescent-pump reuse: the earlier native build-profile and phase-filtering changes
+are present in both runs. It is not a claim that arbitrary workloads improve by
+this ratio, and it establishes no cross-machine performance budget.
+
+Quiescence is reused only after an explicitly empty native drive and stable state
+synchronization. Commands that may change the graph, failures, Rust interop, state
+observers and nested pumps invalidate it conservatively. Epoch validation,
+committed-provider checks and the native transition decision remain authoritative.
+
+```sh
+node scripts/benchmark.mjs --scenario facade.settledReadiness \
+  --fanout 128 --samples 15 --warmup 3 --timeout-ms 120000
+```

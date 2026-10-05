@@ -145,6 +145,8 @@ class Domain {
     this.profile = options.profile ?? 'cordis';
     if (!['cordis','harness'].includes(this.profile)) throw new TypeError('Unsupported Cordis compatibility profile');
     this.driver = nativeDriver(options);
+    this.driverDirty = true;
+    this.pumping = false;
     this.driver.command(JSON.stringify({op:'configure',profile:this.profile}));
     this.fibers = new Map();
     this.values = new Map();
@@ -315,11 +317,23 @@ class Domain {
     }
   }
   command(command) {
-    const result = this.driver.command(JSON.stringify(command));
-    const reply = typeof result === 'string' ? JSON.parse(result) : result;
-    if (reply?.error) throw new CordisError(reply.code ?? 'NATIVE_DRIVER', typeof reply.error === 'string' ? reply.error : JSON.stringify(reply.error));
-    if (!['snapshot','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches'].includes(command.op)) this.wake();
-    return reply;
+    // Checks/reclamation can change admission even when their public result looks
+    // like a read. Unknown commands are writers by default. Drive is accounted
+    // for by pump(), except the explicit constructor/root drive.
+    if (!['snapshot','resolve','validate','validate_check','committed_reaches'].includes(command.op)
+      && !(command.op === 'drive' && this.pumping)) this.driverDirty = true;
+    try {
+      const result = this.driver.command(JSON.stringify(command));
+      const reply = typeof result === 'string' ? JSON.parse(result) : result;
+      if (reply?.error) throw new CordisError(reply.code ?? 'NATIVE_DRIVER', typeof reply.error === 'string' ? reply.error : JSON.stringify(reply.error));
+      if (!['snapshot','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches'].includes(command.op)) this.wake();
+      return reply;
+    } catch (error) {
+      // Even a rejected read may report a faulted native domain. Never let a
+      // previously clean pump hide that fault on a later readiness join.
+      this.driverDirty = true;
+      throw error;
+    }
   }
   refreshChecks(ports) {
     const reply = this.command(ports ? {op:'notify',ports} : {op:'checks'});
@@ -390,12 +404,30 @@ class Domain {
     task.finally(() => { this.tasks.delete(task); this.wake(); this.schedule(); }).catch(error => this.errors.push(error));
   }
   pump() {
-    // Driver calls contain no callbacks. JS executes only after the native borrow ends.
-    const { actions = [], released = [] } = this.command({op: 'drive'});
-    for (const handle of released) this.values.delete(handle);
-    this.dispatch(actions);
-    this.sync();
-    if (actions.length) this.wake();
+    if (!this.driverDirty) return;
+    const outerPump = this.pumping;
+    this.pumping = true;
+    // Clear before callbacks, so every command they issue invalidates this scan.
+    this.driverDirty = false;
+    try {
+      // Driver calls contain no callbacks. JS executes only after the native borrow ends.
+      const reply = this.command({op: 'drive'});
+      const { actions = [], released = [] } = reply;
+      for (const handle of released) this.values.delete(handle);
+      this.dispatch(actions);
+      this.sync();
+      // Only an explicit empty completed drive establishes quiescence. Native
+      // progress without an action is withdrawal closure; it reaches a fixed
+      // point before returning an empty batch, within the driver's loop budget.
+      if (!Array.isArray(reply.actions) || !Array.isArray(reply.released) || actions.length || released.length) this.driverDirty = true;
+      if (actions.length) this.wake();
+    } catch (error) { this.driverDirty = true; throw error; }
+    finally {
+      this.pumping = outerPump;
+      // A synchronous status hook may pump recursively and then resume an older
+      // snapshot. Its inner scan cannot certify the still-running outer scan.
+      if (outerPump) this.driverDirty = true;
+    }
   }
   dispatch(actions) {
     for (const action of [...actions.filter(action => action.kind === 'removed'), ...actions.filter(action => action.kind !== 'removed')]) {
@@ -437,7 +469,12 @@ class Domain {
       const fiber = this.fibers.get(item.id);
       if (!fiber) continue;
       const state = states[String(item.state ?? item.phase).toLowerCase()];
-      if (state !== undefined) {try {fiber._setState(item.pendingAction?.kind === 'setup' ? FiberState.LOADING : state);} catch(error) {this.errors.push(error);}}
+      if (state !== undefined) {
+        const next = item.pendingAction?.kind === 'setup' ? FiberState.LOADING : state;
+        // State observers run arbitrary synchronous code outside native borrows.
+        if (fiber.state !== next) this.driverDirty = true;
+        try { fiber._setState(next); } catch (error) { this.driverDirty = true; this.errors.push(error); }
+      }
     }
   }
   async settle() {

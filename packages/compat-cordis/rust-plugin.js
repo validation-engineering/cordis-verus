@@ -68,6 +68,9 @@ export class RustHost {
     }
   }
   command(command) {
+    // Interop can complete work, publish through reverse calls, or fault the
+    // shared domain. Treat every operation as a writer, including future ones.
+    this.domain.driverDirty = true;
     if (this.fault) throw this.fault;
     try {
       const reply = JSON.parse(this.domain.driver.rustCommand(JSON.stringify(command)));

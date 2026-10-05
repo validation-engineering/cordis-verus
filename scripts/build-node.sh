@@ -8,4 +8,4 @@ elif [[ $# -ne 0 ]]; then
   echo 'Usage: build-node.sh [--offline]' >&2
   exit 2
 fi
-cargo build --locked -p cordis-node --lib --examples --message-format=json-render-diagnostics
+cargo build --release --locked -p cordis-node --lib --examples --message-format=json-render-diagnostics
