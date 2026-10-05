@@ -4,6 +4,17 @@ Changes are recorded before release. There is no published release yet.
 
 ## Unreleased — 0.1.0
 
+- Add opt-in transactions for the unchanged official Harness Loader/Include.
+  Coordinate create/update/remove with native lifecycle and actual write queues;
+  reject stale owner episodes and normalize qualified nested removal. File
+  failures remain explicit and do not claim rollback of running plugin effects.
+- Capture synchronous adapter lifecycle operations while joining discarded
+  Promises. Give update callbacks their own invocation origin so an asynchronous
+  callback cannot reuse saved transaction steps after leaving its update frame.
+  Keep host scheduling independent of observer episodes while preserving recovery
+  admission, and reject retained update continuations after their revision ends.
+  ConfigEditor, Include.refresh and HMR integration remain separate work.
+
 - Distinguish an active owned action from its later asynchronous continuations.
   Completed startup callbacks no longer block the official headless runner's
   shutdown; pending effects, inverses and owned tasks retain self-wait guards.

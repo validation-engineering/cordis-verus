@@ -104,7 +104,7 @@ await ctx.dispose()        // 同样会等待所有 owned task，然后清理资
 `domainMutation(ctx, callback)` 为同一 Context 域内的多个 JSON Loader、直接 Fiber
 update/restart/dispose/retryCleanup 与最终 `Context.dispose()` 提供统一提交顺序。
 它是兼容层扩展；同步 `ctx.plugin/provide/effect` 仍保留原调用形态，应用可以把外部批量
-操作显式放进事务。原版官方 Loader 整条配置持久化事务、Worker supervisor 与模块图 HMR
+操作显式放进事务。官方 Loader 的显式 create/update/remove 现可通过独立事务适配器接入；透明的 ConfigEditor 整条文件事务、Worker supervisor 与模块图 HMR
 仍需各自适配，不能把这里的 Fiber 级接入称为全部装载协议已经完成。
 
 ```js
@@ -196,6 +196,21 @@ npm run test:upstream-core   # 12 个原文件、87 项核心行为测试
 
 性能测量单独使用[基准工具](benchmarks.md)。它记录实际源码、二进制、环境与原始批次采样，并明确区分测量失败和基线退化；行为测试、证明或工具单元测试不能替代性能实测与平台预算验收。
 
+## 官方 Loader 的显式事务适配
+
+`@cordis-verus/compat-loader/harness` 提供 `LoaderTransactions(ctx, tree)`，
+复用实际官方 Loader/Include 的 create/update/remove，并等待同一 Loader 图中
+旧/新 Fiber 和真实 Include 写队列。请求在修改 options 或文件前进入域级队列，
+因此后续 revision 和 Context 关闭等待已经接纳的操作。错误不会冒充原子回滚。
+
+`steps.capture(callback)` 只将同步调用栈的同域生命周期操作纳入当前事务；
+返回 Promise 不会让异步续程取得权限。适配器检查 owner episode，旧 Include
+删除或重启后拒绝旧对象，根树限定 ID 的删除定位到所属 tree 与局部 ID。
+
+这是显式宿主 API，默认 Settings/PluginManager 不自动改走它。`Include.refresh()`、
+ConfigEditor 的外层 YAML 写入/回滚、HMR 与直接绕过接口的修改仍在范围外。
+合同、错误和示例见 [Loader 包文档](../packages/compat-loader/README.md#explicit-transactions-for-the-official-harness-loader)。
+
 ## 长期方案的剩余门槛
 
 | 阶段 | 当前交付 | 仍需完成 |
@@ -205,7 +220,7 @@ npm run test:upstream-core   # 12 个原文件、87 项核心行为测试
 | M2 | publication/lease、跨 owner 转交、check 版本协议、reserve/seal | availability 与宿主对象表的形式连接、动态接口的整条论文投影 |
 | M3 | Native host、错误隔离、owned task、Worker 正常/异常关闭 | 全 environment teardown/引用管理证明与长期驻留成本验收 |
 | M4 | Logger、Service.check、方法 Inject、两个 profile 和类型样例 | 未覆盖公开合同、已知行为差异的应用迁移验证 |
-| M5 | 增量 JSON Loader、Include/group、稳定 Fiber、事务恢复、Worker 制品重启 | 原版 Loader API/配置持久化、完整包管理器安装图 |
+| M5 | 增量 JSON Loader、稳定 Fiber、事务恢复、Worker 制品重启；官方 Loader 显式 create/update/remove 与 Include 写入屏障 | ConfigEditor 全链路事务、refresh/HMR 接入、完整包管理器安装图 |
 | M6 | Harness 真实插件图差分；同图 Rust factory/JSON、双向背压流及显式 object/callback；真实旧 Plugin 静态 typed adapter；factory revision adapter | typed Runtime 动态能力迁移、更多跨语言接口与 ABI 合同、更广生态图、模块依赖图 HMR |
 | M7 | 三个 Rust 制品、三个 npm 包的本机独立安装 gate；原生 manifest/哈希/平台选择与离线合包；源码绑定的性能测量工具 | 各预编译平台实际验收、实测基线与长期运行/性能预算、完整负控与 release acceptance |
 

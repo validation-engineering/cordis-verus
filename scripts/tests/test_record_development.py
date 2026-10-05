@@ -134,7 +134,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
             archive.write_bytes(("test archive: " + name).encode())
             packages.append({"name": name, "version": "0.1.0", "filename": filename,
                              "sha256": module.file_sha256(archive),
-                             "files": ["package.json", "index.js", "index.d.ts", "README.md", "LICENSE", "NOTICE", "native/cordis.node", "native/manifest.json", "native/" + native_provenance]})
+                             "files": ["package.json", "index.js", "index.d.ts", "README.md", "LICENSE", "NOTICE", "native/cordis.node", "native/manifest.json", "native/" + native_provenance] + (["harness.js", "harness.d.ts"] if directory == "compat-loader" else [])})
         self.npm_report.write_text(json.dumps({
             "schema": "cordis-verus.npm-package/v1", "status": "passed", "offline": True, "uploaded": False,
             "registryPublishChecked": False, "otherTargets": "not validated", "packages": packages,
@@ -147,7 +147,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
                             "tests": ["native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity",
                 "original-cordis-import", "JSON-loader-update", "Worker-artifact-load"]},
             "harnessObservation": {"profile": "harness", "tests": ["scoped-original-import", "ESM-CJS-profile-identity",
-                "native-harness-domain", "Service-class"]},
+                "native-harness-domain", "Service-class", "official-loader-adapter-export"]},
         }))
         return 0
 
@@ -336,6 +336,8 @@ class DevelopmentEvidenceTests(unittest.TestCase):
             "wrong Node": lambda report: report["testedTarget"].update(node="v0.0.0"),
             "wrong ABI": lambda report: report["testedTarget"].update(driverAbi=2),
             "missing smoke": lambda report: report["harnessObservation"].update(tests=[]),
+            "missing adapter smoke": lambda report: report["harnessObservation"]["tests"].remove("official-loader-adapter-export"),
+            "missing adapter file": lambda report: next(item for item in report["packages"] if item["name"] == "@cordis-verus/compat-loader")["files"].remove("harness.js"),
             "missing native": lambda report: report["packages"][0]["files"].remove("native/cordis.node"),
             "wrong version": lambda report: report["packages"][0].update(version="9.0.0"),
             "path escape": lambda report: report["packages"][0].update(filename="../escape.tgz"),

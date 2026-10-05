@@ -103,6 +103,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { Context as PackageContext } from '@cordis-verus/compat-harness';
+import { LoaderTransactions } from '@cordis-verus/compat-loader/harness';
+assert.equal(typeof LoaderTransactions, 'function');
 const require = createRequire(import.meta.url);
 assert.equal(Context, PackageContext);
 assert.equal(require('@cordis-verus/compat-harness').Context, Context);
@@ -112,7 +114,7 @@ class Message extends Service { constructor(ctx) { super(ctx, 'packedHarness'); 
 await context.plugin(Message);
 assert.equal(context.get('packedHarness').value, 'packed');
 await context.dispose();
-console.log(JSON.stringify({ profile: 'harness', tests: ['scoped-original-import', 'ESM-CJS-profile-identity', 'native-harness-domain', 'Service-class'] }));
+console.log(JSON.stringify({ profile: 'harness', tests: ['scoped-original-import', 'ESM-CJS-profile-identity', 'native-harness-domain', 'Service-class', 'official-loader-adapter-export'] }));
 `;
 
 async function main() {

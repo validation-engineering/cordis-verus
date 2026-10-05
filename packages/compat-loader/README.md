@@ -60,6 +60,71 @@ The Loader imports modules and validates candidate JSON inputs before disturbing
 
 `loader.reload()` re-reads its last file and included JSON files, then reconciles the changed subtrees. With unchanged configuration and factory identities, it does not remount the graph. After a programmatic `update()` the source is an in-memory recipe; subsequent `reload()` uses that recipe and asks the ModuleHost to prepare its factories again. There is no implicit write-back to the original configuration files and no background file watcher.
 
+## Explicit transactions for the official Harness Loader
+
+The separate `@cordis-verus/compat-loader/harness` entry adapts the **installed,
+unchanged** official Harness `Loader` and `Include` classes. It does not replace
+this package's JSON API or automatically wrap the official Settings UI.
+The tested contract is Harness Cordis 4.0.4, Loader 1.0.5 and Include 1.0.9.
+Use the native Harness profile and a live, fully initialized tree:
+
+```js
+import { LoaderTransactions } from '@cordis-verus/compat-loader/harness';
+
+// ctx and ctx.loader already belong to the booted official application.
+// Select an Include file owned by this host, not an unrelated profile overlay.
+const edits = new LoaderTransactions(ctx, ctx.loader.resolve('custom').subtree);
+await edits.update('greeting', { config: { prefix: 'Welcome' } });
+const id = await edits.create({ name: './another-plugin.mjs', config: {} });
+// create preserves the official fully qualified id; resolve it from the root.
+const rootEdits = new LoaderTransactions(ctx, ctx.loader);
+await rootEdits.remove(id);
+await edits.close(); // closes this adapter's admission; does not dispose the tree
+```
+
+`create`, `update` and `remove` enter the same domain FIFO as Fiber revisions,
+JSON Loader updates and Context shutdown **before** changing options or files.
+Cloneable options are snapshotted at admission, including `undefined` deletion
+values; functions and other non-cloneable values reject before admission.
+The adapter retains old and new Fibers, waits for official Loader and native
+lifecycle work, and observes the actual Include write queues, including writes
+scheduled by timers or teardown. This is conservatively a **whole Loader graph
+barrier**: sibling Includes and existing work may delay it or report failure.
+Use it from an external host operation, outside plugin setup/cleanup actions.
+
+Success means that the observed lifecycle and persistence work completed. It is
+not an atomic rollback mechanism or a guarantee of physical-disk durability after
+power loss. An `OFFICIAL_PERSISTENCE_FAILED` error names affected files and retains
+causes; running plugin changes may already have happened. A subsequent explicit
+revision can retry the official write queue. Cleanup failures still block new
+revisions until actual cleanup recovery succeeds. Pending dependencies retain
+upstream Pending semantics; completion does not certify every plugin Active.
+`revision` counts successful operations, `requestedRevision` counts admitted
+requests, and `lastFailure` retains the last failed request's operation and error.
+
+A cached adapter belongs to its tree owner's current episode. If that Include
+is removed or restarted, `STALE_LOADER` rejects old requests before mutation;
+obtain a new adapter for the new tree. Foreign domains, incompatible class shapes
+and methods replaced after construction are rejected. Nested removal selects the
+entry's owning tree and local id before invoking the unchanged official method.
+
+The bridge uses `MutationSteps.capture(callback)`, whose authority lasts only
+through the callback's synchronous call stack in that domain. A returned Promise
+does not extend that authority; plugin lifecycle callbacks and async update
+continuations cannot borrow it. Ignored lifecycle Promises are still joined.
+
+This opt-in API does not intercept direct official calls, `Include.refresh()`,
+the ConfigEditor's separate profile-file transaction, `hmr.runExclusive()`,
+module-cache invalidation or arbitrary EntryTree subclasses. Do not concurrently
+bypass it with direct writes to the same tree and assume they are serialized.
+Supporting those larger boundaries remains separate work. Runtime shape checks
+are not automatic certification of a different upstream version.
+
+The core gate checks admission contracts and type declarations; the companion
+`cordis-harness` official gate executes real installed Loader/Include classes,
+JSON/YAML files, async inverse/write barriers, write failure/retry, qualified
+removal, fresh-context restore, volatile config and stale-owner rejection.
+
 ## Replace code in a fresh Worker
 
 `ModuleHost` imports canonical file URLs. It **does not invalidate Node's ESM or CommonJS caches**. Changing a source file and calling `loader.reload()` is not code HMR. `ModuleHost.reset()` explicitly rejects with `DOMAIN_RESTART_REQUIRED`. A file edit at an already imported URL does not change the cached factory identity and is not a request for code replacement.

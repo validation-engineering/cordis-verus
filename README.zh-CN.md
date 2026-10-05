@@ -100,7 +100,7 @@ npm run official
 | Verus 全库验证，使用 `--no-cheating --compile` | 2,290 项义务通过，0 错误 |
 | Rust 工作区行为测试 | 399 项通过 |
 | Rust 文档测试 | 2 项通过 |
-| Node 行为测试 | 364 项通过 |
+| Node 行为测试 | 394 项通过 |
 | 解包后的 crate 构建与 npm 安装检查 | 在 macOS ARM64 / Node 22.22.0 通过 |
 
 [开发记录](docs/development-report.json) 将结果绑定到源码和制品哈希。这些数字是验证义务和测试数量，不是已证明的论文定理数量；其他平台需要各自的执行证据。

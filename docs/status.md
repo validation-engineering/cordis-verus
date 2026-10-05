@@ -61,8 +61,10 @@ backend values and journals remain separate. Service checks, two profiles, JSON
 Incremental Loader transactions, owned tasks and Worker artifact recovery have executable
 regressions. A shared domain mutation queue now orders multiple JSON Loaders, direct Fiber revisions and final
 Context shutdown. Scoped lifecycle steps cannot escape into plugin continuations, failed cleanup
-blocks new revisions, and accepted work drains before close. Original Loader persistence and
-module-graph/supervisor transactions still require separate integration. Existing paper completion counts are unchanged.
+blocks new revisions, and accepted work drains before close. An opt-in official Loader adapter now coordinates create/update/remove, old/new
+Fibers and actual Include persistence queues, with stale-owner generation checks.
+ConfigEditor file transactions, Include refresh and module-graph/supervisor
+integration remain separate work; the default official UI is not transparently wrapped. Existing paper completion counts are unchanged.
 
 The [Rust factory SDK](rust-node-plugins.md) adds same-graph JSON services,
 pull streams, explicit opaque object/callback adapters and event-driven Futures

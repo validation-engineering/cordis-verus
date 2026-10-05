@@ -1,0 +1,34 @@
+import type { Context } from '@cordis-verus/compat-cordis';
+
+/** Structural surface of the pinned official Harness Loader/Include classes. */
+export interface OfficialEntryTree {
+  ctx: object;
+  root: { tree: OfficialEntryTree; data: unknown[] };
+  store: Record<string, { fiber?: object; subtree?: OfficialEntryTree }>;
+  entries(): Iterable<unknown>;
+  getTasks(): Promise<unknown>[];
+  await(): Promise<void>;
+  resolve(id: string): unknown;
+  resolveGroup(id: string | null): unknown;
+  create(options: { name: string; [key: string]: any }, parent?: string | null, position?: number): Promise<string>;
+  update(id: string, options: Record<string, any>, parent?: string | null, position?: number): Promise<void>;
+  remove(id: string): void;
+  write(): void;
+}
+export class LoaderTransactions {
+  constructor(ctx: Context, tree: OfficialEntryTree);
+  readonly ctx: Context;
+  readonly tree: OfficialEntryTree;
+  /** Number of successful create/update/remove operations. */
+  readonly revision: number;
+  /** Number of admitted operations, including queued or failed operations. */
+  readonly requestedRevision: number;
+  readonly lastFailure: { revision: number; operation: 'create' | 'update' | 'remove'; error: unknown } | undefined;
+  readonly closed: boolean;
+  /** Options are structured-cloned at admission. */
+  create(options: { name: string; [key: string]: any }, parent?: string | null, position?: number): Promise<string>;
+  update(id: string, options: Record<string, any>, parent?: string | null, position?: number): Promise<void>;
+  remove(id: string): Promise<void>;
+  /** Closes this adapter's admission and drains earlier work; does not dispose the tree. */
+  close(): Promise<void>;
+}

@@ -48,3 +48,19 @@
 - 在性能工作前建立可复现基准，特别记录闭合驱动的机器复制、历史增长和 tombstone 成本；不提前承诺生产吞吐量。
 
 整篇完成门槛仍是[ledger](paper-obligations.json)的原条目审计加 4 项整体连接义务。`python3 scripts/check-paper-coverage.py --require-complete` 当前应拒绝。原文修订、反例审计完成与原文全部成立是三个不同结果，任何发布说明都应说明交付的是哪一个。
+
+
+## 6. Node 长期架构的下一轮交付
+
+2026-10-06 已加入官方 Loader 的显式事务切片：create/update/remove 在同域 FIFO
+中等待实际 Include 写入及旧/新 Fiber，保留原版配置表示，拒绝旧 owner 代次。
+它没有自动接管官方 UI，不能把这个切片记为完整 M5 或全部长期方案完成。
+
+| 下一项 | 需要解决的边界 | 验收条件 |
+| --- | --- | --- |
+| 官方 ConfigEditor/HMR 协调 | 外层文件锁、写入、reconcile、恢复与关闭共用 admission；Include.refresh 在 await 后继续操作 | 真实官方流程的并发修改、写入/恢复失败和关闭竞态；无权限跨异步回调泄露 |
+| 长期运行成本 | 区分存活资源与稳定 identity/publication/lease 历史；当前删除仍保留 tombstone | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
+| 模块依赖图更新 | 依赖闭包、代次保留、不可热更 addon 分类 | 传递依赖改动与失败恢复；安全场景使用已支持的 WorkerDomain；需进程隔离者待 supervisor 接入 |
+| 动态 typed Rust 插件 | 动态 publication、availability 与 Runtime 能力迁移 | 同图 Rust/JS 生命周期与权限一致，非空示例和失败路径验收 |
+
+跨平台制品实际安装、完整发布负控及宿主到论文的整体 refinement 继续按各自门槛执行。

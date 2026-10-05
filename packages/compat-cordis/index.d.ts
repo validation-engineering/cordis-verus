@@ -174,6 +174,8 @@ export const c256: number[];
 
 /** Explicit external revision transaction; lifecycle callbacks cannot nest it. */
 export interface MutationSteps {
+  /** Join synchronous adapter lifecycle calls; authority ends before async continuation. */
+  capture<T>(execute: () => T): T;
   dispose(fiber: Fiber): Promise<void>;
   restart(fiber: Fiber): Promise<void>;
   retryCleanup(fiber: Fiber): Promise<void>;

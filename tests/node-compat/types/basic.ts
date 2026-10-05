@@ -117,6 +117,14 @@ import { domainMutation, assertDomainMutation, type MutationSteps } from 'cordis
 async function coordinated(ctx: Context, fiber: Fiber): Promise<number> {
   assertDomainMutation(ctx, { recovery: true });
   const value: number = await domainMutation(ctx, async (steps: Readonly<MutationSteps>) => {
+    const captured: number = steps.capture(() => 42);
+    const promised: Promise<number> = steps.capture(async () => captured);
+    await promised;
+    // @ts-expect-error Capture preserves the callback result type.
+    const wrongCapture: string = steps.capture(() => 42);
+    // @ts-expect-error Capture requires a callback.
+    steps.capture(42);
+    void wrongCapture;
     await steps.update(fiber, { enabled: true });
     await steps.restart(fiber);
     // @ts-expect-error Steps are scoped readonly authority.

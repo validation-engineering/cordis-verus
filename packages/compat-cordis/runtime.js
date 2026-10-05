@@ -162,6 +162,7 @@ class Domain {
     this.mutationQueue = [];
     this.currentMutation = undefined;
     this.updateFrames = [];
+    this.captureFrames = [];
     this.errors = [];
     this.progress = 0;
     this.waiters = new Set();
@@ -204,10 +205,13 @@ class Domain {
         catch (error) { next.pending.reject(error); }
       });
     };
-    const step = (operation, target, ...args) => {
+    const assertStep = () => {
       if (!token.active || mutation.getStore() !== token || invocation.getStore() !== token.origin || liveInvocation(this) || this.updateFrames.length) {
         throw new CordisError('REENTRANT_MUTATION', 'Transaction steps are only valid in their active coordinator callback');
       }
+    };
+    const step = (operation, target, ...args) => {
+      assertStep();
       return token.performStep(operation, target, ...args);
     };
     token.performStep = (operation, target, ...args) => {
@@ -227,7 +231,20 @@ class Domain {
       }
       return result;
     };
-    const steps = Object.freeze(Object.fromEntries(['dispose','restart','retryCleanup','update'].map(name => [name,(fiber,...args) => step(name,fiber,...args)])));
+    const steps = Object.freeze({
+      ...Object.fromEntries(['dispose','restart','retryCleanup','update'].map(name => [name,(fiber,...args) => step(name,fiber,...args)])),
+      capture: execute => {
+        assertStep();
+        if (typeof execute !== 'function') throw new TypeError('capture requires a callback');
+        // Trusted adapters can invoke upstream methods which discard lifecycle
+        // promises. Only their synchronous prefix may delegate to this token;
+        // returning a Promise never extends the frame across an await.
+        const frame = {token,origin:invocation.getStore()};
+        this.captureFrames.push(frame);
+        try { return execute(); }
+        finally { this.captureFrames.pop(); }
+      },
+    });
     try {
       assertCurrentInvocation(this);
       if (this.closed) throw new CordisError('DOMAIN_CLOSED', 'The domain is closed');
@@ -293,7 +310,13 @@ class Domain {
     const frame = this.currentUpdateFrame();
     if (!frame) {
       if (this.updateFrames.length) throw new CordisError('REENTRANT_MUTATION', 'Plugin actions cannot borrow a configuration update frame');
-      return;
+      const capture = this.captureFrames.at(-1);
+      if (!capture) return;
+      if (!capture.token.active || capture.token !== this.currentMutation || mutation.getStore() !== capture.token
+        || invocation.getStore() !== capture.origin || liveInvocation(this)) {
+        throw new CordisError('REENTRANT_MUTATION', 'Plugin actions cannot borrow a captured adapter frame');
+      }
+      return {result:capture.token.performStep(operation, fiber, ...args)};
     }
     this.assertUpdateWait(fiber, operation);
     return {result:frame.token.performStep(operation, fiber, ...args)};
@@ -302,9 +325,14 @@ class Domain {
     // Legacy Include/Group hooks synchronously issue child lifecycle operations
     // and may return void. Join those operations to the current revision without
     // letting asynchronous continuations or plugin actions borrow its authority.
-    const frame = {fiber,token:this.currentMutation,origin:invocation.getStore()};
+    // Give observers their own episode origin even after the synchronous frame
+    // exits. They may delegate child work while the frame is present, but an
+    // asynchronous observer cannot borrow the outer coordinator's saved steps.
+    const origin = {fiber,generation:fiber._generation,kind:'update',active:false,
+      parentInvocation:invocation.getStore()};
+    const frame = {fiber,token:this.currentMutation,origin};
     this.updateFrames.push(frame);
-    try { return execute(); }
+    try { return invocation.run(origin, execute); }
     finally { this.updateFrames.pop(); }
   }
 
@@ -405,6 +433,16 @@ class Domain {
   }
   pump() {
     if (!this.driverDirty) return;
+    // Driving native transitions is host work, including when an observer
+    // schedules it before its own episode restarts. Callback setup/cleanup
+    // establish their own origins; status observers receive neither an old
+    // episode nor the coordinator's scoped mutation authority.
+    const token = mutation.getStore();
+    const admission = token && {domain:token.domain,
+      get active() { return token.active; }, get recovery() { return token.recovery; }};
+    return invocation.exit(() => mutation.run(admission, () => this._pump()));
+  }
+  _pump() {
     const outerPump = this.pumping;
     this.pumping = true;
     // Clear before callbacks, so every command they issue invalidates this scan.
@@ -865,7 +903,8 @@ export class Fiber {
   }
   async retryCleanup() {
     assertNotWaitingForAncestor(this, 'cleanup retry');
-    return this._domain.enqueueMutation(() => this._retryCleanup(), {recovery:true});
+    const delegated = this._domain.delegateUpdateMutation(this, 'retryCleanup');
+    return this._trackMutation(delegated ? delegated.result : this._domain.enqueueMutation(() => this._retryCleanup(), {recovery:true}));
   }
   async _retryCleanup() {
     assertNotWaitingForAncestor(this,'cleanup retry');
@@ -931,9 +970,21 @@ export class Fiber {
       }
       config = fiber._resolveConfig(config);
     } else config = resolveConfig(fiber.runtime,config);
-    const result = fiber._domain.updateHook(fiber, () => fiber.ctx.waterfall(fiber,'internal/update',config,noSave,() => {
-      fiber.config = config; fiber._error = undefined; return fiber._restart();
-    }));
+    const origin = invocation.getStore(), token = fiber._domain.currentMutation;
+    const result = fiber._domain.updateHook(fiber, () => {
+      const observer = invocation.getStore();
+      return fiber.ctx.waterfall(fiber,'internal/update',config,noSave,() => {
+        // The default continuation is coordinator work, but a retained next()
+        // is not permission to restart after its revision or episode has ended.
+        if (!token?.active || mutation.getStore() !== token || invocation.getStore() !== observer) {
+          throw new CordisError('REENTRANT_MUTATION', 'Update continuation is only valid in its active observer');
+        }
+        assertCurrentInvocation(fiber._domain);
+        return invocation.run(origin, () => {
+          fiber.config = config; fiber._error = undefined; return fiber._restart();
+        });
+      });
+    });
     if (result === undefined) return;
     const task = Promise.resolve(result);
     task.catch(() => {});

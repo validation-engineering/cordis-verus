@@ -252,6 +252,8 @@ def npm_distribution_evidence(path, build_path, node_build):
                 or item.get("version") != manifests[item["name"]].get("version")
                 or not isinstance(files, list) or any(not isinstance(name, str) for name in files)
                 or not required.issubset(files)
+                or (item["name"] == NPM_PACKAGES["compat-loader"]
+                    and not {"harness.js", "harness.d.ts"}.issubset(files))
                 or (item["name"] == NPM_PACKAGES["compat-cordis"] and (not native_files.issubset(files)
                     or {name for name in files if name.endswith(".node")} != native_binaries))
                 or item.get("sha256") != file_sha256(path.parent / filename)):
@@ -265,7 +267,7 @@ def npm_distribution_evidence(path, build_path, node_build):
                 "native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity", "original-cordis-import", "JSON-loader-update", "Worker-artifact-load"}
             or harness.get("profile") != "harness"
             or set(harness.get("tests", [])) != {
-                "scoped-original-import", "ESM-CJS-profile-identity", "native-harness-domain", "Service-class"}):
+                "scoped-original-import", "ESM-CJS-profile-identity", "native-harness-domain", "Service-class", "official-loader-adapter-export"}):
         raise RuntimeError("npm distribution smoke evidence is incomplete")
     return report
 
