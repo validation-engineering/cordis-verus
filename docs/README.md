@@ -1,6 +1,6 @@
 # 文档导航 / Documentation
 
-从[项目 README](../README.md)或[英文入口](../README.en.md)开始。本文按用途导航；完整研究推导保留在专题文档中。
+从[英文 README](../README.md)或[中文 README](../README.zh-CN.md)开始。本文按用途导航；完整研究推导保留在专题文档中。
 
 ## 运行与使用
 

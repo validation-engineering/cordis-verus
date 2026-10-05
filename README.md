@@ -1,87 +1,140 @@
 # cordis-verus
 
-[English](README.en.md) · [文档导航](docs/README.md) · [项目状态](docs/status.md) · [贡献指南](CONTRIBUTING.md)
+**A Rust plugin runtime with a Verus-verified lifecycle kernel.**
 
-用带 [Verus](https://github.com/verus-lang/verus) 契约与证明的可执行 Rust 实现 Cordis 的生命周期与可逆效果。内核的同一份源码接受 Verus 验证和 Cargo 编译；上层 Rust runtime 提供 typed services、异步插件、事件、定时器及配置加载。
+[简体中文](README.zh-CN.md) · [Documentation](docs/README.md) · [Examples](crates/cordis/examples) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)
 
-这是独立于原 TLA+ 研究的新项目，以 [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1) 为语义来源，以 Cordis 和 DeepSeek Harness 的锁定官方快照为功能参考。项目提供 Rust 对应接口，以及可运行部分原版 JS/TS 插件的实验性 Node 原生兼容层；不实现 Harness 的模型 API、权限系统或 UI。
+cordis-verus implements [Cordis](https://github.com/cordiverse/cordis) plugin lifecycles and reversible effects in Rust. Plugins declare services and dependencies; the runtime coordinates activation, provider changes, and cleanup. The kernel is executable Rust: the same source is verified by [Verus](https://github.com/verus-lang/verus) and compiled by Cargo.
 
-**这是私有研究开发项目（实验性 0.1.0），尚未发布到 crates.io，完整发布质量门槛尚未通过。** 公共 API 和证明边界仍在演进；实现优先对齐 Cordis 行为和论文语义。
+Use it to build Rust plugin systems, host supported Cordis JavaScript plugins through a native Node adapter, or compose Rust and JavaScript plugins in one lifecycle graph.
 
-## 当前进度
+**Status:** Experimental, pre-1.0. APIs are evolving, and the crates and npm packages are not yet published. See [verification scope](#verification-scope) for the distinction between kernel proofs, runtime tests, and application compatibility.
 
-| 检查对象 | 冻结快照结果 |
-| --- | --- |
-| Verus 全库正向验证 | 使用 `--no-cheating --compile`；结果与源码哈希见[开发记录](docs/development-report.json)的 `proof` 字段 |
-| Rust 行为测试 | 同一记录的 `tests` 字段；开发检查另包含独立 crate 打包测试 |
-| 论文 81 个编号条目 | **42 formalized · 17 proved · 18 partial · 4 refuted** |
-| 整体连接义务 | **4 项 open** |
-| 负控与发布证据 | **114 项负控待完成全量校准**；完整 `quality.sh` 尚未通过 |
+## Features
 
-这些数字对应已冻结源码，不等于整篇论文已证明。`formalized` 表示定义已编码，不表示其所有模型或宿主实现都已满足定义。实验性 scoped-negative checker 只生成所选证明的证据，**不能代替规范全库负控，也不是 v3 发布证据**。准确记录与重现方法见[项目状态](docs/status.md)及[验证说明](docs/validation.md)。
+- **Dependency-aware lifecycles.** Track provider identity and retain the services an active consumer needs until its cleanup completes. Failed cleanup remains visible and retains the resources needed for recovery.
+- **Typed Rust plugins.** Compose services, asynchronous setup and cleanup, child plugins, events, and timers with explicit resource ownership.
+- **Cordis on Node.** Run supported original JS plugins with Rust making lifecycle decisions. JavaScript objects, functions, and service values retain their identity in Node. Cordis and DeepSeek Harness have separate compatibility profiles.
+- **Rust and JavaScript together.** Mount user-compiled Rust plugins in the Node graph through explicit service, stream, object, and callback adapters. Static typed bindings can preserve existing Rust service slots.
+- **Configuration and reload.** Load JSON plugin trees, reconcile configuration changes, and recover from failed updates. External executable plugins use a separate JSON-RPC interface with captured code revisions.
 
-## 能做什么
+See [upstream parity](docs/upstream-parity.md) for supported behavior and deliberate differences, and [semantics](docs/semantics.md) for lifecycle contracts.
 
-- 生命周期内核：四态转换、真实 provider identity、target／committed bindings、retire／remove 分离和恢复次序守卫。
-- 已验证闭合程序：实际服务值、Provision、跨 provider 操作、动态 Child、真实 LIFO inverse journal、在途准入和目标变化后的 Divert。
-- Rust 宿主：同步／异步 setup、动态服务发布／撤销、服务检查与共享值更新、realm、子插件、取消和清理、事件及 owner 定时器。
-- 原版插件实验入口：Cordis/Harness 两个 Node profile、Service.check、owned task、增量 JSON Loader 与 Worker 制品恢复；Rust/Node 共用生命周期 Driver，JS 服务保留对象语义；[用户 Rust factory](docs/rust-node-plugins.md) 可通过显式 JSON、双向背压流和 opaque object/callback adapter 加入同一图；范围见[Node 兼容指南](docs/node-compatibility.md)。
-- 配置与维护：JSON 配置树、可回滚的原地更新、Include、显式保存、状态诊断及 shutdown；外部可执行插件通过 JSON-RPC 加载，代码快照支持更新失败后的恢复。
+## Quick start
 
-宿主功能由行为与集成测试支撑；任意 Rust callback、Future、锁和文件 I/O 尚未获得完整形式化 refinement。功能对应与差异见[上游对照](docs/upstream-parity.md)，使用限制见[语义边界](docs/semantics.md)。
+You need Git, Rustup, Python 3.9+, curl, and a native Rust build toolchain. The installer selects and checks the pinned Rust/Verus toolchain from [toolchain.lock.json](toolchain.lock.json); it does not change your default Rustup toolchain. Installer targets are macOS ARM64/x86_64 and Linux x86_64.
 
-跨语言对象和回调通过 factory 方法取得，方法参数与结果仍是 JSON。borrowed 引用和 owned 析构有不同合同；普通 inverse 成功后才按 LIFO 释放对象，再清理 Rust session，失败资源保留供重试。既有 `cordis::Plugin` 的[静态 typed 服务](docs/typed-rust-plugins.md)也可加入同一图，保留原 `Arc` 与跨重启闭包。typed Runtime 的动态能力迁移、更广接口/ABI 与生态验收、平台发布和 host refinement 仍未完成。
-
-[性能工具](docs/benchmarks.md)提供源码与实际构建绑定的测量和基线比较；工具存在不代表已有性能实测结论或已通过性能预算。
-
-## 快速开始
-
-Rust 路径需要 Git、Rustup、Python 3 和 curl；完整开发检查另需 Node 22.22.0 和 `npm ci --ignore-scripts`。安装脚本下载并校验锁定的 Verus／Rust 工具链，支持 macOS ARM/Intel 与 Linux x86_64，不修改 Rustup 默认工具链。首次运行需要网络和 Cargo 依赖；后续可使用本地缓存。
-
-```bash
+```sh
 git clone https://github.com/Stool233/cordis-verus.git
 cd cordis-verus
 ./scripts/install-verus.sh
-source scripts/toolchain-env.sh
-cargo test --workspace --locked
-cargo run --locked -p cordis --example basic
+bash -c 'source scripts/toolchain-env.sh && cargo run --locked -p cordis --example basic'
 ```
 
-仓库当前按私有项目管理，克隆需要相应 GitHub 访问权限。示例使用 std executor，无需模型密钥或外部服务。
+Repository access is currently required to clone. Initial setup downloads the toolchain and dependencies. The example needs no model credentials or external service.
 
-| 想了解 | 从这里开始 |
+The [basic example](crates/cordis/examples/basic.rs) mounts a consumer before its provider, then shuts them down:
+
+```text
+consumer: hello from verified Cordis
+consumer cleanup still sees: hello from verified Cordis
+provider cleanup follows the consumer
+```
+
+The consumer can still use its committed service during cleanup. The provider is released afterwards. The example includes a small executor; the Rust runtime itself does not select an async executor for your application.
+
+### Node compatibility
+
+With the Rust toolchain installed, use Node **22.22.0** and npm:
+
+```sh
+npm ci --ignore-scripts
+npm run build:native
+npm run example:node
+```
+
+The [Node example](examples/node/basic.mjs) imports `Context` from `cordis`, loads a service, and disposes its consumers. A preload hook routes that package name to the native adapter. For your own application, select the matching profile:
+
+```sh
+# Original Cordis plugins
+node --import @cordis-verus/compat-cordis/register app.mjs
+
+# DeepSeek Harness Cordis plugins
+node --import @cordis-verus/compat-harness/register app.mjs
+```
+
+These commands require the corresponding local runtime packages. Compile TypeScript plugins to JavaScript before loading them. Use one profile per Node environment. Compatibility is validated for specific interfaces and applications; see the [Node guide](docs/node-compatibility.md) for loading rules, known differences, and platform limits.
+
+### DeepSeek Harness
+
+The companion [cordis-harness](https://github.com/Stool233/cordis-harness) project exercises this runtime in an application. It runs the pinned official **Web / standard** and **headless** compositions, preserving the official CLI, Loader, plugins, frontend, and JSONL session storage while replacing the **Node Cordis host**. Browser-side Cordis remains the official JavaScript implementation.
+
+Follow its [build guide](https://github.com/Stool233/cordis-harness/blob/main/docs/build.md) to prepare the verified runtime artifacts. Then, from that repository:
+
+```sh
+npm run official:install -- --offline
+npm run official
+```
+
+Use the install command without `--offline` when public dependencies are not cached. The [application acceptance record](https://github.com/Stool233/cordis-harness/blob/main/docs/official-validation-report.json) covers the default plugin roster, a real tool call, session recovery across processes, and shutdown. Model requests in acceptance tests use a local fixture; interactive use requires your own model configuration.
+
+## Architecture
+
+| Component | Responsibility |
 | --- | --- |
-| consumer 与 provider 的清理顺序 | [basic.rs](crates/cordis/examples/basic.rs) |
-| 异步 stage、Child 与 LIFO | [async_lifecycle.rs](crates/cordis/examples/async_lifecycle.rs) |
-| 配置加载与保存 | [config_reload.rs](crates/cordis/examples/config_reload.rs)、[config_persistence.rs](crates/cordis/examples/config_persistence.rs) |
-| 已验证程序的具体 API | [固定程序指南](docs/verified-programs.md) |
+| [`cordis-kernel`](crates/cordis-kernel) | Executable Verus specifications, lifecycle transitions, action ownership, and publication contracts |
+| [`cordis-driver`](crates/cordis-driver) | Shared lifecycle control used by the Rust and Node hosts |
+| [`cordis`](crates/cordis) | Typed services, plugin callbacks, async work, events, timers, and configuration loading |
+| [`cordis-node`](crates/cordis-node) and [`packages/`](packages) | Node-API binding, JavaScript facades, compatibility profiles, and Rust plugin adapters |
 
-## 验证与论文范围
+The kernel governs lifecycle state. Each host manages its own values, callbacks, and resource journals. Read the [architecture guide](docs/architecture.md) for source navigation and trust boundaries.
 
-```bash
-# 日常开发检查：格式、lint、文档、全库正向证明、测试、示例及打包
-./scripts/check-development.sh --offline
+## Verification scope
 
-# 仅内核正向验证
-./scripts/verify.sh --num-threads 2 --triggers-mode silent
+Formal guarantees apply to the kernel's specified contracts and their stated assumptions. Arbitrary Rust or JavaScript callbacks, asynchronous host execution, the FFI boundary, and file or network I/O are outside the completed proof scope. Behavior tests and upstream comparisons provide separate evidence for those layers.
 
-# 完整质量流程：格式、lint、文档、证明、测试、示例、全库负控及打包
-./scripts/quality.sh --offline
+The last recorded local development run includes:
 
-# 清单一致性；--require-complete 另检查整篇完成门槛，当前应失败
-python3 scripts/check-paper-coverage.py
+| Check | Result |
+| --- | ---: |
+| Whole-kernel Verus verification, with `--no-cheating --compile` | 2,290 verified obligations; 0 errors |
+| Rust workspace behavior tests | 399 passed |
+| Rust documentation tests | 2 passed |
+| Node behavior tests | 287 passed |
+| Extracted crate builds and npm installation checks | Passed on macOS ARM64 / Node 22.22.0 |
+
+The [development report](docs/development-report.json) binds results to source and artifact hashes. These are verification obligations and tests, not a count of proved paper theorems. Other platforms require their own execution evidence.
+
+The semantic reference is [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1). Full host-to-paper refinement and the complete release gate remain open. The [paper ledger](docs/paper-coverage.md) records completed, partial, and refuted claims; the [paper audit](docs/paper-audit.md) explains their scope. A passing development run does not substitute for the release gate's full negative-control suite.
+
+## Development
+
+After installing the toolchain and Node dependencies:
+
+```sh
+# Proofs, formatting, lints, docs, tests, examples, and package checks
+python3 scripts/record-development.py
+
+# Check that recorded evidence still matches local sources and artifacts
+python3 scripts/record-development.py --check
 ```
 
-锁定工具与输入见 [toolchain.lock.json](toolchain.lock.json)、[Cargo.lock](Cargo.lock) 和 [upstream.lock.json](upstream.lock.json)。负控须先完整编译，再产生真实契约失败；超时、资源耗尽和编译失败不算成功。默认 CI 使用开发检查，**不包含全量负控**；规范全库负控和完整发布质量保留为独立流程。CI 配置的存在不代表远程矩阵已通过。
+Add `--offline` to the first command when dependencies are cached. The second command checks freshness; it does not rerun proofs. Upstream differential tests and the complete release gate are separate checks described in [validation](docs/validation.md) and the [Node guide](docs/node-compatibility.md).
 
-已完成的受限证明包括实际九规则轨迹、provider 次序、观察恢复、带守卫的交换与后缀运输，以及允许 foreign Table／Child 混合日志和动态 registry 的 episode 删除。其条件和局限保留在合同中，不能提升为任意调度汇合或完整宿主证明。详见[架构](docs/architecture.md)、[refinement](docs/refinement.md)和[逐项覆盖清单](docs/paper-coverage.md)。
+## Documentation and contributing
 
-论文 Lemma 62、75、77 和 Theorem 71(2) 的无条件闭合断言有 Unit 组件的原文反例。Child 的交换、删除与字面输入见证仍有原 Component 表示缺口，**不构成原文 78／79／80 的无条件反驳**。判断依据见[论文审计](docs/paper-audit.md)。
+| Topic | Guide |
+| --- | --- |
+| Rust services and resource ownership | [Runtime](docs/runtime.md) · [Events](docs/events.md) |
+| Configuration and external plugins | [Loader](docs/loader.md) · [Process plugins](docs/process-plugins.md) |
+| Original JS plugins and native packages | [Node compatibility](docs/node-compatibility.md) · [Distribution](docs/native-distribution.md) |
+| Rust plugins in a Node application | [Factory SDK](docs/rust-node-plugins.md) · [Typed bindings](docs/typed-rust-plugins.md) |
+| Proofs, progress, and remaining work | [Refinement](docs/refinement.md) · [Status](docs/status.md) · [Roadmap](docs/roadmap.md) |
 
-当前使用 Verus 官方滚动发布 `0.2026.10.04.1687598`，按完整提交和各平台归档 SHA-256 固定。上游锁同时记录匹配的 Verus 源码，供核对语言能力和证明实现；正式发布、滚动发布和更靠前的主分支提交分别对待。
+The [documentation index](docs/README.md) includes further examples and design notes. Detailed documentation is currently a mix of English and Chinese.
 
-## 参与与许可
+Bug reports, focused fixes, plugin compatibility cases, and proof contributions are welcome in either language. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup and review expectations, [SECURITY.md](SECURITY.md) for vulnerability reporting, and the [release procedure](docs/releasing.md) for publication requirements.
 
-实现和证明的后续工作见[路线图](docs/roadmap.md)。提交变更请遵循[贡献指南](CONTRIBUTING.md)，安全问题按[安全报告流程](SECURITY.md)处理，发布要求见[发布流程](docs/releasing.md)。
+## License
 
-本项目 Rust 代码采用 [MIT](LICENSE) 许可。上游代码保留各自许可；论文及提取文本不属于项目 MIT 许可，未随源码分发，详见[研究输入说明](reference/README.md)。
+[MIT](LICENSE). Upstream components retain their licenses and attribution in [NOTICE](NOTICE). cordis-verus is an independent implementation, not an official Cordis or DeepSeek release. The reference paper and extracted text are not distributed with this repository; see [research inputs](reference/README.md).

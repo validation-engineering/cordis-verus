@@ -27,8 +27,9 @@
     "Cargo.toml": "b167bf9642792574a5bbcce140531706d9e4f90e884d8c47b589e29148a9e4ae",
     "LICENSE": "171c999ad70650b28bd47f2b760725732509180ef76f8b207a3140e5bd5f38b8",
     "NOTICE": "94d95a8c7ce4ae647cf458a93e91aaad105b6759867926939454cbcfedbc0cb8",
-    "README.en.md": "d5a9fca3bd384152379838efb884d2717fef8459d1f37b4866beb50c3078fe2c",
-    "README.md": "46761d70e50138174d30ae34bde9ef1f3f40a12fcfcaead054680e8394878f7a",
+    "README.en.md": "de6448cefdff15a8d01901d0f67f75f6e8aa6eed3f0b6b3fc86b276fe3b2a98f",
+    "README.md": "dbadb1ed54e7db012aaf0a2af207bd1ec5004318acd04ab53ea194e2a707f315",
+    "README.zh-CN.md": "07b9a7cc66911ef6f347490d7a57fc40f464dc144eb9739bd7cf35ab84130ab5",
     "SECURITY.md": "5d5bbbbbcc4e13db38ec4f0cf5611721d78ac4512a4d1188d4295a41010e412b",
     "crates/cordis-driver/Cargo.toml": "8ca927dfaee34158e4efe4029b81e4504bdb506e114baa2a388b5d10ba1ececd",
     "crates/cordis-driver/LICENSE": "171c999ad70650b28bd47f2b760725732509180ef76f8b207a3140e5bd5f38b8",
@@ -274,7 +275,7 @@
     "crates/cordis/tests/shutdown_review.rs": "bd034b0aef15e90b2a09e795eb2c0d6e6394448c4433bfa287f1bea9f007a141",
     "crates/cordis/tests/static_host.rs": "718fde91c64fade1ee3d6cb87f9f889a91e27a27bfae5eda2be2a67c7b0f0b85",
     "crates/cordis/tests/timer.rs": "d434d1e7904669288cdf66ee1f249c5b2cbb1270f4d9b568dfa13b5d209346c2",
-    "docs/README.md": "e29d77c5becc3ffb24fc18e128e2114a2eb5948aa36d82b867c804eb96702cbc",
+    "docs/README.md": "e340f14e9b30153aa454ed79cd17b6a181bb31ed4e256af14bcfe535eda8e52d",
     "docs/architecture.md": "2a029913e60315d3d84bc51c7f6d200457508375080b6de22a4d023b75e73d6b",
     "docs/benchmarks.md": "b95c2d2353d67f989b3bde9406826e659e966c118fb2b41dfec364275b2451ae",
     "docs/diagnostics.md": "db076df9646549cb95c817e09f39bd7df40fb58d583e419a112fdd1144b52515",
@@ -439,7 +440,7 @@
     "toolchain.lock.json": "cccc6f7acc7f3674349d83a0b5d525c4e866490205c324270b69e4bf67b1807c",
     "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750"
   },
-  "checkedAt": "2026-10-05T11:20:14.958795+00:00",
+  "checkedAt": "2026-10-05T12:15:33.677428+00:00",
   "host": {
     "os": "Darwin",
     "architecture": "arm64"
@@ -539,7 +540,7 @@
       {
         "name": "cordis-kernel",
         "version": "0.1.0",
-        "sha256": "2513e58df3c042116a272a0fc502530f46cff993e808b57ef9dcdca07694c987",
+        "sha256": "af2caebab17ccc840aec8e9b7846c24a63249703c709b70f69dc96a7b6cf0240",
         "files": [
           "cordis-kernel-0.1.0/.cargo_vcs_info.json",
           "cordis-kernel-0.1.0/Cargo.lock",
@@ -727,7 +728,7 @@
       {
         "name": "cordis-driver",
         "version": "0.1.0",
-        "sha256": "f64c1888c7ffe1940386cafe32d9fd9340ff4d592ef3685a671cd3657dd3a0cb",
+        "sha256": "d46a4267e524e1c4f515d493123a273bece972dc4a2f5b72d73d36d43a46ecea",
         "files": [
           "cordis-driver-0.1.0/.cargo_vcs_info.json",
           "cordis-driver-0.1.0/Cargo.lock",
@@ -753,7 +754,7 @@
       {
         "name": "cordis",
         "version": "0.1.0",
-        "sha256": "8bfb43aebe2264427ff5e66fe58e60b426e00ee1c1efabab053d7d5399d5296a",
+        "sha256": "db580c56b028d7d89bef74a0df1a88bee5f75605d3a3baba769346ed9391d399",
         "files": [
           "cordis-0.1.0/.cargo_vcs_info.json",
           "cordis-0.1.0/Cargo.lock",
@@ -1080,7 +1081,7 @@
   "npmDistribution": {
     "schema": "cordis-verus.npm-package/v1",
     "status": "passed",
-    "checkedAt": "2026-10-05T11:20:14.879Z",
+    "checkedAt": "2026-10-05T12:15:33.591Z",
     "registryPublishChecked": false,
     "uploaded": false,
     "offline": true,
@@ -1093,7 +1094,7 @@
       "driverAbi": 1
     },
     "otherTargets": "not validated",
-    "nativeManifestSha256": "4db87ca1af6a2b5cb8741a094bce6fc7ac377babaaf7eaef857d240221f867be",
+    "nativeManifestSha256": "22fc8807aaceec56fa74533877b940a2b8b6a5ace7edc605cc3700e14c9a2807",
     "nativeTarget": "darwin-arm64-napi8",
     "buildReportSha256": "628ccf186aa31a6d10400266c9e9b8808fe04a1ea77410a9a3f54d472080cdaa",
     "nativeArtifactSha256": "a49d5a64475f366661c7415c527362a3a08e2bea4c72490b53cb18a34daddb91",
@@ -1115,8 +1116,8 @@
       "packages/compat-cordis/native-artifacts.d.ts": "e640dfb044f1752cee13075a88d363c4173061696b2b8d8b930894f6c9f6b9dc",
       "packages/compat-cordis/native-artifacts.js": "7ff966b24eaff87d218c42c20eb386e27f6051a313cf7b71c81c12bac2a05780",
       "packages/compat-cordis/native/cordis.node": "a49d5a64475f366661c7415c527362a3a08e2bea4c72490b53cb18a34daddb91",
-      "packages/compat-cordis/native/manifest.json": "4db87ca1af6a2b5cb8741a094bce6fc7ac377babaaf7eaef857d240221f867be",
-      "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json": "b83dc399bc6064db3fd5212e0d92b0182ec3c0457c42b4355cb84797c7fc191d",
+      "packages/compat-cordis/native/manifest.json": "22fc8807aaceec56fa74533877b940a2b8b6a5ace7edc605cc3700e14c9a2807",
+      "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json": "6176c0e42f80ff15f673b0be713509e117d35edb512cfd385fd2eba994491d87",
       "packages/compat-cordis/package.json": "908a186ab1789ea4826776ef583891d64e88c9b528461e1133102900a4c87846",
       "packages/compat-cordis/register.js": "b9625922ce2224339433d17e26396395e5a7d359a736a0684e6ef88e1fa9663b",
       "packages/compat-cordis/runtime.js": "5960f2c791022ab09bd18c874c42bba2b13f8db94c75ed50525e53ac4273dfde",
@@ -1392,7 +1393,7 @@
         "name": "@cordis-verus/compat-cordis",
         "version": "0.1.0",
         "filename": "cordis-verus-compat-cordis-0.1.0.tgz",
-        "sha256": "a4a903540be905094f0d7ea394e6196afcc5cf3a53017ceae5a6f5dbc52f494f",
+        "sha256": "2f3b009b15abfe0ccf25952c159914696fec496befc2a108f92075f984433cdc",
         "files": [
           "LICENSE",
           "LICENSE.upstream",
@@ -1471,7 +1472,7 @@
         ],
         "values": "javascript-object-table"
       },
-      "nativeManifestSha256": "4db87ca1af6a2b5cb8741a094bce6fc7ac377babaaf7eaef857d240221f867be",
+      "nativeManifestSha256": "22fc8807aaceec56fa74533877b940a2b8b6a5ace7edc605cc3700e14c9a2807",
       "nativeTarget": "darwin-arm64-napi8",
       "tests": [
         "native-manifest-selection",
@@ -1493,14 +1494,14 @@
       ]
     }
   },
-  "npmDistributionReportSha256": "8eac5cdebb94e6b4cbc10971d91f4f1e2407408ae2a30ce52450b1a7bb1a5e93",
+  "npmDistributionReportSha256": "b9cb617e0eaeeeae22af7f70b8b2c13a3781a62534c3d01a30f843bc2152b300",
   "examples": [
     "async_lifecycle",
     "basic",
     "config_persistence",
     "config_reload"
   ],
-  "logSha256": "05d193ec6d43d5dca2994a5cb4f1261430af463c49b7976ed51b5ef834466eb9",
+  "logSha256": "cee6f791e2234a190a8f94610c44276bb47293d4e8a28698ea4d8000cc864e0e",
   "workflowSha256": {
     "scripts/record-development.py": "69d0fdc9476a9e9362c9a78466860d7b8dd08ac9f5b191a66e37711338f11abd",
     "scripts/check-development.sh": "60beac571aea466741ca079b81ff25c36b9eaf0c4d2a8796c46283a3811cfb76",
