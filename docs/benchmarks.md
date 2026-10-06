@@ -138,3 +138,71 @@ committed-provider checks and the native transition decision remain authoritativ
 node scripts/benchmark.mjs --scenario facade.settledReadiness \
   --fanout 128 --samples 15 --warmup 3 --timeout-ms 120000
 ```
+
+## Resident lifecycle history
+
+Two scenarios keep one Harness-profile Context and a fixed set of committed
+consumers alive throughout all warmup and measured batches:
+
+- `facade.residentRestart`: restart the same provider identity; consumers restore
+  against the old committed value and rebind to the new episode.
+- `facade.residentReplace`: dispose the provider, mount a fresh provider and rebind
+  the same consumers; node identities grow with completed replacement cycles.
+
+Each batch executes `10 * --scale` cycles. Construction and final graph disposal
+remain outside timing; consumer cleanup, publication retirement and reactivation
+are included. Assertions check the old committed value during every inverse,
+consumer reactivation, and zero live resources after final disposal.
+
+```sh
+node scripts/benchmark.mjs \
+  --scenario facade.residentRestart --scenario facade.residentReplace \
+  --fanout 4 --samples 100 --warmup 0 --timeout-ms 300000 \
+  --output target/benchmarks/resident.json
+```
+
+This example measures 1,000 cycles in each independent process. Every batch,
+including warmup, has a `checkpoints` entry with cumulative cycles, native Driver
+storage counters and process memory. Initial and final-cleanup checkpoints are
+also retained. The report validator requires the complete sequence, monotonic
+stable identity histories and zero live resources at the closed checkpoint.
+Inspect the raw ordered samples to see latency changes as history accumulates;
+the aggregate p95 alone loses that relationship.
+
+Checkpoint snapshots and memory observations run outside timed batches. Forced GC
+still runs only before the initial measurement and after final cleanup, so per-batch
+heap movement includes ordinary GC noise. RSS includes V8 and native allocations,
+while record counts separate stable history from live resources; neither establishes
+an exact bytes-per-record cost. The retained Context intentionally remains reachable
+at the final checkpoint. These finite churn measurements do not establish an
+unbounded-run memory guarantee, absence of leaks or a production performance budget.
+
+### 2026-10-06 history maintenance checkpoint
+
+The shared Node Driver now invokes the already verified stable binding/declaration
+filters after every 256 successful cleanup or removal changes. It does not reclaim
+live commitments, reuse node identities, or renumber publication/lease records.
+The failed-cleanup regression triggers maintenance through unrelated nodes while
+an Unloading consumer still reads its retained provider value.
+
+A local Apple M4 / macOS arm64 / Node 22.22.0 comparison used four consumers,
+100 batches of ten cycles, no warmup, and the same benchmark harness, environment
+and optimized/assertion-enabled build profile:
+
+| After 1,000 cycles | Same provider restart | Fresh provider replacement |
+| --- | ---: | ---: |
+| Binding records before maintenance | 4,004 | 4,004 |
+| Binding records with maintenance | 112 | 78 |
+| Live bindings / leases, both runs | 4 / 4 | 4 / 4 |
+| Batch-amortized p95 before | 665.34 microseconds | 777.71 microseconds |
+| Batch-amortized p95 with maintenance | 478.82 microseconds | 648.16 microseconds |
+
+The [before](performance/2026-10-06-resident-before.json) and
+[after](performance/2026-10-06-resident-after.json) reports retain every ordered
+batch, checkpoint and source/build hash. Their source maps differ only in the
+shared Driver and its regression test. Both close with zero live resources.
+Publication records still reach 1,001 and lease records 4,004; replacement also
+retains 1,006 node identities. Those remaining histories are an explicit future
+reclamation task. The timing observations are one local comparison, without a
+statistical-significance or cross-platform throughput claim; RSS does not measure
+the bytes reclaimed by the binding filter.

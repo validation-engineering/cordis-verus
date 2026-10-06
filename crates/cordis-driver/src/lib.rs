@@ -86,6 +86,7 @@ pub struct Driver {
     checked: BTreeMap<usize, u64>,
     availability: Availability,
     declarations: BTreeMap<(u64, u64), usize>,
+    maintenance_changes: usize,
 }
 impl Driver {
     /// Allocate a process-unique domain identity, failing rather than wrapping.
@@ -105,7 +106,20 @@ impl Driver {
             checked: BTreeMap::new(),
             availability: Availability::default(),
             declarations: BTreeMap::new(),
+            maintenance_changes: 0,
         })
+    }
+
+    // Use the verified stable filters also used by the ordinary Rust Runtime.
+    // They retain live commitments even while another inverse is pending or
+    // failed. Identity/publication/lease records are deliberately not reused.
+    fn maintain_history(&mut self) {
+        self.maintenance_changes += 1;
+        if self.maintenance_changes >= 256 {
+            self.kernel.compact_bindings();
+            self.kernel.compact_declarations();
+            self.maintenance_changes = 0;
+        }
     }
 
     /// The domain carried by all completion tickets.
@@ -651,6 +665,7 @@ impl Driver {
                     self.nodes.remove(&id);
                     self.declarations.retain(|_, owner| *owner != id);
                     self.availability.remove_consumer(id);
+                    self.maintain_history();
                     actions.push(HostAction::Removed { id });
                     progress = true;
                 }
@@ -815,6 +830,7 @@ impl Driver {
                 node.restart = false;
                 node.cleanup_failed = false;
                 self.reconcile_publications()?;
+                self.maintain_history();
             }
         }
         Ok(())
@@ -850,7 +866,19 @@ impl Driver {
             let state = match phase { Phase::Inactive if node.failed.is_some() => "Failed", Phase::Inactive => "Pending", Phase::Loading => "Loading", Phase::Active => "Active", Phase::Unloading => "Unloading" };
             json!({"id":id.to_string(),"generation":self.kernel.episode_generation(id).unwrap().to_string(),"parent":node.parent.map(|id|id.to_string()),"state":state,"retired":self.kernel.retired(id),"error":node.failed,"cleanupFailed":node.cleanup_failed,"pendingAction":node.pending})
         }).collect();
-        json!({"abi":1,"profile":self.profile,"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics()})
+        let storage = json!({
+            "registeredPlugins": self.nodes.len(),
+            "identitySlots": self.kernel.identity_slots(),
+            "declarationRecords": self.kernel.declaration_records(),
+            "bindingRecords": self.kernel.binding_records(),
+            "liveBindings": self.nodes.keys().map(|id| self.kernel.committed(*id).len()).sum::<usize>(),
+            "publicationRecords": self.publications.publication_records(),
+            "leaseRecords": self.publications.lease_record_count(),
+            "liveLeases": self.nodes.values().map(|node| node.resources.len()).sum::<usize>(),
+            "publishedValues": self.values.len(),
+            "pendingActions": self.nodes.values().filter(|node| node.pending.is_some()).count(),
+        });
+        json!({"abi":1,"profile":self.profile,"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics(),"storage":storage})
     }
 
     /// Whether a fiber is in an episode's still-committed dependency closure.

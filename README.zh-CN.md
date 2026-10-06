@@ -15,8 +15,8 @@ cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的�
 - **依赖感知的生命周期。** 跟踪服务提供者的实际身份，直到消费者完成清理后才释放其依赖的服务。清理失败会明确报告，并保留恢复所需的资源。
 - **类型化 Rust 插件。** 组合服务、异步初始化与清理、子插件、事件和定时器，显式管理资源所有权。
 - **在 Node 中运行 Cordis。** 由 Rust 决定生命周期动作，运行支持范围内的原版 JS 插件。JavaScript 对象、函数和服务值保留在 Node 中，保持原有身份。Cordis 与 DeepSeek Harness 使用不同的兼容 profile。
-- **组合 Rust 与 JavaScript。** 用户编译的 Rust 插件可通过显式服务、流、对象和回调适配器加入 Node 图；typed binding 保留既有 Rust 服务槽，并可显式开启动态值与按 consumer 检查 availability。
-- **配置与重载。** 加载 JSON 插件树，并通过同一生命周期队列协调官方 Harness 配置编辑。检查已观测的模块依赖后，用捕获的制品替换 Worker，启动失败时恢复旧版本。外部可执行插件使用独立 JSON-RPC 接口。
+- **组合 Rust 与 JavaScript。** 用户编译的 Rust 插件可通过显式服务、流、对象和回调适配器加入 Node 图；typed binding 保留既有 Rust 服务槽，并可显式开启动态值、固定依赖配置与按 consumer 检查 availability。
+- **配置与重载。** 加载 JSON 插件树，并通过同一生命周期队列协调官方 Harness 配置编辑。检查已观测的模块依赖后，用捕获的制品替换 Worker 或操作系统进程，启动失败时恢复旧版本。外部可执行插件使用独立 JSON-RPC 接口。
 
 支持行为和有意保留的差异见[上游对照](docs/upstream-parity.md)，生命周期契约见[语义说明](docs/semantics.md)。
 
@@ -97,10 +97,10 @@ npm run official
 
 | 检查 | 结果 |
 | --- | ---: |
-| Verus 全库验证，使用 `--no-cheating --compile` | 2,290 项义务通过，0 错误 |
-| Rust 工作区行为测试 | 403 项通过 |
+| Verus 全库验证，使用 `--no-cheating --compile` | 2,292 项义务通过，0 错误 |
+| Rust 工作区行为测试 | 407 项通过 |
 | Rust 文档测试 | 2 项通过 |
-| Node 行为测试 | 441 项通过 |
+| Node 行为测试 | 471 项通过 |
 | 解包后的 crate 构建与 npm 安装检查 | 在 macOS ARM64 / Node 22.22.0 通过 |
 
 [开发记录](docs/development-report.json) 将结果绑定到源码和制品哈希。这些数字是验证义务和测试数量，不是已证明的论文定理数量；其他平台需要各自的执行证据。

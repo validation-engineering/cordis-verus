@@ -79,8 +79,7 @@ Any application artifact containing a `.node` file is classified as
 Worker. This conservative policy avoids implicitly certifying third-party addons
 for multiple Node environments or unload/reload. The pinned host facade's native
 addon is part of the separately tested host runtime, outside the application
-artifact; it is not counted as an application addon. No general process supervisor
-is implemented by this API.
+artifact; it is not counted as an application addon. `ProcessDomain`, described below, provides that separate OS process boundary.
 
 For an eligible candidate, the existing supervisor sequence remains:
 
@@ -110,7 +109,7 @@ cleanup failure, crash/exit acknowledgement, and retained-artifact integrity.
 Actual declarations are compiled in `tests/node-loader/types/module-graph.ts`.
 
 Still separate work: same-environment ESM/CJS module replacement with identity
-contracts, certified application native addons or a process supervisor, complete
+contracts, certification of arbitrary application native addons, complete
 static graph extraction for an arbitrary build tool, and connecting the official Harness module watcher to a Worker/process boundary.
 The [official configuration bridge](official-config-transactions.md) coordinates
 configuration revisions and rejects main-thread module-cache replacement. This feature is not a paper proof of module loading
@@ -120,3 +119,109 @@ The mechanism follows Node's documented [synchronous customization hooks](https:
 and the distinction between [ESM and CommonJS caches](https://nodejs.org/api/esm.html#no-requirecache).
 Acceptance uses the project's pinned Node 22.22 baseline; current documentation
 alone does not establish support on older Node versions.
+
+
+## ProcessDomain: application native addons and external hosts
+
+The exported `@cordis-verus/compat-loader/process` API executes each artifact in
+its own operating-system Node process. It reuses the Worker supervisor's serial
+revision queue, captured artifact journal, restoration sequence and cleanup
+barriers. `pid` identifies the currently active child, and changes on every
+replacement and restoration. The default host creates exactly one native Cordis
+Context and JSON Loader in that child.
+
+```js
+import { ProcessDomain } from '@cordis-verus/compat-loader/process';
+
+const domain = new ProcessDomain({ entry: 'cordis.json', timeout: 30_000 });
+const loaded = await domain.load('./materialized-project');
+console.log(domain.pid, loaded.plan.strategy); // a child PID, process-restart
+await domain.call('tools', 'execute', { operation: 'inspect' });
+await domain.reload();
+await domain.dispose();
+```
+
+Unlike `WorkerDomain`, this executor permits captured application `.node` addons.
+Their code is loaded only in the child, and replacing the domain replaces its OS
+process. The observed graph still records their actual resolution. This avoids
+assuming that an arbitrary addon is safe to unload or reinitialize in a Worker.
+The regression and extracted-package smoke load a real copied Node-API binary;
+they do not infer native support from a filename-only fixture.
+
+Business calls use Node's dedicated JSON IPC channel, independently of stdout and
+stderr. Only finite JSON values cross that API. A parent closes new admission,
+waits for accepted calls to land, requests host cleanup, receives an explicit
+cleanup acknowledgement, and then requires a normal exit with code zero. An
+acknowledgement alone is insufficient: a leaked timer/socket that keeps the child
+alive blocks replacement. An unexpected exit or IPC disconnect, even exit zero,
+is abandonment. Startup/call/exit timeouts establish no cleanup success; failed
+cleanup blocks new revisions until explicit disposal succeeds or `abandon()`
+terminates the child. Forced termination returns `cleanupConfirmed: false`.
+Candidate startup failure restores the old captured bytes only after candidate
+cleanup and exit have both been confirmed. Old cleanup failure, candidate cleanup
+failure and failed old-artifact restoration remain distinct outcomes.
+
+`env` overlays the inherited environment and is snapshotted at construction;
+`NODE_OPTIONS` and `NODE_PATH` are removed so implicit preload flags cannot replace
+the explicit bootstrap. `cwd` optionally selects an existing persistent workspace
+outside the private artifact copy. It is never removed by the supervisor. Output
+inherits the parent's streams by default; `stdio: 'ignore'` discards it, or
+`onOutput({ stream, data })` receives UTF-8 chunks. Output is not retained in
+diagnostics, and observers must handle its potentially sensitive contents.
+Exceptions from this observational callback do not interrupt cleanup.
+
+Every launch comes from `Artifact.launch()` and owns a private temporary copy.
+The release function accepts only directories registered by that allocator;
+source project directories, arbitrary paths and persistent `cwd` are rejected as
+cleanup targets. A failed spawn without a PID still releases its allocated copy
+when explicitly abandoned.
+
+### Trusted host adapter contract
+
+A host such as the official Harness CLI already creates its own Context and
+composition. Supply `hostModule` to use that implementation instead of creating a
+second JSON Loader Context:
+
+```js
+// trusted-host.mjs — kept outside the replaceable application artifact
+export function createHost({ directory, entry, allowPending }) {
+  const host = createApplicationHost({ directory, entry, allowPending });
+  return {
+    ready: host.start(),
+    call: (service, method, args) => host.call(service, method, args),
+    diagnostics: () => host.diagnostics(),
+    close: () => host.close(),
+  };
+}
+```
+
+`createHost` must be synchronous and immediately return its cleanup controller.
+`ready` is a Promise that settles after actual initialization. Its rejection does
+not hide that controller: the supervisor still calls `close()` to drain partial
+startup. If module evaluation or `createHost` fails before exposing a controller,
+clean teardown cannot be established, and the child remains blocked pending
+explicit abandonment. `close()` must wait for application cleanup; normal process
+exit remains independently checked. Do not use `process.exit()` to simulate an
+acknowledgement or bypass pending work.
+
+The host's root module is canonicalized and hashed when constructing the
+supervisor. `hostProvenance` and the process reload plan expose that identity.
+The hash is checked before candidate retirement/launch and around child import;
+changes require a reviewed new supervisor. This does **not** capture or certify
+all transitive host dependencies: the embedding application must separately lock
+and verify its host installation. Application artifacts remain separate, immutable
+restoration inputs; the adapter must load their private `directory`, not mutable
+original source. Host initialization is outside the application module graph.
+Captured plugin dependencies remain confined to their artifact, builtins, and
+the exact Cordis or Harness facade URL. A trusted adapter may supply the official
+single-Context composition without turning all external paths into allowed
+application imports.
+
+The process boundary isolates ordinary addon crashes and module-global state. It
+is not an OS security sandbox, does not stop deliberately spawned grandchildren,
+and does not roll back filesystem/network side effects. Arbitrary addons, native
+ABIs, platforms and host adapters require their own acceptance evidence. The
+current process tests cover real PIDs, addon import/restart, transitive updates,
+accepted-call draining, candidate rollback, both cleanup failure phases, failed
+restoration, partial-host startup, malformed IPC, failed spawn, persistent-path
+protection, and timeout/abandonment.

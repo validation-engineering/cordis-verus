@@ -46,6 +46,19 @@ export namespace Plugin {
 }
 export interface Events { [name: string | symbol]: (...args: any[]) => any; }
 export interface EventOptions { prepend?: boolean; global?: boolean; }
+/** Record counts, not allocated bytes. Stable identity/lease tombstones are included. */
+export interface DriverStorageStats {
+  registeredPlugins: number;
+  identitySlots: number;
+  declarationRecords: number;
+  bindingRecords: number;
+  liveBindings: number;
+  publicationRecords: number;
+  leaseRecords: number;
+  liveLeases: number;
+  publishedValues: number;
+  pendingActions: number;
+}
 export class Context {
   static readonly effect: unique symbol;
   static readonly filter: unique symbol;
@@ -83,7 +96,7 @@ export class Context {
   waterfall(name: keyof Events, ...args: any[]): any;
   settle(): Promise<void>;
   dispose(): Promise<void>;
-  snapshot(): {domain: string; plugins: object[]};
+  snapshot(): {domain: string; plugins: object[]; storage: DriverStorageStats};
 }
 export const FiberState: Readonly<{PENDING: 0; LOADING: 1; ACTIVE: 2; FAILED: 3; DISPOSED: 4; UNLOADING: 5}>;
 export class Fiber {

@@ -15,6 +15,22 @@ export function summarize(samplesMs,unitsPerSample) {
     nanosecondsPerUnit:{min:values[0],p50:percentile(.5),p95:percentile(.95),p99:percentile(.99),max:values.at(-1),mean:totalMs*1e6/(values.length*unitsPerSample)},
     unitsPerSecond:values.length*unitsPerSample*1000/totalMs};
 }
+export function validateCheckpoints(result,method) {
+  const required=['facade.residentRestart','facade.residentReplace'].includes(result.name);
+  if(!required&&result.checkpoints===undefined)return;
+  const points=result.checkpoints,total=method.warmup+method.samples;
+  if(!Array.isArray(points)||points.length!==total+2||!Number.isSafeInteger(result.iterationsPerSample)||result.iterationsPerSample<=0)throw new Error('Incomplete resident checkpoints');
+  const counters=['registeredPlugins','identitySlots','declarationRecords','bindingRecords','liveBindings','publicationRecords','leaseRecords','liveLeases','publishedValues','pendingActions'];
+  for(const [index,point] of points.entries()) {
+    const closed=index===total+1,cycles=Math.min(index,total)*result.iterationsPerSample;
+    const stage=index===0?'initial':closed?'closed':index<=method.warmup?'warmup':'sample';
+    if(point.stage!==stage||point.completedCycles!==cycles||index>0&&!closed&&point.batch!==index
+      ||counters.some(key=>!Number.isSafeInteger(point.storage?.[key])||point.storage[key]<0)
+      ||['rss','heapTotal','heapUsed','external','arrayBuffers','maxRssBytes'].some(key=>!Number.isFinite(point.memoryBytes?.[key])||point.memoryBytes[key]<0))throw new Error('Invalid resident checkpoint');
+    if(index>0&&['identitySlots','publicationRecords','leaseRecords'].some(key=>point.storage[key]<points[index-1].storage[key]))throw new Error('Resident checkpoint lost stable identity history');
+    if(closed&&['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'].some(key=>point.storage[key]!==0))throw new Error('Resident cleanup checkpoint has live resources');
+  }
+}
 export function validateReport(report) {
   const hash=/^[a-f0-9]{64}$/;
   if(report?.schema!==SCHEMA||report.measurementStatus!=='passed'||!['passed','performance-regression'].includes(report.status)) throw new Error('Baseline/candidate does not contain a complete successful measurement');
@@ -27,6 +43,7 @@ export function validateReport(report) {
   for(const result of report.results) {
     if(!result||result.cleanupConfirmed!==true||typeof result.unit!=='string'||!result.unit||seen.has(result.name)||!report.method.scenarios.includes(result.name)||result.samplesMs?.length!==report.method.samples) throw new Error('Incomplete or duplicate benchmark samples');
     seen.add(result.name);
+    validateCheckpoints(result,report.method);
     if(JSON.stringify(canonical(result.statistics))!==JSON.stringify(canonical(summarize(result.samplesMs,result.unitsPerSample)))) throw new Error('Benchmark statistics do not match the raw samples');
   }
   return report;

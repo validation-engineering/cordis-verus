@@ -4,7 +4,15 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { LoaderError } from './config.js';
 
-/** Each Worker gets a private copy, never the retained restoration recipe. */
+const managedLaunches = new Set();
+/** Release only a private directory allocated by Artifact.launch in this process. */
+export async function releaseLaunch(directory) {
+  if (!managedLaunches.has(directory)) throw new LoaderError('ARTIFACT_CLEANUP_TARGET', 'Only a registered private artifact launch may be released');
+  await rm(directory, { recursive: true, force: true });
+  managedLaunches.delete(directory);
+}
+
+/** Each isolated environment gets a private copy, never the retained restoration recipe. */
 export class Artifact {
   static async capture(directory, options = {}) {
     const source = resolve(directory);
@@ -53,6 +61,7 @@ export class Artifact {
     const location = relative(this.root, resolve(this.root, entry));
     if (!location || location === '..' || location.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(location)) throw new LoaderError('ARTIFACT_ENTRY', 'entry must be a file inside the artifact');
     const directory = await mkdtemp(join(tmpdir(), 'cordis-worker-'));
+    managedLaunches.add(directory);
     try {
       // Only captured entries are copied; later additions to retained storage
       // cannot enter an artifact under its original digest.
@@ -64,7 +73,7 @@ export class Artifact {
         await chmod(join(directory, item.name), item.mode);
       }
       return { directory, entry: location };
-    } catch (error) { await rm(directory, { recursive: true, force: true }); throw error; }
+    } catch (error) { await releaseLaunch(directory); throw error; }
   }
 
   async dispose() { if (!this.closed) { await rm(this.storage, { recursive: true, force: true }); this.closed = true; } }

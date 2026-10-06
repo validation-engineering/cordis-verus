@@ -51,6 +51,12 @@ graph. Source-bound local measurements and their limited scope are documented in
 [benchmarks](benchmarks.md); lifecycle correctness and paper completion claims
 remain unchanged.
 
+The shared Node Driver also performs periodic verified binding/declaration history
+filtering. The finite 1,000-cycle resident measurements record live resources,
+identity/publication/lease histories, memory and latency before and after this
+change. Stable publication and lease histories still grow; this is not a constant
+memory claim or long-running production acceptance.
+
 ## Native Node compatibility slice
 
 The new `cordis-driver`, Node-API binding and JS facade run a tested subset of
@@ -70,7 +76,10 @@ callbacks cannot borrow transaction steps, and readiness reports a retained nati
 cleanup failure instead of waiting forever. Main-thread module-cache replacement
 is explicitly refused before mutation; [observed module graphs](module-graph-reloads.md)
 explain changes executed by full Worker replacement and retained-artifact recovery.
-Application native addons require a separate process supervisor. Existing paper
+`ProcessDomain` supplies a real OS-process boundary for application native addons,
+with accepted-call drain, cleanup acknowledgement plus normal exit, and restoration
+from retained artifacts after candidate failure. The companion Harness provides
+an opt-in Web/standard supervisor and file-change polling. Existing paper
 completion counts are unchanged.
 
 The [Rust factory SDK](rust-node-plugins.md) adds same-graph JSON services,
@@ -83,6 +92,8 @@ The [typed adapter](typed-rust-plugins.md) executes real `cordis::Plugin` defini
 in the Node graph. It retains original slots and per-Fiber FnMut state, with
 explicit opt-in for `provide_checked`, `set` and `refresh` on declared services.
 Availability uses real pending CheckTickets and consumer injection configuration.
+Fixed-per-factory `requires_with_config` declarations now apply while Pending and
+are checked against the original Plugin before setup, including explicit JSON null.
 Dynamic publication creation/removal and the remaining typed Runtime operations
 are still outside this adapter. Legacy FnOnce cleanup failure stays permanent
 instead of accepting an empty retry. These host changes are not paper proofs.
@@ -113,7 +124,7 @@ require separate runs and acceptance.
 
 Remaining integration work includes dynamic typed Runtime/publication migration, broader
 interface and ABI contracts, more Cordis/Harness ecosystem coverage, safe
-same-environment HMR, a process supervisor, actual platform acceptance and
+same-environment HMR, broader supervisor/CLI coverage, actual platform acceptance and
 host-to-paper refinement. The full long-term
 architecture and release gate remain incomplete.
 

@@ -12,7 +12,7 @@
 | [Rust/JS plugins](rust-node-plugins.md) | 同图 Rust factory、JSON/流/显式对象与回调、borrowed/owned 及 action/cleanup 合同 |
 | [Typed Rust plugins](typed-rust-plugins.md) | 既有 Plugin 接入 Node、共享 typed slot、动态值与 availability、清理失败合同 |
 | [Official configuration transactions](official-config-transactions.md) | 默认 Harness 配置 UI、Include/HMR 队列与失败恢复 |
-| [Module graphs and Worker reloads](module-graph-reloads.md) | 观测依赖、候选更新计划与旧制品恢复 |
+| [Module graphs, Worker and process reloads](module-graph-reloads.md) | 观测依赖、候选更新计划与旧制品恢复 |
 | [Node compatibility](node-compatibility.md) | 原版 JS/TS 插件的实验性原生运行路径、构建、加载、差分测试与范围 |
 | [Native distribution](native-distribution.md) | 原生产物 manifest、平台选择、校验和离线合包 |
 | [Process plugins](process-plugins.md) | 外部可执行插件、JSON-RPC、代码快照与失败恢复 |

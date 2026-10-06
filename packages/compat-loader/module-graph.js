@@ -10,10 +10,16 @@ const facadeURLs = new Set([
   import.meta.resolve('@cordis-verus/compat-cordis'),
   pathToFileURL(require.resolve('@cordis-verus/compat-cordis')).href,
 ]);
+const harnessURLs = new Set();
+try {
+  harnessURLs.add(import.meta.resolve('@cordis-verus/compat-harness'));
+  harnessURLs.add(pathToFileURL(require.resolve('@cordis-verus/compat-harness')).href);
+} catch { /* Harness is optional for the default Cordis host. */ }
 
 /** Observed Node module edges in one Worker, not a static parser or cache reset. */
 export class ModuleGraph {
-  constructor(directory) {
+  constructor(directory, options = {}) {
+    this.allowNativeAddons = options.allowNativeAddons === true;
     this.root = realpathSync(directory);
     this.modules = new Map();
     this.edges = new Map();
@@ -44,8 +50,9 @@ export class ModuleGraph {
           if (child) target = child.id;
           else if (isBuiltin(result.url)) target = result.url.startsWith('node:') ? result.url : `node:${result.url}`;
           else if (specifier === 'cordis' && facadeURLs.has(result.url)) target = 'host:cordis';
+          else if (specifier === '@deepseek-ai/cordis' && harnessURLs.has(result.url)) target = 'host:harness';
           else throw new LoaderError('MODULE_OUTSIDE_ARTIFACT', `Project dependency ${specifier} resolves outside its captured artifact`, { parent: parent.id, url: result.url });
-          if (child?.path.endsWith('.node')) throw new LoaderError('PROCESS_RESTART_REQUIRED', 'Application native addons require a separately certified process restart boundary', { file: child.path });
+          if (child?.path.endsWith('.node') && !this.allowNativeAddons) throw new LoaderError('PROCESS_RESTART_REQUIRED', 'Application native addons require a separately certified process restart boundary', { file: child.path });
           this.observe(context.parentURL);
           const edge = { from: parent.id, to: target, specifier, source: 'resolution', kind: context.conditions.includes('require') ? 'require' : 'import' };
           this.edges.set(JSON.stringify(edge), edge);
@@ -72,7 +79,7 @@ export class ModuleGraph {
       for (const child of module.children ?? []) {
         if (!child.filename) continue;
         const childURL = pathToFileURL(child.filename).href;
-        const target = this.location(childURL)?.id ?? (facadeURLs.has(childURL) ? 'host:cordis' : undefined);
+        const target = this.location(childURL)?.id ?? (facadeURLs.has(childURL) ? 'host:cordis' : harnessURLs.has(childURL) ? 'host:harness' : undefined);
         if (!target || resolvedPairs.has(JSON.stringify([parent.id, target, 'require']))) continue;
         this.observe(pathToFileURL(module.filename).href);
         this.observe(childURL);

@@ -138,7 +138,7 @@ Official main-thread `partialReload()` rejects with
 `OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED` before changing module caches. Use
 [Worker module graphs and reload plans](../../docs/module-graph-reloads.md) to inspect
 actual dependencies and replace a captured artifact. This still replaces the
-whole Worker; application native addons require a separate process supervisor.
+whole environment; application native addons use `ProcessDomain` below.
 Runtime shape checks do not certify a different upstream version or arbitrary
 EntryTree subclass.
 
@@ -164,7 +164,7 @@ const moduleHost = new ModuleHost({
 const loader = new Loader(context, { moduleHost });
 ```
 
-Resolution still requires an explicit existing file path and applies `rootDirectory` confinement. The adapter replaces only module loading; it does not bypass JSON validation or lifecycle cleanup. It must return the same plugin object and revision while the executable factory is unchanged. A changed identity or revision requests replacement of entries using that module. Revision is a comparison token, not a claim that Node's dependency cache was reset. Publish immutable factory snapshots: the retained old plugin object must remain executable for rollback. Building source, evaluating it in another environment, deciding the dependency closure and maintaining those factory snapshots remain the embedding host's responsibility. Use `WorkerDomain` when an ESM/CommonJS environment and its transitive dependencies must actually be replaced.
+Resolution still requires an explicit existing file path and applies `rootDirectory` confinement. The adapter replaces only module loading; it does not bypass JSON validation or lifecycle cleanup. It must return the same plugin object and revision while the executable factory is unchanged. A changed identity or revision requests replacement of entries using that module. Revision is a comparison token, not a claim that Node's dependency cache was reset. Publish immutable factory snapshots: the retained old plugin object must remain executable for rollback. Building source, evaluating it in another environment, deciding the dependency closure and maintaining those factory snapshots remain the embedding host's responsibility. Use `WorkerDomain` or `ProcessDomain` when an ESM/CommonJS environment and its transitive dependencies must actually be replaced.
 
 Use a `WorkerDomain` for real code replacement, including changed transitive imports:
 
@@ -192,6 +192,17 @@ A cleanup failure or unknown timeout blocks replacement. An unexpected Worker ex
 
 Objects/functions stay ordinary JS objects **inside** each Worker. `WorkerDomain.call(service, method, ...args)` is an explicit asynchronous JSON boundary between environments. It has no transparent callback/stream/object transport. A Worker is not an operating-system process or a security sandbox; a native crash can affect the whole process.
 
+### Replace an OS process
+
+Use `ProcessDomain` from `@cordis-verus/compat-loader/process` for application
+native addons or a whole application process. It has the same captured-artifact
+load/reload/call workflow and adds a read-only PID. A successful replacement needs
+both a cleanup acknowledgement and exit code zero; a timeout or crash is not
+normal cleanup. An optional trusted `hostModule` can host the official Harness
+without creating another Context. See the [process contract and example](../../docs/module-graph-reloads.md#processdomain-application-native-addons-and-external-hosts)
+for adapter, provenance and failure boundaries. The companion Harness exposes an
+opt-in [official Web supervisor](https://github.com/Stool233/cordis-harness/blob/main/docs/process-supervisor.md).
+
 ### Artifact contract
 
 Publish a complete, stable input directory before capture. Include all relative imports, installed dependencies, resources and configuration. The directory must not change during capture. `.git` is excluded; symlinks, special files and artifacts exceeding configured limits are rejected. Defaults are 256 MiB and 20,000 files. Materialize symlinked package dependencies before capture. The facade/addon and Node runtime come from the host installation, not the captured project.
@@ -208,4 +219,4 @@ Run `node --test --test-timeout=30000 tests/node-loader/*.test.mjs` from the rep
 
 ## Local distribution check
 
-`node scripts/check-npm-package.mjs --offline` stages the facade, Loader and Harness profile packages, includes the freshly recorded host-native addon and notices, runs `npm pack --ignore-scripts`, and installs the tarballs in a separate temporary project. It verifies that no workspace path or symlink supplies the packages, then runs native, Loader, Worker and Harness profile examples from that installation. The report and local tarballs are written to `target/release-artifacts/npm`. Only the tested OS/architecture/Node combination is recorded as validated; this check uploads nothing and does not establish a prebuilt distribution matrix or registry publish eligibility.
+`node scripts/check-npm-package.mjs --offline` stages the facade, Loader and Harness profile packages, includes the freshly recorded host-native addon and notices, runs `npm pack --ignore-scripts`, and installs the tarballs in a separate temporary project. It verifies that no workspace path or symlink supplies the packages, then runs native, Loader, Worker, Process (including an application native addon) and Harness profile examples from that installation. The report and local tarballs are written to `target/release-artifacts/npm`. Only the tested OS/architecture/Node combination is recorded as validated; this check uploads nothing and does not establish a prebuilt distribution matrix or registry publish eligibility.

@@ -693,3 +693,64 @@ fn closed_retained_setup_releases_service_notification_resources_outside_journal
     assert!(old.refresh().is_err());
     assert_eq!(dropped.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn configured_dependencies_require_exact_host_declarations_before_callbacks() {
+    let key = ServiceKey::<usize>::new("configured");
+    let other = ServiceKey::<usize>::new("configured");
+    let runs = Arc::new(AtomicUsize::new(0));
+    let plugin = |config| {
+        let runs = runs.clone();
+        Plugin::new("configured", move |setup| {
+            assert_eq!(*setup.get(key)?, 7);
+            runs.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .requires_with_config(key, config)
+    };
+    let config = serde_json::json!({"minimum":3,"nested":{"levels":[1,2]}});
+    let port = Context::new().port(key);
+    let expected = |key, value| [(key, value)].into_iter().collect();
+    for declared in [
+        expected(
+            port.key,
+            serde_json::json!({"minimum":3,"nested":{"levels":[2,1]}}),
+        ),
+        expected(Context::new().port(other).key, config.clone()),
+        expected(port.key, serde_json::Value::Null),
+        expected(port.key, serde_json::json!({})),
+    ] {
+        assert!(
+            matches!(StaticPlugin::new_with_injection_config(plugin(config.clone()), declared), Err(error) if error == "StaticInjectionConfigurationMismatch")
+        );
+    }
+    assert_eq!(runs.load(Ordering::SeqCst), 0);
+    let mut definition =
+        StaticPlugin::new_with_injection_config(plugin(config.clone()), expected(port.key, config))
+            .unwrap();
+    let start = definition
+        .begin(
+            2,
+            1,
+            Context::new(),
+            vec![StaticBinding {
+                port,
+                provider: 1,
+                slot: TypedSlot::from_arc(Arc::new(7usize)),
+            }],
+        )
+        .unwrap();
+    finish(start.setup).unwrap();
+    assert_eq!(runs.load(Ordering::SeqCst), 1);
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    assert!(StaticPlugin::new_with_injection_config(
+        plugin(serde_json::Value::Null),
+        expected(port.key, serde_json::Value::Null)
+    )
+    .is_ok());
+    assert!(StaticPlugin::new_with_injection_config(
+        plugin(serde_json::Value::Null),
+        Default::default()
+    )
+    .is_err());
+}

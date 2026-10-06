@@ -121,6 +121,53 @@ await ctx.intercept('counter', { minimum: 10 }).rustPlugin('example.consumer')
 
 真实 [typed fixture](../crates/cordis-node/examples/typed_fixture/mod.rs) 和[两个 profile 的回归](../tests/node-compat/rust-typed-live.test.mjs)覆盖更新后 Pending/Active 转换、不同 injection 配置、realm 隔离、相同 committed slot 与旧 Arc、旧代次拒绝、部分 setup 失败、predicate panic、失败清理保留以及票据防伪与重放。
 
+## 原 `requires_with_config` 声明
+
+`TypedFactory::requires_with_config(key, name, json)` 把配置依赖预先登记在 Node factory 上，原插件继续使用 `Plugin::requires_with_config(key, json)`。两处应共享同一个 JSON 值。这样消费者处于 Pending、尚未执行 factory/setup 时，原 `provide_checked` predicate 已能取得正确配置。
+
+```rust
+let declaration = serde_json::json!({ "minimum": 10 });
+let plugin_declaration = declaration.clone();
+registry.register_typed(
+    TypedFactory::new("example.configured-consumer", move |_| {
+        Ok(Plugin::new("configured-consumer", move |setup| {
+            let current = setup.get(counter)?;
+            // Use the original typed Arc after availability admits this episode.
+            let _value = current.load(Ordering::SeqCst);
+            Ok(())
+        }).requires_with_config(counter, plugin_declaration.clone()))
+    }).requires_with_config(counter, "counter", declaration)
+)?;
+```
+
+配置以原 `ServiceKey` 身份对应。第一次可启动时，adapter 在进入原 setup callback 前核对真实 Plugin 的依赖配置与预登记配置，包括嵌套 JSON；不一致返回 `StaticInjectionConfigurationMismatch`。没有预登记却使用原 `requires_with_config` 的 Plugin 继续被默认静态入口拒绝。这不会通过伪造 setup 或提前执行 factory 来绕过 Pending。
+
+已登记的配置优先于 Context 上继承的服务 intercept；显式 JSON `null` 也是声明，会覆写继承值。普通 `.requires(key, name)` 继续采用已有的继承配置。无隐式合并或 schema 转换，provider predicate 自己判断配置是否可用。JSON 类型不满足 predicate 时，消费者保持 Pending。注册的配置与 Node 预配置都不替代 Rust `ServiceKey`/`TypeId`、realm 和 committed publication 检查。
+
+本入口支持 **每个注册 factory 固定的配置依赖**。如果 Plugin 的配置依赖是根据每个 Fiber 的普通 config 动态生成的，需要新的 descriptor 预检协议；当前不提供这种模式。修改已安装 Fiber 的 factory/config/port 声明仍会被拒绝，应创建新 Fiber。这个限制避免在 availability 已按一种配置放行后，再执行另一种配置的 Plugin。
+
+[配置依赖回归](../tests/node-compat/rust-typed-injection.test.mjs)使用真实原 Plugin，覆盖启动前 Pending、通知后激活、精确声明错配、显式 null、schema 不匹配、realm 隔离、失败 consumer 的 committed slot 保留、显式恢复和旧服务句柄失效。
+
+## 动态 publication 的后续实现合同
+
+`Setup::publish` / `AsyncSetup::publish` **尚未接入 Node adapter**。原 Rust Runtime 会创建独立 provider child，并用显式 owner-anchor 依赖保留父插件资源；`ServiceHandle` 同时表示该 child 的初始化、撤销与真实清理结果。把它改写成 owner 上的 `provide/revoke` 或一个可删除的 key map，会丢失这些语义。
+
+后续实现需要一套同图协议，至少同时满足以下合同：
+
+| 阶段 | 必要行为 | 必须验证的边界 |
+| --- | --- | --- |
+| 声明 | 区分始终存在的 `provides` 与允许动态发布的 typed key/interface；明确允许的名称、类型和 realm。 | 未声明 key、同名不同 ServiceKey、端口冲突不得发布。 |
+| 请求 | `publish` 返回原 ServiceHandle，把原 SharedSlot 和 owner episode 绑定的请求交给外部 host；不创建第二个 Runtime。 | 请求必须有独立身份；取消或重启后的晚到请求不得挂到下一代 owner。 |
+| 分配 | 在当前 NativeDriver 中分配真实 child，建立显式 owner-anchor 依赖。child 的可见性等待 owner 初始化完成。 | ownership 不替代服务依赖；父 setup 内等待这个 child 初始化仍不能伪造完成。 |
+| 发布 | child 的真实 setup ticket 绑定原 typed slot、View、publication 和 native port。JS 与 Rust 消费者使用这个 child 的 committed publication。 | 导入失败、publish 冲突、取消中的部分 setup 都必须保留已取得资源的 inverse。 |
+| 撤销 | handle.dispose 关闭新业务准入，由同一 Driver 撤销 child、等待所有 committed 消费者和资源调用落地。 | 不能在依赖自身的 consumer action 中等待 handle.join，造成自等待。 |
+| 完成 | 只有 child 的真实 cleanup 成功后，handle.join/status 才报告完成；父清理等该 anchor 的所有使用者完成。 | FnOnce inverse 失败必须保持 sticky failure；进程退出和 GC 不代表恢复成功。 |
+| 更新 | handle.set/refresh 只影响这次 publication 的 SharedSlot/check，并按 owner generation 与 child/publication 身份过滤通知。 | 旧 handle 不转向替代 publication；旧 Arc 和旧 committed lease 仍保留到实际释放。 |
+
+实现前还需要明确 Node host 对“无活跃 Rust action 的后台 publish/dispose”的事务排队，以及已开始的请求如何与 shutdown、ConfigEditor revision、失败恢复互相等待。不能借用已完成的 setup token 或在恢复 coordinator 中任意新增资源。应先补齐 queued request → native child → typed child session →真实 cleanup completion 的单向状态记录，再开启原 API 的 feature gate。
+
+验收应包括真实 JS 和 typed Rust 消费者同时保留一个动态 publication、在消费者清理挂起时 dispose/re-publish、owner restart、发布冲突、异步 setup 取消、失败清理不伪造 join 成功，以及旧句柄和晚到通知。当前 `with_service_updates` 和配置依赖能力不表示这些验收已完成。
+
 ## 取消与清理
 
 withdrawal 同时更新 SDK token 和旧 `AsyncSetup` 的 episode 状态。已经开始的 setup 必须真正落地，仍可登记其取得资源的 inverse；未开始的异步 setup 可以在取消后不再进入 body。用户 Future 如果永不完成，框架不会伪造完成。
@@ -133,7 +180,7 @@ withdrawal 同时更新 SDK token 和旧 `AsyncSetup` 的 episode 状态。已�
 
 ## 当前范围
 
-支持静态 `requires/provides`、`get/provide`、同步或异步 setup、同步或异步 cleanup；显式 opt-in 支持已声明服务的 `provide_checked` 和 `set/refresh`。`publish`、子插件、effect group、`requires_with_config` 和配置更新 hook 尚未接入这个 adapter，均明确拒绝；setup 期间忽略不支持操作的返回值，也不会使该次 setup 成功。
+支持静态 `requires/provides`、显式预登记配置的 `requires_with_config`、`get/provide`、同步或异步 setup、同步或异步 cleanup；显式 opt-in 支持已声明服务的 `provide_checked` 和 `set/refresh`。`publish`、子插件、effect group 和配置更新 hook 尚未接入这个 adapter，均明确拒绝；setup 期间忽略不支持操作的返回值，也不会使该次 setup 成功。
 
 这是真实旧 API 的一个同图实现切片，不是完整 typed Runtime 迁移。创建/撤销动态 publication、Loader 更新、更完整的 context/realm 映射与反向 typed JS 服务仍需逐项接入。当前更新同一个 publication 的槽位及 availability 不等于支持 `Setup::publish` 的动态 provider 子图。普通 Rust Runtime 保持其原有完整宿主入口和合同。
 

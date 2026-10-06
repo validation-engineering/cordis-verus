@@ -70,11 +70,26 @@ pub struct StaticPlugin {
 }
 impl StaticPlugin {
     pub fn new(plugin: Plugin) -> Result<Self, String> {
-        if plugin.config_update.is_some() {
-            return Err("UnsupportedStaticFeature: config_update".into());
-        }
         if !plugin.injection_config.is_empty() {
             return Err("UnsupportedStaticFeature: requires_with_config".into());
+        }
+        Self::new_inner(plugin)
+    }
+    /// Admit configured dependencies only after the external host has installed
+    /// these exact ServiceKey/configuration pairs for pending availability.
+    /// Explicit JSON null is a declaration, distinct from an inherited default.
+    pub fn new_with_injection_config(
+        plugin: Plugin,
+        expected: BTreeMap<u64, serde_json::Value>,
+    ) -> Result<Self, String> {
+        if plugin.injection_config != expected {
+            return Err("StaticInjectionConfigurationMismatch".into());
+        }
+        Self::new_inner(plugin)
+    }
+    fn new_inner(plugin: Plugin) -> Result<Self, String> {
+        if plugin.config_update.is_some() {
+            return Err("UnsupportedStaticFeature: config_update".into());
         }
         let declarations = StaticDeclarations {
             name: plugin.name.clone(),

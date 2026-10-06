@@ -1,6 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { rm } from 'node:fs/promises';
-import { Artifact } from './artifact.js';
+import { Artifact, releaseLaunch } from './artifact.js';
 import { planReplacement } from './module-graph.js';
 import { LoaderError, jsonValue } from './config.js';
 export { Artifact };
@@ -72,11 +71,11 @@ class WorkerClient {
     await this.request('shutdown');
     await timed(this.exit.promise, this.timeout, 'Worker exit after cleanup');
     this.closed = true;
-    await rm(this.directory, { recursive: true, force: true });
+    await releaseLaunch(this.directory);
   }
   async abandon() {
     if (!this.exited) await this.worker.terminate();
-    await rm(this.directory, { recursive: true, force: true });
+    await releaseLaunch(this.directory);
     this.closed = true;
   }
 }
@@ -85,6 +84,7 @@ class WorkerClient {
 export class WorkerDomain {
   constructor(options = {}) {
     this.options = { ...options, entry: options.entry ?? 'cordis.json' };
+    this.boundary = 'Worker';
     this.state = 'empty';
     this.lastRecovery = undefined;
     this._queue = Promise.resolve();
@@ -105,17 +105,22 @@ export class WorkerDomain {
     const launch = await artifact.launch(this.options.entry);
     let client;
     try {
-      client = new WorkerClient(launch, this.options, error => { this.state = 'abandoned'; this.failure = error; });
-    } catch (error) { await rm(launch.directory, { recursive: true, force: true }); throw error; }
+      client = this._createClient(launch, (error, state = 'abandoned') => { this.state = state; this.failure = error; });
+    } catch (error) { await releaseLaunch(launch.directory); throw error; }
     this._clients.add(client);
     return client;
+  }
+  _createClient(launch, onFault) { return new WorkerClient(launch, this.options, onFault); }
+  _plan(artifact, graph) { return planReplacement(this._current?.artifact, artifact, graph); }
+  _assertPlan(plan) {
+    if (plan.strategy === 'process-restart-required') throw new LoaderError('PROCESS_RESTART_REQUIRED', 'Application native addons are not certified for Worker replacement; the current domain was retained', { plan });
   }
   async _close(client) {
     if (!client) return;
     try { await client.close(); this._clients.delete(client); }
     catch (cause) {
       this.state = client.crashed ? 'abandoned' : 'blocked';
-      throw new LoaderError(client.crashed ? 'DOMAIN_ABANDONED' : 'CLEANUP_BLOCKED', 'Worker cleanup was not confirmed; no replacement was activated', {}, cause);
+      throw new LoaderError(client.crashed ? 'DOMAIN_ABANDONED' : 'CLEANUP_BLOCKED', `${this.boundary} cleanup was not confirmed; no replacement was activated`, {}, cause);
     }
   }
   load(directory) {
@@ -124,8 +129,8 @@ export class WorkerDomain {
       let plan;
       try {
         const graph = this._current ? await this._current.client.request('moduleGraph') : undefined;
-        plan = planReplacement(this._current?.artifact, artifact, graph);
-        if (plan.strategy === 'process-restart-required') throw new LoaderError('PROCESS_RESTART_REQUIRED', 'Application native addons are not certified for Worker replacement; the current domain was retained', { plan });
+        plan = this._plan(artifact, graph);
+        this._assertPlan(plan);
       } catch (error) { await artifact.dispose(); throw error; }
       this._artifacts.add(artifact);
       const result = await this._replace(artifact);
@@ -133,6 +138,8 @@ export class WorkerDomain {
     });
   }
   reload(directory) {
+    if (!this._accepting) return Promise.reject(new LoaderError('DOMAIN_CLOSED', `${this.boundary}Domain is closing or closed`));
+    if (['blocked', 'abandoned'].includes(this.state)) return Promise.reject(new LoaderError('DOMAIN_BLOCKED', 'The prior domain did not confirm cleanup; dispose or explicitly abandon it'));
     if (directory === undefined) directory = this._current?.artifact.source;
     if (!directory) return Promise.reject(new LoaderError('NO_RECIPE', 'load() an artifact before reload()'));
     return this.load(directory);
@@ -145,7 +152,7 @@ export class WorkerDomain {
       const artifact = await Artifact.capture(directory, this.options);
       try {
         const graph = this._current ? await this._current.client.request('moduleGraph') : undefined;
-        return planReplacement(this._current?.artifact, artifact, graph);
+        return this._plan(artifact, graph);
       } finally { await artifact.dispose(); }
     });
   }
@@ -185,7 +192,7 @@ export class WorkerDomain {
           this.state = 'empty';
           throw new LoaderError('RESTORE_FAILED', 'Old captured artifact could not restart after candidate failure', {}, new AggregateError([cause, recoveryError]));
         }
-        throw new LoaderError('RELOAD_FAILED', 'Candidate Worker was drained; the retained old artifact restarted in a new Worker', { restored: true, digest: previous.artifact.digest }, cause);
+        throw new LoaderError('RELOAD_FAILED', `Candidate ${this.boundary} was drained; the retained old artifact restarted in a new ${this.boundary}`, { restored: true, digest: previous.artifact.digest }, cause);
       }
       this.state = 'empty';
       throw cause;

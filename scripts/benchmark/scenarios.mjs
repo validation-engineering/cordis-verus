@@ -9,6 +9,8 @@ export const scenarios=Object.freeze({
   'rust.syncService':{batch:100,unit:'call',description:'JS to Rust JSON DTO synchronous service through the native SDK fixture'},
   'rust.asyncRoundTrip':{batch:10,unit:'call',description:'JS to Rust Future to async JS service and back; no artificial sleep'},
   'rust.pullStream':{batch:2,unit:'item',description:'Full Rust pull stream consumption including open, EOF, reverse JS record callbacks and close amortized per item'},
+  'facade.residentRestart':{batch:10,unit:'provider restart cycle',description:'Repeated provider activation and committed consumer rebinding in one retained Context, retaining the provider identity'},
+  'facade.residentReplace':{batch:10,unit:'provider replacement cycle',description:'Fresh provider mount/dispose and committed consumer rebinding in one retained Context; records identity/publication/lease history growth'},
   'facade.mountDispose':{batch:5,unit:'mount/dispose cycle',description:'Await plugin activation and effect disposal in a retained Context'},
   'facade.settledReadiness':{batch:1,unit:'settled fiber readiness read',description:'Sequential Fiber.await reads of an already settled Harness-profile graph with fixed fanout consumers and eight committed providers; graph construction and final disposal are outside timing'},
   'facade.providerWithdrawal':{batch:1,unit:'provider group withdrawal',description:'Dispose one provider after fixed fanout consumers activate; graph setup and final Context removal are outside timing'},
@@ -30,6 +32,39 @@ export async function prepareScenario(name,{fixturePath,fanout,streamItems}) {
       throw new Error('Native benchmark driver did not settle');
     };
     return {runSync(count){for(let i=0;i<count;i++){const {id}=command({op:'mount'});finish();command({op:'retire',id});finish();}return count;},validate(value,count){assert.equal(value,count);assert.equal(command({op:'snapshot'}).plugins.length,0);},async close(){}};
+  }
+  if(name==='facade.residentRestart'||name==='facade.residentReplace') {
+    const ctx=new Context({profile:'harness'}),consumers=[];
+    let provider,version=0,cycles=0,providerCleanups=0,consumerCleanups=0;
+    const setup=c=>{const current=++version;c.provide('residentValue',current);return()=>{providerCleanups++;};};
+    try {
+      provider=await ctx.plugin(setup);
+      for(let i=0;i<fanout;i++)consumers.push(await ctx.inject(['residentValue'],c=>{
+        const committed=c.residentValue;
+        return()=>{assert.equal(c.residentValue,committed);consumerCleanups++;};
+      }));
+      await ctx.settle();
+    } catch(error) {await ctx.dispose();throw error;}
+    return {async run(count){
+      for(let i=0;i<count;i++) {
+        if(name==='facade.residentRestart')await provider.restart();
+        else {await provider.dispose();provider=await ctx.plugin(setup);}
+        await ctx.settle();cycles++;
+      }
+      return count;
+    },validate(value,count){
+      assert.equal(value,count);assert.equal(version,cycles+1);
+      assert.equal(providerCleanups,cycles);assert.equal(consumerCleanups,cycles*fanout);
+      assert.ok(consumers.every(fiber=>fiber.state===FiberState.ACTIVE));
+      const stats=ctx.snapshot().storage;
+      assert.equal(stats.registeredPlugins,fanout+2);assert.equal(stats.liveBindings,fanout);
+      assert.equal(stats.liveLeases,fanout);assert.equal(stats.pendingActions,0);
+    },checkpoint(){return {completedCycles:cycles,storage:ctx.snapshot().storage};},async close(){
+      await ctx.dispose();
+      assert.equal(providerCleanups,cycles+1);assert.equal(consumerCleanups,(cycles+1)*fanout);
+      const stats=ctx.snapshot().storage;
+      for(const key of ['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'])assert.equal(stats[key],0,key);
+    }};
   }
   if(name==='facade.settledReadiness') {
     const ctx=new Context({profile:'harness'}),fibers=[],names=Array.from({length:8},(_,i)=>'benchReady'+i);

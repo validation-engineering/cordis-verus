@@ -19,6 +19,10 @@
     "./harness": {
       "types": "./harness.d.ts",
       "import": "./harness.js"
+    },
+    "./process": {
+      "types": "./process.d.ts",
+      "import": "./process.js"
     }
   },
   "peerDependencies": {

@@ -51,6 +51,7 @@ export class RustHost {
     this.results = new Map();
     this.factories = new Map();
     this.typedChecks = new WeakMap();
+    this.typedInjectionConfigs = new WeakMap();
     this.scheduled = false;
     this.streams = new JavaScriptStreams(this, jsonValue);
     this.objects = new JavaScriptObjects(this, jsonValue);
@@ -136,8 +137,11 @@ export class RustHost {
     const ctx = receiver[symbols.caller] ?? receiver.ctx;
     const names = [...session.factory.inject,...session.factory.services.map(item=>item.name)];
     const realms = Object.fromEntries(names.map(name=>[name,this.domain.port(ctx,name)]));
+    const declared = this.typedInjectionConfigs.get(ctx.fiber.runtime?.callback);
+    const config = declared && Object.hasOwn(declared,service)
+      ? declared[service] : ctx[symbols.intercept]?.[service] ?? null;
     return this.command({op:'typed_check',session:session.id,service,ticket:action.ticket,
-      realms,config:jsonValue(ctx[symbols.intercept]?.[service] ?? null)}).available;
+      realms,config:jsonValue(config)}).available;
   }
   finish(waiter,result) {
     if (result.success) waiter.resolve(result.value);
@@ -162,8 +166,11 @@ export class RustHost {
   plugin(name) {
     const factory = this.factories.get(name);
     if (!factory) throw new Error(`Rust factory is not registered in this addon: ${name}`);
-    return factory.plugin ??= {
-      name:`rust:${name}`, inject:[...factory.inject],
+    if (factory.plugin) return factory.plugin;
+    const plugin = {
+      name:`rust:${name}`, inject:factory.injectConfig
+        ? Object.fromEntries(factory.inject.map(service=>[service,structuredClone(factory.injectConfig[service] ?? null)]))
+        : [...factory.inject],
       apply:async (ctx,config) => {
         const token = this.hooks.invocation();
         const ports = Object.fromEntries([...factory.inject,...factory.services.map(service => service.name)].map(name => [name,this.domain.port(ctx,name)]));
@@ -197,6 +204,11 @@ export class RustHost {
         await this.wait(reply.job,session,'setup');
       },
     };
+    // Pending consumers have no Rust session yet. Tie their fixed declaration
+    // to this actual callback, preserving explicit null over inherited config.
+    if (factory.injectConfig) this.typedInjectionConfigs.set(plugin.apply,structuredClone(factory.injectConfig));
+    factory.plugin = plugin;
+    return plugin;
   }
   removed(fiber) {
     if (fiber._rustDefinition) {

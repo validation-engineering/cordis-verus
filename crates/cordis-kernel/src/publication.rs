@@ -73,6 +73,16 @@ impl PublicationRegistry {
         ensures out.wf(), out.publications().len() == 0, out.lease_records().len() == 0,
     { Self { entries: Vec::new(), leases: Vec::new() } }
 
+    /// Stored identities, including reclaimed publication tombstones.
+    pub fn publication_records(&self) -> (count: usize)
+        ensures count == self.publications().len(),
+    { self.entries.len() }
+
+    /// Stored lease identities, including released lease tombstones.
+    pub fn lease_record_count(&self) -> (count: usize)
+        ensures count == self.lease_records().len(),
+    { self.leases.len() }
+
     pub fn entry(&self, id: PublicationId) -> (out: Option<Publication>)
         ensures out == if id.0 < self.publications().len() {
             Some(self.publications()[id.0 as int])

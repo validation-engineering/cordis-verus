@@ -113,6 +113,7 @@ struct Binding {
     type_id: TypeId,
     name: String,
     view: Option<Arc<dyn ServiceView>>,
+    injection_config: Option<Value>,
 }
 /// An explicit map from real ServiceKey identities to Node service names.
 /// The builder constructs one Plugin definition per logical Fiber; restarting
@@ -151,8 +152,39 @@ impl TypedFactory {
             type_id: TypeId::of::<T>(),
             name: name.into(),
             view: None,
+            injection_config: None,
         });
         self
+    }
+    /// Bind an original `Plugin::requires_with_config` declaration before the
+    /// consumer can be admitted. Its JSON must exactly match the real Plugin.
+    /// Values are fixed per registered factory; explicit null overrides any
+    /// inherited Node service configuration.
+    pub fn requires_with_config<T: Any + Send + Sync>(
+        mut self,
+        key: ServiceKey<T>,
+        name: impl Into<String>,
+        config: Value,
+    ) -> Self {
+        self.bindings.push(Binding {
+            key: TypedContext::new().port(key).key,
+            type_id: TypeId::of::<T>(),
+            name: name.into(),
+            view: None,
+            injection_config: Some(config),
+        });
+        self
+    }
+    pub(super) fn injection_config(&self) -> BTreeMap<String, Value> {
+        self.bindings
+            .iter()
+            .filter_map(|binding| {
+                binding
+                    .injection_config
+                    .as_ref()
+                    .map(|config| (binding.name.clone(), config.clone()))
+            })
+            .collect()
     }
     pub fn provides<T: Any + Send + Sync>(
         mut self,
@@ -168,6 +200,7 @@ impl TypedFactory {
                 adapter,
                 marker: std::marker::PhantomData,
             })),
+            injection_config: None,
         });
         self
     }
@@ -461,7 +494,22 @@ impl Backend {
                 return Err("TypedMountDefinitionChanged".into());
             }
         } else {
-            let definition = StaticPlugin::new((factory.make)(config.clone())?)?;
+            let expected_config = factory
+                .bindings
+                .iter()
+                .filter_map(|binding| {
+                    binding
+                        .injection_config
+                        .as_ref()
+                        .map(|value| (binding.key, value.clone()))
+                })
+                .collect::<BTreeMap<_, _>>();
+            let plugin = (factory.make)(config.clone())?;
+            let definition = if expected_config.is_empty() {
+                StaticPlugin::new(plugin)?
+            } else {
+                StaticPlugin::new_with_injection_config(plugin, expected_config)?
+            };
             let declarations = definition.declarations();
             let expected = |owned: bool| {
                 factory

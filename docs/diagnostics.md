@@ -36,3 +36,32 @@ runtime 每累计 256 次 episode 清理或节点删除，自动安排一次回�
 丢弃 shutdown future 只暂停驱动，不撤销退休请求；再次 shutdown 会继续，已记录错误不会因 pause 丢失。正常成功后可重复调用。保留中的事件 continuation、永不结束的 stage/handler 或阻塞 Drop 仍会阻止完成；框架不会通过强行丢弃在途工作破坏恢复契约。
 
 需要分阶段控制时，原有 `dispose/dispose_all`、`join/settle`、`take_cleanup_errors` 仍可使用。单独丢弃 Runtime 不执行异步 inverse。上述诊断、自动维护和关闭编排是普通 Rust，只有其调用的 kernel primitive 及明确契约经过 Verus 验证。
+
+## Node shared-driver storage observations
+
+`ctx.snapshot().storage` now exposes record counts from the actual shared Driver:
+
+| Counter | Meaning |
+| --- | --- |
+| `registeredPlugins` / `identitySlots` | Present plugins versus all allocated stable node identities, including removed nodes |
+| `bindingRecords` / `liveBindings` | Stored commitment history versus bindings still committed by present episodes |
+| `declarationRecords` | Kernel interface declaration records, including records not yet compacted |
+| `publicationRecords` / `publishedValues` | Allocated publication identities versus values still retained for lookup or cleanup |
+| `leaseRecords` / `liveLeases` | Allocated lease identities versus leases still held by present episodes |
+| `pendingActions` | Setup/cleanup actions awaiting their real completion ticket |
+
+These observations do not drive callbacks or reclaim resources. A failed consumer
+inverse continues to hold its live lease and provider value until cleanup succeeds.
+A successful shutdown reaches zero registered plugins, live bindings, live leases,
+published values and pending actions; identity/publication/lease record counts can
+remain nonzero. Counters are record counts, not allocator capacity or exact bytes.
+The Node shared Driver now runs the same verified binding/declaration filters as
+the ordinary Rust Runtime after every 256 successful cleanup/removal changes.
+Failed cleanup does not count as completion; still-committed bindings survive
+maintenance. Stable identity, publication and lease tombstones remain; this policy
+does not imply constant space.
+
+The [resident lifecycle measurements](benchmarks.md#resident-lifecycle-history)
+record these counters alongside process memory and batch latency across repeated
+provider restarts and fresh provider replacement. This makes a future reclamation
+change assessable without reusing stale identities or hiding incomplete cleanup.

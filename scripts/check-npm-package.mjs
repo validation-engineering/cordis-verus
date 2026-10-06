@@ -61,11 +61,12 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { realpath, mkdir, writeFile } from 'node:fs/promises';
+import { realpath, mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { Context } from '@cordis-verus/compat-cordis';
 import { selectNativeArtifact } from '@cordis-verus/compat-cordis/native-artifacts';
 import { Loader } from '@cordis-verus/compat-loader';
 import { WorkerDomain } from '@cordis-verus/compat-loader/worker';
+import { ProcessDomain } from '@cordis-verus/compat-loader/process';
 const require = createRequire(import.meta.url);
 const facade = fileURLToPath(import.meta.resolve('@cordis-verus/compat-cordis'));
 const loaderPath = fileURLToPath(import.meta.resolve('@cordis-verus/compat-loader'));
@@ -100,7 +101,18 @@ try {
   assert.equal((await domain.planReload()).identical, true);
   assert.equal(await domain.call('message', 'hello', 'worker'), 'packed:worker');
 } finally { await domain.dispose(); }
-console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load'] }));
+await copyFile(selected.path, join(project, 'application.node'));
+await writeFile(join(project, 'plugin.mjs'), "import { Service } from 'cordis'; import { createRequire } from 'node:module'; const addon = createRequire(import.meta.url)('./application.node'); export default class Message extends Service { constructor(ctx) { super(ctx, 'message'); } abi() { return JSON.parse(addon.bindingInfo()).abi; } }");
+const isolated = new ProcessDomain({ timeout: 10000, stdio: 'ignore' });
+try {
+  const loaded = await isolated.load(project);
+  assert.equal(loaded.plan.strategy, 'process-restart');
+  assert.deepEqual(loaded.plan.nativeAddons, ['application.node']);
+  assert.notEqual(isolated.pid, process.pid);
+  assert.equal(await isolated.call('message', 'abi'), 1);
+  assert.ok((await isolated.moduleGraph()).modules.some(module => module.path === 'application.node'));
+} finally { await isolated.dispose(); }
+console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load', 'Process-native-artifact-load'] }));
 `;
 
 const harnessSmoke = `

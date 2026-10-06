@@ -454,7 +454,22 @@ impl Backend {
         }
     }
     pub fn info(&self) -> Value {
-        serde_json::json!({"abi":1,"factories":self.registry.factories.values().map(|(descriptor,_)|descriptor).collect::<Vec<_>>()})
+        let factories = self
+            .registry
+            .factories
+            .values()
+            .map(|(descriptor, factory)| {
+                let mut value = serde_json::json!(descriptor);
+                if let RegisteredFactory::Typed(factory) = factory {
+                    let config = factory.injection_config();
+                    if !config.is_empty() {
+                        value["injectConfig"] = serde_json::json!(config);
+                    }
+                }
+                value
+            })
+            .collect::<Vec<_>>();
+        serde_json::json!({"abi":1,"factories":factories})
     }
     pub fn owner(&self, session: u64) -> PluginResult<(usize, u64)> {
         let s = self.sessions.get(&session).ok_or("UnknownSession")?;

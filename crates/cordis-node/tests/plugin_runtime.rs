@@ -1961,3 +1961,88 @@ fn typed_live_service_check_notifications_preserve_slot_and_episode_boundaries()
     );
     typed_release(&mut backend, next_session);
 }
+
+#[test]
+fn typed_dependency_configuration_is_advertised_and_matches_the_original_plugin() {
+    let key = cordis::ServiceKey::<AtomicUsize>::new("configured");
+    let mut registry = FactoryRegistry::new();
+    registry
+        .register_typed(
+            TypedFactory::new("provider", move |_| {
+                Ok(cordis::Plugin::new("provider", move |setup| {
+                    setup.provide(key, AtomicUsize::new(7))?;
+                    Ok(())
+                })
+                .provides(key))
+            })
+            .provides(key, "counter", TypedCounterView::default()),
+        )
+        .unwrap();
+    for (name, declared, actual) in [
+        (
+            "configured",
+            json!({"minimum":3,"policy":{"levels":[1,2]}}),
+            json!({"minimum":3,"policy":{"levels":[1,2]}}),
+        ),
+        ("null", Value::Null, Value::Null),
+        ("mismatch", json!({"minimum":3}), json!({"minimum":4})),
+    ] {
+        registry
+            .register_typed(
+                TypedFactory::new(name, move |_| {
+                    Ok(cordis::Plugin::new("configured consumer", move |setup| {
+                        assert_eq!(setup.get(key)?.load(Ordering::SeqCst), 7);
+                        Ok(())
+                    })
+                    .requires_with_config(key, actual.clone()))
+                })
+                .requires_with_config(key, "counter", declared),
+            )
+            .unwrap();
+    }
+    let mut backend = plugin::Backend::new(registry, Arc::new(|| {}));
+    let info = backend.info();
+    let factories = info["factories"].as_array().unwrap();
+    assert_eq!(
+        factories
+            .iter()
+            .find(|f| f["name"] == "configured")
+            .unwrap()["injectConfig"],
+        json!({"counter":{"minimum":3,"policy":{"levels":[1,2]}}})
+    );
+    assert_eq!(
+        factories.iter().find(|f| f["name"] == "null").unwrap()["injectConfig"],
+        json!({"counter":null})
+    );
+    assert!(factories
+        .iter()
+        .find(|f| f["name"] == "provider")
+        .unwrap()
+        .get("injectConfig")
+        .is_none());
+    let port = typed_port(31, 9);
+    let ports = typed_ports(&[("counter", port)]);
+    let provider = backend
+        .start_resolved(1, 1, "provider", Value::Null, ports.clone(), vec![])
+        .unwrap();
+    let session = typed_publish(&mut backend, &provider, 17, port);
+    let import = || {
+        vec![ResolvedImport {
+            name: "counter".into(),
+            port,
+            owner: 1,
+            publication: 17,
+        }]
+    };
+    for (id, name) in [(2, "configured"), (3, "null")] {
+        let started = backend
+            .start_resolved(id, 1, name, Value::Null, ports.clone(), import())
+            .unwrap();
+        assert_eq!(backend.poll()["jobs"][0]["success"], true);
+        typed_release(&mut backend, number(&started, "session"));
+    }
+    assert!(
+        matches!(backend.start_resolved(4,1,"mismatch",Value::Null,ports,import()),Err(error) if error == "StaticInjectionConfigurationMismatch")
+    );
+    typed_release(&mut backend, session);
+}

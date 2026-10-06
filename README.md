@@ -15,8 +15,8 @@ Use it to build Rust plugin systems, host supported Cordis JavaScript plugins th
 - **Dependency-aware lifecycles.** Track provider identity and retain the services an active consumer needs until its cleanup completes. Failed cleanup remains visible and retains the resources needed for recovery.
 - **Typed Rust plugins.** Compose services, asynchronous setup and cleanup, child plugins, events, and timers with explicit resource ownership.
 - **Cordis on Node.** Run supported original JS plugins with Rust making lifecycle decisions. JavaScript objects, functions, and service values retain their identity in Node. Cordis and DeepSeek Harness have separate compatibility profiles.
-- **Rust and JavaScript together.** Mount user-compiled Rust plugins in the Node graph through explicit service, stream, object, and callback adapters. Typed bindings preserve existing Rust service slots, with opt-in live values and consumer-specific availability checks.
-- **Configuration and reload.** Load JSON plugin trees and coordinate official Harness configuration edits through one lifecycle queue. Inspect observed module dependencies before replacing a Worker from a captured artifact, with recovery after failed startup. External executable plugins use a separate JSON-RPC interface.
+- **Rust and JavaScript together.** Mount user-compiled Rust plugins in the Node graph through explicit service, stream, object, and callback adapters. Typed bindings preserve existing Rust service slots, with opt-in live values, fixed injection configuration and consumer-specific availability checks.
+- **Configuration and reload.** Load JSON plugin trees and coordinate official Harness configuration edits through one lifecycle queue. Inspect observed module dependencies before replacing a Worker or OS process from a captured artifact, with recovery after failed startup. External executable plugins use a separate JSON-RPC interface.
 
 See [upstream parity](docs/upstream-parity.md) for supported behavior and deliberate differences, and [semantics](docs/semantics.md) for lifecycle contracts.
 
@@ -97,10 +97,10 @@ The last recorded local development run includes:
 
 | Check | Result |
 | --- | ---: |
-| Whole-kernel Verus verification, with `--no-cheating --compile` | 2,290 verified obligations; 0 errors |
-| Rust workspace behavior tests | 403 passed |
+| Whole-kernel Verus verification, with `--no-cheating --compile` | 2,292 verified obligations; 0 errors |
+| Rust workspace behavior tests | 407 passed |
 | Rust documentation tests | 2 passed |
-| Node behavior tests | 441 passed |
+| Node behavior tests | 471 passed |
 | Extracted crate builds and npm installation checks | Passed on macOS ARM64 / Node 22.22.0 |
 
 The [development report](docs/development-report.json) binds results to source and artifact hashes. These are verification obligations and tests, not a count of proved paper theorems. Other platforms require their own execution evidence.

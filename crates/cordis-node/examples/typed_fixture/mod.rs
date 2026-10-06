@@ -425,6 +425,28 @@ impl TypedService<LiveReader> for LiveReaderView {
             "sameArc": Arc::ptr_eq(&current, &value.original)}))
     }
 }
+fn live_reader_plugin(
+    control_key: ServiceKey<Control>,
+    key: ServiceKey<LiveValue>,
+    reader: ServiceKey<LiveReader>,
+    injection: Option<Value>,
+) -> Plugin {
+    let plugin = Plugin::new("live-reader", move |setup| {
+        let control = setup.get(control_key)?;
+        let original = setup.get(key)?;
+        let handle = setup.to_async();
+        setup.provide(reader, LiveReader { setup: handle.clone(), key, original: original.clone() })?;
+        setup.on_cleanup(move || {
+            control.record(json!({"phase":"live-reader:cleanup", "current":handle.get(key)?.0,"original":original.0}));
+            Ok(())
+        });
+        Ok(())
+    }).requires(control_key).provides(reader);
+    match injection {
+        Some(config) => plugin.requires_with_config(key, config),
+        None => plugin.requires(key),
+    }
+}
 fn register_live(
     registry: &mut FactoryRegistry,
     control_key: ServiceKey<Control>,
@@ -447,6 +469,9 @@ fn register_live(
                 setup.provide_checked(key, LiveValue(initial), move |value, context, config| {
                     assert!(!panic_check, "live predicate failure");
                     context.port(key).realm == realm
+                        && (config.is_null()
+                            || config.get("minimum").is_none()
+                            || config["minimum"].is_i64())
                         && value.0 >= config["minimum"].as_i64().unwrap_or(0)
                 })?;
                 let handle = setup.to_async();
@@ -481,19 +506,59 @@ fn register_live(
         .provides(controller, "typedLiveControl", LiveControlView)
         .with_service_updates(),
     )?;
-    registry.register_typed(TypedFactory::new("fixture.typedLiveReader", move |_| {
-        Ok(Plugin::new("live-reader", move |setup| {
-            let control = setup.get(control_key)?;
-            let original = setup.get(key)?;
-            let handle = setup.to_async();
-            setup.provide(reader, LiveReader { setup: handle.clone(), key, original: original.clone() })?;
-            setup.on_cleanup(move || {
-                control.record(json!({"phase":"live-reader:cleanup", "current":handle.get(key)?.0,"original":original.0}));
-                Ok(())
-            });
-            Ok(())
-        }).requires(control_key).requires(key).provides(reader))
-    }).requires(control_key,"typedControl").requires(key,"typedLiveValue").provides(reader,"typedLiveReader",LiveReaderView))?;
+    registry.register_typed(
+        TypedFactory::new("fixture.typedLiveReader", move |_| {
+            Ok(live_reader_plugin(control_key, key, reader, None))
+        })
+        .requires(control_key, "typedControl")
+        .requires(key, "typedLiveValue")
+        .provides(reader, "typedLiveReader", LiveReaderView),
+    )?;
+    for (name, declared, actual) in [
+        (
+            "fixture.typedConfiguredReader",
+            json!({"minimum":10,"policy":{"levels":[1,2]}}),
+            Some(json!({"minimum":10,"policy":{"levels":[1,2]}})),
+        ),
+        ("fixture.typedNullReader", Value::Null, Some(Value::Null)),
+        (
+            "fixture.typedWrongConfigReader",
+            json!({"minimum":0}),
+            Some(json!({"minimum":1})),
+        ),
+        (
+            "fixture.typedMissingConfigReader",
+            json!({"minimum":0}),
+            None,
+        ),
+        (
+            "fixture.typedSchemaReader",
+            json!({"minimum":"ten"}),
+            Some(json!({"minimum":"ten"})),
+        ),
+    ] {
+        registry.register_typed(
+            TypedFactory::new(name, move |_| {
+                Ok(live_reader_plugin(control_key, key, reader, actual.clone()))
+            })
+            .requires(control_key, "typedControl")
+            .requires_with_config(key, "typedLiveValue", declared)
+            .provides(reader, "typedLiveReader", LiveReaderView),
+        )?;
+    }
+    registry.register_typed(
+        TypedFactory::new("fixture.typedUndeclaredConfigReader", move |_| {
+            Ok(live_reader_plugin(
+                control_key,
+                key,
+                reader,
+                Some(json!({"minimum":0})),
+            ))
+        })
+        .requires(control_key, "typedControl")
+        .requires(key, "typedLiveValue")
+        .provides(reader, "typedLiveReader", LiveReaderView),
+    )?;
     Ok(())
 }
 pub(super) fn register(registry: &mut FactoryRegistry) -> PluginResult<()> {
