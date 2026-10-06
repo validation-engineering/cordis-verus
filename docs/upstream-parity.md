@@ -1,6 +1,6 @@
 # Cordis 与 DeepSeek Harness 功能对照
 
-本项目以 Rust 重现 Cordis 的生命周期、依赖和效果组合接口，DeepSeek Harness 提供真实使用场景。新增实验性 Node facade 可运行限定范围内的原版 JS/TS 插件；它不重写 Harness 的 UI、AgentLoop 业务、模型 API、持久化、权限或工具执行。论文安全语义用于约束恢复顺序；上游运行结果和 Rust 行为测试不能代替证明。[upstream.lock.json](../upstream.lock.json) 记录官方源码快照。
+本项目以 Rust 重现 Cordis 的生命周期、依赖和效果组合接口，DeepSeek Harness 提供真实使用场景。实验性 Node facade 可运行限定范围内的原版 JS/TS 插件；它不重写 Harness 的 UI、AgentLoop 业务、模型 API、持久化、权限或工具执行。论文安全语义用于约束恢复顺序；上游运行结果和 Rust 行为测试不能代替证明。[upstream.lock.json](../upstream.lock.json) 记录官方源码快照。
 
 | 官方仓库 | 锁定 revision | 用途 |
 | --- | --- | --- |
@@ -44,11 +44,11 @@ Verus 内核的 `wf` 包含 registry 结构、provision 唯一性、live binding
 | 具体 reversible resource | ReversibleStore、owner transaction、write/rollback、Setup::reversible | 实际调用已证明的 Store；Mutex/journal/owner 编排仍为宿主测试 |
 | 观测恢复与独立性 | calculus 的 sequence recovery、interference recovery、independent groups | 条件定理；需要每一步 inverse witness、观测等价及交换前提，不是任意 plugin 的自动证明 |
 
-使用方式与完整取消/错误边界见 [runtime.md](runtime.md)、[loader.md](loader.md) 和 [process-plugins.md](process-plugins.md)。Rust 外部进程插件须实现进程协议；原版 JS/TS 插件使用单独的 [Node 原生兼容入口](node-compatibility.md)。下表描述 Rust 宿主，不能将它的全部能力归入尚在实现中的 Node facade。
+使用方式与完整取消/错误边界见 [runtime.md](runtime.md)、[loader.md](loader.md) 和 [process-plugins.md](process-plugins.md)。Rust 外部进程插件须实现进程协议；原版 JS/TS 插件使用单独的 [Node 原生兼容入口](node-compatibility.md)。上述表格描述 Rust 宿主；Node 兼容层的独立合同、模块缓存与 HMR 范围见 [Node compatibility](node-compatibility.md)。
 
 ## Rust 接口选择及尚未覆盖的上游特性
 
-Rust 类型和显式资源所有权构成这一版本的应用接口。`ServiceKey<T>`、Plugin builder、ConfigScope、EffectIterator、typed event、factory registry 和外部进程协议提供相应 Rust 接口。这些 Rust API 不实现 JS Proxy/shadow 或 Node 模块缓存。Node facade 单独实现语言层与显式导入入口，但尚未提供完整 npm profile/模块缓存/HMR 兼容。
+Rust 类型和显式资源所有权构成这一版本的应用接口。`ServiceKey<T>`、Plugin builder、ConfigScope、EffectIterator、typed event、factory registry 和外部进程协议提供相应 Rust 接口。这些 Rust API 不实现 JS Proxy/shadow 或 Node 模块缓存。Node facade 已提供独立 Cordis/Harness npm profiles、官方配置事务与受支持的原地模块 HMR，另有 Worker／进程替换和独立 Rust cdylib 换代。具体支持范围见 [官方原地 HMR](official-in-place-hmr.md)、[模块图替换](module-graph-reloads.md)和 [Rust 模块](native-rust-modules.md)；这些能力不等于任意第三方插件及所有模块缓存行为均兼容。
 
 Include 支持 JSON 与显式 ID、继承 scope、递归来源和内容 polling。YAML/JS 表达式、匿名 ID 自动回写、上游 YAML/JS patch journal 不兼容；Rust JSON 已提供显式保存计划、按 ID/字段三方合并、Include 拓扑保留和部分失败重试。程序内 apply/set_enabled 默认只修改内存配置，显式 save 才写文件；保存不自动将外部合并内容应用到 runtime，后续 file polling 以文件内容为准。group 的 enabled=false 会禁用整个拥有的子树，这个明确的 Rust 接口不复刻上游内部 group marker 始终 enabled 的表达方式。
 
@@ -64,7 +64,7 @@ Cordis 核心入口为 `upstream/cordis/packages/core/src/index.ts`，主要实�
 
 ## Harness 使用场景
 
-下表描述 Cordis 层可以表达的组合，未声称移植或验证对应 Harness 业务模块。
+下表描述 Rust Cordis 层可以表达的组合。配套 [cordis-harness](https://github.com/validation-engineering/cordis-harness) 另外执行固定官方 Web/standard/headless 组合和原版 AgentLoop；其应用验收记录是集成测试证据，不是业务模块的形式化证明。
 
 | Harness 固定快照文件 | 实际使用 | 已有 Rust 表达方式 |
 | --- | --- | --- |

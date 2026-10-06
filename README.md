@@ -10,6 +10,8 @@ Use it to build Rust plugin systems, host supported Cordis JavaScript plugins th
 
 **Status:** Experimental, pre-1.0. APIs are evolving, and the crates and npm packages are not yet published. See [verification scope](#verification-scope) for the distinction between kernel proofs, runtime tests, and application compatibility.
 
+Part of [Validation Engineering](https://github.com/validation-engineering): connecting specifications, executable code, and reproducible evidence. Start with the [evidence guide](docs/evidence-guide.md) for a runnable lifecycle case, an upstream comparison, and paper-to-code review paths.
+
 ## Features
 
 - **Dependency-aware lifecycles.** Track provider identity and retain the services an active consumer needs until its cleanup completes. Failed cleanup remains visible and retains the resources needed for recovery.
@@ -26,7 +28,7 @@ See [upstream parity](docs/upstream-parity.md) for supported behavior and delibe
 You need Git, Rustup, Python 3.9+, curl, and a native Rust build toolchain. The installer selects and checks the pinned Rust/Verus toolchain from [toolchain.lock.json](toolchain.lock.json); it does not change your default Rustup toolchain. Installer targets are macOS ARM64/x86_64 and Linux x86_64.
 
 ```sh
-git clone https://github.com/Stool233/cordis-verus.git
+git clone https://github.com/validation-engineering/cordis-verus.git
 cd cordis-verus
 ./scripts/install-verus.sh
 bash -c 'source scripts/toolchain-env.sh && cargo run --locked -p cordis --example basic'
@@ -68,16 +70,16 @@ These commands require the corresponding local runtime packages. Compile TypeScr
 
 ### DeepSeek Harness
 
-The companion [cordis-harness](https://github.com/Stool233/cordis-harness) project exercises this runtime in an application. It runs the pinned official **Web / standard** and **headless** compositions, preserving the official CLI, Loader, plugins, frontend, and JSONL session storage while replacing the **Node Cordis host**. Browser-side Cordis remains the official JavaScript implementation.
+The companion [cordis-harness](https://github.com/validation-engineering/cordis-harness) project exercises this runtime in an application. It runs the pinned official **Web / standard** and **headless** compositions, preserving the official CLI, Loader, plugins, frontend, and JSONL session storage while replacing the **Node Cordis host**. Browser-side Cordis remains the official JavaScript implementation.
 
-Follow its [build guide](https://github.com/Stool233/cordis-harness/blob/main/docs/build.md) to prepare the verified runtime artifacts. Then, from that repository:
+Follow its [build guide](https://github.com/validation-engineering/cordis-harness/blob/main/docs/build.md) to prepare the verified runtime artifacts. Then, from that repository:
 
 ```sh
 npm run official:install -- --offline
 npm run official
 ```
 
-Use the install command without `--offline` when public dependencies are not cached. The [application acceptance record](https://github.com/Stool233/cordis-harness/blob/main/docs/official-validation-report.json) covers the default plugin roster, a real tool call, session recovery across processes, and shutdown. Model requests in acceptance tests use a local fixture; interactive use requires your own model configuration.
+Use the install command without `--offline` when public dependencies are not cached. The [application acceptance record](https://github.com/validation-engineering/cordis-harness/blob/main/docs/official-validation-report.json) covers the default plugin roster, a real tool call, session recovery across processes, and shutdown. Model requests in acceptance tests use a local fixture; interactive use requires your own model configuration.
 
 ## Architecture
 
@@ -99,7 +101,7 @@ The last recorded local development run includes:
 
 | Check | Result |
 | --- | ---: |
-| Whole-kernel Verus verification, with `--no-cheating --compile` | 2,292 verified obligations; 0 errors |
+| Whole-kernel Verus verification, with `--no-cheating --compile` | Source-bound proof counts in the [development report](docs/development-report.json) |
 | Rust, documentation, and Node behavior tests | Source-bound counts in the [development report](docs/development-report.json) |
 | Extracted crate builds and npm installation checks | Passed on macOS ARM64 / Node 22.22.0 |
 

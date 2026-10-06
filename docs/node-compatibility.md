@@ -94,10 +94,12 @@ await ctx.dispose()        // 同样会等待所有 owned task，然后清理资
 
 - `Fiber inertia lock 2`：上游可以在 Loading 中撤销后同 owner 重发布时恢复旧 epoch；内核已经执行的 withdrawal 不会被撤销，会先清理再重新激活。旧 lease 不被偷偷替换。
 - `Fiber dispose error`：上游记录并吞掉 inverse 错误；这里保留失败资源并拒绝完成，等待显式 retry。返回成功会错误宣称资源已恢复。
-- Harness 的 wrapped fiber update receiver 缺陷在本实现中修正，更新作用于实际 fiber。
+- `Fiber update config while injected service reloads`：并列请求 provider/consumer update 时，同域队列逐项收敛，会多一次使用旧 consumer 配置的激活；固定上游将这两个更新合并。这是待解决的兼容缺口。
+- `Plugin inactive context`：清理期间的 plugin/effect/listener 注册均被拒绝，但当前错误为 `CLEANUP_BLOCKED`／`Recovery transactions cannot acquire new resources`，与上游要求的 `inactive context` 文本不同。
+- Harness wrapped fiber 的更新作用于实际 fiber，并有本地回归；上游 wrapper receiver 的独立四路缺陷复现仍需另行补充。
 - Service.check 重入旧值失效时不自动重新调用，必须由真实 notify 触发；通知环最多执行 256 次后报告诊断。
 
-这些差异限制“完全替换”的声明；需要逐个目标应用验证。
+本轮未修改上游的完整测试为 upstream 87/87、native 83/87，4 项失败全部保留在[原始对比记录](evidence/README.md)。上述 profile 与扩展合同不等于每项都来自该测试集。这些差异限制“完全替换”的声明；需要逐个目标应用验证。
 
 ## 同域外部变更事务
 

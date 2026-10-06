@@ -44,9 +44,23 @@ claims. Describe compatibility using a concrete observable behavior rather than
 claiming complete upstream parity. Update research/toolchain locks only in an
 intentional, reviewed change and rerun proofs, negative tests, and packaging.
 
+## Evidence and paper reviews
+
+Start with the [evidence guide](docs/evidence-guide.md) and the five
+[paper review paths](docs/paper-review-guide.md). A claim should identify its
+paper version or runtime revision, premises, executable call path and observable
+result. Keep a reproduced defect distinct from an upstream acknowledgment or a
+deliberate contract difference. Preserve failed differential results.
+
+When changing a referenced contract or test, update
+`docs/paper-review-cases.json` and run `python3 scripts/check-paper-review.py`.
+This index check runs in the development workflow; it detects missing references,
+not an invalid mathematical correspondence. Record exact commands and outputs for
+independent reproductions.
+
 ## Version and support policy
 
-The four Rust crates currently share unreleased version 0.1.0 and are developed together.
+The five workspace Rust crates currently share unreleased version 0.1.0 and are developed together.
 During this unpublished development stage, prioritize Cordis behavior and paper
 semantics; update callers and documentation directly when an API changes rather
 than adding compatibility shims for earlier development snapshots. After publication, patch
@@ -58,7 +72,7 @@ published, the latest 0.x release receive maintenance; no LTS commitment exists.
 
 The supported Rust compiler is the pinned Rust 1.98.1, also declared as the
 minimum package version. Raising it requires a documented toolchain update and
-the complete verification gate. The source repository is [Stool233/cordis-verus](https://github.com/Stool233/cordis-verus),
+the complete verification gate. The source repository is [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus),
 initially private. No public release or registry namespace is configured; see `docs/releasing.md` before distribution.
 
 By submitting a contribution, you license it under the project's MIT license.

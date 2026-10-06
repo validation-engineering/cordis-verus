@@ -84,3 +84,11 @@ owned child、独立 owner anchor、ready/retire/join 与 cleanup retry；定义
 | 剩余 typed Rust 接口 | 已接入新建/撤销 publication 与子插件；继续处理 effect group、每 Fiber 动态 injection config、更新 hook 与反向 typed JS 服务 | 同图 Rust/JS 生命周期与权限一致，真实子图及失败路径验收；保留现有槽位和 cleanup 合同 |
 
 跨平台制品实际安装、完整发布负控及宿主到论文的整体 refinement 继续按各自门槛执行。
+
+## 7. 可审查的开源证据与兼容缺口
+
+首组[证据入口](evidence-guide.md)已提供四路异步清理复现、英文功能/性能对比，以及五条论文到合同、执行代码和回归的审查链；映射检查接入日常开发门槛。它们是新增审查材料，不提升论文 ledger 状态。
+
+最新[上游差分归档](evidence/README.md)为 upstream 87/87、native 83/87。下一轮兼容工作应先处理两个新增缺口：并列 provider/consumer 更新的合并语义，以及清理期资源注册错误的兼容文本；先写明是否有意改变合同，再增加针对回归、重跑原样上游套件和 Harness 验收。另两项 committed publication 和 cleanup failure 的有意差异继续公开保留。
+
+运营验收关注外部独立复现、实际插件接入与一次相关修改后的重新验证；当前没有声称已有外部采用。完整发布负控、跨平台实际运行和公开前安全报告渠道见[证据指南](evidence-guide.md)。

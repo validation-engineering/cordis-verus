@@ -2,6 +2,15 @@
 
 从[英文 README](../README.md)或[中文 README](../README.zh-CN.md)开始。本文按用途导航；完整研究推导保留在专题文档中。
 
+## Evidence and independent review
+
+| Guide | What you can check |
+| --- | --- |
+| [Evidence guide](evidence-guide.md) | Claims, commands, evidence types and remaining publication work |
+| [Comparison with Cordis](comparison.md) | Capabilities, deliberate differences and performance tradeoffs |
+| [Lifecycle cleanup case](cases/lifecycle-cleanup.md) | One fixture across two pinned upstreams and two native profiles |
+| [Paper review guide](paper-review-guide.md) | Five exact paper → contract → executable path → regression chains |
+
 ## 运行与使用
 
 | 文档 | 内容 |

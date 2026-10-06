@@ -29,6 +29,7 @@ VERIFIER_LOCK = Path("/tmp/cordis-local-verifier.lock")
 FIXED_SCRIPTS = (
     "scripts/record-development.py", "scripts/check-development.sh",
     "scripts/record-verification.py", "scripts/check-paper-coverage.py",
+    "scripts/check-paper-review.py",
     "scripts/verify.sh", "scripts/toolchain-env.sh", "scripts/install-verus.py",
     "scripts/package-check.py", "scripts/build-node.mjs", "scripts/build-node.sh",
     "scripts/check-npm-package.mjs", "scripts/sync-profile-types.mjs",

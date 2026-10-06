@@ -1,7 +1,7 @@
 # Current status — 2026-10-06
 
 This is an experimental development checkpoint for the initially private
-[Stool233/cordis-verus](https://github.com/Stool233/cordis-verus) repository.
+[validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus) repository.
 It is not a published crate, a production-readiness claim, or a completed
 refinement of the entire paper.
 

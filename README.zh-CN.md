@@ -10,6 +10,8 @@ cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的�
 
 **项目状态：** 实验性、尚未达到 1.0。API 仍在演进，crate 和 npm 包尚未发布。内核证明、运行时测试与应用兼容性各自的范围见[验证范围](#验证范围)。
 
+本项目属于 [Validation Engineering](https://github.com/validation-engineering)，连接规格、执行代码与可复现证据。从[证据指南](docs/evidence-guide.md)进入实际清理案例、上游对比与论文到代码的审查路径。
+
 ## 功能
 
 - **依赖感知的生命周期。** 跟踪服务提供者的实际身份，直到消费者完成清理后才释放其依赖的服务。清理失败会明确报告，并保留恢复所需的资源。
@@ -26,7 +28,7 @@ cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的�
 需要 Git、Rustup、Python 3.9+、curl 和本机 Rust 编译工具链。安装脚本按照 [toolchain.lock.json](toolchain.lock.json) 选择并校验固定的 Rust/Verus 工具链，不修改 Rustup 默认工具链。安装器支持 macOS ARM64/x86_64 和 Linux x86_64。
 
 ```sh
-git clone https://github.com/Stool233/cordis-verus.git
+git clone https://github.com/validation-engineering/cordis-verus.git
 cd cordis-verus
 ./scripts/install-verus.sh
 bash -c 'source scripts/toolchain-env.sh && cargo run --locked -p cordis --example basic'
@@ -68,16 +70,16 @@ node --import @cordis-verus/compat-harness/register app.mjs
 
 ### DeepSeek Harness
 
-配套项目 [cordis-harness](https://github.com/Stool233/cordis-harness) 在实际应用中验证这个运行时。它运行固定官方版本的 **Web / standard** 和 **headless** 组合，保留官方 CLI、Loader、插件、前端与 JSONL 会话存储，替换其中的 **Node Cordis 宿主**。浏览器端 Cordis 仍为官方 JavaScript 实现。
+配套项目 [cordis-harness](https://github.com/validation-engineering/cordis-harness) 在实际应用中验证这个运行时。它运行固定官方版本的 **Web / standard** 和 **headless** 组合，保留官方 CLI、Loader、插件、前端与 JSONL 会话存储，替换其中的 **Node Cordis 宿主**。浏览器端 Cordis 仍为官方 JavaScript 实现。
 
-按配套项目的[构建指南](https://github.com/Stool233/cordis-harness/blob/main/docs/build.md) 准备已验收的 runtime 制品，然后在该仓库运行：
+按配套项目的[构建指南](https://github.com/validation-engineering/cordis-harness/blob/main/docs/build.md) 准备已验收的 runtime 制品，然后在该仓库运行：
 
 ```sh
 npm run official:install -- --offline
 npm run official
 ```
 
-没有公开依赖缓存时，安装命令去掉 `--offline`。[应用验收记录](https://github.com/Stool233/cordis-harness/blob/main/docs/official-validation-report.json) 覆盖默认插件清单、真实工具调用、跨进程会话恢复和关闭。验收中的模型请求使用本机 fixture；交互使用需自行配置模型。
+没有公开依赖缓存时，安装命令去掉 `--offline`。[应用验收记录](https://github.com/validation-engineering/cordis-harness/blob/main/docs/official-validation-report.json) 覆盖默认插件清单、真实工具调用、跨进程会话恢复和关闭。验收中的模型请求使用本机 fixture；交互使用需自行配置模型。
 
 ## 架构
 
@@ -99,7 +101,7 @@ npm run official
 
 | 检查 | 结果 |
 | --- | ---: |
-| Verus 全库验证，使用 `--no-cheating --compile` | 2,292 项义务通过，0 错误 |
+| Verus 全库验证，使用 `--no-cheating --compile` | 以[开发报告](docs/development-report.json)中绑定源码的证明结果为准 |
 | Rust、文档与 Node 行为测试 | 精确数量见绑定源码的[开发记录](docs/development-report.json) |
 | 解包后的 crate 构建与 npm 安装检查 | 在 macOS ARM64 / Node 22.22.0 通过 |
 

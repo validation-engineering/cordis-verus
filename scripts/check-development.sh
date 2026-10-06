@@ -11,6 +11,7 @@ elif [[ $# -ne 0 ]]; then
 fi
 node scripts/sync-profile-types.mjs --check
 python3 scripts/check-paper-coverage.py
+python3 scripts/check-paper-review.py
 python3 -m unittest discover -s scripts/tests
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings

@@ -1,8 +1,8 @@
 # Release procedure
 
-No release has been published. Both manifests intentionally set `publish = false`:
+No release has been published. The workspace crate manifests intentionally set `publish = false`:
 the repository starts private at
-[Stool233/cordis-verus](https://github.com/Stool233/cordis-verus). Registry names
+[validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus). Registry names
 and a monitored security reporting route must be confirmed before a public release.
 The initial GitHub source snapshot is a development checkpoint, not a release;
 see [current status](status.md) and [validation gates](validation.md). In particular, the
@@ -41,7 +41,7 @@ paper copies, and build outputs must not appear in them.
 
 ## Maintainer checklist
 
-1. Confirm ownership of the public repository and both registry names; rename
+1. Confirm ownership of the public repository and the required registry names; rename
    packages/imports if needed. Set real `repository`/`documentation` links and
    the private reporting route in `SECURITY.md`. Enable private vulnerability
    reporting before announcing a release. Review the selected MIT license and

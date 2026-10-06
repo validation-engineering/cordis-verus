@@ -1,0 +1,1734 @@
+{
+  "schema": "cordis-verus.upstream-core/v1",
+  "profile": {
+    "name": "cordis",
+    "version": "4.0.0-rc.10",
+    "revision": "f8ea3cd50f1a5724e8e715995bcde131c9c12b2c",
+    "tree": "f9e330f9e3d195aa47323b0857ef67c79d0bfac9"
+  },
+  "node": "v22.22.0",
+  "runner": {
+    "name": "vitest",
+    "version": "4.1.11"
+  },
+  "upstreamSuiteCount": 12,
+  "sourceEdits": false,
+  "traceNormalization": "none",
+  "typeOnlyTestsIncluded": false,
+  "inputs": {
+    "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750",
+    "package-lock.json": "6050902d2b9774c16e6787cd464fd28803992050559b87c1d1fc2d7358fce2ae",
+    "scripts/check-upstream-core.mjs": "6e8e57118a2b8b737173250ab5e2fdb58339e66a3eb59d5bad2ad309024e266b",
+    "tests/upstream-core/vitest.config.mjs": "72768d8a76f4b37bab25c7877694a967766e42a7e06aed69067cf1a993081403",
+    "tests/upstream-core/evidence.mjs": "e730e7ce2db560ed45490b5d1b8a4f5cd73822a5bb9fb27d08226ee42fe86eff",
+    "upstream/cordis/packages/core/src/context.ts": "118a4e9befb99ee7e00cce78f3210b34e1d039ea11c2abd1484a4ae00b937528",
+    "upstream/cordis/packages/core/src/events.ts": "b632a0b2ec033aca9959679dd823036f9f9ecea868464dc9274b54f383baf6da",
+    "upstream/cordis/packages/core/src/fiber.ts": "0aafd697050aca1a89a1d3a301429a0abb7399089f50d73fa478d1a40973e12a",
+    "upstream/cordis/packages/core/src/index.ts": "a596f3da4463411079c96921c0e8b3ca480140b5096f434a20213ebc425abe83",
+    "upstream/cordis/packages/core/src/logger.ts": "074a9f1a5fa84a6da7724de7fc04707bc007fff7185650149bb32342d3bddb8c",
+    "upstream/cordis/packages/core/src/reflect.ts": "53fbc89517a73c080d9c387f46d1b24aa317ddf2cdd63a04750149820c299e1a",
+    "upstream/cordis/packages/core/src/registry.ts": "258d0d5408be00a651701363296d9af9f4cfda02450c11143e8da402fb9c845f",
+    "upstream/cordis/packages/core/src/service.ts": "6cd699bf7ff394d74250243795b080c1cbffd6759767cd238c7381fbe3357cfb",
+    "upstream/cordis/packages/core/src/utils.ts": "0b92ca0feb7587cde8f0a33a5b7b45f4bcca6a483e1f2c4de2acfbb38aa6f73f",
+    "upstream/cordis/packages/core/tests/associate.spec.ts": "19ccff1261affc77d237b01ab3ba4c46566b3abe9d0b9db59998374836da012f",
+    "upstream/cordis/packages/core/tests/decorator.spec.ts": "3ff2f48fcdc0df7b88c865ceeb9bf2b7e238af781174425c661ad4145ed13868",
+    "upstream/cordis/packages/core/tests/dispose.spec.ts": "da0228ae703f551cf14dbeb7de6a18810a49840256b64618ed693ae06039d735",
+    "upstream/cordis/packages/core/tests/events.spec.ts": "821e4c8e81e712c41a5d17c2c15a2edb87a1a64f6b375fd188cde65aa23c95c2",
+    "upstream/cordis/packages/core/tests/events.types.ts": "b886f78edbedebb5854e4204328f84063249ffa8f34ca1ddb6fde6f145df5bcd",
+    "upstream/cordis/packages/core/tests/fiber.spec.ts": "f346b908d1cf9d0fdb0d33eca019f1e22483fc4c0a6af065cdaf0d3ee496a688",
+    "upstream/cordis/packages/core/tests/invoke.spec.ts": "550ef2e880587cacf2708d677f03edffd63390bce394b51176f7af0f4247c460",
+    "upstream/cordis/packages/core/tests/isolate.spec.ts": "dcd9ada046c1c10846db9ff3011642cdd4188dd22b2f3d2257f88db1a1c9a589",
+    "upstream/cordis/packages/core/tests/logger.spec.ts": "8839ec08d35d322c6b13d445b097e6f5a1be87821d5e4628ae7c161a74eaa37d",
+    "upstream/cordis/packages/core/tests/plugin.spec.ts": "c2600e58732f2bc16ec69c59b8f672d506778a20c16ef668419bbfacccfe0a15",
+    "upstream/cordis/packages/core/tests/reflect.spec.ts": "72e4a35944d9b5da65452f98e756b1b9e96772cbfc5576a83f8391f6f875700c",
+    "upstream/cordis/packages/core/tests/service.spec.ts": "4cd5e5b1fc99c2fdc08936aab196d5efc86902255be3638cfed2ef6d6893dfbc",
+    "upstream/cordis/packages/core/tests/shadow.spec.ts": "8af0ee1139eb9b5143e51549c50af5dae0dab08d70c014ae1275f48555164dc5",
+    "upstream/cordis/packages/core/tests/tsconfig.json": "551953ddbf04b7fab6d8f3e53d1d4cd7c40faf2a942ccef9e00652b814750172",
+    "upstream/cordis/packages/core/tests/utils.ts": "3691efda1d95db62714fd31175a66d83f4586cb97a7645bf6945dbd52fb3b910",
+    "packages/compat-cordis/bootstrap.js": "7426c8ee90208f6e8b4fb71ba16a4f3e56d585aae34338611598bcd870cef58a",
+    "packages/compat-cordis/context.js": "3a61e26a148c143ab30b8a0d713fb6ed8f128929c5a8dc741a7cd3ead10e1623",
+    "packages/compat-cordis/events.js": "46d70717c10cb19238c8317157682a5c25e35c9df122b9deb0b185d48dbceb19",
+    "packages/compat-cordis/fiber.js": "641b2b6de00979d76da09ba36fe4f7fe970d283195d44ff461b1415adc3c12f8",
+    "packages/compat-cordis/index.cjs": "2b45c88302dc0c62819d4008f7c54770f770ac79446e0452ae16052c87ab8149",
+    "packages/compat-cordis/index.js": "b56320ee4db3d5d5cca8390c38f6fd5102b6473be7b315e1c6b8364f001987d0",
+    "packages/compat-cordis/logger.js": "7ce249b305df994dd7cc0bb1add6edeae476dabea2ada558ceca8611cabb3dda",
+    "packages/compat-cordis/native-artifacts.js": "7ff966b24eaff87d218c42c20eb386e27f6051a313cf7b71c81c12bac2a05780",
+    "packages/compat-cordis/package.json": "908a186ab1789ea4826776ef583891d64e88c9b528461e1133102900a4c87846",
+    "packages/compat-cordis/register.js": "b9625922ce2224339433d17e26396395e5a7d359a736a0684e6ef88e1fa9663b",
+    "packages/compat-cordis/runtime.js": "cd38c21466bcf7ff7051722cc7a2e91fd61990e58e72a89abba13aa14ec99914",
+    "packages/compat-cordis/rust-objects.js": "27e78ac7d8ed19ae419e3ce9d8e4a588a0466b86438463b006a8effa3f19abc2",
+    "packages/compat-cordis/rust-plugin.js": "3446dacc56326601af2833ea2e8459e95b9e606cd621d713b801146052d063de",
+    "packages/compat-cordis/rust-streams.js": "28a9f4df4b23469f00dfbc14c8b8bd3a9c67e319698c75db2537bcd05bb77692",
+    "packages/compat-cordis/service.js": "3413bdac5920898c59f401afaa1a93e6ed8d61c1cd728b0a313062a8626d10ee",
+    "packages/compat-cordis/support.js": "f6b2007bfc0badbdaa0e122c50f41386e482b82e227f9d6b81eed2a297143634",
+    "packages/compat-cordis/utils.js": "ddf4ee17f1b03b5ca11836b23c73143bdb4fa81622425176b4cea583e05d4493",
+    "packages/compat-cordis/native/cordis.node": "6ab82f13c93ee53a0d52b9a4850e173197469b78c02205c986d9891eb1ee662b",
+    "Cargo.lock": "247d4a06cb349ee660db78f1c5120b742e2c983cde7773eb055707e4fda0e8cc",
+    "Cargo.toml": "9449e122e21d691379418f5775a54a1bb1e21a669a7ae48e402e8bacd9936fc7",
+    "crates/cordis-driver/Cargo.toml": "8ca927dfaee34158e4efe4029b81e4504bdb506e114baa2a388b5d10ba1ececd",
+    "crates/cordis-driver/src/availability.rs": "cb5c256dd1c39a40c49629345f2b7c196500126f55c142ba3ce5b87e26e6b60b",
+    "crates/cordis-driver/src/lib.rs": "922e81d6b79cd394ccf0d3ff38613f3c3a303345ae44a1f0fbd3065c47016e2d",
+    "crates/cordis-driver/src/protocol.rs": "45a63a88371bc19bdb9772e28680e765b8fe72e6de355c80e1afa5d9790bbbf9",
+    "crates/cordis-driver/src/shared.rs": "65dc8a5a6233cefccabf58a4b0f5e55ba4b334668cafb31b018b34dc510e7a3a",
+    "crates/cordis-driver/tests/check_protocol.rs": "ba46d0fb3fc293872044731a2c99b13063b7f2ba12d481cbc1f010b765df455a",
+    "crates/cordis-driver/tests/committed_reachability.rs": "cd0f764c454369ceaa6634b536b080f14453058015bbc71620b599440c1ffe57",
+    "crates/cordis-driver/tests/episode_failure.rs": "a96c95fe891cac62af45acb39f0a0211caaba29482bbf9ca6b1f2dc298a84a8a",
+    "crates/cordis-driver/tests/native_driver.rs": "56b596830e9abecb07e515e3e41d266ae1b923e584766660757e095d6e9efdf8",
+    "crates/cordis-driver/tests/reservation_effects.rs": "a8dadadad0bb34bf62f6484290c02e2d79c58133ddbc8a6396492541b99b7b29",
+    "crates/cordis-driver/tests/shared_lifecycle.rs": "0f3abc8ed5eb183820530b5d2145c294da47f5682d4cbe496144df3c26f8fc4c",
+    "crates/cordis-kernel/Cargo.toml": "abe2c70a90f0de345f122d4b0e1990acd10e71238106afa82ecea6712148622e",
+    "crates/cordis-kernel/src/action_ledger.rs": "3515900b8d86ce890a8e06901710241af0d6054844e1625f52f46e1294cd0820",
+    "crates/cordis-kernel/src/administrative_orchestration.rs": "6793dc4b8d003f29862d7df8696555639467c1fe44339e380534838c0aca2a50",
+    "crates/cordis-kernel/src/admitted_fresh_driver.rs": "de04d282e983c4ea680c4df999c123bba20648ac1538e8bdf65cee693d9047e2",
+    "crates/cordis-kernel/src/admitted_script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
+    "crates/cordis-kernel/src/allocation_inputs.rs": "b3a25966f428ae318b4fd7a42122de6179b901c41757c38146c8f90608ca5b55",
+    "crates/cordis-kernel/src/alpha.rs": "f453c4b6b3ee72e09763193c3be749242bc906f70f2d3921f737a2f7ce3a89dc",
+    "crates/cordis-kernel/src/calculus.rs": "c8873eac61e9883cf4c72922e395b89558ee25a361eb72e9f0a7f609a14ed790",
+    "crates/cordis-kernel/src/canonical.rs": "c1726a10742fb7396cd566b2b913181908fe87e1a77f4f1086c630b311f1483f",
+    "crates/cordis-kernel/src/causal_normalization.rs": "2f21f76a87f7c87b29df69674f2290a2fafaaf98aec686c71ce3b5946b0e3639",
+    "crates/cordis-kernel/src/child_driver.rs": "dbd018c49d1dfc7350bcbb33bc81068ccdd05543eca4df25b00e6f1a03f19348",
+    "crates/cordis-kernel/src/child_history.rs": "4705af8d5c1304c4d7b763ab8124c762045937963599938fddaab6fcf67598a4",
+    "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
+    "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
+    "crates/cordis-kernel/src/contexts.rs": "72c32f067433e1a64e7e4196cb12c0ba5f7eed0d4d9f77255e57d58c7032aec8",
+    "crates/cordis-kernel/src/deletion.rs": "1c44e19ce407f69e7411bb7ac2fc29940471c350020e60bb1bce462a0d9cbae3",
+    "crates/cordis-kernel/src/dependent_grammar.rs": "89016e4db79a21cff12b24aa73b1c3d03852cd931c4460e35e98914b0988629d",
+    "crates/cordis-kernel/src/dependent_independence.rs": "bf4fa296cef98066b9e3903b36455598fb7bd47201d5f62b496dc9b139d788bd",
+    "crates/cordis-kernel/src/dependent_independence_example.rs": "e30a431798dd92ac4e64dc3cd8659f3f3cb5a64001bb04b506cef16e39d2f41c",
+    "crates/cordis-kernel/src/dependent_lift.rs": "a7027a087915d476f41fe34a21ab2f148e52c0d1c57b08389dda8a15abe377d9",
+    "crates/cordis-kernel/src/driver.rs": "e9944c7b5d09f2c440d374ec8a0a37c834a5977c763418f4ca781673e8b3b194",
+    "crates/cordis-kernel/src/dynamic_table_deletion.rs": "9692ad12a7a5c546a86806b9f515676117d953eba45d795be634e850a11186d8",
+    "crates/cordis-kernel/src/dynamic_table_deletion_example.rs": "238a5f3daf21a4686ce82a8e03f4dfbf4f09e0cd2d8ab9acdbd6df226d79329c",
+    "crates/cordis-kernel/src/dynamic_table_registry.rs": "d252c00bcd3e60cfe77cfebad2862cf8c0260915db77858a2946e3e9cc36122d",
+    "crates/cordis-kernel/src/dynamic_table_registry_example.rs": "b3f80dfbbb905a958b345d83e9f87aa6ec5f599dc99f670b937b859777b513eb",
+    "crates/cordis-kernel/src/effect_realization.rs": "ae12b213f3cb9827e2213c436b0559f3681ba44937f95489cf218d65ba8cc021",
+    "crates/cordis-kernel/src/effects.rs": "2fb10d958faa7a3e3b4a53050599e96db22328a5b3bc09269bbe492eb9e94672",
+    "crates/cordis-kernel/src/entangled.rs": "ff5e821b638bb9153c34b2357f7614f7a8d4254a674bb74cfdecbcdd1b252080",
+    "crates/cordis-kernel/src/entangled_loading.rs": "9a0585f2be02be2c09b6c4faabced9448ec1ffddde7616d066ca78de20578ed6",
+    "crates/cordis-kernel/src/episode.rs": "252a9cec3ec9a3bb3581e61e21cf9f01a8f606d635e8e826aecb27e8f6f756d9",
+    "crates/cordis-kernel/src/external_inputs.rs": "a7491019af25e1d647220f5f9f0d649d197541d6336cb44072151d2a1425ebfb",
+    "crates/cordis-kernel/src/foreign_child_deletion.rs": "2e2f58d8f2d8ba97c5dd6b1f2426b5fc821605e5b3f8827b0d2ccf550c08b988",
+    "crates/cordis-kernel/src/foreign_child_deletion_example.rs": "d3fc5d4a699ccc049a8722e8b544b1b715a00ef1191590ad2d92ba1233b52701",
+    "crates/cordis-kernel/src/foreign_child_transport.rs": "2946519aa289c6677fa48ea44c05cd710a9bf29dcabec2bb62f8a8a3e388755e",
+    "crates/cordis-kernel/src/foreign_child_transport_example.rs": "dcc5399bf25f778e4d6beb50100ff77715e9f6cbb2a83ce94379cc5f2640266e",
+    "crates/cordis-kernel/src/foreign_provision_transport.rs": "5b837c2c97458a940e52d0717bd7509fa296c3d29083f72773a0b5fbfc5357b4",
+    "crates/cordis-kernel/src/foreign_unload.rs": "c1e07e10f8eabc5fa48750c5249528be377bb68ef25d6a3264cacac5ef7e003f",
+    "crates/cordis-kernel/src/foundations.rs": "0b19e7afb7855da5312dc63a4303e26f6716159e57b41bd62ffa511c7aeb316d",
+    "crates/cordis-kernel/src/fresh_driver.rs": "2295f9218a8dde8c644d86dcd98fdbcf8e088e7f65664ec1de8407458de20941",
+    "crates/cordis-kernel/src/fresh_equivariance.rs": "e9074e2b56d1d130948d2af396bbb50b3e85e81e719c7b866c9456d223315227",
+    "crates/cordis-kernel/src/fresh_grammar.rs": "cce7d43aa00a054a75dca28403c03f8891bee70f9d7a346d79575e103627fce4",
+    "crates/cordis-kernel/src/fresh_semantics.rs": "26826a984ca805e003b6a996fac17d8b8dc4f5f15d7df2a91a14917295dcfe63",
+    "crates/cordis-kernel/src/functional_quotient.rs": "db95c1c293848d7eb280d04f5f2540c9365804d0c819c5957cb23544f6be37f0",
+    "crates/cordis-kernel/src/generalized_table_deletion.rs": "45cf8f559d5fb854fbb5a2ca02cdd08f4236357e4aa8a67569ee9f9217eabf85",
+    "crates/cordis-kernel/src/generalized_table_deletion_example.rs": "159dd24027cb18adeea3d0bcc9026e282f8f87a87aa308349ea23d25635f3f91",
+    "crates/cordis-kernel/src/global.rs": "bc49325a37fb08efae55dc7b1242a8310805ba924e796697c21ff0925aaeae2c",
+    "crates/cordis-kernel/src/grammar_lift.rs": "229713b5eba33d6a7d9685a676f7b29abd8a8cb1ad75685cd082a5f0aa2c9282",
+    "crates/cordis-kernel/src/grammar_ordering.rs": "858f856575fba13cfebd6a66056ab47afb0560db9675ac0130d071ca8504abd5",
+    "crates/cordis-kernel/src/grammar_recovery.rs": "4dacf54db0501a1ddf1af27fda5cd31255eed527bbd17aac587dec3039227f82",
+    "crates/cordis-kernel/src/guarded_child_domains.rs": "40ce966a9d9ffbab8ec11182350767a5c824bf50df0abc3909b1a36332b5983b",
+    "crates/cordis-kernel/src/history.rs": "c20f5087d8634e76fdeeeb222a352cec64d61d948dce8b998645df8768aa462d",
+    "crates/cordis-kernel/src/indexed_ordering.rs": "5a920dc64959e98027faad54c8604404fd93aacaeaed027400f59070d3702dbd",
+    "crates/cordis-kernel/src/interface_observation.rs": "4e97e34839281d27aee6ee463cfbb4bb9aa0474c4faa470eae1bdefe04d21a07",
+    "crates/cordis-kernel/src/interface_observation_example.rs": "e663ec059cbcf0450f4d527ed70194cec2b400ac3252b2b5218caf15b43a3e88",
+    "crates/cordis-kernel/src/internal_old_unload.rs": "7e071cbad6376f5053e2ddbb489d2634a840ac20c5fa5f0021c6ec551844e0ac",
+    "crates/cordis-kernel/src/internal_old_unload_example.rs": "1a422b72714f5e1cbce8afba7cec6f23967fbd00621f9cc323da1d5b82402054",
+    "crates/cordis-kernel/src/internal_table_unload.rs": "c389c7775c1889e9150333414d50ed96a70a6c2ceb3d0467f80ea8a3c30fd1ef",
+    "crates/cordis-kernel/src/internal_table_unload_example.rs": "825233c6ff3f4e10e0a714f955b6e828f4fb602d771398b51f6b96ba91a3e884",
+    "crates/cordis-kernel/src/isolated_deletion.rs": "851afcd76c1303873d8f40d2f5b0e0ac6ef05da047a3211366c4620a8a6b47b7",
+    "crates/cordis-kernel/src/iterator_bridge.rs": "3521e908dcc6a47c54470e8b8b8d967693a151c78061a8b3ffaa5e88c0554ac3",
+    "crates/cordis-kernel/src/iterator_independence.rs": "95c2c384036c43048b29023d26d076a0113c4cfa1cd778b5a63fb04c3d8e57dd",
+    "crates/cordis-kernel/src/iterators.rs": "1c3bc0cee83d69e2140354e51613ce6033d53171fc71b912ad682b234118f92d",
+    "crates/cordis-kernel/src/lib.rs": "08120ccbc034346ecb3248c32e8df60ec3b8575ffd34d535fd0fe3a9d4145262",
+    "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
+    "crates/cordis-kernel/src/mediated.rs": "c63d88166e35070b1f14d99b12f32b39daa4c714ae7ac500227dd0a8aa948f67",
+    "crates/cordis-kernel/src/mixed_age_unload.rs": "1418ae76432a7c171f0a92e646210bc31948f0ef189ada174443716ef766fe1d",
+    "crates/cordis-kernel/src/mixed_age_unload_example.rs": "c04c9fe655c154e8f107e04b6ed76f149685b0e1b10b13d8f7f728fabd1c4e43",
+    "crates/cordis-kernel/src/mixed_driver.rs": "a520f60d1d5aa378d210cf41ae7c90d6f3cdf5ad8c58b6a86c6c72ccb773ed53",
+    "crates/cordis-kernel/src/mixed_examples.rs": "c397fcc35928dfea1ced7717dcf01ef07714d35ad889886ecb7c02cfeb686131",
+    "crates/cordis-kernel/src/mixed_foreign_restore.rs": "baa61e793f0b92d38507215871a25779e1e2652c1169384fce6838742f733749",
+    "crates/cordis-kernel/src/mixed_grammar.rs": "ed9faa272b0f6dc9f1cdf739458ae1902c353ba190bf9d5ed60b622b153aa1ab",
+    "crates/cordis-kernel/src/mixed_iteration_exchange.rs": "94d88f2cd45a81bca3b793ff6425d11f11a5b225aa9101b6b9931c51eb9ee95b",
+    "crates/cordis-kernel/src/mixed_observational_runs.rs": "59b2420ccb4e816d857dc91b61a56dc49e31aab92a7860b08a8c5c85cea95ee2",
+    "crates/cordis-kernel/src/mixed_observational_transport.rs": "1c33c71c173ac67f12dbc711b1af0187dc56a4399cbe79b966b6b3b55cbfa385",
+    "crates/cordis-kernel/src/mixed_orchestration.rs": "4e296ad62b04d8b1b28c222dd642f83502fd978967e2c38a442e96ac1789b190",
+    "crates/cordis-kernel/src/mixed_ordering.rs": "af602a8fce022da5ff2d321e8a3940648ddec65e22253145dae375908a90d67b",
+    "crates/cordis-kernel/src/mixed_recovery.rs": "619c23e25559d01857e571727645f95ba4a484298fd470194224853fff8392e4",
+    "crates/cordis-kernel/src/mixed_syntax.rs": "20e09717be841c5b8b3736e873a199c5ec1166765c051fc1e2ef18159dd7519e",
+    "crates/cordis-kernel/src/mixed_transport.rs": "f0b6fe307377fac26e96f6a738ff09206856e8914c5cce52d84e721342a7eb1a",
+    "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
+    "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
+    "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
+    "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
+    "crates/cordis-kernel/src/observational_examples.rs": "212fba2609c8823aa12c9c1484aa7e877f38654bf879d4d3823d736aa27952db",
+    "crates/cordis-kernel/src/observational_execution.rs": "be89fdd73e9e398d5327ca1351b29f17d9ac395aab9e38e93eb41ad7a639da0b",
+    "crates/cordis-kernel/src/observational_grammar.rs": "c3724c31751c622ed4dd969e48be6c8fb3f72855717d82ebee4302481159ae19",
+    "crates/cordis-kernel/src/observational_lift.rs": "d8721aa7b7bebe32d814783c2b4af1e871d61a8068d169937bc3f022da0d7950",
+    "crates/cordis-kernel/src/observational_permutation.rs": "57abe81c05c5c58275065eb93ca7cddeb55b01791913b665fc856d5bdbe78748",
+    "crates/cordis-kernel/src/observational_recovery.rs": "74130d3d2150b03058c998ea7edd6d7c629ec3d8b5e6e5225c793937a2c9d4b2",
+    "crates/cordis-kernel/src/old_journal_closed_example.rs": "2c9e5cdb133f331eb326dfb39c1ed1ff16e976e96ede35994c6d49ad6cd3c690",
+    "crates/cordis-kernel/src/old_journal_closure.rs": "f56357f039066684c48bb54baa364f08dc6df491e7eb4d3a29a61280ab10fa31",
+    "crates/cordis-kernel/src/old_journal_examples.rs": "32bbc2026b8ae7797145a1c8efc1c77473ad7c240179050ebdc08010bad6f42a",
+    "crates/cordis-kernel/src/old_journal_interleaving.rs": "c9e7b3d9e834e27a6dab893a3ac9783db0cf7ea76142f6c9fdad970cbfaa7c43",
+    "crates/cordis-kernel/src/old_journal_interleaving_example.rs": "5328e56022ab5fc3cf65617a21c3beaa94f4af1ffaafcd2ae817c8736923b4dd",
+    "crates/cordis-kernel/src/old_journal_unload.rs": "706948f6ee80ffc326d8ecefe567e54f826a245c16f348bf5529a6638855db69",
+    "crates/cordis-kernel/src/old_provision_journal.rs": "62096cda7b70c467f7ce7b80bf0e75a6680fb229b35f23480beca08d9076e1f7",
+    "crates/cordis-kernel/src/old_provision_journal_example.rs": "2f8a892bb36ca6528525ed87e19314c65d810a75fb8238c7788e6f68a7aacedb",
+    "crates/cordis-kernel/src/old_provision_support.rs": "e00f9d8beba56a9486c09900d337ef6a27e92688a41e1fbc51aba78ea010863c",
+    "crates/cordis-kernel/src/old_receipt_support.rs": "400dbfce63c0c1c56c7422c2d7b57d7378b50945f584cf4d480443dde535a3e8",
+    "crates/cordis-kernel/src/orchestration_support_cycle.rs": "16406acf722db08876eec71084f45723eae6a8db754dd14c69a3f53d59d58d47",
+    "crates/cordis-kernel/src/ownership.rs": "02bb157bdf63254bbc146d7561762fb3d605a550efa9e3f972dd4bc4f6b4aeda",
+    "crates/cordis-kernel/src/paper_components.rs": "39d2bc1c7419a582aa40348ae278785264dbf27f24d67ed54550df5a54a1b45c",
+    "crates/cordis-kernel/src/paper_confinement.rs": "13fd2a182c446945cac1b756ec08852ae63f3b01426aac1231bca58741513887",
+    "crates/cordis-kernel/src/paper_counterexamples.rs": "064abae9ccd2c02d76314c052162279c6bf095e4fb878540a2b803d39dcc0732",
+    "crates/cordis-kernel/src/paper_instantiation.rs": "eb6cdb87c62ed8349111b6015da7374b6386614fecc3bd4439d191a6941c8f63",
+    "crates/cordis-kernel/src/paper_invariants.rs": "84be535a87dd7808ac90460c20778bd3fd6696882d36576c3953ae5657e21de2",
+    "crates/cordis-kernel/src/paper_observations.rs": "cbb227b44365f700c39e8d97d302832ddfee2f55a910cb5e0c111812f370ab9c",
+    "crates/cordis-kernel/src/paper_trace_independence.rs": "342ffe28831122c2df4ade7da60a3517e9e7396a45da320c09b3f3317b61d1ec",
+    "crates/cordis-kernel/src/paper_typed_context.rs": "0e6f50d6073c7125967559d3d9cc4c562eb1c8b674dfaa71f54677458625444f",
+    "crates/cordis-kernel/src/partial_domains.rs": "0f88ff591367886d93e0cbb3c41ee0ecf98bdf664610bbcba2844d9d8c8bfa8c",
+    "crates/cordis-kernel/src/partial_independence.rs": "62a65b3a4afc82fb09f77f4f132023737bbb994fc8a2d3981e7d4528d609f596",
+    "crates/cordis-kernel/src/permutation.rs": "484a6976b16420a050c69388ef8cffba65e7771f1bf844da5dc377f844b32f19",
+    "crates/cordis-kernel/src/preservation.rs": "e15e6c12384c80ac100bf8812f35f01cd14285e3f561bfe737be2dcbf37e4b4d",
+    "crates/cordis-kernel/src/program.rs": "ee0820a1ddd6ba6d8b172b29e1c1ebf145b9d95691dff6ba9b175e8bdd9bccf7",
+    "crates/cordis-kernel/src/program_normal_form.rs": "d6c5bfbf6ac588080370d76950a563bbf3d60e11fda0ef8ae51b02c69a223cb1",
+    "crates/cordis-kernel/src/program_refinement.rs": "cef2120d184d37ed6412e8a4a18a848a8856d95f1f959e5b635999e1868f9174",
+    "crates/cordis-kernel/src/program_trace.rs": "6295d76bd6b1b7f1f95e6e2c6173cde0b9845e89f8350255f369624a5c2c9a2d",
+    "crates/cordis-kernel/src/progress.rs": "46fdb8931d649daf8870ceb757b2f1bc9581b39c5e9eee1cb9ff4e8be80414ca",
+    "crates/cordis-kernel/src/projection.rs": "2af0c9ed9f8fd7e4a28b327e2e50a795aa3144dc913f2e3e4fa30f7f35234593",
+    "crates/cordis-kernel/src/providing_owner_deletion.rs": "ff6abd0adbf51a0d7577f7b535e7eac2d84607a971843098280349f94e7d2a33",
+    "crates/cordis-kernel/src/providing_owner_examples.rs": "9a834d887a3f471eae7af212da017ace137171e26a23e832da80c1820f789440",
+    "crates/cordis-kernel/src/providing_owner_execution.rs": "4b04784b13630dbaa5267601e44bc5d6268e60d8f4c49a076c9dbb0386063b6e",
+    "crates/cordis-kernel/src/providing_owner_transport.rs": "5854946bcfd3b6204537532a48c7fd37771cf1538d4ae85123b7cb130d3f707a",
+    "crates/cordis-kernel/src/publication.rs": "306318a377609e2048d803cb1b1f305ec1fa276d7504e270144f4397bd466325",
+    "crates/cordis-kernel/src/quotient.rs": "295f0fa31f3ff1c7e18145ae8141c043dfcb5d4d90508073e72444dc6040b3d1",
+    "crates/cordis-kernel/src/recovery_examples.rs": "9414a8b078f0b9e616b363dd6d411d091b55d1915554b058cc30b016ccc0884e",
+    "crates/cordis-kernel/src/recursive_context.rs": "a032537ab661dce5392226e43a3174ad83f660008198084beb7d84f46cf955bc",
+    "crates/cordis-kernel/src/refinement.rs": "73bb8eed7ab88cf9d4556bb6fe308d1d1c436ab42de799046a5799fdc5cf60e6",
+    "crates/cordis-kernel/src/resolution_completion_counterexample.rs": "c7449f9259095cd1b9232e75c849e0e797cd109d0fac95f255fc7550bc8c3281",
+    "crates/cordis-kernel/src/resources.rs": "47b0fe33ab7bab13ea6ffa28e66cfbc73a459ba6ee8c2ab4e263fdaab4010447",
+    "crates/cordis-kernel/src/rewrite_confluence.rs": "def51aea34c8d19d0f2fd8ad5e1c5e147def31899128ce4f2a7e15c74eac0b9a",
+    "crates/cordis-kernel/src/rule_frames.rs": "e34f0f98702955cc99775c106e04c6b0ba12066a1ffe1106d3ffabdf5f7b6055",
+    "crates/cordis-kernel/src/selective_foreign_recovery.rs": "ad3c486c96920e0875bbc7f2a01af7c6a3e5aed7f637b7ba0469034481fca7a5",
+    "crates/cordis-kernel/src/semantics.rs": "5f8435c400d8272af930db537a3ae9d21adb027baf1cb9cf9397cd0ae4cee423",
+    "crates/cordis-kernel/src/shared_execution.rs": "7881a86204f4e172116aa11c7c419c26ee0920a7a84b513c58d1536902ddc70e",
+    "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
+    "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
+    "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
+    "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
+    "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
+    "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs": "21681292c6c7a568b2e40c6bb4d1fd2c7f7c7254bac0aa93f47fa5fbccf030c3",
+    "crates/cordis-kernel/src/strict_partial_quotient_example.rs": "e82014c379ae642a03b0608df261321f609c2b736b69d86fd46e04c7827aa2d2",
+    "crates/cordis-kernel/src/strict_partial_quotient_per.rs": "8f057c24cc527ba518aeb8539a5b68dcfdd8290ecf9e854eb7d6f93eb3c896a8",
+    "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs": "ebe8a3e72554a588d36ece0fa6448e645d8b2828f8568e12458d5b4f4dbbe421",
+    "crates/cordis-kernel/src/termination.rs": "584437e136782e356eb6b4e959e33772e9248e5c3464bb42d1530e1b860f8e5e",
+    "crates/cordis-kernel/src/unload_orchestration.rs": "df1c85da2daaa83e2ef3a6b9c9e01e5fe723ee5f01c553cebce06258b70ff570",
+    "crates/cordis-kernel/src/witnessed.rs": "fceb6532bdcdeeefa3eed198073baedd824fc65b1b598d0dc2d1dd3107e95956",
+    "crates/cordis-kernel/tests/admitted_fresh_driver.rs": "8724f48d0f8cc610a05807f2da438a08ae0f2a871c059455e4395066c427d707",
+    "crates/cordis-kernel/tests/admitted_script.rs": "ef1aad8d98e5cf4cbec4b4788329b79dc5f075c74aea04f06c3ce4df88e31797",
+    "crates/cordis-kernel/tests/child_driver.rs": "9cf7ed234fd268cc5ee2cb362fe547b21912c97ae2c5393e319d43dc5c628a47",
+    "crates/cordis-kernel/tests/compaction_equivalence.rs": "7127fffe4ca9cea73ae50e2bbb8af2f3b089967ae7ff868781907c8b4ac86cb8",
+    "crates/cordis-kernel/tests/driver.rs": "22088bc0a082c88efded80f5871d027aecda4aa6f1899a268dc2ebf5b92298ba",
+    "crates/cordis-kernel/tests/episode_identity.rs": "3d6f6c3022faf0fa6db3e74d2d3db127b2f8c857d916440cabb0022655f7710d",
+    "crates/cordis-kernel/tests/episode_protocol.rs": "fc1987807de8de5183df0f3c29a12d79945ddee563382a6a1fa2015c735002ff",
+    "crates/cordis-kernel/tests/fresh_driver.rs": "ab9f9aff9b7528204526b31ce0381b4b0eefdf678d4aeb98198be691a7bbeb8f",
+    "crates/cordis-kernel/tests/history.rs": "1da6df0ca8359517bba4befd0fc61877e664bfc7aafda5caa1afa4b2b9b625d9",
+    "crates/cordis-kernel/tests/lifecycle.rs": "06448b7ab2443bd7ba39da106a1d2254d06d2a74c5e3fbe482fde7bf701e79eb",
+    "crates/cordis-kernel/tests/mixed_driver.rs": "3ffe364dcebac8e00c7f578e25b72d143cc652937dd56f9ef8c8e30624723837",
+    "crates/cordis-kernel/tests/native_action_ledger.rs": "4579697c48c766f087ec8dc39537cc96d3f13e128eba5b26fbd0588af8d00094",
+    "crates/cordis-kernel/tests/native_publication.rs": "e099052fa203b7ef43b254819194237e24c2eedbec8534984031b7fbdf95e27f",
+    "crates/cordis-kernel/tests/ownership.rs": "9bc750ac65233b6d7abc6977e10ac770e22d47ee4ae58a63554ade68a6524cec",
+    "crates/cordis-kernel/tests/paper_child_support.rs": "85d8f1a76287a2d92079abd3de19cac18b837f75fbd84c3f6ac94162d97d462a",
+    "crates/cordis-kernel/tests/paper_deletion.rs": "dc25b02e735d5adbf14b7f9812bef5ed87d05c5a87dcd8618e76a0be331ea18b",
+    "crates/cordis-kernel/tests/paper_support.rs": "2ae205acc86e7f7c4138f9dd2a59f50a66d03749f3376abb1c0fea4ea88afd0b",
+    "crates/cordis-kernel/tests/paper_transposition.rs": "794186b9b44c4df39315d1bcd3677cfa755c057e6c8b8c348bb9a8bfa4968d47",
+    "crates/cordis-kernel/tests/paper_vestige.rs": "c99b333f8f58b890cbd28c5670a0a2b1de60a077f9104e5383d78e6dd79805fe",
+    "crates/cordis-kernel/tests/program.rs": "2382f03e98f59d2752104c1a96b830dbc627188006a57d3d0af60e7bb0711f8a",
+    "crates/cordis-kernel/tests/program_normal_form.rs": "e8a570680ebaad6799b79726a03a8e1086eae898859fe4345dd02a85845e99e2",
+    "crates/cordis-kernel/tests/program_trace.rs": "a1b716ec5b6a526f28c4a5babec5caac8dc95ef05092ca52ad74c6460460a9e7",
+    "crates/cordis-kernel/tests/progress.rs": "f5938ac7922e0b93ca7073d0be22aff02be3a93068ea726be2799ac775100d32",
+    "crates/cordis-kernel/tests/refinement.rs": "ab4e7fda8b295f8cbe9d7481ddfae12d741f6cff8d895f9b783cc9468adef7ea",
+    "crates/cordis-kernel/tests/witnessed.rs": "708e863b721eaed518c0c61023c137b9a59c91368bea7b6e8154599c42ade337",
+    "crates/cordis-node/Cargo.toml": "45dc6845b3d344c31c92c7c6cd7721c6f74b6ed0542543f68c069e10d9b4320c",
+    "crates/cordis-node/build.rs": "fcbd1ff3f627a7553fa1704dc6f558998daff8bc256015c37aace62cc49ce584",
+    "crates/cordis-node/examples/interop_fixture.rs": "a5a823ff06ecdbf903bfd926fcb080a8c6efaf7a35bbd74cd791b79441a750b7",
+    "crates/cordis-node/examples/typed_fixture/dynamic.rs": "c5fa32b587a2e1c1ed93bac870cfafe740ed0fca7ff88f7f04be2d0a2e7333bf",
+    "crates/cordis-node/examples/typed_fixture/mod.rs": "e2ad6a6431720aa03251b6ac177071cd2bdd7253ef43f2ae3aa6eccf537ef19b",
+    "crates/cordis-node/src/dynamic.rs": "647f6617eee1a619e32ead259eb282da75c40d8ee56a3418a39d70329a6ac133",
+    "crates/cordis-node/src/dynamic_checkpoint.rs": "484d71e0c76c520f5319d52279c07317873c0709ae07028167477d30a9117845",
+    "crates/cordis-node/src/dynamic_checkpoint_tests.rs": "0a45e57c017c2355e96c436d384cff1339242cfa8d8ced389dd7eb14e98c2d1e",
+    "crates/cordis-node/src/dynamic_children.rs": "42b463d82b77ac518e01739c813f5b7c5fb73341f29e80e17d063b0fc1c82e4e",
+    "crates/cordis-node/src/dynamic_children_tests.rs": "a18c7778c78b07999a58518187b3eddfcf6869688c2ad0dffbc3f5f0a759e786",
+    "crates/cordis-node/src/dynamic_ffi.rs": "6d11f760e99e14fb02dc5944795bdf90175b1e6ede564aa40247a24d5121dcba",
+    "crates/cordis-node/src/dynamic_resources.rs": "677cf2d2fb460a77996585786b7d3027c9878497bc7374c4c30f0d89b9db9fae",
+    "crates/cordis-node/src/dynamic_reverse.rs": "df88e5028fe682752efa3ec65e52892d0150e1b54647ae96054569eb4f0555a5",
+    "crates/cordis-node/src/dynamic_reverse_tests.rs": "4a06e25b56a9edeeab2a8886295f92517c421dab91bc76e95bdb34dbeb0be2b9",
+    "crates/cordis-node/src/interop.rs": "dcf8f782a6c8e78ddfd46c602039515c0962abb1efdde0692048e63d1e022038",
+    "crates/cordis-node/src/lib.rs": "5104abb815d47054ed250304c7c3c6d9f75380f5552479ea6d23caba494fa738",
+    "crates/cordis-node/src/objects.rs": "8b483868b80e4fc424fb8511cc979b24d6bf38b4f1fc8b02aa35dcbac9996f6d",
+    "crates/cordis-node/src/plugin.rs": "5d83bf1ea1bd4f6aaf2b02f12cf710baaa0cdacb534344d0568d1203a4d8100a",
+    "crates/cordis-node/src/streams.rs": "383980b09f6567ac38889189c21c2890753f67100d28f7c46ca87414f95b761d",
+    "crates/cordis-node/src/typed.rs": "a46e69925e2fcaade7074874d71751adc5452585c21dfd34b674b0a8a107197b",
+    "crates/cordis-node/src/typed_children.rs": "6d42a5b983642e745547e4b4295d7f953320d66deb4f1c70b0f84d04b06cc2d1",
+    "crates/cordis-node/tests/plugin_runtime.rs": "c6ded6f03eaf5b97dae7ce1b2580eb18b0799e737ec3577f284a506a68bf7abf",
+    "crates/cordis-plugin-api/Cargo.toml": "adb3f8df1774d36b38ba8019962098486acb3bfb65bbfe953583663eb04276a1",
+    "crates/cordis-plugin-api/examples/dynamic_fixture_fail.rs": "70d1ebbdaa56f3654f0ffcd1c740135eaa3df3a549393fda6b2691d7be4ddaf8",
+    "crates/cordis-plugin-api/examples/dynamic_fixture_v1.rs": "16a84beef62d11450897b5caeb1def7587f0f7ce305503d8919f56177a44cd12",
+    "crates/cordis-plugin-api/examples/dynamic_fixture_v2.rs": "c91478ef5d1861c6ff34c72028b64dbb9dd01d1bd4b0e0b633700c358bfb1ce0",
+    "crates/cordis-plugin-api/examples/shared/checkpoint.rs": "1034ae16f1268e43bcc34d49f484f89be71c52ede585d64a7f9d24d529b6c338",
+    "crates/cordis-plugin-api/examples/shared/children.rs": "3f20c05bd0f485e776bdb62e36bd3aac36f495f143d27beb0af7c39033e083f1",
+    "crates/cordis-plugin-api/examples/shared/mod.rs": "61693a8bd00727ca90554e8b43d333ac7c6dda7f6a747f52cf4984d4ef350fed",
+    "crates/cordis-plugin-api/examples/shared/resources.rs": "08e2ab30923a0b0f4b7165561ba5c9ffb654a99d6d59d215bfaedc8df49d3a18",
+    "crates/cordis-plugin-api/examples/shared/reverse_resources.rs": "20759fff62b9526978d0073886c3a8b5bca1bb53ccdcabfed29931fdc412216f",
+    "crates/cordis-plugin-api/src/checkpoint.rs": "a94088dcea694cd703ad620814e12a2c9d241bf8d8f11cc1189d6952132e1a32",
+    "crates/cordis-plugin-api/src/checkpoint_tests.rs": "41bfcdf01b1685b59a6f54a9fa9e661c6e3185cccba1d268e040735c879d1234",
+    "crates/cordis-plugin-api/src/children.rs": "d7bfc5d613644def3c19e0691e165e8f1b606314cb112c935a3b6fbe11e6cc6f",
+    "crates/cordis-plugin-api/src/children_tests.rs": "5eac591736433aa3a827e4acadf2e7bcf8c433b14ac7bf963aae40e23d2636ba",
+    "crates/cordis-plugin-api/src/lib.rs": "983a90801ac053e2f566d7c0170e097756009cea735243c5aca780a17fec8a5d",
+    "crates/cordis-plugin-api/src/resource_tests.rs": "df7d8cfef2b147ebd3d1bc2acb4d4818dda2d10d7571105c85afd6607781afee",
+    "crates/cordis-plugin-api/src/resources.rs": "76b9f6cdf8eab59f26e336ddba2303bb2c0c7c0a2650f456c51eb9bf6a93f060",
+    "crates/cordis-plugin-api/src/reverse.rs": "cfbdafd39d471347598f9cda8a4d02d2f64eca0b2483d4c97946b9fe6763b950",
+    "crates/cordis-plugin-api/src/reverse_resource_tests.rs": "2b20bec126712722b0dfd7da1dba14220243330181f526340bc48302a2b3218c",
+    "crates/cordis-plugin-api/src/reverse_tests.rs": "da5651c73d88125c4e0d1a4375da649cb4e67f9471d9ba9215a5d918de600450",
+    "crates/cordis-plugin-api/src/tests.rs": "3c987a4e224796621edef92a0a006d45d90f61b00137fceed413579d74439b89",
+    "crates/cordis/Cargo.toml": "e73693f2b50723c6ffda5ddb4361e6f4a586f49bb3177873ac4bb8bd744fec87",
+    "crates/cordis/examples/async_lifecycle.rs": "16b5f6253bac68bfed7c6b087a10296db1099417f03ca4a982833e320a4f8371",
+    "crates/cordis/examples/basic.rs": "7b465025a3053fab402b332204deb85cd056dee0128d925caf38ca0388fdf40a",
+    "crates/cordis/examples/config_persistence.rs": "975bbedc661ffc699d04bd6023fd6dbda15d1bbad10a06a77c77e277d5eaa9d2",
+    "crates/cordis/examples/config_reload.rs": "01a224255d0dca41f060cea49879eab0f35c9dbc19a3e5a5dcd506b79170e86f",
+    "crates/cordis/src/config.rs": "e5e958942dfa0162865958379e70037186edfbd681d8a4076725d68da6c3cebb",
+    "crates/cordis/src/diagnostics.rs": "e554dc9d7c5be702c03e98fe41fadad9379cac57e1723fef1e36b42b3ca24bfb",
+    "crates/cordis/src/events.rs": "88a77593c0c9467ea11d43b4fc00b52b1833bc97195049bb5417b2498a550058",
+    "crates/cordis/src/future_support.rs": "160f9ca56163c8c8bb0ec7b264f04539c5412e0d934bef71f2c46594c8fce9d3",
+    "crates/cordis/src/lib.rs": "ff1d9cf39fe20b6f787abeb67b7dad7226c24cba6214dac36ebdc9d7669c678e",
+    "crates/cordis/src/loader.rs": "2e1797ec89cf47e72cd7599cb2bf04d433d425dc2e2b46ae36b9896c54dd3d05",
+    "crates/cordis/src/owned_events.rs": "3f3f1a776daa80fb9d74a8f442985f1c4a95f6bbf06b922317c4dcb3957b828e",
+    "crates/cordis/src/persistence.rs": "4a4226b7f15319c6f58dfd16b419608d6908efe151651ba00fc742b8c8ef722b",
+    "crates/cordis/src/process_plugin.rs": "b73b82fc80ed0f167af72541730e64eba6a942f651d989783d248ea1d6353295",
+    "crates/cordis/src/resources.rs": "8d7189a8ecfabb13bd8b594329a93574c7eafae3969f4781b1891ef5188d38ba",
+    "crates/cordis/src/runtime.rs": "c6028509583967fdf02970d73d6bf7a6569515f529728a2edabbccb089fb9127",
+    "crates/cordis/src/runtime/static_host.rs": "0f4b10ced9eb2c3f28bf144d087ab3f320479c184670197a1a2d7335843fc536",
+    "crates/cordis/src/timer.rs": "3e053bf6e3b50a07e03cffd5cc12330fd76b90bc4747ad039a83964c0b49d16d",
+    "crates/cordis/tests/config.rs": "e9b6ed84488b113c83655d62bf5bd9086c8bea7a43d60c77f40c04b90098803a",
+    "crates/cordis/tests/diagnostics.rs": "fa9e97ac7c44a8c91bd4cbd6e39e0f28f40dc8999ad5dafaafd6dec345f1f25a",
+    "crates/cordis/tests/diagnostics_review.rs": "6386befe662944a678b9e867734038e1f92f6147be07ad0df4abd04fd4f424bb",
+    "crates/cordis/tests/episode_refinement.rs": "b2c628c9dfb18c84cd86fe350d5134a7f004edb420c6b4ac707c5fd3e1e4a8e7",
+    "crates/cordis/tests/events.rs": "220237f64994d60ec5e091af0bd08f8fd0190391f1ff4b978cabd7c7e5500c41",
+    "crates/cordis/tests/harness_composition.rs": "4d1f3418e9ae780c81c9230c005256f2f3ea4ce5635c6ad541dfd9949823650c",
+    "crates/cordis/tests/loader.rs": "281859cf2a9845b86efa6646041688023abfb12ff731f1432220829148ccb0b7",
+    "crates/cordis/tests/loader_update.rs": "11f79adcff55c6bea9536143c279a2ac2bad9c85c9aca2f3445032b1a22f7a50",
+    "crates/cordis/tests/owned_events.rs": "2e3e8a2b674f8bb0ca629152732f1b331d61e0437e42184b87321b40b99422a2",
+    "crates/cordis/tests/persistence.rs": "869fa4f84cfa5d608ba898735af17169896e099dcbf4998ede13e3b68f59542e",
+    "crates/cordis/tests/persistence_paths.rs": "5809f8b3ec788036ac89203739f74ceadca00d1e14a731960c0bcb5de37142e8",
+    "crates/cordis/tests/process_plugin.rs": "b70149d59322dcc67f9421906b4334be36811f37f8017fec0bccd572d157c762",
+    "crates/cordis/tests/resources.rs": "2fcf460e332233af347de012447c5dfb1e455241e7592da810721ef0f26fd747",
+    "crates/cordis/tests/runtime.rs": "3e970cc6bf3b5d8b01faf2373181e916336bb5f99b19895d3c1a25ba82447a6a",
+    "crates/cordis/tests/runtime_waiters.rs": "8851b649be95e05b09508cf650f2c21a2b1a450c6889d8b84dd0723c7da8aff6",
+    "crates/cordis/tests/service_configuration.rs": "abdcfa7e819675551dec0380c750354c80609e8c88a1a12adfa2696314f00170",
+    "crates/cordis/tests/service_parity.rs": "e07fb6ad5f89514f8395a29abd601159502bc5f82ae7a15c6c6d5bff589401de",
+    "crates/cordis/tests/shared_backend_traces.rs": "7b904a3051fbc9fa139e165aa9b08d6cab55d42196c86afcd4e0aa607450b72b",
+    "crates/cordis/tests/shutdown_review.rs": "bd034b0aef15e90b2a09e795eb2c0d6e6394448c4433bfa287f1bea9f007a141",
+    "crates/cordis/tests/static_host.rs": "c3982448fe16578ad1d1c07cd0ea98cc6c7642135f467541a0eceac1ae8d10ef",
+    "crates/cordis/tests/static_host_join.rs": "50501904f8a6b73517caab7c5f292459b84e2d56baa490ea1eef7fac2b813e02",
+    "crates/cordis/tests/timer.rs": "d434d1e7904669288cdf66ee1f249c5b2cbb1270f4d9b568dfa13b5d209346c2",
+    "scripts/build-node.mjs": "0be2f9dd6b6434614119db785fefa94d4fbd69d287987a0fffdb3869a8caf530",
+    "scripts/build-node.sh": "2247863df8b1efc8123b1b6dfbd50e0871f414979700c3c9ee502d8cadc66902",
+    "scripts/toolchain-env.sh": "f9e6689dca3a5658409f110523085600dcb5a233feba2c00720db48c72a0abe9",
+    "scripts/write-native-manifest.mjs": "3e1e64b6f3f363476da302cc6c1718493ff2145db571f7b39c4cae55f3cfb370",
+    "toolchain.lock.json": "cccc6f7acc7f3674349d83a0b5d525c4e866490205c324270b69e4bf67b1807c"
+  },
+  "installedDependencies": {
+    "sha256": "4e37e9324f83671b993b4d7b66c066d1f449df9f72c02e28624d9eb47fbe5f51",
+    "files": 1896,
+    "excludedGeneratedDirectories": [
+      ".vite",
+      ".vite-temp",
+      ".cache"
+    ]
+  },
+  "runs": {
+    "upstream": {
+      "exitCode": 0,
+      "signal": null,
+      "passed": 87,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "total": 87,
+      "unhandledErrors": [],
+      "suites": [
+        {
+          "file": "upstream/cordis/packages/core/tests/associate.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Association service injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association property injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association associated type - service injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association associated type - accessor injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association associated access follows the service fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association inspect",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/decorator.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Decorator @Inject on class method",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/dispose.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Effects dispose by plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects dispose manually",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects yield dispose",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async return 1",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async return 2",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 1",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 2 (aborted)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 3 (aborted)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 4 (await dispose)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects return with error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects yield with error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async return with error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield with error",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/events.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Events supports symbol event names across dispatch modes",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events supports symbol event names with ctx.once()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events treats prototype property names as ordinary events",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events removes empty event buckets after disposal",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.on()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.once()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.parallel()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.emit()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.serial()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.bail()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() rejects duplicate next()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() rejects continuations from outer frames",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() rejects duplicate next() after awaiting",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() supports nested async calls",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/fiber.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Fiber inertia lock 1",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber inertia lock 2",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber inertia lock 3",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber plugin error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber failed fiber does not re-enter on dependency refresh",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update recovers a failed fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update surfaces a failed reload to its caller",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update does not leak a dropped failure",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber dispose error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update config on wrapped fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber restart wrapped fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update config while injected service reloads",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/invoke.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Functional Service functional service",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Functional Service uses the service shadow for callable extensions",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/isolate.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Isolation isolated context",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Isolation shared label",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Isolation isolated event",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/logger.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Logger keeps the bounded buffer in place and chronological",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger disposes the exporter that registered the disposer",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses fiber name when called from outside any service",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger honours explicit name argument",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger honours intercept name",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses service name when called from inside a Service method (regression)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger still lets outer caller intercept override the service-derived name",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses the innermost service name and restores the outer service",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses service name when called from inside [Service.init] (unchanged behaviour)",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/plugin.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Plugin apply functional plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin apply object plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin apply invalid plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin inactive context",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin context inspect",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin ctx.registry",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin nested plugins",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin compare snapshot",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin root dispose",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin Service.init",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/reflect.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Reflect Context.is()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Reflect access check",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Reflect service injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Reflect service inject leak",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/service.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Service pending inject",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service traceable effect (with inject)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service traceable effect (without inject)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service compare snapshot",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service multiple injects",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/shadow.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Traceable caller keeps caller metadata separate from the service shadow",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller applies the service inject when entered from root",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller resolves dependencies through a captured shadow",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller keeps unchecked access for services provided on the root ctx",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller exposes the caller without preserving shadow for noShadow services",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller exposes the caller to callable services",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller strips service shadow before creating plugins",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        }
+      ],
+      "status": "passed"
+    },
+    "native": {
+      "exitCode": 1,
+      "signal": null,
+      "passed": 83,
+      "failed": 4,
+      "pending": 0,
+      "todo": 0,
+      "total": 87,
+      "unhandledErrors": [],
+      "suites": [
+        {
+          "file": "upstream/cordis/packages/core/tests/associate.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Association service injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association property injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association associated type - service injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association associated type - accessor injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association associated access follows the service fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Association inspect",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/decorator.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Decorator @Inject on class method",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/dispose.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Effects dispose by plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects dispose manually",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects yield dispose",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async return 1",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async return 2",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 1",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 2 (aborted)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 3 (aborted)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield 4 (await dispose)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects return with error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects yield with error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async return with error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Effects async yield with error",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/events.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Events supports symbol event names across dispatch modes",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events supports symbol event names with ctx.once()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events treats prototype property names as ordinary events",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events removes empty event buckets after disposal",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.on()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.once()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.parallel()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.emit()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.serial()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.bail()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() rejects duplicate next()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() rejects continuations from outer frames",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() rejects duplicate next() after awaiting",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Events ctx.waterfall() supports nested async calls",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/fiber.spec.ts",
+          "status": "failed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Fiber inertia lock 1",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber inertia lock 2",
+              "status": "failed",
+              "failures": [
+                "AssertionError: expected 5 to equal 2\n    at /Users/apple/workspaces/cordis-verus/upstream/cordis/packages/core/tests/fiber.spec.ts:40:28\n    at /Users/apple/workspaces/cordis-verus/upstream/cordis/packages/core/tests/utils.ts:10:7\n    at file:///Users/apple/workspaces/cordis-verus/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+              ]
+            },
+            {
+              "name": "Fiber inertia lock 3",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber plugin error",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber failed fiber does not re-enter on dependency refresh",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update recovers a failed fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update surfaces a failed reload to its caller",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update does not leak a dropped failure",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber dispose error",
+              "status": "failed",
+              "failures": [
+                "Error: promise rejected \"AggregateError: Native cleanup failed { errors: [ AggregateError: … { errors: [ Error: … ] } ] }\" instead of resolving\n    at _Assertion.__VITEST_RESOLVES__ (file:///Users/apple/workspaces/cordis-verus/node_modules/@vitest/expect/dist/index.js:1710:17)\n    at _Assertion.propertyGetter (file:///Users/apple/workspaces/cordis-verus/node_modules/chai/index.js:1607:27)\n    at Reflect.get (<anonymous>)\n    at Object.proxyGetter [as get] (file:///Users/apple/workspaces/cordis-verus/node_modules/chai/index.js:1696:22)\n    at /Users/apple/workspaces/cordis-verus/upstream/cordis/packages/core/tests/fiber.spec.ts:159:33\n    at file:///Users/apple/workspaces/cordis-verus/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+              ]
+            },
+            {
+              "name": "Fiber update config on wrapped fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber restart wrapped fiber",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Fiber update config while injected service reloads",
+              "status": "failed",
+              "failures": [
+                "AssertionError: expected [ [ 1, 'old' ], [ 2, 'old' ], …(1) ] to deeply equal [ [ 1, 'old' ], [ 2, 'new' ] ]\n    at /Users/apple/workspaces/cordis-verus/upstream/cordis/packages/core/tests/fiber.spec.ts:231:29\n    at file:///Users/apple/workspaces/cordis-verus/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+              ]
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/invoke.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Functional Service functional service",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Functional Service uses the service shadow for callable extensions",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/isolate.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Isolation isolated context",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Isolation shared label",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Isolation isolated event",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/logger.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Logger keeps the bounded buffer in place and chronological",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger disposes the exporter that registered the disposer",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses fiber name when called from outside any service",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger honours explicit name argument",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger honours intercept name",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses service name when called from inside a Service method (regression)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger still lets outer caller intercept override the service-derived name",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses the innermost service name and restores the outer service",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Logger uses service name when called from inside [Service.init] (unchanged behaviour)",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/plugin.spec.ts",
+          "status": "failed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Plugin apply functional plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin apply object plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin apply invalid plugin",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin inactive context",
+              "status": "failed",
+              "failures": [
+                "AggregateError: Cleanup failed for root\n    at Fiber._cleanup (/Users/apple/workspaces/cordis-verus/packages/compat-cordis/runtime.js:843:40)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)"
+              ]
+            },
+            {
+              "name": "Plugin context inspect",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin ctx.registry",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin nested plugins",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin compare snapshot",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin root dispose",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Plugin Service.init",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/reflect.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Reflect Context.is()",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Reflect access check",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Reflect service injection",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Reflect service inject leak",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/service.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Service pending inject",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service traceable effect (with inject)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service traceable effect (without inject)",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service compare snapshot",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Service multiple injects",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "upstream/cordis/packages/core/tests/shadow.spec.ts",
+          "status": "passed",
+          "message": "",
+          "cases": [
+            {
+              "name": "Traceable caller keeps caller metadata separate from the service shadow",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller applies the service inject when entered from root",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller resolves dependencies through a captured shadow",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller keeps unchecked access for services provided on the root ctx",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller exposes the caller without preserving shadow for noShadow services",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller exposes the caller to callable services",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "Traceable caller strips service shadow before creating plugins",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        }
+      ],
+      "status": "failed"
+    }
+  },
+  "status": "failed",
+  "nativeBuild": {
+    "schema": "cordis-verus.node-build/v1",
+    "sourceHashes": {
+      "Cargo.lock": "247d4a06cb349ee660db78f1c5120b742e2c983cde7773eb055707e4fda0e8cc",
+      "Cargo.toml": "9449e122e21d691379418f5775a54a1bb1e21a669a7ae48e402e8bacd9936fc7",
+      "crates/cordis-driver/Cargo.toml": "8ca927dfaee34158e4efe4029b81e4504bdb506e114baa2a388b5d10ba1ececd",
+      "crates/cordis-driver/src/availability.rs": "cb5c256dd1c39a40c49629345f2b7c196500126f55c142ba3ce5b87e26e6b60b",
+      "crates/cordis-driver/src/lib.rs": "922e81d6b79cd394ccf0d3ff38613f3c3a303345ae44a1f0fbd3065c47016e2d",
+      "crates/cordis-driver/src/protocol.rs": "45a63a88371bc19bdb9772e28680e765b8fe72e6de355c80e1afa5d9790bbbf9",
+      "crates/cordis-driver/src/shared.rs": "65dc8a5a6233cefccabf58a4b0f5e55ba4b334668cafb31b018b34dc510e7a3a",
+      "crates/cordis-driver/tests/check_protocol.rs": "ba46d0fb3fc293872044731a2c99b13063b7f2ba12d481cbc1f010b765df455a",
+      "crates/cordis-driver/tests/committed_reachability.rs": "cd0f764c454369ceaa6634b536b080f14453058015bbc71620b599440c1ffe57",
+      "crates/cordis-driver/tests/episode_failure.rs": "a96c95fe891cac62af45acb39f0a0211caaba29482bbf9ca6b1f2dc298a84a8a",
+      "crates/cordis-driver/tests/native_driver.rs": "56b596830e9abecb07e515e3e41d266ae1b923e584766660757e095d6e9efdf8",
+      "crates/cordis-driver/tests/reservation_effects.rs": "a8dadadad0bb34bf62f6484290c02e2d79c58133ddbc8a6396492541b99b7b29",
+      "crates/cordis-driver/tests/shared_lifecycle.rs": "0f3abc8ed5eb183820530b5d2145c294da47f5682d4cbe496144df3c26f8fc4c",
+      "crates/cordis-kernel/Cargo.toml": "abe2c70a90f0de345f122d4b0e1990acd10e71238106afa82ecea6712148622e",
+      "crates/cordis-kernel/src/action_ledger.rs": "3515900b8d86ce890a8e06901710241af0d6054844e1625f52f46e1294cd0820",
+      "crates/cordis-kernel/src/administrative_orchestration.rs": "6793dc4b8d003f29862d7df8696555639467c1fe44339e380534838c0aca2a50",
+      "crates/cordis-kernel/src/admitted_fresh_driver.rs": "de04d282e983c4ea680c4df999c123bba20648ac1538e8bdf65cee693d9047e2",
+      "crates/cordis-kernel/src/admitted_script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
+      "crates/cordis-kernel/src/allocation_inputs.rs": "b3a25966f428ae318b4fd7a42122de6179b901c41757c38146c8f90608ca5b55",
+      "crates/cordis-kernel/src/alpha.rs": "f453c4b6b3ee72e09763193c3be749242bc906f70f2d3921f737a2f7ce3a89dc",
+      "crates/cordis-kernel/src/calculus.rs": "c8873eac61e9883cf4c72922e395b89558ee25a361eb72e9f0a7f609a14ed790",
+      "crates/cordis-kernel/src/canonical.rs": "c1726a10742fb7396cd566b2b913181908fe87e1a77f4f1086c630b311f1483f",
+      "crates/cordis-kernel/src/causal_normalization.rs": "2f21f76a87f7c87b29df69674f2290a2fafaaf98aec686c71ce3b5946b0e3639",
+      "crates/cordis-kernel/src/child_driver.rs": "dbd018c49d1dfc7350bcbb33bc81068ccdd05543eca4df25b00e6f1a03f19348",
+      "crates/cordis-kernel/src/child_history.rs": "4705af8d5c1304c4d7b763ab8124c762045937963599938fddaab6fcf67598a4",
+      "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
+      "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
+      "crates/cordis-kernel/src/contexts.rs": "72c32f067433e1a64e7e4196cb12c0ba5f7eed0d4d9f77255e57d58c7032aec8",
+      "crates/cordis-kernel/src/deletion.rs": "1c44e19ce407f69e7411bb7ac2fc29940471c350020e60bb1bce462a0d9cbae3",
+      "crates/cordis-kernel/src/dependent_grammar.rs": "89016e4db79a21cff12b24aa73b1c3d03852cd931c4460e35e98914b0988629d",
+      "crates/cordis-kernel/src/dependent_independence.rs": "bf4fa296cef98066b9e3903b36455598fb7bd47201d5f62b496dc9b139d788bd",
+      "crates/cordis-kernel/src/dependent_independence_example.rs": "e30a431798dd92ac4e64dc3cd8659f3f3cb5a64001bb04b506cef16e39d2f41c",
+      "crates/cordis-kernel/src/dependent_lift.rs": "a7027a087915d476f41fe34a21ab2f148e52c0d1c57b08389dda8a15abe377d9",
+      "crates/cordis-kernel/src/driver.rs": "e9944c7b5d09f2c440d374ec8a0a37c834a5977c763418f4ca781673e8b3b194",
+      "crates/cordis-kernel/src/dynamic_table_deletion.rs": "9692ad12a7a5c546a86806b9f515676117d953eba45d795be634e850a11186d8",
+      "crates/cordis-kernel/src/dynamic_table_deletion_example.rs": "238a5f3daf21a4686ce82a8e03f4dfbf4f09e0cd2d8ab9acdbd6df226d79329c",
+      "crates/cordis-kernel/src/dynamic_table_registry.rs": "d252c00bcd3e60cfe77cfebad2862cf8c0260915db77858a2946e3e9cc36122d",
+      "crates/cordis-kernel/src/dynamic_table_registry_example.rs": "b3f80dfbbb905a958b345d83e9f87aa6ec5f599dc99f670b937b859777b513eb",
+      "crates/cordis-kernel/src/effect_realization.rs": "ae12b213f3cb9827e2213c436b0559f3681ba44937f95489cf218d65ba8cc021",
+      "crates/cordis-kernel/src/effects.rs": "2fb10d958faa7a3e3b4a53050599e96db22328a5b3bc09269bbe492eb9e94672",
+      "crates/cordis-kernel/src/entangled.rs": "ff5e821b638bb9153c34b2357f7614f7a8d4254a674bb74cfdecbcdd1b252080",
+      "crates/cordis-kernel/src/entangled_loading.rs": "9a0585f2be02be2c09b6c4faabced9448ec1ffddde7616d066ca78de20578ed6",
+      "crates/cordis-kernel/src/episode.rs": "252a9cec3ec9a3bb3581e61e21cf9f01a8f606d635e8e826aecb27e8f6f756d9",
+      "crates/cordis-kernel/src/external_inputs.rs": "a7491019af25e1d647220f5f9f0d649d197541d6336cb44072151d2a1425ebfb",
+      "crates/cordis-kernel/src/foreign_child_deletion.rs": "2e2f58d8f2d8ba97c5dd6b1f2426b5fc821605e5b3f8827b0d2ccf550c08b988",
+      "crates/cordis-kernel/src/foreign_child_deletion_example.rs": "d3fc5d4a699ccc049a8722e8b544b1b715a00ef1191590ad2d92ba1233b52701",
+      "crates/cordis-kernel/src/foreign_child_transport.rs": "2946519aa289c6677fa48ea44c05cd710a9bf29dcabec2bb62f8a8a3e388755e",
+      "crates/cordis-kernel/src/foreign_child_transport_example.rs": "dcc5399bf25f778e4d6beb50100ff77715e9f6cbb2a83ce94379cc5f2640266e",
+      "crates/cordis-kernel/src/foreign_provision_transport.rs": "5b837c2c97458a940e52d0717bd7509fa296c3d29083f72773a0b5fbfc5357b4",
+      "crates/cordis-kernel/src/foreign_unload.rs": "c1e07e10f8eabc5fa48750c5249528be377bb68ef25d6a3264cacac5ef7e003f",
+      "crates/cordis-kernel/src/foundations.rs": "0b19e7afb7855da5312dc63a4303e26f6716159e57b41bd62ffa511c7aeb316d",
+      "crates/cordis-kernel/src/fresh_driver.rs": "2295f9218a8dde8c644d86dcd98fdbcf8e088e7f65664ec1de8407458de20941",
+      "crates/cordis-kernel/src/fresh_equivariance.rs": "e9074e2b56d1d130948d2af396bbb50b3e85e81e719c7b866c9456d223315227",
+      "crates/cordis-kernel/src/fresh_grammar.rs": "cce7d43aa00a054a75dca28403c03f8891bee70f9d7a346d79575e103627fce4",
+      "crates/cordis-kernel/src/fresh_semantics.rs": "26826a984ca805e003b6a996fac17d8b8dc4f5f15d7df2a91a14917295dcfe63",
+      "crates/cordis-kernel/src/functional_quotient.rs": "db95c1c293848d7eb280d04f5f2540c9365804d0c819c5957cb23544f6be37f0",
+      "crates/cordis-kernel/src/generalized_table_deletion.rs": "45cf8f559d5fb854fbb5a2ca02cdd08f4236357e4aa8a67569ee9f9217eabf85",
+      "crates/cordis-kernel/src/generalized_table_deletion_example.rs": "159dd24027cb18adeea3d0bcc9026e282f8f87a87aa308349ea23d25635f3f91",
+      "crates/cordis-kernel/src/global.rs": "bc49325a37fb08efae55dc7b1242a8310805ba924e796697c21ff0925aaeae2c",
+      "crates/cordis-kernel/src/grammar_lift.rs": "229713b5eba33d6a7d9685a676f7b29abd8a8cb1ad75685cd082a5f0aa2c9282",
+      "crates/cordis-kernel/src/grammar_ordering.rs": "858f856575fba13cfebd6a66056ab47afb0560db9675ac0130d071ca8504abd5",
+      "crates/cordis-kernel/src/grammar_recovery.rs": "4dacf54db0501a1ddf1af27fda5cd31255eed527bbd17aac587dec3039227f82",
+      "crates/cordis-kernel/src/guarded_child_domains.rs": "40ce966a9d9ffbab8ec11182350767a5c824bf50df0abc3909b1a36332b5983b",
+      "crates/cordis-kernel/src/history.rs": "c20f5087d8634e76fdeeeb222a352cec64d61d948dce8b998645df8768aa462d",
+      "crates/cordis-kernel/src/indexed_ordering.rs": "5a920dc64959e98027faad54c8604404fd93aacaeaed027400f59070d3702dbd",
+      "crates/cordis-kernel/src/interface_observation.rs": "4e97e34839281d27aee6ee463cfbb4bb9aa0474c4faa470eae1bdefe04d21a07",
+      "crates/cordis-kernel/src/interface_observation_example.rs": "e663ec059cbcf0450f4d527ed70194cec2b400ac3252b2b5218caf15b43a3e88",
+      "crates/cordis-kernel/src/internal_old_unload.rs": "7e071cbad6376f5053e2ddbb489d2634a840ac20c5fa5f0021c6ec551844e0ac",
+      "crates/cordis-kernel/src/internal_old_unload_example.rs": "1a422b72714f5e1cbce8afba7cec6f23967fbd00621f9cc323da1d5b82402054",
+      "crates/cordis-kernel/src/internal_table_unload.rs": "c389c7775c1889e9150333414d50ed96a70a6c2ceb3d0467f80ea8a3c30fd1ef",
+      "crates/cordis-kernel/src/internal_table_unload_example.rs": "825233c6ff3f4e10e0a714f955b6e828f4fb602d771398b51f6b96ba91a3e884",
+      "crates/cordis-kernel/src/isolated_deletion.rs": "851afcd76c1303873d8f40d2f5b0e0ac6ef05da047a3211366c4620a8a6b47b7",
+      "crates/cordis-kernel/src/iterator_bridge.rs": "3521e908dcc6a47c54470e8b8b8d967693a151c78061a8b3ffaa5e88c0554ac3",
+      "crates/cordis-kernel/src/iterator_independence.rs": "95c2c384036c43048b29023d26d076a0113c4cfa1cd778b5a63fb04c3d8e57dd",
+      "crates/cordis-kernel/src/iterators.rs": "1c3bc0cee83d69e2140354e51613ce6033d53171fc71b912ad682b234118f92d",
+      "crates/cordis-kernel/src/lib.rs": "08120ccbc034346ecb3248c32e8df60ec3b8575ffd34d535fd0fe3a9d4145262",
+      "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
+      "crates/cordis-kernel/src/mediated.rs": "c63d88166e35070b1f14d99b12f32b39daa4c714ae7ac500227dd0a8aa948f67",
+      "crates/cordis-kernel/src/mixed_age_unload.rs": "1418ae76432a7c171f0a92e646210bc31948f0ef189ada174443716ef766fe1d",
+      "crates/cordis-kernel/src/mixed_age_unload_example.rs": "c04c9fe655c154e8f107e04b6ed76f149685b0e1b10b13d8f7f728fabd1c4e43",
+      "crates/cordis-kernel/src/mixed_driver.rs": "a520f60d1d5aa378d210cf41ae7c90d6f3cdf5ad8c58b6a86c6c72ccb773ed53",
+      "crates/cordis-kernel/src/mixed_examples.rs": "c397fcc35928dfea1ced7717dcf01ef07714d35ad889886ecb7c02cfeb686131",
+      "crates/cordis-kernel/src/mixed_foreign_restore.rs": "baa61e793f0b92d38507215871a25779e1e2652c1169384fce6838742f733749",
+      "crates/cordis-kernel/src/mixed_grammar.rs": "ed9faa272b0f6dc9f1cdf739458ae1902c353ba190bf9d5ed60b622b153aa1ab",
+      "crates/cordis-kernel/src/mixed_iteration_exchange.rs": "94d88f2cd45a81bca3b793ff6425d11f11a5b225aa9101b6b9931c51eb9ee95b",
+      "crates/cordis-kernel/src/mixed_observational_runs.rs": "59b2420ccb4e816d857dc91b61a56dc49e31aab92a7860b08a8c5c85cea95ee2",
+      "crates/cordis-kernel/src/mixed_observational_transport.rs": "1c33c71c173ac67f12dbc711b1af0187dc56a4399cbe79b966b6b3b55cbfa385",
+      "crates/cordis-kernel/src/mixed_orchestration.rs": "4e296ad62b04d8b1b28c222dd642f83502fd978967e2c38a442e96ac1789b190",
+      "crates/cordis-kernel/src/mixed_ordering.rs": "af602a8fce022da5ff2d321e8a3940648ddec65e22253145dae375908a90d67b",
+      "crates/cordis-kernel/src/mixed_recovery.rs": "619c23e25559d01857e571727645f95ba4a484298fd470194224853fff8392e4",
+      "crates/cordis-kernel/src/mixed_syntax.rs": "20e09717be841c5b8b3736e873a199c5ec1166765c051fc1e2ef18159dd7519e",
+      "crates/cordis-kernel/src/mixed_transport.rs": "f0b6fe307377fac26e96f6a738ff09206856e8914c5cce52d84e721342a7eb1a",
+      "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
+      "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
+      "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
+      "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
+      "crates/cordis-kernel/src/observational_examples.rs": "212fba2609c8823aa12c9c1484aa7e877f38654bf879d4d3823d736aa27952db",
+      "crates/cordis-kernel/src/observational_execution.rs": "be89fdd73e9e398d5327ca1351b29f17d9ac395aab9e38e93eb41ad7a639da0b",
+      "crates/cordis-kernel/src/observational_grammar.rs": "c3724c31751c622ed4dd969e48be6c8fb3f72855717d82ebee4302481159ae19",
+      "crates/cordis-kernel/src/observational_lift.rs": "d8721aa7b7bebe32d814783c2b4af1e871d61a8068d169937bc3f022da0d7950",
+      "crates/cordis-kernel/src/observational_permutation.rs": "57abe81c05c5c58275065eb93ca7cddeb55b01791913b665fc856d5bdbe78748",
+      "crates/cordis-kernel/src/observational_recovery.rs": "74130d3d2150b03058c998ea7edd6d7c629ec3d8b5e6e5225c793937a2c9d4b2",
+      "crates/cordis-kernel/src/old_journal_closed_example.rs": "2c9e5cdb133f331eb326dfb39c1ed1ff16e976e96ede35994c6d49ad6cd3c690",
+      "crates/cordis-kernel/src/old_journal_closure.rs": "f56357f039066684c48bb54baa364f08dc6df491e7eb4d3a29a61280ab10fa31",
+      "crates/cordis-kernel/src/old_journal_examples.rs": "32bbc2026b8ae7797145a1c8efc1c77473ad7c240179050ebdc08010bad6f42a",
+      "crates/cordis-kernel/src/old_journal_interleaving.rs": "c9e7b3d9e834e27a6dab893a3ac9783db0cf7ea76142f6c9fdad970cbfaa7c43",
+      "crates/cordis-kernel/src/old_journal_interleaving_example.rs": "5328e56022ab5fc3cf65617a21c3beaa94f4af1ffaafcd2ae817c8736923b4dd",
+      "crates/cordis-kernel/src/old_journal_unload.rs": "706948f6ee80ffc326d8ecefe567e54f826a245c16f348bf5529a6638855db69",
+      "crates/cordis-kernel/src/old_provision_journal.rs": "62096cda7b70c467f7ce7b80bf0e75a6680fb229b35f23480beca08d9076e1f7",
+      "crates/cordis-kernel/src/old_provision_journal_example.rs": "2f8a892bb36ca6528525ed87e19314c65d810a75fb8238c7788e6f68a7aacedb",
+      "crates/cordis-kernel/src/old_provision_support.rs": "e00f9d8beba56a9486c09900d337ef6a27e92688a41e1fbc51aba78ea010863c",
+      "crates/cordis-kernel/src/old_receipt_support.rs": "400dbfce63c0c1c56c7422c2d7b57d7378b50945f584cf4d480443dde535a3e8",
+      "crates/cordis-kernel/src/orchestration_support_cycle.rs": "16406acf722db08876eec71084f45723eae6a8db754dd14c69a3f53d59d58d47",
+      "crates/cordis-kernel/src/ownership.rs": "02bb157bdf63254bbc146d7561762fb3d605a550efa9e3f972dd4bc4f6b4aeda",
+      "crates/cordis-kernel/src/paper_components.rs": "39d2bc1c7419a582aa40348ae278785264dbf27f24d67ed54550df5a54a1b45c",
+      "crates/cordis-kernel/src/paper_confinement.rs": "13fd2a182c446945cac1b756ec08852ae63f3b01426aac1231bca58741513887",
+      "crates/cordis-kernel/src/paper_counterexamples.rs": "064abae9ccd2c02d76314c052162279c6bf095e4fb878540a2b803d39dcc0732",
+      "crates/cordis-kernel/src/paper_instantiation.rs": "eb6cdb87c62ed8349111b6015da7374b6386614fecc3bd4439d191a6941c8f63",
+      "crates/cordis-kernel/src/paper_invariants.rs": "84be535a87dd7808ac90460c20778bd3fd6696882d36576c3953ae5657e21de2",
+      "crates/cordis-kernel/src/paper_observations.rs": "cbb227b44365f700c39e8d97d302832ddfee2f55a910cb5e0c111812f370ab9c",
+      "crates/cordis-kernel/src/paper_trace_independence.rs": "342ffe28831122c2df4ade7da60a3517e9e7396a45da320c09b3f3317b61d1ec",
+      "crates/cordis-kernel/src/paper_typed_context.rs": "0e6f50d6073c7125967559d3d9cc4c562eb1c8b674dfaa71f54677458625444f",
+      "crates/cordis-kernel/src/partial_domains.rs": "0f88ff591367886d93e0cbb3c41ee0ecf98bdf664610bbcba2844d9d8c8bfa8c",
+      "crates/cordis-kernel/src/partial_independence.rs": "62a65b3a4afc82fb09f77f4f132023737bbb994fc8a2d3981e7d4528d609f596",
+      "crates/cordis-kernel/src/permutation.rs": "484a6976b16420a050c69388ef8cffba65e7771f1bf844da5dc377f844b32f19",
+      "crates/cordis-kernel/src/preservation.rs": "e15e6c12384c80ac100bf8812f35f01cd14285e3f561bfe737be2dcbf37e4b4d",
+      "crates/cordis-kernel/src/program.rs": "ee0820a1ddd6ba6d8b172b29e1c1ebf145b9d95691dff6ba9b175e8bdd9bccf7",
+      "crates/cordis-kernel/src/program_normal_form.rs": "d6c5bfbf6ac588080370d76950a563bbf3d60e11fda0ef8ae51b02c69a223cb1",
+      "crates/cordis-kernel/src/program_refinement.rs": "cef2120d184d37ed6412e8a4a18a848a8856d95f1f959e5b635999e1868f9174",
+      "crates/cordis-kernel/src/program_trace.rs": "6295d76bd6b1b7f1f95e6e2c6173cde0b9845e89f8350255f369624a5c2c9a2d",
+      "crates/cordis-kernel/src/progress.rs": "46fdb8931d649daf8870ceb757b2f1bc9581b39c5e9eee1cb9ff4e8be80414ca",
+      "crates/cordis-kernel/src/projection.rs": "2af0c9ed9f8fd7e4a28b327e2e50a795aa3144dc913f2e3e4fa30f7f35234593",
+      "crates/cordis-kernel/src/providing_owner_deletion.rs": "ff6abd0adbf51a0d7577f7b535e7eac2d84607a971843098280349f94e7d2a33",
+      "crates/cordis-kernel/src/providing_owner_examples.rs": "9a834d887a3f471eae7af212da017ace137171e26a23e832da80c1820f789440",
+      "crates/cordis-kernel/src/providing_owner_execution.rs": "4b04784b13630dbaa5267601e44bc5d6268e60d8f4c49a076c9dbb0386063b6e",
+      "crates/cordis-kernel/src/providing_owner_transport.rs": "5854946bcfd3b6204537532a48c7fd37771cf1538d4ae85123b7cb130d3f707a",
+      "crates/cordis-kernel/src/publication.rs": "306318a377609e2048d803cb1b1f305ec1fa276d7504e270144f4397bd466325",
+      "crates/cordis-kernel/src/quotient.rs": "295f0fa31f3ff1c7e18145ae8141c043dfcb5d4d90508073e72444dc6040b3d1",
+      "crates/cordis-kernel/src/recovery_examples.rs": "9414a8b078f0b9e616b363dd6d411d091b55d1915554b058cc30b016ccc0884e",
+      "crates/cordis-kernel/src/recursive_context.rs": "a032537ab661dce5392226e43a3174ad83f660008198084beb7d84f46cf955bc",
+      "crates/cordis-kernel/src/refinement.rs": "73bb8eed7ab88cf9d4556bb6fe308d1d1c436ab42de799046a5799fdc5cf60e6",
+      "crates/cordis-kernel/src/resolution_completion_counterexample.rs": "c7449f9259095cd1b9232e75c849e0e797cd109d0fac95f255fc7550bc8c3281",
+      "crates/cordis-kernel/src/resources.rs": "47b0fe33ab7bab13ea6ffa28e66cfbc73a459ba6ee8c2ab4e263fdaab4010447",
+      "crates/cordis-kernel/src/rewrite_confluence.rs": "def51aea34c8d19d0f2fd8ad5e1c5e147def31899128ce4f2a7e15c74eac0b9a",
+      "crates/cordis-kernel/src/rule_frames.rs": "e34f0f98702955cc99775c106e04c6b0ba12066a1ffe1106d3ffabdf5f7b6055",
+      "crates/cordis-kernel/src/selective_foreign_recovery.rs": "ad3c486c96920e0875bbc7f2a01af7c6a3e5aed7f637b7ba0469034481fca7a5",
+      "crates/cordis-kernel/src/semantics.rs": "5f8435c400d8272af930db537a3ae9d21adb027baf1cb9cf9397cd0ae4cee423",
+      "crates/cordis-kernel/src/shared_execution.rs": "7881a86204f4e172116aa11c7c419c26ee0920a7a84b513c58d1536902ddc70e",
+      "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
+      "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
+      "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
+      "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
+      "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
+      "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs": "21681292c6c7a568b2e40c6bb4d1fd2c7f7c7254bac0aa93f47fa5fbccf030c3",
+      "crates/cordis-kernel/src/strict_partial_quotient_example.rs": "e82014c379ae642a03b0608df261321f609c2b736b69d86fd46e04c7827aa2d2",
+      "crates/cordis-kernel/src/strict_partial_quotient_per.rs": "8f057c24cc527ba518aeb8539a5b68dcfdd8290ecf9e854eb7d6f93eb3c896a8",
+      "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs": "ebe8a3e72554a588d36ece0fa6448e645d8b2828f8568e12458d5b4f4dbbe421",
+      "crates/cordis-kernel/src/termination.rs": "584437e136782e356eb6b4e959e33772e9248e5c3464bb42d1530e1b860f8e5e",
+      "crates/cordis-kernel/src/unload_orchestration.rs": "df1c85da2daaa83e2ef3a6b9c9e01e5fe723ee5f01c553cebce06258b70ff570",
+      "crates/cordis-kernel/src/witnessed.rs": "fceb6532bdcdeeefa3eed198073baedd824fc65b1b598d0dc2d1dd3107e95956",
+      "crates/cordis-kernel/tests/admitted_fresh_driver.rs": "8724f48d0f8cc610a05807f2da438a08ae0f2a871c059455e4395066c427d707",
+      "crates/cordis-kernel/tests/admitted_script.rs": "ef1aad8d98e5cf4cbec4b4788329b79dc5f075c74aea04f06c3ce4df88e31797",
+      "crates/cordis-kernel/tests/child_driver.rs": "9cf7ed234fd268cc5ee2cb362fe547b21912c97ae2c5393e319d43dc5c628a47",
+      "crates/cordis-kernel/tests/compaction_equivalence.rs": "7127fffe4ca9cea73ae50e2bbb8af2f3b089967ae7ff868781907c8b4ac86cb8",
+      "crates/cordis-kernel/tests/driver.rs": "22088bc0a082c88efded80f5871d027aecda4aa6f1899a268dc2ebf5b92298ba",
+      "crates/cordis-kernel/tests/episode_identity.rs": "3d6f6c3022faf0fa6db3e74d2d3db127b2f8c857d916440cabb0022655f7710d",
+      "crates/cordis-kernel/tests/episode_protocol.rs": "fc1987807de8de5183df0f3c29a12d79945ddee563382a6a1fa2015c735002ff",
+      "crates/cordis-kernel/tests/fresh_driver.rs": "ab9f9aff9b7528204526b31ce0381b4b0eefdf678d4aeb98198be691a7bbeb8f",
+      "crates/cordis-kernel/tests/history.rs": "1da6df0ca8359517bba4befd0fc61877e664bfc7aafda5caa1afa4b2b9b625d9",
+      "crates/cordis-kernel/tests/lifecycle.rs": "06448b7ab2443bd7ba39da106a1d2254d06d2a74c5e3fbe482fde7bf701e79eb",
+      "crates/cordis-kernel/tests/mixed_driver.rs": "3ffe364dcebac8e00c7f578e25b72d143cc652937dd56f9ef8c8e30624723837",
+      "crates/cordis-kernel/tests/native_action_ledger.rs": "4579697c48c766f087ec8dc39537cc96d3f13e128eba5b26fbd0588af8d00094",
+      "crates/cordis-kernel/tests/native_publication.rs": "e099052fa203b7ef43b254819194237e24c2eedbec8534984031b7fbdf95e27f",
+      "crates/cordis-kernel/tests/ownership.rs": "9bc750ac65233b6d7abc6977e10ac770e22d47ee4ae58a63554ade68a6524cec",
+      "crates/cordis-kernel/tests/paper_child_support.rs": "85d8f1a76287a2d92079abd3de19cac18b837f75fbd84c3f6ac94162d97d462a",
+      "crates/cordis-kernel/tests/paper_deletion.rs": "dc25b02e735d5adbf14b7f9812bef5ed87d05c5a87dcd8618e76a0be331ea18b",
+      "crates/cordis-kernel/tests/paper_support.rs": "2ae205acc86e7f7c4138f9dd2a59f50a66d03749f3376abb1c0fea4ea88afd0b",
+      "crates/cordis-kernel/tests/paper_transposition.rs": "794186b9b44c4df39315d1bcd3677cfa755c057e6c8b8c348bb9a8bfa4968d47",
+      "crates/cordis-kernel/tests/paper_vestige.rs": "c99b333f8f58b890cbd28c5670a0a2b1de60a077f9104e5383d78e6dd79805fe",
+      "crates/cordis-kernel/tests/program.rs": "2382f03e98f59d2752104c1a96b830dbc627188006a57d3d0af60e7bb0711f8a",
+      "crates/cordis-kernel/tests/program_normal_form.rs": "e8a570680ebaad6799b79726a03a8e1086eae898859fe4345dd02a85845e99e2",
+      "crates/cordis-kernel/tests/program_trace.rs": "a1b716ec5b6a526f28c4a5babec5caac8dc95ef05092ca52ad74c6460460a9e7",
+      "crates/cordis-kernel/tests/progress.rs": "f5938ac7922e0b93ca7073d0be22aff02be3a93068ea726be2799ac775100d32",
+      "crates/cordis-kernel/tests/refinement.rs": "ab4e7fda8b295f8cbe9d7481ddfae12d741f6cff8d895f9b783cc9468adef7ea",
+      "crates/cordis-kernel/tests/witnessed.rs": "708e863b721eaed518c0c61023c137b9a59c91368bea7b6e8154599c42ade337",
+      "crates/cordis-node/Cargo.toml": "45dc6845b3d344c31c92c7c6cd7721c6f74b6ed0542543f68c069e10d9b4320c",
+      "crates/cordis-node/build.rs": "fcbd1ff3f627a7553fa1704dc6f558998daff8bc256015c37aace62cc49ce584",
+      "crates/cordis-node/examples/interop_fixture.rs": "a5a823ff06ecdbf903bfd926fcb080a8c6efaf7a35bbd74cd791b79441a750b7",
+      "crates/cordis-node/examples/typed_fixture/dynamic.rs": "c5fa32b587a2e1c1ed93bac870cfafe740ed0fca7ff88f7f04be2d0a2e7333bf",
+      "crates/cordis-node/examples/typed_fixture/mod.rs": "e2ad6a6431720aa03251b6ac177071cd2bdd7253ef43f2ae3aa6eccf537ef19b",
+      "crates/cordis-node/src/dynamic.rs": "647f6617eee1a619e32ead259eb282da75c40d8ee56a3418a39d70329a6ac133",
+      "crates/cordis-node/src/dynamic_checkpoint.rs": "484d71e0c76c520f5319d52279c07317873c0709ae07028167477d30a9117845",
+      "crates/cordis-node/src/dynamic_checkpoint_tests.rs": "0a45e57c017c2355e96c436d384cff1339242cfa8d8ced389dd7eb14e98c2d1e",
+      "crates/cordis-node/src/dynamic_children.rs": "42b463d82b77ac518e01739c813f5b7c5fb73341f29e80e17d063b0fc1c82e4e",
+      "crates/cordis-node/src/dynamic_children_tests.rs": "a18c7778c78b07999a58518187b3eddfcf6869688c2ad0dffbc3f5f0a759e786",
+      "crates/cordis-node/src/dynamic_ffi.rs": "6d11f760e99e14fb02dc5944795bdf90175b1e6ede564aa40247a24d5121dcba",
+      "crates/cordis-node/src/dynamic_resources.rs": "677cf2d2fb460a77996585786b7d3027c9878497bc7374c4c30f0d89b9db9fae",
+      "crates/cordis-node/src/dynamic_reverse.rs": "df88e5028fe682752efa3ec65e52892d0150e1b54647ae96054569eb4f0555a5",
+      "crates/cordis-node/src/dynamic_reverse_tests.rs": "4a06e25b56a9edeeab2a8886295f92517c421dab91bc76e95bdb34dbeb0be2b9",
+      "crates/cordis-node/src/interop.rs": "dcf8f782a6c8e78ddfd46c602039515c0962abb1efdde0692048e63d1e022038",
+      "crates/cordis-node/src/lib.rs": "5104abb815d47054ed250304c7c3c6d9f75380f5552479ea6d23caba494fa738",
+      "crates/cordis-node/src/objects.rs": "8b483868b80e4fc424fb8511cc979b24d6bf38b4f1fc8b02aa35dcbac9996f6d",
+      "crates/cordis-node/src/plugin.rs": "5d83bf1ea1bd4f6aaf2b02f12cf710baaa0cdacb534344d0568d1203a4d8100a",
+      "crates/cordis-node/src/streams.rs": "383980b09f6567ac38889189c21c2890753f67100d28f7c46ca87414f95b761d",
+      "crates/cordis-node/src/typed.rs": "a46e69925e2fcaade7074874d71751adc5452585c21dfd34b674b0a8a107197b",
+      "crates/cordis-node/src/typed_children.rs": "6d42a5b983642e745547e4b4295d7f953320d66deb4f1c70b0f84d04b06cc2d1",
+      "crates/cordis-node/tests/plugin_runtime.rs": "c6ded6f03eaf5b97dae7ce1b2580eb18b0799e737ec3577f284a506a68bf7abf",
+      "crates/cordis-plugin-api/Cargo.toml": "adb3f8df1774d36b38ba8019962098486acb3bfb65bbfe953583663eb04276a1",
+      "crates/cordis-plugin-api/examples/dynamic_fixture_fail.rs": "70d1ebbdaa56f3654f0ffcd1c740135eaa3df3a549393fda6b2691d7be4ddaf8",
+      "crates/cordis-plugin-api/examples/dynamic_fixture_v1.rs": "16a84beef62d11450897b5caeb1def7587f0f7ce305503d8919f56177a44cd12",
+      "crates/cordis-plugin-api/examples/dynamic_fixture_v2.rs": "c91478ef5d1861c6ff34c72028b64dbb9dd01d1bd4b0e0b633700c358bfb1ce0",
+      "crates/cordis-plugin-api/examples/shared/checkpoint.rs": "1034ae16f1268e43bcc34d49f484f89be71c52ede585d64a7f9d24d529b6c338",
+      "crates/cordis-plugin-api/examples/shared/children.rs": "3f20c05bd0f485e776bdb62e36bd3aac36f495f143d27beb0af7c39033e083f1",
+      "crates/cordis-plugin-api/examples/shared/mod.rs": "61693a8bd00727ca90554e8b43d333ac7c6dda7f6a747f52cf4984d4ef350fed",
+      "crates/cordis-plugin-api/examples/shared/resources.rs": "08e2ab30923a0b0f4b7165561ba5c9ffb654a99d6d59d215bfaedc8df49d3a18",
+      "crates/cordis-plugin-api/examples/shared/reverse_resources.rs": "20759fff62b9526978d0073886c3a8b5bca1bb53ccdcabfed29931fdc412216f",
+      "crates/cordis-plugin-api/src/checkpoint.rs": "a94088dcea694cd703ad620814e12a2c9d241bf8d8f11cc1189d6952132e1a32",
+      "crates/cordis-plugin-api/src/checkpoint_tests.rs": "41bfcdf01b1685b59a6f54a9fa9e661c6e3185cccba1d268e040735c879d1234",
+      "crates/cordis-plugin-api/src/children.rs": "d7bfc5d613644def3c19e0691e165e8f1b606314cb112c935a3b6fbe11e6cc6f",
+      "crates/cordis-plugin-api/src/children_tests.rs": "5eac591736433aa3a827e4acadf2e7bcf8c433b14ac7bf963aae40e23d2636ba",
+      "crates/cordis-plugin-api/src/lib.rs": "983a90801ac053e2f566d7c0170e097756009cea735243c5aca780a17fec8a5d",
+      "crates/cordis-plugin-api/src/resource_tests.rs": "df7d8cfef2b147ebd3d1bc2acb4d4818dda2d10d7571105c85afd6607781afee",
+      "crates/cordis-plugin-api/src/resources.rs": "76b9f6cdf8eab59f26e336ddba2303bb2c0c7c0a2650f456c51eb9bf6a93f060",
+      "crates/cordis-plugin-api/src/reverse.rs": "cfbdafd39d471347598f9cda8a4d02d2f64eca0b2483d4c97946b9fe6763b950",
+      "crates/cordis-plugin-api/src/reverse_resource_tests.rs": "2b20bec126712722b0dfd7da1dba14220243330181f526340bc48302a2b3218c",
+      "crates/cordis-plugin-api/src/reverse_tests.rs": "da5651c73d88125c4e0d1a4375da649cb4e67f9471d9ba9215a5d918de600450",
+      "crates/cordis-plugin-api/src/tests.rs": "3c987a4e224796621edef92a0a006d45d90f61b00137fceed413579d74439b89",
+      "crates/cordis/Cargo.toml": "e73693f2b50723c6ffda5ddb4361e6f4a586f49bb3177873ac4bb8bd744fec87",
+      "crates/cordis/examples/async_lifecycle.rs": "16b5f6253bac68bfed7c6b087a10296db1099417f03ca4a982833e320a4f8371",
+      "crates/cordis/examples/basic.rs": "7b465025a3053fab402b332204deb85cd056dee0128d925caf38ca0388fdf40a",
+      "crates/cordis/examples/config_persistence.rs": "975bbedc661ffc699d04bd6023fd6dbda15d1bbad10a06a77c77e277d5eaa9d2",
+      "crates/cordis/examples/config_reload.rs": "01a224255d0dca41f060cea49879eab0f35c9dbc19a3e5a5dcd506b79170e86f",
+      "crates/cordis/src/config.rs": "e5e958942dfa0162865958379e70037186edfbd681d8a4076725d68da6c3cebb",
+      "crates/cordis/src/diagnostics.rs": "e554dc9d7c5be702c03e98fe41fadad9379cac57e1723fef1e36b42b3ca24bfb",
+      "crates/cordis/src/events.rs": "88a77593c0c9467ea11d43b4fc00b52b1833bc97195049bb5417b2498a550058",
+      "crates/cordis/src/future_support.rs": "160f9ca56163c8c8bb0ec7b264f04539c5412e0d934bef71f2c46594c8fce9d3",
+      "crates/cordis/src/lib.rs": "ff1d9cf39fe20b6f787abeb67b7dad7226c24cba6214dac36ebdc9d7669c678e",
+      "crates/cordis/src/loader.rs": "2e1797ec89cf47e72cd7599cb2bf04d433d425dc2e2b46ae36b9896c54dd3d05",
+      "crates/cordis/src/owned_events.rs": "3f3f1a776daa80fb9d74a8f442985f1c4a95f6bbf06b922317c4dcb3957b828e",
+      "crates/cordis/src/persistence.rs": "4a4226b7f15319c6f58dfd16b419608d6908efe151651ba00fc742b8c8ef722b",
+      "crates/cordis/src/process_plugin.rs": "b73b82fc80ed0f167af72541730e64eba6a942f651d989783d248ea1d6353295",
+      "crates/cordis/src/resources.rs": "8d7189a8ecfabb13bd8b594329a93574c7eafae3969f4781b1891ef5188d38ba",
+      "crates/cordis/src/runtime.rs": "c6028509583967fdf02970d73d6bf7a6569515f529728a2edabbccb089fb9127",
+      "crates/cordis/src/runtime/static_host.rs": "0f4b10ced9eb2c3f28bf144d087ab3f320479c184670197a1a2d7335843fc536",
+      "crates/cordis/src/timer.rs": "3e053bf6e3b50a07e03cffd5cc12330fd76b90bc4747ad039a83964c0b49d16d",
+      "crates/cordis/tests/config.rs": "e9b6ed84488b113c83655d62bf5bd9086c8bea7a43d60c77f40c04b90098803a",
+      "crates/cordis/tests/diagnostics.rs": "fa9e97ac7c44a8c91bd4cbd6e39e0f28f40dc8999ad5dafaafd6dec345f1f25a",
+      "crates/cordis/tests/diagnostics_review.rs": "6386befe662944a678b9e867734038e1f92f6147be07ad0df4abd04fd4f424bb",
+      "crates/cordis/tests/episode_refinement.rs": "b2c628c9dfb18c84cd86fe350d5134a7f004edb420c6b4ac707c5fd3e1e4a8e7",
+      "crates/cordis/tests/events.rs": "220237f64994d60ec5e091af0bd08f8fd0190391f1ff4b978cabd7c7e5500c41",
+      "crates/cordis/tests/harness_composition.rs": "4d1f3418e9ae780c81c9230c005256f2f3ea4ce5635c6ad541dfd9949823650c",
+      "crates/cordis/tests/loader.rs": "281859cf2a9845b86efa6646041688023abfb12ff731f1432220829148ccb0b7",
+      "crates/cordis/tests/loader_update.rs": "11f79adcff55c6bea9536143c279a2ac2bad9c85c9aca2f3445032b1a22f7a50",
+      "crates/cordis/tests/owned_events.rs": "2e3e8a2b674f8bb0ca629152732f1b331d61e0437e42184b87321b40b99422a2",
+      "crates/cordis/tests/persistence.rs": "869fa4f84cfa5d608ba898735af17169896e099dcbf4998ede13e3b68f59542e",
+      "crates/cordis/tests/persistence_paths.rs": "5809f8b3ec788036ac89203739f74ceadca00d1e14a731960c0bcb5de37142e8",
+      "crates/cordis/tests/process_plugin.rs": "b70149d59322dcc67f9421906b4334be36811f37f8017fec0bccd572d157c762",
+      "crates/cordis/tests/resources.rs": "2fcf460e332233af347de012447c5dfb1e455241e7592da810721ef0f26fd747",
+      "crates/cordis/tests/runtime.rs": "3e970cc6bf3b5d8b01faf2373181e916336bb5f99b19895d3c1a25ba82447a6a",
+      "crates/cordis/tests/runtime_waiters.rs": "8851b649be95e05b09508cf650f2c21a2b1a450c6889d8b84dd0723c7da8aff6",
+      "crates/cordis/tests/service_configuration.rs": "abdcfa7e819675551dec0380c750354c80609e8c88a1a12adfa2696314f00170",
+      "crates/cordis/tests/service_parity.rs": "e07fb6ad5f89514f8395a29abd601159502bc5f82ae7a15c6c6d5bff589401de",
+      "crates/cordis/tests/shared_backend_traces.rs": "7b904a3051fbc9fa139e165aa9b08d6cab55d42196c86afcd4e0aa607450b72b",
+      "crates/cordis/tests/shutdown_review.rs": "bd034b0aef15e90b2a09e795eb2c0d6e6394448c4433bfa287f1bea9f007a141",
+      "crates/cordis/tests/static_host.rs": "c3982448fe16578ad1d1c07cd0ea98cc6c7642135f467541a0eceac1ae8d10ef",
+      "crates/cordis/tests/static_host_join.rs": "50501904f8a6b73517caab7c5f292459b84e2d56baa490ea1eef7fac2b813e02",
+      "crates/cordis/tests/timer.rs": "d434d1e7904669288cdf66ee1f249c5b2cbb1270f4d9b568dfa13b5d209346c2",
+      "packages/compat-cordis/native-artifacts.js": "7ff966b24eaff87d218c42c20eb386e27f6051a313cf7b71c81c12bac2a05780",
+      "packages/compat-cordis/package.json": "908a186ab1789ea4826776ef583891d64e88c9b528461e1133102900a4c87846",
+      "scripts/build-node.mjs": "0be2f9dd6b6434614119db785fefa94d4fbd69d287987a0fffdb3869a8caf530",
+      "scripts/build-node.sh": "2247863df8b1efc8123b1b6dfbd50e0871f414979700c3c9ee502d8cadc66902",
+      "scripts/toolchain-env.sh": "f9e6689dca3a5658409f110523085600dcb5a233feba2c00720db48c72a0abe9",
+      "scripts/write-native-manifest.mjs": "3e1e64b6f3f363476da302cc6c1718493ff2145db571f7b39c4cae55f3cfb370",
+      "toolchain.lock.json": "cccc6f7acc7f3674349d83a0b5d525c4e866490205c324270b69e4bf67b1807c"
+    },
+    "dynamicFixtures": {
+      "v1": {
+        "path": "target/node-compat/dynamic-fixture-v1.dylib",
+        "sha256": "f5fe723daf69d1b18aa9412248a96592497a24f33ae815093127369c5e007fee"
+      },
+      "v2": {
+        "path": "target/node-compat/dynamic-fixture-v2.dylib",
+        "sha256": "f796f35eb0d94422bc2d3440d96332f82f82b634e291a7a9944c7cb394efb8e6"
+      },
+      "fail": {
+        "path": "target/node-compat/dynamic-fixture-fail.dylib",
+        "sha256": "6b0a3e4811d52887c36b36e0640203d4331e4b832327278c1d7ffc26c294475a"
+      }
+    },
+    "interopFixture": {
+      "path": "target/node-compat/interop-fixture.node",
+      "sha256": "f7fb108b51471c120618eb28eb185509ada0b0983c630d2d1b8bf3839d8387b3"
+    },
+    "compilerArtifact": "/Users/apple/workspaces/cordis-verus/target/release/libcordis_node.dylib",
+    "compilerProfile": {
+      "opt_level": "3",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v22.22.0",
+    "artifactSha256": "6ab82f13c93ee53a0d52b9a4850e173197469b78c02205c986d9891eb1ee662b",
+    "cargoLockSha256": "247d4a06cb349ee660db78f1c5120b742e2c983cde7773eb055707e4fda0e8cc",
+    "toolchainLockSha256": "cccc6f7acc7f3674349d83a0b5d525c4e866490205c324270b69e4bf67b1807c"
+  }
+}

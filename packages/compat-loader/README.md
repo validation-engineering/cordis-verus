@@ -204,7 +204,7 @@ both a cleanup acknowledgement and exit code zero; a timeout or crash is not
 normal cleanup. An optional trusted `hostModule` can host the official Harness
 without creating another Context. See the [process contract and example](../../docs/module-graph-reloads.md#processdomain-application-native-addons-and-external-hosts)
 for adapter, provenance and failure boundaries. The companion Harness exposes an
-opt-in [official Web supervisor](https://github.com/Stool233/cordis-harness/blob/main/docs/process-supervisor.md).
+opt-in [official Web supervisor](https://github.com/validation-engineering/cordis-harness/blob/main/docs/process-supervisor.md).
 
 ### Artifact contract
 

@@ -1,0 +1,443 @@
+{
+  "schema": "cordis-verus.paper-review/v1",
+  "paper": {
+    "version": "arXiv:2608.25512v1",
+    "url": "https://arxiv.org/abs/2608.25512v1",
+    "pdfUrl": "https://arxiv.org/pdf/2608.25512v1",
+    "sha256": "390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0",
+    "textSha256": "b1f29dafd129114c1c4a5f90477a5771ba9215ef9d240142b819c3b291ce6d4a"
+  },
+  "guide": "docs/paper-review-guide.md",
+  "cases": [
+    {
+      "id": "PR-01",
+      "title": "Committed provider identity",
+      "paper": {
+        "items": [
+          {
+            "id": 53,
+            "status": "formalized"
+          },
+          {
+            "id": 54,
+            "status": "formalized"
+          }
+        ],
+        "section": "4.2.2",
+        "pages": [
+          35,
+          36,
+          37
+        ],
+        "clauses": [
+          "Definition 53 equations (48) and (49)",
+          "Definition 54 equation (50)",
+          "L-Begin and L-Unload"
+        ]
+      },
+      "classification": "formalized definitions and executable control/resource refinement; asynchronous host tested separately",
+      "symbols": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "target",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "quiet",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "relied",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "step",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "begin",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "begin_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "finish_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/driver.rs",
+          "symbol": "unload",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis/src/runtime.rs",
+          "symbol": "poll_settle",
+          "kind": "fn"
+        }
+      ],
+      "tests": [
+        {
+          "package": "cordis-kernel",
+          "target": "refinement",
+          "name": "strict_departure_preserves_committed_views_until_guarded_unload"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "driver",
+          "name": "provider_resources_remain_live_until_consumer_recovery"
+        },
+        {
+          "package": "cordis",
+          "target": "runtime",
+          "name": "provider_waits_for_async_consumer_cleanup"
+        }
+      ],
+      "negativeControl": {
+        "name": "provider-lifetime-guard",
+        "evidence": "candidate-only; inspect source-bound acceptance separately"
+      }
+    },
+    {
+      "id": "PR-02",
+      "title": "Captured child retirement and retention",
+      "paper": {
+        "items": [
+          {
+            "id": 52,
+            "status": "formalized"
+          }
+        ],
+        "section": "4.2.1",
+        "pages": [
+          35
+        ],
+        "clauses": [
+          "Definition 52 child name capture and retirement inverse",
+          "Registered-name premise discussed after the definition"
+        ]
+      },
+      "classification": "formalized conditional primitive with explicitly revised removal policy",
+      "symbols": [
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "typed_instantiate",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "captured_retirement",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "remove_unreferenced",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retention_protocol_refines",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "wf",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "refines_retention",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "land_child",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "remove",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "unload",
+          "kind": "fn"
+        }
+      ],
+      "tests": [
+        {
+          "package": "cordis-kernel",
+          "target": "paper_vestige",
+          "name": "retiring_an_already_removed_child_requires_an_idempotent_extension"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "child_driver",
+          "name": "retired_inactive_child_is_retained_until_real_inverse_is_consumed"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "child_driver",
+          "name": "all_actual_journals_retain_their_children_through_nested_recovery"
+        }
+      ],
+      "negativeControl": {
+        "name": "child-removal-ignores-retained-token",
+        "evidence": "candidate-only; inspect source-bound acceptance separately"
+      }
+    },
+    {
+      "id": "PR-03",
+      "title": "Vestigial entries and parent guards",
+      "paper": {
+        "items": [
+          {
+            "id": 62,
+            "status": "refuted"
+          }
+        ],
+        "section": "4.3",
+        "pages": [
+          42
+        ],
+        "clauses": [
+          "Lemma 62 clause (1)",
+          "Lemma 62 clause (2)"
+        ]
+      },
+      "classification": "original lemma refuted; corrected transport has additional premises",
+      "symbols": [
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "vestigial_parent_counterexample",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "vestigial_insert_counterexample",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/semantics.rs",
+          "symbol": "counterexample_reachable_full",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "full_step_bisimulation",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "suffix_deletion",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "insert",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "retire",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "remove",
+          "kind": "fn"
+        }
+      ],
+      "tests": [
+        {
+          "package": "cordis-kernel",
+          "target": "paper_vestige",
+          "name": "erasing_a_vestigial_child_changes_the_parent_removal_guard"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "paper_vestige",
+          "name": "vestigial_parent_is_observable_to_new_child_insertion"
+        }
+      ],
+      "negativeControl": {
+        "name": "erasure-drops-parent-read",
+        "evidence": "candidate-only; inspect source-bound acceptance separately"
+      }
+    },
+    {
+      "id": "PR-04",
+      "title": "Quiet confluence of fixed executable programs",
+      "paper": {
+        "items": [
+          {
+            "id": 80,
+            "status": "partial"
+          }
+        ],
+        "section": "4.3.5",
+        "pages": [
+          54
+        ],
+        "clauses": [
+          "Theorem 80 clause (2); clause (1) is not discharged by this result"
+        ]
+      },
+      "classification": "restricted positive theorem; original paper item remains partial",
+      "symbols": [
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "ProgramDriver",
+          "kind": "struct"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "land",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_refinement.rs",
+          "symbol": "wf",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_refinement.rs",
+          "symbol": "project",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_trace.rs",
+          "symbol": "raw_execution",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_trace.rs",
+          "symbol": "driver_trace_refinement",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_normal_form.rs",
+          "symbol": "trace_inputs",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program_normal_form.rs",
+          "symbol": "driver_quiet_confluence",
+          "kind": "fn"
+        }
+      ],
+      "tests": [
+        {
+          "package": "cordis-kernel",
+          "target": "program_normal_form",
+          "name": "quiet_values_agree_after_different_schedules_and_provider_replacement"
+        }
+      ],
+      "negativeControl": {
+        "name": "normal-form-counts-phantom-stages",
+        "evidence": "candidate-only; inspect source-bound acceptance separately"
+      }
+    },
+    {
+      "id": "PR-05",
+      "title": "Six-field configuration projection",
+      "paper": {
+        "items": [
+          {
+            "id": 81,
+            "status": "formalized"
+          }
+        ],
+        "section": "5.2.1",
+        "pages": [
+          65
+        ],
+        "clauses": [
+          "Definition 81 six record-field bullets; subsequent reconciliation claims excluded"
+        ]
+      },
+      "classification": "formalized executable record; ordinary-host leaf projection tested separately",
+      "symbols": [
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "Entry",
+          "kind": "struct"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "new",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "enabled",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "set_config",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "set_disabled",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "reconciliation_key",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "sibling_keys",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "bound_effect",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "binding_ignores_administration",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "as_paper_entry",
+          "kind": "fn"
+        }
+      ],
+      "tests": [
+        {
+          "package": "cordis",
+          "target": "loader",
+          "name": "paper_leaf_projection_requires_resolution_and_preserves_raw_configuration"
+        }
+      ],
+      "negativeControl": {
+        "name": "configuration-enabled-polarity",
+        "evidence": "candidate-only; inspect source-bound acceptance separately"
+      }
+    }
+  ]
+}

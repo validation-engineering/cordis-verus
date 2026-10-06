@@ -11,7 +11,7 @@ are maintained. There is no guaranteed security response time or backport policy
 
 ## Reporting
 
-The repository is [Stool233/cordis-verus](https://github.com/Stool233/cordis-verus),
+The repository is [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus),
 initially private, maintained by [Stool233](https://github.com/Stool233).
 Existing collaborators can request a private reporting route from the owner.
 A monitored public vulnerability-reporting endpoint has not yet been configured.
