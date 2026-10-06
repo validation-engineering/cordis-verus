@@ -31,7 +31,7 @@ async function close(controller) {
   try { await controller.dispose(); }
   catch (error) { if (!/FixtureCleanupFailed/.test(messages(error))) throw error; await controller.retryCleanup(); await controller.dispose(); }
 }
-for (const profile of ['cordis','harness']) {
+export function registerCheckpointTests(profile) {
   test(`checkpoint migrates logical data across native schema versions (${profile})`, async () => {
     const {ctx} = environment(profile);
     try {

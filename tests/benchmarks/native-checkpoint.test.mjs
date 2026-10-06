@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dynamicFixtureInputs } from '../../scripts/benchmark/inputs.mjs';
 import { scenarios, prepareScenario } from '../../scripts/benchmark/scenarios.mjs';
-import { summarize, validateCheckpoints } from '../../scripts/benchmark/statistics.mjs';
+import { RECLAIMED_STORAGE_SCHEMA, summarize, validateCheckpoints } from '../../scripts/benchmark/statistics.mjs';
 
 const root=fileURLToPath(new URL('../..',import.meta.url));
 const worker=fileURLToPath(new URL('../../scripts/benchmark/worker.mjs',import.meta.url));
@@ -29,13 +29,14 @@ test('native checkpoint replacement records bounded live resources and increasin
   assert.equal(result.samplesMs.length,2);assert.equal(result.cpuSamplesMicroseconds.length,2);
   assert.deepEqual(result.statistics,summarize(result.samplesMs,10));
   assert.deepEqual(points.map(point=>point.completedCycles),[0,10,20,30,30]);
+  for(const point of points)assert.equal(point.storageSchema,RECLAIMED_STORAGE_SCHEMA);
   for(const point of points.slice(0,-1)) {
     const cycles=point.completedCycles;
     assert.equal(point.storage.registeredPlugins,5);assert.equal(point.storage.liveBindings,3);
     assert.equal(point.storage.liveLeases,3);assert.equal(point.storage.publishedValues,3);
     assert.equal(point.storage.identitySlots,5+2*cycles);
     assert.equal(point.storage.publicationRecords,3+2*cycles);
-    assert.equal(point.storage.leaseRecords,3*(cycles+1));
+    assert.equal(point.storage.leaseRecords,3);assert.equal(point.storage.leaseAllocations,3*(cycles+1));
     assert.equal(point.providerSetups,cycles+1);assert.equal(point.providerCleanups,cycles);
     assert.equal(point.consumerSetups,2*(cycles+1));assert.equal(point.consumerCleanups,2*cycles);
     assert.equal(point.native.retainedImageCount,2);assert.equal(point.native.moduleCount,2);
@@ -47,6 +48,7 @@ test('native checkpoint replacement records bounded live resources and increasin
   }
   const closed=points.at(-1);
   assert.deepEqual(closed.logical,points.at(-2).logical,'Terminal consumer writes are outside the measured migration result');
+  assert.equal(closed.storage.leaseRecords,0);assert.equal(closed.storage.leaseAllocations,93);
   assert.equal(closed.providerCleanups,31);assert.equal(closed.consumerCleanups,62);
   assert.equal(closed.native.checkpoints.tokens,0);assert.equal(closed.native.checkpoints.bytes,0);
   assert.ok(Object.values(closed.native.resources).every(count=>count===0));
@@ -70,6 +72,11 @@ test('native checkpoint replacement records bounded live resources and increasin
     report=>delete report.checkpoints[1].logical,
     report=>report.checkpoints[1].storage.publishedValues=2,
     report=>report.unitsPerSample++,
+    report=>delete report.checkpoints[1].storage.leaseAllocations,
+    report=>report.checkpoints[1].storage.leaseAllocations--,
+    report=>report.checkpoints[1].storage.leaseRecords++,
+    report=>report.checkpoints.at(-1).storage.leaseRecords=1,
+    report=>delete report.checkpoints[1].storageSchema,
   ];
   for(const mutate of corruptions) {
     const changed=structuredClone(result);mutate(changed);

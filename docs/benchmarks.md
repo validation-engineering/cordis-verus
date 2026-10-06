@@ -183,7 +183,7 @@ unbounded-run memory guarantee, absence of leaks or a production performance bud
 
 The shared Node Driver now invokes the already verified stable binding/declaration
 filters after every 256 successful cleanup or removal changes. It does not reclaim
-live commitments, reuse node identities, or renumber publication/lease records.
+live commitments, reuse node identities, or renumber publication/lease IDs.
 The failed-cleanup regression triggers maintenance through unrelated nodes while
 an Unloading consumer still reads its retained provider value.
 
@@ -203,9 +203,10 @@ The [before](performance/2026-10-06-resident-before.json) and
 [after](performance/2026-10-06-resident-after.json) reports retain every ordered
 batch, checkpoint and source/build hash. Their source maps differ only in the
 shared Driver and its regression test. Both close with zero live resources.
-Publication records still reach 1,001 and lease records 4,004; replacement also
-retains 1,006 node identities. Those remaining histories are an explicit future
-reclamation task. The timing observations are one local comparison, without a
+In these historical reports, publication records reach 1,001 and lease records
+4,004; replacement also retains 1,006 node identities. The later lease reclamation
+checkpoint below removes released lease records; publication and node histories
+remain a future reclamation task. The timing observations are one local comparison, without a
 statistical-significance or cross-platform throughput claim; RSS does not measure
 the bytes reclaimed by the binding filter.
 
@@ -250,8 +251,8 @@ consumer cleanup, so it describes only the measured replacement cycles.
 The fixture explicitly migrates one integer; it does not measure large payload
 serialization, new-image loading per deployment, concurrent business traffic,
 rollback storms or native threads outside the SDK. Increasing stable identity,
-publication or lease histories remain visible and must not be interpreted as
-live plugin resource leaks. Likewise, zero live resource counters do not imply
+publication histories and cumulative lease allocations remain visible and must
+not be interpreted as live plugin resource leaks. Likewise, zero live resource counters do not imply
 constant RSS or prove the absence of all leaks. Reclamation optimizations require
 separate before/after evidence and must retain stale-handle invalidation.
 
@@ -301,6 +302,63 @@ baseline, not a measured speedup or an upstream Cordis comparison. RSS remains
 higher after cleanup even though live counters are zero and the JS heap returns
 near its initial 5.13 MiB; these observations do not identify the individual
 allocator, V8 or native contributions. Stable identity/publication/lease histories
-still grow, so subsequent reclamation work must preserve old-handle rejection and
-be evaluated against this measured workload. No runtime optimization or reclamation
-policy changed in this baseline step.
+grew in this baseline. The subsequent lease reclamation checkpoint below uses
+fresh before/after runs of the same workload and preserves old-handle rejection.
+No runtime optimization or reclamation policy changed in this baseline step.
+
+
+### 2026-10-06 lease record reclamation
+
+The kernel now separates monotonically allocated `LeaseId` values from a Vec of
+active records. Successful release removes its matching record, even behind an
+older lease retained by failed cleanup. It preserves every other active lease and
+its captured publication. A missing ID below the allocation high-water mark is
+still `Released`; an ID never allocated is `Unknown`. IDs are never reused.
+Lookup and stable removal are linear in the number of active leases, rather than
+retaining storage proportional to all previous acquisitions. The Vec can retain
+its peak simultaneous capacity; the allocation counter is a single integer.
+
+`leaseRecords` now means physically stored active records, including failed
+cleanup, and `leaseAllocations` reports cumulative successful allocations. Raw
+benchmark checkpoints tag this as `cordis-driver.storage/lease-records-v2`.
+The old build uses `lease-records-v1`, where `leaseRecords` retains released records
+and no `leaseAllocations` field exists. Historical reports are left unchanged;
+the validator does not fabricate new counters for them.
+
+The before build was preserved from `bc970bc` before rebuilding. Both builds ran
+the same updated harness on Apple M4 / macOS arm64 / Node 22.22.0, with the same
+optimized, assertion-enabled profile. Three pairs ran sequentially in alternating
+before/after order, each in a fresh process, with four consumers, 100 batches of
+ten replacements and no warmup. Each after report explicitly pins its paired
+before source digest; method, harness and environment equality are checked. The
+20% p95 comparison threshold is a local regression check, not a production budget.
+
+| Observation | Before, runs 1 / 2 / 3 | After, runs 1 / 2 / 3 |
+| --- | --- | --- |
+| Batch-amortized p50, ms/replacement | 5.02 / 5.04 / 5.10 | 5.05 / 5.08 / 5.12 |
+| Batch-amortized p95, ms/replacement | 5.45 / 5.48 / 5.68 | 5.47 / 5.47 / 5.50 |
+| RSS after final cleanup and GC, MiB | 106.69 / 108.16 / 106.30 | 106.14 / 106.17 / 106.53 |
+| Physical lease records after 1,000 replacements | 5,005 / 5,005 / 5,005 | 5 / 5 / 5 |
+| Physical lease records after final cleanup | 5,005 / 5,005 / 5,005 | 0 / 0 / 0 |
+
+All six runs retained the same business result of 5,000, rejected old handles,
+kept exactly two code images, and finished with zero live graph/native resources
+and checkpoint receipts. Every after run reported 5,005 cumulative lease
+allocations, including after final cleanup. Node identity slots still reached
+2,007 and publication records 2,003; these histories are not reclaimed by this
+change. The paired p95 differences were +0.42%, -0.18% and -3.19%. These finite
+observations establish reduced lease record retention, not a measured speedup,
+statistical significance, constant RSS or elimination of every historical cost.
+
+Raw reports: before [1](performance/2026-10-06-lease-before-run1.json),
+[2](performance/2026-10-06-lease-before-run2.json),
+[3](performance/2026-10-06-lease-before-run3.json); after
+[1](performance/2026-10-06-lease-after-run1.json),
+[2](performance/2026-10-06-lease-after-run2.json),
+[3](performance/2026-10-06-lease-after-run3.json). They retain ordered samples,
+all checkpoints, storage schema tags, source/build bindings and library hashes.
+Kernel regressions also exercise arbitrary release order, allocation exhaustion,
+and 10,000 acquisitions behind a pinned lease without growing Vec capacity.
+The shared Driver regression keeps a failed cleanup lease and its revoked value
+alive while reclaiming 300 later unrelated leases, then explicitly retries and
+releases the old lease.

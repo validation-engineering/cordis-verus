@@ -54,8 +54,13 @@ remain unchanged.
 The shared Node Driver also performs periodic verified binding/declaration history
 filtering. The finite 1,000-cycle resident measurements record live resources,
 identity/publication/lease histories, memory and latency before and after this
-change. Stable publication and lease histories still grow; this is not a constant
-memory claim or long-running production acceptance.
+change. Released lease records are now removed while their logical IDs remain monotonic;
+node and publication histories still grow. Three paired 1,000-cycle native
+checkpoint measurements reduced physically stored lease records from 5,005 to 5,
+then zero at shutdown, with p95 around 5.5 ms on both builds. See the
+[lease reclamation evidence](benchmarks.md#2026-10-06-lease-record-reclamation).
+These are record counts, not a constant memory claim or long-running production
+acceptance.
 
 ## Native Node compatibility slice
 
@@ -89,7 +94,7 @@ through user-compiled addons. Objects and callbacks are acquired through declare
 factory methods; arguments and results remain JSON. They are not arbitrary handles
 or closures embedded in DTOs.
 
-The [native module SDK](native-rust-modules.md) adds independent Rust `cdylib` plugins to the resident Node Driver through C ABI v1. Immutable factory references, synchronous/asynchronous JSON services, cooperative cancellation, actual cleanup barriers and candidate-failure recovery support same-process code replacement. The ABI also supports declared reverse JS JSON calls, streams and object interfaces in both directions, and explicit JS callbacks, with action-scoped acquisition, real operation drain and retryable close. It retains code images and exposes resource diagnostics and a per-addon image limit. Dynamic publication and typed children remain outside this ABI. It does not automatically migrate state, physically unload images or prove native callbacks.
+The [native module SDK](native-rust-modules.md) adds independent Rust `cdylib` plugins to the resident Node Driver through C ABI v1. Immutable factory references, synchronous/asynchronous JSON services, cooperative cancellation, actual cleanup barriers and candidate-failure recovery support same-process code replacement. The ABI also supports declared reverse JS JSON calls, streams and object interfaces in both directions, and explicit JS callbacks, with action-scoped acquisition, real operation drain and retryable close. It retains code images and exposes resource diagnostics and a per-addon image limit. Owned children and dynamically published factories use the same lifecycle graph; arbitrary Rust typed slots are not shared across the ABI. Opt-in versioned JSON checkpoints migrate declared logical state after drain and support recovery through consumer acceptance. This does not physically unload images or prove native callbacks.
 
 The [typed adapter](typed-rust-plugins.md) executes real `cordis::Plugin` definitions
 in the Node graph. It retains original slots and per-Fiber FnMut state, with
@@ -122,10 +127,11 @@ in `target/node-compat/differential.json`; the default CI does not run that suit
 None of these records proves arbitrary JS callbacks or complete profile compatibility.
 
 The [performance tools](benchmarks.md) provide source/build-bound measurements,
-raw batch samples and explicit baseline comparison. A local smoke measurement has exercised the scenario runner; it does not establish
-a stable baseline or an accepted budget. Tool tests are not measurement evidence;
-platform baselines, production workloads and long-running resource tests still
-require separate runs and acceptance.
+raw batch samples and explicit baseline comparison. Three independent local
+1,000-cycle native checkpoint replacement runs establish a reproducible baseline
+with actual migrated values and resource observations. The fixed two-image workload
+does not establish production budgets, prolonged application stability or platform
+acceptance; those require separate workloads and execution evidence.
 
 Remaining integration work includes the other typed Runtime operations, broader
 interface and ABI contracts, more Cordis/Harness ecosystem and module-boundary

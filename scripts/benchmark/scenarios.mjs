@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { Context, FiberState } from '../../packages/compat-cordis/index.js';
 import { loadRustModule } from '../../packages/compat-loader/rust-module.js';
 import { selectNativeArtifact } from '../../packages/compat-cordis/native-artifacts.js';
+import { checkpointStorage, RECLAIMED_STORAGE_SCHEMA } from './statistics.mjs';
 export const scenarios=Object.freeze({
   'native.lifecycle':{batch:20,unit:'mount-setup-cleanup-remove cycle',description:'Rust shared driver through JSON and N-API, including command encoding/decoding; not isolated kernel CPU time'},
   'facade.syncService':{batch:500,unit:'call',description:'Committed JS service lookup and synchronous method call'},
@@ -62,11 +63,15 @@ export async function prepareScenario(name,{fixturePath,dynamicFixtures,fanout,s
       const stats=ctx.snapshot().storage;
       assert.equal(stats.registeredPlugins,fanout+2);assert.equal(stats.liveBindings,fanout);
       assert.equal(stats.liveLeases,fanout);assert.equal(stats.pendingActions,0);
-    },checkpoint(){return {completedCycles:cycles,storage:ctx.snapshot().storage};},async close(){
+      if(checkpointStorage(stats).storageSchema===RECLAIMED_STORAGE_SCHEMA) {
+        assert.equal(stats.leaseRecords,fanout);assert.equal(stats.leaseAllocations,(cycles+1)*fanout);
+      }
+    },checkpoint(){return {completedCycles:cycles,...checkpointStorage(ctx.snapshot().storage)};},async close(){
       await ctx.dispose();
       assert.equal(providerCleanups,cycles+1);assert.equal(consumerCleanups,(cycles+1)*fanout);
       const stats=ctx.snapshot().storage;
       for(const key of ['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'])assert.equal(stats[key],0,key);
+      if(checkpointStorage(stats).storageSchema===RECLAIMED_STORAGE_SCHEMA)assert.equal(stats.leaseRecords,0);
     }};
   }
   if(name==='facade.settledReadiness') {
@@ -206,9 +211,12 @@ async function prepareCheckpointReplacement(dynamicFixtures,fanout) {
       const storage=ctx.snapshot().storage;
       assert.equal(storage.registeredPlugins,fanout+3);assert.equal(storage.liveBindings,fanout+1);
       assert.equal(storage.liveLeases,fanout+1);assert.equal(storage.publishedValues,3);assert.equal(storage.pendingActions,0);
+      if(checkpointStorage(storage).storageSchema===RECLAIMED_STORAGE_SCHEMA) {
+        assert.equal(storage.leaseRecords,fanout+1);assert.equal(storage.leaseAllocations,(cycles+1)*(fanout+1));
+      }
     },
     checkpoint() {
-      return {completedCycles:cycles,storage:ctx.snapshot().storage,native:checkNative(),logical:{...logical},currentFiberId,previousFiberId,providerSetups,providerCleanups,consumerSetups,consumerCleanups};
+      return {completedCycles:cycles,...checkpointStorage(ctx.snapshot().storage),native:checkNative(),logical:{...logical},currentFiberId,previousFiberId,providerSetups,providerCleanups,consumerSetups,consumerCleanups};
     },
     async close() {
       if(closed)return;
@@ -221,7 +229,9 @@ async function prepareCheckpointReplacement(dynamicFixtures,fanout) {
       if(failures.length)throw new AggregateError(failures,'Native checkpoint benchmark cleanup failed');
       if(!aborting) {assert.equal(providerCleanups,cycles+1);assert.equal(consumerCleanups,(cycles+1)*fanout);}
       assert.throws(()=>firstHandle.read(),/STALE|no longer admitted/);
-      for(const key of ['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'])assert.equal(ctx.snapshot().storage[key],0,key);
+      const storage=ctx.snapshot().storage;
+      for(const key of ['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'])assert.equal(storage[key],0,key);
+      if(checkpointStorage(storage).storageSchema===RECLAIMED_STORAGE_SCHEMA)assert.equal(storage.leaseRecords,0);
       checkNative(true);closed=true;
     },
   };

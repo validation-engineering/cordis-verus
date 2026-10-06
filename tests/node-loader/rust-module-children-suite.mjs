@@ -37,7 +37,7 @@ async function environment(profile, config = {}, hook) {
   } catch (error) { await ctx.dispose(); throw error; }
 }
 
-for (const profile of ['cordis', 'harness']) {
+export function registerChildrenTests(profile) {
   test(`native publication creates a real provider child and can be withdrawn and republished (${profile})`, async () => {
     const { ctx, controller, manager, trace } = await environment(profile);
     try {

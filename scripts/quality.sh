@@ -11,6 +11,6 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 RUSTDOCFLAGS="${RUSTDOCFLAGS:-} -D warnings" cargo doc --workspace --no-deps --locked
 ./scripts/check.sh
 node scripts/build-node.mjs "$@"
-node --test --test-timeout=30000 --test-reporter=tap tests/node-compat/*.test.mjs tests/node-loader/*.test.mjs tests/benchmarks/*.test.mjs
+node --test --test-concurrency=4 --test-timeout=30000 --test-reporter=tap tests/node-compat/*.test.mjs tests/node-loader/*.test.mjs tests/benchmarks/*.test.mjs
 python3 scripts/package-check.py "$@"
 node scripts/check-npm-package.mjs

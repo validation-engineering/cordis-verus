@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SCHEMA,compareReports,digest,summarize,validateReport } from '../../scripts/benchmark/statistics.mjs';
+import { readFile } from 'node:fs/promises';
+import { LEGACY_STORAGE_SCHEMA,RECLAIMED_STORAGE_SCHEMA,SCHEMA,checkpointStorage,compareReports,digest,summarize,validateReport } from '../../scripts/benchmark/statistics.mjs';
 import { parseBaseline,parseOptions } from '../../scripts/benchmark.mjs';
 function fixture(samples=[1,2,3,4,5]) {
   const sourceHashes={'runtime.js':digest('source')};
@@ -76,4 +77,77 @@ test('native checkpoint reports require two distinct versioned fixture hashes',(
   // Existing reports remain valid; optional evidence is still checked when present.
   const report=fixture();report.inputs.dynamicFixtureSha256={v1:digest('v1'),v2:digest('v2')};
   assert.equal(validateReport(report),report);
+});
+
+
+function residentFixture(schema) {
+  const report=fixture([1,2]);
+  report.method={...report.method,warmup:0,scale:1,fanout:2,scenarios:['facade.residentReplace']};
+  const result=report.results[0];result.name='facade.residentReplace';result.unit='provider replacement cycle';result.iterationsPerSample=10;
+  result.checkpoints=[0,10,20,20].map((cycles,index)=>{
+    const closed=index===3,live=closed?0:2,allocations=2*(cycles+1);
+    return {stage:index===0?'initial':closed?'closed':'sample',...(index>0&&!closed?{batch:index}:{}),completedCycles:cycles,
+      ...(schema?{storageSchema:schema}:{}),
+      storage:{registeredPlugins:closed?0:4,identitySlots:4+cycles,declarationRecords:4,bindingRecords:allocations,
+        liveBindings:live,publicationRecords:cycles+1,leaseRecords:schema===RECLAIMED_STORAGE_SCHEMA?live:allocations,
+        ...(schema===RECLAIMED_STORAGE_SCHEMA?{leaseAllocations:allocations}:{}),liveLeases:live,publishedValues:closed?0:1,pendingActions:0},
+      memoryBytes:{rss:1,heapTotal:1,heapUsed:1,external:0,arrayBuffers:0,maxRssBytes:1}};
+  });
+  return report;
+}
+
+test('checkpoint storage tags preserve raw old/new snapshots without synthesized allocations',()=>{
+  const legacy={leaseRecords:62,liveLeases:2},current={leaseRecords:2,liveLeases:2,leaseAllocations:62};
+  assert.equal(checkpointStorage(legacy).storage,legacy);assert.equal(checkpointStorage(current).storage,current);
+  assert.equal(checkpointStorage(legacy).storageSchema,LEGACY_STORAGE_SCHEMA);
+  assert.equal(checkpointStorage(current).storageSchema,RECLAIMED_STORAGE_SCHEMA);
+  assert.equal(Object.hasOwn(legacy,'leaseAllocations'),false);
+});
+
+test('historical untagged and newly tagged legacy checkpoints retain their original lease semantics',async()=>{
+  for(const schema of [undefined,LEGACY_STORAGE_SCHEMA,RECLAIMED_STORAGE_SCHEMA])assert.equal(validateReport(residentFixture(schema)).status,'passed');
+  for(const name of ['2026-10-06-resident-before.json','2026-10-06-resident-after.json','2026-10-06-native-checkpoint-run1.json']) {
+    const report=JSON.parse(await readFile(new URL('../../docs/performance/'+name,import.meta.url),'utf8'));
+    const original=JSON.stringify(report);
+    assert.equal(validateReport(report),report);
+    assert.equal(JSON.stringify(report),original,'Validation must not rewrite historical observations');
+    for(const result of report.results)for(const point of result.checkpoints) {
+      assert.equal(Object.hasOwn(point,'storageSchema'),false);assert.equal(Object.hasOwn(point.storage,'leaseAllocations'),false);
+    }
+  }
+});
+
+test('storage schema rejects missing, mixed, unknown or inconsistent allocation semantics',()=>{
+  for(const mutate of [
+    r=>delete r.results[0].checkpoints[1].storageSchema,
+    r=>r.results[0].checkpoints[1].storageSchema=null,
+    r=>r.results[0].checkpoints[1].storageSchema='unknown',
+    r=>r.results[0].checkpoints[1].storageSchema=LEGACY_STORAGE_SCHEMA,
+    r=>delete r.results[0].checkpoints[1].storage.leaseAllocations,
+    r=>r.results[0].checkpoints[1].storage.leaseAllocations=1,
+    r=>r.results[0].checkpoints[1].storage.leaseAllocations++,
+    r=>r.results[0].checkpoints[1].storage.leaseRecords=22,
+    r=>r.results[0].checkpoints.at(-1).storage.leaseRecords=1,
+    r=>r.results[0].checkpoints.at(-1).storage.leaseAllocations++,
+  ]) {
+    const report=residentFixture(RECLAIMED_STORAGE_SCHEMA);mutate(report);
+    assert.throws(()=>validateReport(report),/checkpoint/i);
+  }
+  const legacy=residentFixture(LEGACY_STORAGE_SCHEMA);legacy.results[0].checkpoints[1].storage.leaseRecords--;
+  assert.throws(()=>validateReport(legacy),/allocation history/);
+  const mixed=residentFixture(LEGACY_STORAGE_SCHEMA);
+  mixed.results[0].checkpoints[1]=residentFixture(RECLAIMED_STORAGE_SCHEMA).results[0].checkpoints[1];
+  assert.throws(()=>validateReport(mixed),/storage schema changed/);
+});
+
+test('same-harness latency comparison exposes old/new storage semantics and still pins old source',()=>{
+  const baseline=residentFixture(LEGACY_STORAGE_SCHEMA),candidate=residentFixture(RECLAIMED_STORAGE_SCHEMA);
+  candidate.inputs.sourceHashes['runtime.js']=digest('reclaimed leases');candidate.inputs.sourceDigest=digest(candidate.inputs.sourceHashes);
+  assert.throws(()=>compareReports(candidate,baseline,{threshold:0}),/source changed/);
+  const comparison=compareReports(candidate,baseline,{threshold:0,baselineSource:baseline.inputs.sourceDigest});
+  assert.equal(comparison.status,'passed');assert.equal(comparison.crossSource,true);
+  assert.equal(comparison.comparisons[0].baselineStorageSchema,LEGACY_STORAGE_SCHEMA);
+  assert.equal(comparison.comparisons[0].candidateStorageSchema,RECLAIMED_STORAGE_SCHEMA);
+  assert.equal(comparison.comparisons[0].ratio,1);
+  assert.equal(Object.hasOwn(baseline.results[0].checkpoints[0].storage,'leaseAllocations'),false);
 });

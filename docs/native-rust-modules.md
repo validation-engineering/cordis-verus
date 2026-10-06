@@ -284,7 +284,7 @@ they do not implement the statically linked typed adapter's shared-slot
 `ServiceHandle::set()` or transfer arbitrary Rust memory between libraries.
 
 The `native-children` fixture and
-[`rust-module-children.test.mjs`](../tests/node-loader/rust-module-children.test.mjs)
+[`rust-module-children-suite.mjs`](../tests/node-loader/rust-module-children-suite.mjs)
 exercise publication, named and nested children, isolation, consumer barriers,
 cleanup retry, failed allocation observers and replacement through real cdylibs.
 The extracted npm package smoke creates and removes both kinds of child.

@@ -1,5 +1,19 @@
 import { createHash } from 'node:crypto';
 export const SCHEMA='cordis-verus.benchmark/v1';
+export const LEGACY_STORAGE_SCHEMA='cordis-driver.storage/lease-records-v1';
+export const RECLAIMED_STORAGE_SCHEMA='cordis-driver.storage/lease-records-v2';
+// Preserve raw snapshots. Old drivers retain all lease records and do not expose
+// the allocation counter; never synthesize the new field for a historical run.
+export function checkpointStorage(storage) {
+  return {storageSchema:Object.hasOwn(storage,'leaseAllocations')?RECLAIMED_STORAGE_SCHEMA:LEGACY_STORAGE_SCHEMA,storage};
+}
+function checkpointStorageSchema(point) {
+  const schema=Object.hasOwn(point,'storageSchema')?point.storageSchema:LEGACY_STORAGE_SCHEMA;
+  const allocations=Object.hasOwn(point.storage??{},'leaseAllocations');
+  if(![LEGACY_STORAGE_SCHEMA,RECLAIMED_STORAGE_SCHEMA].includes(schema)
+    ||allocations!==(schema===RECLAIMED_STORAGE_SCHEMA))throw new Error('Invalid resident checkpoint storage schema');
+  return schema;
+}
 export function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value==='object') return Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,item])=>[key,canonical(item)]));
@@ -22,15 +36,26 @@ export function validateCheckpoints(result,method) {
     ||result.iterationsPerSample!==10*method.scale||result.unitsPerSample!==result.iterationsPerSample))throw new Error('Native checkpoint replacement units do not match its batch size');
   const points=result.checkpoints,total=method.warmup+method.samples;
   if(!Array.isArray(points)||points.length!==total+2||!Number.isSafeInteger(result.iterationsPerSample)||result.iterationsPerSample<=0)throw new Error('Incomplete resident checkpoints');
-  const counters=['registeredPlugins','identitySlots','declarationRecords','bindingRecords','liveBindings','publicationRecords','leaseRecords','liveLeases','publishedValues','pendingActions'];
+  const storageSchema=checkpointStorageSchema(points[0]);
+  const reclaimed=storageSchema===RECLAIMED_STORAGE_SCHEMA;
+  const counters=['registeredPlugins','identitySlots','declarationRecords','bindingRecords','liveBindings','publicationRecords','leaseRecords','liveLeases','publishedValues','pendingActions',...(reclaimed?['leaseAllocations']:[])];
   for(const [index,point] of points.entries()) {
     const closed=index===total+1,cycles=Math.min(index,total)*result.iterationsPerSample;
     const stage=index===0?'initial':closed?'closed':index<=method.warmup?'warmup':'sample';
+    if(checkpointStorageSchema(point)!==storageSchema)throw new Error('Resident checkpoint storage schema changed during measurement');
     if(point.stage!==stage||point.completedCycles!==cycles||index>0&&!closed&&point.batch!==index
       ||counters.some(key=>!Number.isSafeInteger(point.storage?.[key])||point.storage[key]<0)
       ||['rss','heapTotal','heapUsed','external','arrayBuffers','maxRssBytes'].some(key=>!Number.isFinite(point.memoryBytes?.[key])||point.memoryBytes[key]<0))throw new Error('Invalid resident checkpoint');
-    if(index>0&&['identitySlots','publicationRecords','leaseRecords'].some(key=>point.storage[key]<points[index-1].storage[key]))throw new Error('Resident checkpoint lost stable identity history');
-    if(closed&&['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'].some(key=>point.storage[key]!==0))throw new Error('Resident cleanup checkpoint has live resources');
+    if(index>0&&['identitySlots','publicationRecords',reclaimed?'leaseAllocations':'leaseRecords'].some(key=>point.storage[key]<points[index-1].storage[key]))throw new Error('Resident checkpoint lost stable identity history');
+    if(reclaimed&&(point.storage.leaseRecords!==point.storage.liveLeases
+      ||point.storage.leaseAllocations<point.storage.leaseRecords))throw new Error('Resident checkpoint lease records do not match live resources');
+    if(required) {
+      const allocationCount=reclaimed?point.storage.leaseAllocations:point.storage.leaseRecords;
+      const perCycle=method.fanout+(result.name==='rust.checkpointReplace'?1:0);
+      if(!Number.isSafeInteger(method.fanout)||method.fanout<1
+        ||allocationCount!==(cycles+1)*perCycle)throw new Error('Resident checkpoint lease allocation history is incomplete');
+    }
+    if(closed&&['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions',...(reclaimed?['leaseRecords']:[])].some(key=>point.storage[key]!==0))throw new Error('Resident cleanup checkpoint has live resources');
     if(result.name==='rust.checkpointReplace')validateNativeCheckpoint(point,method,closed);
   }
 }
@@ -88,7 +113,8 @@ export function compareReports(candidate,baseline,{threshold,metric='p95',baseli
     if(result.unitsPerSample!==prior.unitsPerSample||result.unit!==prior.unit) throw new Error('Stale baseline: scenario units changed');
     const current=result.statistics.nanosecondsPerUnit[metric],previous=prior.statistics.nanosecondsPerUnit[metric];
     const ratio=current/previous;
-    return {name:result.name,metric,baselineNanoseconds:previous,candidateNanoseconds:current,ratio,regressed:ratio>1+threshold};
+    return {name:result.name,metric,baselineNanoseconds:previous,candidateNanoseconds:current,ratio,regressed:ratio>1+threshold,
+      ...(result.checkpoints?{baselineStorageSchema:checkpointStorageSchema(prior.checkpoints[0]),candidateStorageSchema:checkpointStorageSchema(result.checkpoints[0])}:{})};
   });
   return {status:comparisons.some(item=>item.regressed)?'performance-regression':'passed',threshold,metric,
     baselineSourceDigest:baseline.inputs.sourceDigest,candidateSourceDigest:candidate.inputs.sourceDigest,crossSource:candidate.inputs.sourceDigest!==baseline.inputs.sourceDigest,comparisons};

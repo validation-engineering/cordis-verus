@@ -47,19 +47,26 @@ runtime 每累计 256 次 episode 清理或节点删除，自动安排一次回�
 | `bindingRecords` / `liveBindings` | Stored commitment history versus bindings still committed by present episodes |
 | `declarationRecords` | Kernel interface declaration records, including records not yet compacted |
 | `publicationRecords` / `publishedValues` | Allocated publication identities versus values still retained for lookup or cleanup |
-| `leaseRecords` / `liveLeases` | Allocated lease identities versus leases still held by present episodes |
+| `leaseRecords` / `liveLeases` | Physically stored active lease records versus leases held by present episodes; both include failed cleanup |
+| `leaseAllocations` | Cumulative successful lease allocations; the monotonic ID high-water mark, not stored history |
 | `pendingActions` | Setup/cleanup actions awaiting their real completion ticket |
 
 These observations do not drive callbacks or reclaim resources. A failed consumer
 inverse continues to hold its live lease and provider value until cleanup succeeds.
 A successful shutdown reaches zero registered plugins, live bindings, live leases,
-published values and pending actions; identity/publication/lease record counts can
-remain nonzero. Counters are record counts, not allocator capacity or exact bytes.
+published values, pending actions and stored lease records; node identity and
+publication histories, plus the cumulative lease allocation count, can remain nonzero. Counters are record counts, not allocator capacity or exact bytes.
 The Node shared Driver now runs the same verified binding/declaration filters as
 the ordinary Rust Runtime after every 256 successful cleanup/removal changes.
 Failed cleanup does not count as completion; still-committed bindings survive
-maintenance. Stable identity, publication and lease tombstones remain; this policy
-does not imply constant space.
+maintenance. Successful lease release immediately removes its physical record,
+including releases behind an older still-active lease. Lease IDs are never reused;
+a token below the allocation high-water mark that has no active record remains
+`Released`, while a token never allocated remains `Unknown`. The registry's
+`lease(id)` diagnostic now returns only active records; it no longer preserves a
+released lease's old publication. Releasing an already released token cannot affect
+another consumer. Node and publication histories still remain, and Vec capacity can
+retain an earlier peak of simultaneous leases, so this does not imply constant RSS.
 
 The [resident lifecycle measurements](benchmarks.md#resident-lifecycle-history)
 record these counters alongside process memory and batch latency across repeated

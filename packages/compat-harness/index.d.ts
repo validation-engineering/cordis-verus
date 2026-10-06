@@ -46,7 +46,7 @@ export namespace Plugin {
 }
 export interface Events { [name: string | symbol]: (...args: any[]) => any; }
 export interface EventOptions { prepend?: boolean; global?: boolean; }
-/** Record counts, not allocated bytes. Stable identity/lease tombstones are included. */
+/** Record counts, not allocated bytes. Node/publication tombstones remain; released lease records are removed. */
 export interface DriverStorageStats {
   registeredPlugins: number;
   identitySlots: number;
@@ -54,7 +54,10 @@ export interface DriverStorageStats {
   bindingRecords: number;
   liveBindings: number;
   publicationRecords: number;
+  /** Actual stored lease records, including leases held by failed cleanup. */
   leaseRecords: number;
+  /** Cumulative successful allocations; lease IDs never repeat. */
+  leaseAllocations: number;
   liveLeases: number;
   publishedValues: number;
   pendingActions: number;

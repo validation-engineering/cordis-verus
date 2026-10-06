@@ -79,7 +79,7 @@ owned child、独立 owner anchor、ready/retire/join 与 cleanup retry；定义
 | --- | --- | --- |
 | 独立 Rust 模块扩展 | 首版 C ABI 的同进程换代、失败恢复、配置 reconcile、普通 Loader 插件与常驻映像预算已实现；反向 JSON 服务与双向流/对象及 JS callback 已接入；真实 owned child 与动态 factory publication 已接入；显式状态迁移和事务回滚快照已接入；继续处理跨平台运行保障与长期驻留成本 | 同图真实 native 场景、失败保留、跨平台执行；物理卸载需要额外资源和代码引用证明，不以逻辑清理冒充 |
 | 隔离宿主扩展 | ProcessDomain 与 Harness Web/standard opt-in watcher 已接入；继续扩展 CLI 覆盖和运行保障 | 默认应用的模块更新、客户端重连、候选失败恢复；应用 addon 需真实进程隔离与验收 |
-| 长期运行成本 | 已测量 1,000 次驻留生命周期并自动回收失效 binding；新增 3 次独立的 1,000 轮 checkpoint 原生换代基准，活动资源和快照凭据有界且关闭归零，固定两份代码映像；identity/publication/lease tombstone 仍增长，见[实测](benchmarks.md#2026-10-06-checkpoint-replacement-baseline) | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
+| 长期运行成本 | 已测量 1,000 次驻留生命周期并自动回收失效 binding；新增 3 次独立的 1,000 轮 checkpoint 原生换代基准，活动资源和快照凭据有界且关闭归零，固定两份代码映像；已将单调 LeaseId 与活跃记录分离，释放即回收，失败 cleanup 仍保留租约；identity/publication tombstone 仍增长，见[实测](benchmarks.md#2026-10-06-lease-record-reclamation) | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
 | 模块依赖图精化 | 当前图只记录已执行的 Node 解析，执行器保守替换整个 Worker | 完整安装图、未执行动态导入、可保留 identity 的模块边界；不能用观测图冒充静态完备图 |
 | 剩余 typed Rust 接口 | 已接入新建/撤销 publication 与子插件；继续处理 effect group、每 Fiber 动态 injection config、更新 hook 与反向 typed JS 服务 | 同图 Rust/JS 生命周期与权限一致，真实子图及失败路径验收；保留现有槽位和 cleanup 合同 |
 

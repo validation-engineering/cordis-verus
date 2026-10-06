@@ -393,3 +393,122 @@ fn reservation_adoption_preserves_identity_and_requires_unleased_initial_generat
         Err(PublicationError::Unknown)
     );
 }
+
+#[test]
+fn releasing_middle_records_preserves_logical_identity_and_other_publications() {
+    let mut registry = PublicationRegistry::new();
+    let publications: Vec<_> = (0..4)
+        .map(|i| {
+            registry
+                .publish(i as usize, 1, port(i), 100 + i as usize)
+                .unwrap()
+        })
+        .collect();
+    let tokens: Vec<_> = (0..12)
+        .map(|i| registry.acquire(publications[i % 4]).unwrap())
+        .collect();
+    let mut live = [true; 12];
+    // Removing from the middle, beginning and end must not reinterpret IDs as
+    // their current Vec positions or release a surviving consumer's lease.
+    for index in [5, 0, 11, 3, 1, 8, 6, 2, 10, 4, 9, 7] {
+        registry.release(tokens[index]).unwrap();
+        live[index] = false;
+        assert_eq!(registry.lease_allocation_count(), 12);
+        assert_eq!(
+            registry.lease_record_count(),
+            live.iter().filter(|v| **v).count()
+        );
+        for (i, token) in tokens.iter().enumerate() {
+            if live[i] {
+                assert_eq!(
+                    registry.lease(*token).unwrap().publication,
+                    publications[i % 4]
+                );
+                assert_eq!(registry.leased_slot(*token), Ok(100 + i % 4));
+            } else {
+                assert_eq!(registry.lease(*token), None);
+                assert_eq!(
+                    registry.leased_slot(*token),
+                    Err(PublicationError::Released)
+                );
+                assert_eq!(registry.release(*token), Err(PublicationError::Released));
+            }
+        }
+    }
+    let fresh = registry.acquire(publications[0]).unwrap();
+    assert_eq!(fresh, LeaseId(12));
+    assert_eq!(registry.leased_slot(fresh), Ok(100));
+    for token in tokens {
+        assert_eq!(registry.release(token), Err(PublicationError::Released));
+    }
+    assert_eq!(registry.lease_record_count(), 1);
+    assert_eq!(registry.leased_slot(fresh), Ok(100));
+}
+
+#[test]
+fn unrelated_churn_does_not_collect_a_revoked_publications_old_cleanup_lease() {
+    let mut registry = PublicationRegistry::new();
+    let old = registry.publish(1, 1, port(1), 10).unwrap();
+    let pinned = registry.acquire(old).unwrap();
+    registry.revoke(old).unwrap();
+    let replacement = registry.publish(2, 1, port(1), 11).unwrap();
+    let first_released = registry.acquire(replacement).unwrap();
+    registry.release(first_released).unwrap();
+    for _ in 0..1_000 {
+        let transient = registry.acquire(replacement).unwrap();
+        assert_eq!(registry.leased_slot(transient), Ok(11));
+        registry.release(transient).unwrap();
+        assert_eq!(registry.lease_record_count(), 1);
+        assert_eq!(registry.leased_slot(pinned), Ok(10));
+        assert_eq!(registry.reclaim(old), Err(PublicationError::Relied));
+        assert_eq!(
+            registry.release(first_released),
+            Err(PublicationError::Released)
+        );
+    }
+    assert_eq!(registry.lease_allocation_count(), 1_002);
+    registry.release(pinned).unwrap();
+    assert_eq!(registry.lease_record_count(), 0);
+    assert_eq!(registry.reclaim(old), Ok(10));
+    assert_eq!(registry.resolve(port(1)), Some(replacement));
+    assert_eq!(registry.lease(pinned), None);
+    assert_eq!(
+        registry.leased_slot(pinned),
+        Err(PublicationError::Released)
+    );
+}
+
+#[test]
+fn failed_operations_preserve_live_records_and_allocation_high_water() {
+    let mut registry = PublicationRegistry::new();
+    let publication = registry.publish(1, 1, port(1), 10).unwrap();
+    let active = registry.acquire(publication).unwrap();
+    let released = registry.acquire(publication).unwrap();
+    registry.release(released).unwrap();
+    registry.revoke(publication).unwrap();
+    let before = registry.lease(active);
+    let entry = registry.entry(publication);
+    assert_eq!(
+        registry.acquire(publication),
+        Err(PublicationError::Revoked)
+    );
+    assert_eq!(
+        registry.acquire(PublicationId(999)),
+        Err(PublicationError::Unknown)
+    );
+    assert_eq!(registry.release(released), Err(PublicationError::Released));
+    for unknown in [LeaseId(2), LeaseId(999), LeaseId(usize::MAX)] {
+        assert_eq!(registry.lease(unknown), None);
+        assert_eq!(registry.release(unknown), Err(PublicationError::Unknown));
+        assert_eq!(
+            registry.leased_slot(unknown),
+            Err(PublicationError::Unknown)
+        );
+    }
+    assert_eq!(registry.reclaim(publication), Err(PublicationError::Relied));
+    assert_eq!(registry.lease_record_count(), 1);
+    assert_eq!(registry.lease_allocation_count(), 2);
+    assert_eq!(registry.lease(active), before);
+    assert_eq!(registry.entry(publication), entry);
+    assert_eq!(registry.leased_slot(active), Ok(10));
+}

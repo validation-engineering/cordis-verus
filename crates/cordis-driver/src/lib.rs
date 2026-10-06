@@ -112,7 +112,8 @@ impl Driver {
 
     // Use the verified stable filters also used by the ordinary Rust Runtime.
     // They retain live commitments even while another inverse is pending or
-    // failed. Identity/publication/lease records are deliberately not reused.
+    // failed. Identity/publication records are deliberately not reused. Released
+    // lease records are reclaimed immediately without reusing their identities.
     fn maintain_history(&mut self) {
         self.maintenance_changes += 1;
         if self.maintenance_changes >= 256 {
@@ -882,6 +883,8 @@ impl Driver {
     }
 
     /// Diagnostic observations, not an independent lifecycle state machine.
+    /// `leaseRecords` counts stored live leases; `leaseAllocations` is the
+    /// monotonic allocation count, including leases already released.
     pub fn snapshot(&self) -> Value {
         let plugins: Vec<_> = self.nodes.iter().map(|(&id, node)| {
             let phase = if node.prepared_cleanup { Phase::Unloading } else { self.kernel.phase(id).unwrap() };
@@ -896,6 +899,7 @@ impl Driver {
             "liveBindings": self.nodes.keys().map(|id| self.kernel.committed(*id).len()).sum::<usize>(),
             "publicationRecords": self.publications.publication_records(),
             "leaseRecords": self.publications.lease_record_count(),
+            "leaseAllocations": self.publications.lease_allocation_count(),
             "liveLeases": self.nodes.values().map(|node| node.resources.len()).sum::<usize>(),
             "publishedValues": self.values.len(),
             "pendingActions": self.nodes.values().filter(|node| node.pending.is_some()).count(),

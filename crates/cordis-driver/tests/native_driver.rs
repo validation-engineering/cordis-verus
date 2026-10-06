@@ -399,6 +399,7 @@ fn storage_observations_distinguish_retained_cleanup_from_history() {
     assert_eq!(storage["identitySlots"], 2);
     assert_eq!(storage["publicationRecords"], 1);
     assert_eq!(storage["leaseRecords"], 1);
+    assert_eq!(storage["leaseAllocations"], 1);
     assert_eq!(storage["liveLeases"], 1);
     assert_eq!(storage["liveBindings"], 1);
     assert_eq!(storage["publishedValues"], 1);
@@ -412,6 +413,8 @@ fn storage_observations_distinguish_retained_cleanup_from_history() {
     let failed = driver.snapshot()["storage"].clone();
     assert_eq!(failed["pendingActions"], 0);
     assert_eq!(failed["liveLeases"], 1);
+    assert_eq!(failed["leaseRecords"], 1);
+    assert_eq!(failed["leaseAllocations"], 1);
     assert_eq!(failed["publishedValues"], 1);
     let HostAction::Cleanup { ticket, .. } = driver.retry_cleanup(consumer).unwrap() else {
         panic!("expected retried cleanup");
@@ -434,7 +437,8 @@ fn storage_observations_distinguish_retained_cleanup_from_history() {
     }
     assert_eq!(removed["identitySlots"], 2);
     assert_eq!(removed["publicationRecords"], 1);
-    assert_eq!(removed["leaseRecords"], 1);
+    assert_eq!(removed["leaseRecords"], 0);
+    assert_eq!(removed["leaseAllocations"], 1);
     let next = driver.mount(None, vec![], vec![]).unwrap();
     assert!(next > consumer, "removed identities must never be reused");
     assert_eq!(driver.snapshot()["storage"]["identitySlots"], 3);
@@ -449,13 +453,15 @@ fn automatic_history_maintenance_keeps_failed_cleanup_leases_and_old_tickets_sta
     complete(&mut driver, first.clone());
     let mut largest = 0;
     let mut compacted = false;
-    for _ in 0..600 {
+    for cycle in 1..=600 {
         driver.restart(consumer).unwrap();
         let ticket = only_cleanup(&mut driver, consumer);
         complete(&mut driver, ticket);
         let ticket = setup(&mut driver, consumer);
         complete(&mut driver, ticket);
         let stats = driver.snapshot()["storage"].clone();
+        assert_eq!(stats["leaseRecords"], 1);
+        assert_eq!(stats["leaseAllocations"], cycle + 1);
         let records = stats["bindingRecords"].as_u64().unwrap();
         compacted |= records < largest;
         largest = largest.max(records);
@@ -490,6 +496,8 @@ fn automatic_history_maintenance_keeps_failed_cleanup_leases_and_old_tickets_sta
     }
     let stats = driver.snapshot()["storage"].clone();
     assert_eq!(stats["bindingRecords"], 1);
+    assert_eq!(stats["leaseRecords"], 1);
+    assert_eq!(stats["leaseAllocations"], 601);
     assert_eq!(stats["liveBindings"], 1);
     assert_eq!(stats["liveLeases"], 1);
     assert_eq!(stats["publishedValues"], 1);
@@ -507,6 +515,131 @@ fn automatic_history_maintenance_keeps_failed_cleanup_leases_and_old_tickets_sta
     driver.retire(consumer).unwrap();
     driver.drive().unwrap();
     assert_eq!(driver.snapshot()["storage"]["liveLeases"], 0);
+    assert_eq!(driver.snapshot()["storage"]["leaseRecords"], 0);
+    assert_eq!(driver.snapshot()["storage"]["leaseAllocations"], 601);
     assert_eq!(driver.snapshot()["storage"]["registeredPlugins"], 0);
     assert_eq!(driver.snapshot()["storage"]["identitySlots"], 302);
+}
+
+#[test]
+fn unrelated_leases_are_reclaimed_behind_an_old_failed_cleanup_lease() {
+    const OTHER_PORT: ServicePort = ServicePort { key: 2, realm: 0 };
+    const CYCLES: u64 = 300;
+    let mut driver = Driver::new().unwrap();
+    let (provider, provider_generation, publication) = active_provider(&mut driver, 42);
+    let consumer = driver.mount(None, vec![PORT], vec![]).unwrap();
+    let ticket = setup(&mut driver, consumer);
+    let consumer_generation = ticket.generation;
+    let consumer_id = consumer.to_string();
+    complete(&mut driver, ticket);
+    driver
+        .revoke(provider, provider_generation, publication)
+        .unwrap();
+    driver.retire(provider).unwrap();
+    let failed_ticket = only_cleanup(&mut driver, consumer);
+    driver
+        .complete(failed_ticket.clone(), false, Some("inverse blocked".into()))
+        .unwrap();
+    assert!(driver.resolve(PORT, None, None).unwrap().is_none());
+    assert!(driver.drive().unwrap().is_empty());
+
+    let unrelated_provider = driver.mount(None, vec![], vec![]).unwrap();
+    let ticket = setup(&mut driver, unrelated_provider);
+    driver
+        .publish(unrelated_provider, ticket.generation, OTHER_PORT, 900)
+        .unwrap();
+    complete(&mut driver, ticket);
+    // The oldest lease stays live throughout churn. Reclaiming only an inactive
+    // prefix would retain every unrelated lease released behind this one.
+    for cycle in 1..=CYCLES {
+        let unrelated = driver.mount(None, vec![OTHER_PORT], vec![]).unwrap();
+        let ticket = setup(&mut driver, unrelated);
+        let generation = ticket.generation;
+        complete(&mut driver, ticket);
+        let active = driver.snapshot()["storage"].clone();
+        assert_eq!(active["leaseRecords"], 2);
+        assert_eq!(active["liveLeases"], 2);
+        assert_eq!(active["leaseAllocations"], cycle + 1);
+        assert_eq!(
+            driver
+                .resolve(OTHER_PORT, Some(unrelated), Some(generation))
+                .unwrap()
+                .unwrap()["value"],
+            "900"
+        );
+        driver.retire(unrelated).unwrap();
+        let cleanup = only_cleanup(&mut driver, unrelated);
+        complete(&mut driver, cleanup);
+        let released = driver.snapshot()["storage"].clone();
+        assert_eq!(released["leaseRecords"], 1);
+        assert_eq!(released["liveLeases"], 1);
+        assert_eq!(released["leaseAllocations"], cycle + 1);
+        assert_eq!(
+            driver.drive().unwrap(),
+            vec![HostAction::Removed { id: unrelated }]
+        );
+        let retained = driver
+            .resolve(PORT, Some(consumer), Some(consumer_generation))
+            .unwrap()
+            .unwrap();
+        assert_eq!(retained["publication"], publication.to_string());
+        assert_eq!(retained["value"], "42");
+        assert!(driver.snapshot()["plugins"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|node| node["id"].as_str() == Some(consumer_id.as_str())
+                && node["cleanupFailed"] == true));
+    }
+    assert_eq!(
+        driver.complete(failed_ticket, true, None).unwrap_err().code,
+        "StaleAction"
+    );
+    assert_eq!(driver.snapshot()["storage"]["leaseRecords"], 1);
+    driver.retire(unrelated_provider).unwrap();
+    let cleanup = only_cleanup(&mut driver, unrelated_provider);
+    complete(&mut driver, cleanup);
+    assert_eq!(
+        driver.drive().unwrap(),
+        vec![HostAction::Removed {
+            id: unrelated_provider
+        }]
+    );
+    assert_eq!(driver.snapshot()["storage"]["publishedValues"], 1);
+    assert_eq!(
+        driver
+            .resolve(PORT, Some(consumer), Some(consumer_generation))
+            .unwrap()
+            .unwrap()["value"],
+        "42"
+    );
+
+    let HostAction::Cleanup { ticket, .. } = driver.retry_cleanup(consumer).unwrap() else {
+        panic!("expected cleanup retry")
+    };
+    complete(&mut driver, ticket);
+    assert_eq!(driver.snapshot()["storage"]["leaseRecords"], 0);
+    let cleanup = only_cleanup(&mut driver, provider);
+    complete(&mut driver, cleanup);
+    assert_eq!(
+        driver.drive().unwrap(),
+        vec![HostAction::Removed { id: provider }]
+    );
+    driver.retire(consumer).unwrap();
+    assert_eq!(
+        driver.drive().unwrap(),
+        vec![HostAction::Removed { id: consumer }]
+    );
+    let closed = driver.snapshot()["storage"].clone();
+    for key in [
+        "leaseRecords",
+        "liveLeases",
+        "liveBindings",
+        "publishedValues",
+        "registeredPlugins",
+        "pendingActions",
+    ] {
+        assert_eq!(closed[key], 0, "{key}");
+    }
+    assert_eq!(closed["leaseAllocations"], CYCLES + 1);
 }

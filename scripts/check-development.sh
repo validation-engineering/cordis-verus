@@ -24,7 +24,7 @@ for source in crates/cordis/examples/*.rs; do
 done
 node scripts/build-node.mjs "$@"
 echo 'BEGIN NODE COMPATIBILITY TESTS'
-node --test --test-timeout=30000 --test-reporter=tap tests/node-compat/*.test.mjs tests/node-loader/*.test.mjs tests/benchmarks/*.test.mjs
+node --test --test-concurrency=4 --test-timeout=30000 --test-reporter=tap tests/node-compat/*.test.mjs tests/node-loader/*.test.mjs tests/benchmarks/*.test.mjs
 echo 'END NODE COMPATIBILITY TESTS'
 python3 scripts/package-check.py "$@"
 node scripts/check-npm-package.mjs

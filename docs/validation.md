@@ -17,6 +17,14 @@ dispatched and runs `quality.sh` on the same matrix. Green development CI does
 not mean full release acceptance. No workflow publishes packages.
 Both retain logs and artifacts; full validation also retains negative reports.
 
+The development/release Node suites and `npm run test:node` use four concurrent
+test files, with the same 30-second timeout and complete test set. This bounds
+competition between independent native-library fixtures on machines with many
+logical CPUs; it does not skip tests or increase their timeout.
+Native checkpoint and child tests use separate Cordis/Harness profile entrypoints
+with shared test bodies. Each profile has its own file deadline; all original
+cases, assertions and individual timeouts remain in the suite.
+
 ## Reproduce locally
 
 Install Rustup, Python 3.9+, Git and curl:
