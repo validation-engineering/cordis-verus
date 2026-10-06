@@ -6,11 +6,13 @@
 
 cordis-verus implements [Cordis](https://github.com/cordiverse/cordis) plugin lifecycles and reversible effects in Rust. Plugins declare services and dependencies; the runtime coordinates activation, provider changes, and cleanup. The kernel is executable Rust: the same source is verified by [Verus](https://github.com/verus-lang/verus) and compiled by Cargo.
 
+The project connects formal methods to running software while aligning with Cordis functionality. Follow the [paper-to-code review paths](docs/paper-review-guide.md) to inspect lifecycle contracts, or explore [functional alignment](docs/comparison.md) through original plugins and official Harness workflows.
+
 Use it to build Rust plugin systems, host supported Cordis JavaScript plugins through a native Node adapter, or compose Rust and JavaScript plugins in one lifecycle graph.
 
-**Status:** Experimental, pre-1.0. APIs are evolving, and the crates and npm packages are not yet published. See [verification scope](#verification-scope) for the distinction between kernel proofs, runtime tests, and application compatibility.
+**Status:** Experimental, pre-1.0. APIs are evolving, and the crates and npm packages are not yet published. See [current progress and next steps](#current-progress-and-next-steps) for remaining work, and [verification scope](#verification-scope) for the distinction between kernel proofs, runtime tests, and application compatibility.
 
-Part of [Validation Engineering](https://github.com/validation-engineering): connecting specifications, executable code, and reproducible evidence. Start with the [evidence guide](docs/evidence-guide.md) for a runnable lifecycle case, an upstream comparison, and paper-to-code review paths.
+Part of [Validation Engineering](https://github.com/validation-engineering): connecting specifications, executable code, and reproducible evidence. Start with the [evidence guide](docs/evidence-guide.md) for paper-to-code review paths, supported Cordis functionality, and a runnable lifecycle case.
 
 ## Features
 
@@ -108,6 +110,26 @@ The last recorded local development run includes:
 The [development report](docs/development-report.json) binds results to source and artifact hashes. These are verification obligations and tests, not a count of proved paper theorems. Other platforms require their own execution evidence.
 
 The semantic reference is [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1). Full host-to-paper refinement and the complete release gate remain open. The [paper ledger](docs/paper-coverage.md) records completed, partial, and refuted claims; the [paper audit](docs/paper-audit.md) explains their scope. A passing development run does not substitute for the release gate's full negative-control suite.
+
+## Current progress and next steps
+
+Status overview as of **2026-10-07**. Results below refer to the linked source-bound snapshots; implementation progress, formal proof coverage and application acceptance are tracked separately.
+
+| Area | Current progress | Remaining scope |
+| --- | --- | --- |
+| Executable lifecycle kernel | The same Rust source is verified by Verus and compiled into the runtime; [development evidence](docs/development-report.json) covers local proofs, tests and package checks. | General host refinement, including asynchronous callbacks, FFI and external I/O, remains open. |
+| Paper correspondence | The [81-item ledger](docs/paper-coverage.md) records 42 `formalized`, 17 `proved`, 18 `partial` and 4 `refuted` items. | Four integration obligations remain open. A formalized definition is not a proved theorem; refuted original claims retain their counterexamples. |
+| Cordis functional alignment | Rust and Node plugin paths, two compatibility profiles, configuration updates and supported reload mechanisms are implemented. The [archived core comparison](docs/evidence/README.md) records upstream 87/87 and native 83/87. | Two intentional contract differences and two compatibility gaps remain; broader third-party plugin coverage needs validation. |
+| Application integration | The companion [Harness acceptance](https://github.com/validation-engineering/cordis-harness/blob/main/docs/official-validation-report.json) covers pinned official Web/standard and headless workflows with JS/Rust extensions. | This is application test evidence. Cross-platform acceptance and a full release gate are still pending. |
+
+The next priorities are:
+
+1. **Restore reproducible setup and CI.** Establish a durable source for the pinned Verus archives, preserving their versions and checksums. The [recorded CI failure](https://github.com/validation-engineering/cordis-verus/actions/runs/37490393141) occurred because the old rolling-release assets returned HTTP 404.
+2. **Close the identified compatibility gaps.** Align consecutive provider/consumer update coalescing and the error contract for resource registration during cleanup, then rerun the unchanged upstream suites and Harness acceptance. Keep deliberate lifecycle differences documented.
+3. **Extend paper-to-code refinement.** Work through the four integration obligations, including whole-lifecycle behavior, corrected specification, executable simulation and host boundaries. Preserve the distinction between original claims, counterexamples and revised results.
+4. **Complete release evidence.** Finish the full-crate negative-control gate and actual platform-specific builds and application runs, then prepare package publication and independent reproductions.
+
+The [roadmap](docs/roadmap.md) gives detailed deliverables and acceptance criteria, including remaining typed Rust interfaces and module-reload boundaries. These are priorities, not scheduled releases; full paper refinement and production readiness are not yet claimed.
 
 ## Development
 

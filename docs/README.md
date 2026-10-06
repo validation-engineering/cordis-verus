@@ -6,8 +6,8 @@
 
 | Guide | What you can check |
 | --- | --- |
-| [Evidence guide](evidence-guide.md) | Claims, commands, evidence types and remaining publication work |
-| [Comparison with Cordis](comparison.md) | Capabilities, deliberate differences and performance tradeoffs |
+| [Evidence guide](evidence-guide.md) | Formal-methods review, functional alignment and reproducible cases |
+| [Comparison with Cordis](comparison.md) | Lifecycle contracts, supported functionality and known differences |
 | [Lifecycle cleanup case](cases/lifecycle-cleanup.md) | One fixture across two pinned upstreams and two native profiles |
 | [Paper review guide](paper-review-guide.md) | Five exact paper → contract → executable path → regression chains |
 

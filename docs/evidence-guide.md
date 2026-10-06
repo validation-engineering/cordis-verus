@@ -1,23 +1,25 @@
 # Evidence you can inspect and reproduce
 
-cordis-verus is a Validation Engineering project: we connect a software claim to
-its specification, executable implementation, checks and remaining assumptions.
-The practical question here is whether a plugin can finish cleanup while the
-services it already depends on are being replaced or shut down.
+cordis-verus is a Validation Engineering project with two connected goals:
+make lifecycle constraints reviewable in executable Verus Rust, and align with
+Cordis functionality through supported original plugins and real applications.
 
-Start with a case, then follow the contract. A passing test, a proved kernel
-contract and successful application integration establish different things.
+Start with the paper-to-code paths to review the formal-methods work, or the
+official Harness composition to evaluate functional alignment. The lifecycle
+case connects both: a consumer must be able to finish cleanup while its provider
+is being shut down. Kernel proofs, host regressions and application acceptance
+provide evidence at their respective layers.
 
 ## Three entry points
 
 | Question | Start here | Evidence type |
 | --- | --- | --- |
-| Can a consumer still write its final log during asynchronous cleanup? | [Lifecycle cleanup case](cases/lifecycle-cleanup.md) | The same plugin fixture executed on two pinned upstreams and two native profiles |
 | Which paper clause constrains the running code? | [Paper review guide](paper-review-guide.md) | Five paper locations, contracts, executable calls and named regressions |
 | Can this host run a useful existing application? | [cordis-harness](https://github.com/validation-engineering/cordis-harness) | Official Web/standard and headless compositions with original plugins, storage and AgentLoop |
+| Can a consumer still write its final log during asynchronous cleanup? | [Lifecycle cleanup case](cases/lifecycle-cleanup.md) | The same plugin fixture executed on two pinned upstreams and two native profiles |
 
-The [comparison](comparison.md) explains capabilities, behavioral differences and
-costs. The [evidence archive](evidence/README.md) retains differential results,
+The [comparison](comparison.md) connects lifecycle guarantees, supported functionality and
+known differences. The [evidence archive](evidence/README.md) retains differential results,
 including failures. This is an experimental implementation; neither repository
 is a published crate or npm release. Both repositories currently require access.
 
@@ -94,8 +96,7 @@ The next review and release deliverables are:
 
 These are remaining deliverables, not completed adoption claims. Public visibility
 and registry publication are separate decisions. We do not claim paper-wide
-refinement, production readiness, independent external validation or general
-performance superiority.
+refinement, production readiness or independent external validation.
 
 For project operations, track completed external reproductions, real plugin
 integrations, reviewed contract corrections and contributions that keep their

@@ -6,11 +6,13 @@
 
 cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的插件生命周期与可逆效果。插件声明服务和依赖，运行时协调激活、提供者变化和清理。内核是可执行的 Rust：同一份源码接受 [Verus](https://github.com/verus-lang/verus) 验证，并由 Cargo 编译。
 
+项目的主线是将形式化方法落实到运行代码，同时对齐 Cordis 功能。通过[论文到代码的审查路径](docs/paper-review-guide.md)检查生命周期合同，通过原版插件和官方 Harness 工作流检验[功能对齐](docs/comparison.md)。
+
 你可以用它构建 Rust 插件系统，通过原生 Node 适配器运行支持范围内的 Cordis JavaScript 插件，或将 Rust 与 JavaScript 插件组合到同一个生命周期图中。
 
-**项目状态：** 实验性、尚未达到 1.0。API 仍在演进，crate 和 npm 包尚未发布。内核证明、运行时测试与应用兼容性各自的范围见[验证范围](#验证范围)。
+**项目状态：** 实验性、尚未达到 1.0。API 仍在演进，crate 和 npm 包尚未发布。剩余工作见[当前进度与后续计划](#当前进度与后续计划)，内核证明、运行时测试与应用兼容性各自的范围见[验证范围](#验证范围)。
 
-本项目属于 [Validation Engineering](https://github.com/validation-engineering)，连接规格、执行代码与可复现证据。从[证据指南](docs/evidence-guide.md)进入实际清理案例、上游对比与论文到代码的审查路径。
+本项目属于 [Validation Engineering](https://github.com/validation-engineering)，连接规格、执行代码与可复现证据。从[证据指南](docs/evidence-guide.md)进入论文到代码的审查路径、Cordis 功能对齐与实际清理案例。
 
 ## 功能
 
@@ -108,6 +110,26 @@ npm run official
 [开发记录](docs/development-report.json) 将结果绑定到源码和制品哈希。这些数字是验证义务和测试数量，不是已证明的论文定理数量；其他平台需要各自的执行证据。
 
 语义参考为 [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1)。完整宿主到论文的 refinement 和完整发布门槛仍未完成。[论文清单](docs/paper-coverage.md) 记录已完成、部分完成和已反驳的条目，[论文审计](docs/paper-audit.md) 解释具体范围。开发检查通过不能替代发布门槛中的完整负控测试。
+
+## 当前进度与后续计划
+
+以下为 **2026-10-07** 的进度概览。验证结果对应所链接的源码绑定快照；实现进度、形式化证明覆盖和应用验收分别记录。
+
+| 方向 | 当前进度 | 尚未完成的范围 |
+| --- | --- | --- |
+| 可执行生命周期内核 | 同一份 Rust 源码接受 Verus 验证并编译进入运行时；[开发证据](docs/development-report.json)覆盖本机证明、测试和包检查。 | 包括异步回调、FFI 与外部 I/O 在内的一般宿主 refinement 仍未完成。 |
+| 论文对应 | [81 项清单](docs/paper-coverage.md)记录 42 项 `formalized`、17 项 `proved`、18 项 `partial`、4 项 `refuted`。 | 另有 4 项整体连接义务开放。定义形式化不等于定理证明；已反驳的原文主张保留其反例。 |
+| Cordis 功能对齐 | 已实现 Rust 与 Node 插件路径、两种兼容 profile、配置更新和支持范围内的重载机制。[已归档核心对比](docs/evidence/README.md)为 upstream 87/87、native 83/87。 | 仍有两项有意合同差异和两项兼容缺口；更多第三方插件还需验证。 |
+| 应用集成 | 配套 [Harness 验收](https://github.com/validation-engineering/cordis-harness/blob/main/docs/official-validation-report.json)覆盖固定官方 Web/standard、headless 工作流及 JS/Rust 扩展。 | 这是应用测试证据；跨平台验收和完整发布门槛尚未完成。 |
+
+接下来优先推进：
+
+1. **恢复可复现安装与 CI。** 为锁定的 Verus 包建立长期可用的下载来源，保留版本和校验值。[已记录的 CI 失败](https://github.com/validation-engineering/cordis-verus/actions/runs/37490393141)源于旧 rolling release 资产返回 HTTP 404。
+2. **补齐已识别的兼容缺口。** 对齐连续 provider/consumer 更新的合并语义，以及清理期间注册资源的错误合同，随后重跑未经修改的上游套件与 Harness 验收。有意保留的生命周期差异继续明确记录。
+3. **扩大论文到代码的 refinement。** 推进完整生命周期、修正规范、可执行模拟和宿主边界等 4 项整体连接义务，持续区分原文主张、反例与修订结论。
+4. **完成发布证据。** 完成全库负控门槛与各目标平台的实际构建、应用运行，再准备包发布和独立复现。
+
+[路线图](docs/roadmap.md)列出详细交付物与验收条件，包括剩余 typed Rust 接口和模块重载边界。这些是工作优先级，不是已承诺的发布日期；完整论文 refinement 和生产就绪尚未宣称完成。
 
 ## 开发与验证
 
