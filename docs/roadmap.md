@@ -52,15 +52,17 @@
 
 ## 6. Node 长期架构的下一轮交付
 
-2026-10-06 已加入官方 Loader 的显式事务切片：create/update/remove 在同域 FIFO
-中等待实际 Include 写入及旧/新 Fiber，保留原版配置表示，拒绝旧 owner 代次。
-它没有自动接管官方 UI，不能把这个切片记为完整 M5 或全部长期方案完成。
+2026-10-06 本轮已接入默认 Harness 配置 UI：ConfigEditor 的文件锁、写入、
+reconcile/rollback，Include.refresh 和 HMR 队列进入同域事务；真实官方类的
+测试覆盖失败恢复与旧代次拒绝。WorkerDomain 提供实际观测模块图、影响闭包与
+整体替换恢复。typed Rust adapter 显式支持已声明服务的动态值与 availability。
+这三项交付没有关闭完整 M5/M6 或论文 refinement。
 
 | 下一项 | 需要解决的边界 | 验收条件 |
 | --- | --- | --- |
-| 官方 ConfigEditor/HMR 协调 | 外层文件锁、写入、reconcile、恢复与关闭共用 admission；Include.refresh 在 await 后继续操作 | 真实官方流程的并发修改、写入/恢复失败和关闭竞态；无权限跨异步回调泄露 |
+| 模块 watcher 与隔离宿主 | 将官方模块变更路由到 Worker/process supervisor；原地 partialReload 现明确拒绝 | 默认应用的模块更新、客户端重连、候选失败恢复；应用 addon 需真实进程隔离与验收 |
 | 长期运行成本 | 区分存活资源与稳定 identity/publication/lease 历史；当前删除仍保留 tombstone | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
-| 模块依赖图更新 | 依赖闭包、代次保留、不可热更 addon 分类 | 传递依赖改动与失败恢复；安全场景使用已支持的 WorkerDomain；需进程隔离者待 supervisor 接入 |
-| 动态 typed Rust 插件 | 动态 publication、availability 与 Runtime 能力迁移 | 同图 Rust/JS 生命周期与权限一致，非空示例和失败路径验收 |
+| 模块依赖图精化 | 当前图只记录已执行的 Node 解析，执行器保守替换整个 Worker | 完整安装图、未执行动态导入、可保留 identity 的模块边界；不能用观测图冒充静态完备图 |
+| 动态 typed Rust 插件 | 新建/撤销 publication、子插件、effect group、requires_with_config 和更新 hook | 同图 Rust/JS 生命周期与权限一致，真实子图及失败路径验收；保留现有槽位和 cleanup 合同 |
 
 跨平台制品实际安装、完整发布负控及宿主到论文的整体 refinement 继续按各自门槛执行。

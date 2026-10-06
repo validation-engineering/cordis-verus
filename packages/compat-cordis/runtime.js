@@ -205,8 +205,10 @@ class Domain {
         catch (error) { next.pending.reject(error); }
       });
     };
+    const isCurrent = () => token.active && mutation.getStore() === token
+      && invocation.getStore() === token.origin && !liveInvocation(this) && !this.updateFrames.length;
     const assertStep = () => {
-      if (!token.active || mutation.getStore() !== token || invocation.getStore() !== token.origin || liveInvocation(this) || this.updateFrames.length) {
+      if (!isCurrent()) {
         throw new CordisError('REENTRANT_MUTATION', 'Transaction steps are only valid in their active coordinator callback');
       }
     };
@@ -232,6 +234,15 @@ class Domain {
       return result;
     };
     const steps = Object.freeze({
+      isCurrent,
+      observe: (target, execute) => {
+        assertStep();
+        const fiber = target?.ctx?.fiber;
+        if (!fiber || fiber._domain !== this) throw new CordisError('FOREIGN_DOMAIN', 'Observers require a fiber in this domain');
+        fiber._assertRegistered();
+        if (typeof execute !== 'function') throw new TypeError('observe requires a callback');
+        return this.invokeObserver(fiber, () => execute());
+      },
       ...Object.fromEntries(['dispose','restart','retryCleanup','update'].map(name => [name,(fiber,...args) => step(name,fiber,...args)])),
       capture: execute => {
         assertStep();
@@ -336,9 +347,67 @@ class Domain {
     finally { this.updateFrames.pop(); }
   }
 
+  // Callback identity is separate from the coordinator, including after await.
+  // Only waterfall's checked continuation can resume the original caller scope.
+  invokeObserver(fiber, execute, continuation) {
+    assertCurrentInvocation(this);
+    const origin = invocation.getStore(), token = mutation.getStore();
+    const observer = {fiber,generation:fiber._generation,kind:'observer',active:false,parentInvocation:origin};
+    const update = continuation && this.currentUpdateFrame();
+    const frame = update && {...update,origin:observer};
+    const capture = continuation && this.captureFrames.at(-1);
+    let active = true;
+    const resume = continuation && (() => {
+      if (!active || !token?.active || mutation.getStore() !== token || invocation.getStore() !== observer) {
+        throw new CordisError('REENTRANT_MUTATION', 'Event continuation is only valid in its active callback');
+      }
+      assertCurrentInvocation(this);
+      const suspended = frame && this.updateFrames.at(-1) === frame;
+      if (suspended) this.updateFrames.pop();
+      const restoring = capture && capture.token === token && capture.origin === origin
+        && this.captureFrames.at(-1) !== capture;
+      if (restoring) this.captureFrames.push(capture);
+      try { return invocation.run(origin, continuation); }
+      finally {
+        if (restoring) this.captureFrames.pop();
+        if (suspended) this.updateFrames.push(frame);
+      }
+    });
+    if (frame) this.updateFrames.push(frame);
+    try {
+      return invocation.run(observer, () => {
+        const result = execute(resume);
+        // Reading then and assimilating a thenable can execute user callbacks.
+        // Keep both in observer scope and return the adopted native Promise so
+        // a trusted caller's await does not assimilate the user thenable again.
+        if (typeof result?.then === 'function') {
+          const settled = Promise.resolve(result);
+          settled.then(() => { active = false; }, () => { active = false; });
+          return settled;
+        }
+        active = false;
+        return result;
+      });
+    } catch (error) { active = false; throw error; }
+    finally { if (frame) this.updateFrames.pop(); }
+  }
+  invokeEvent(fiber, callback, receiver, args, waterfall = false) {
+    const token = mutation.getStore();
+    if (!token?.active || token.domain !== this) return Reflect.apply(callback, receiver, args);
+    const continuation = waterfall ? args.at(-1) : undefined;
+    return this.invokeObserver(fiber, resume => Reflect.apply(callback, receiver,
+      waterfall ? [...args.slice(0,-1), resume] : args), continuation);
+  }
+
   assertResourceAdmission() {
     if (mutation.getStore()?.domain === this && mutation.getStore().active && mutation.getStore().recovery) {
-      throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions cannot acquire new resources');
+      // A successful inverse retry can unblock a previously requested restart.
+      // Only a live native-admitted setup may acquire resources here, including
+      // its synchronous effect wrappers. Cleanup, observers and the recovery
+      // coordinator itself retain the no-new-resources rule.
+      const setup = invocation.getStore()?.kind === 'setup' && [...invocationScopes()].some(token =>
+        token.fiber._domain === this && token.kind === 'setup' && token.ticket && token.active !== false);
+      if (!setup) throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions cannot acquire new resources');
     }
     if (this.closed || !this.acceptingMutations && !(mutation.getStore()?.domain === this && mutation.getStore().active) && !liveInvocation(this)) {
       throw new CordisError('DOMAIN_CLOSED', 'The domain is closing or closed');
@@ -381,7 +450,7 @@ class Domain {
               const checker = this.checks.get(action.publication);
               const consumer = this.fibers.get(action.consumer);
               if (checker && consumer) {
-                const result = checker.call(getTraceable(consumer.ctx,this.values.get(action.value)));
+                const result = this.rust.check(checker,getTraceable(consumer.ctx,this.values.get(action.value)),action);
                 if (result?.then) { Promise.resolve(result).catch(() => {}); throw new TypeError('Service.check must return synchronously'); }
                 available = !!result;
               }
@@ -728,6 +797,28 @@ export class Fiber {
       if (!this.runtime.fibers.length) this._domain.registry._internal.delete(this.runtime.callback);
     }
   }
+  _cleanupFailure() {
+    const nodes = this._domain.command({op:'snapshot'}).plugins;
+    if (!nodes.some(node => node.cleanupFailed)) return;
+    const children = new Map();
+    for (const node of nodes) {
+      if (!children.has(node.parent)) children.set(node.parent,[]);
+      children.get(node.parent).push(node.id);
+    }
+    const owned = new Set(), pending = [this.id];
+    while (pending.length) {
+      const id = pending.pop();
+      if (owned.has(id)) continue;
+      owned.add(id); pending.push(...(children.get(id) ?? []));
+    }
+    const failed = nodes.filter(node => node.cleanupFailed && (owned.has(node.id)
+      || [...owned].some(target => this._domain.command({op:'committed_reaches',from:node.id,generation:node.generation,target}).reachable)));
+    if (failed.length) return new AggregateError(failed.flatMap(node => {
+      const error = new CordisError('CLEANUP_FAILED', `Cleanup failed for fiber ${node.id}: ${node.error ?? 'native inverse failure'}`);
+      const callbackError = this._domain.fibers.get(node.id)?._error;
+      return callbackError ? [error,callbackError] : [error];
+    }), 'Native cleanup failed');
+  }
   _dispose() {
     if (this._removedFlag) return Promise.resolve();
     assertNotWaitingForAncestor(this,'disposal');
@@ -764,25 +855,8 @@ export class Fiber {
           // Settlement/readiness observers may already have consumed the event
           // error queue. A failed inverse remains a native barrier until an
           // explicit retry succeeds; waiting for a new event would never finish.
-          const nodes = this._domain.command({op:'snapshot'}).plugins;
-          const children = new Map();
-          for (const node of nodes) {
-            if (!children.has(node.parent)) children.set(node.parent,[]);
-            children.get(node.parent).push(node.id);
-          }
-          const owned = new Set(), pending = [this.id];
-          while (pending.length) {
-            const id = pending.pop();
-            if (owned.has(id)) continue;
-            owned.add(id); pending.push(...(children.get(id) ?? []));
-          }
-          const failed = nodes.filter(node => node.cleanupFailed && (owned.has(node.id)
-            || [...owned].some(target => this._domain.command({op:'committed_reaches',from:node.id,generation:node.generation,target}).reachable)));
-          if (failed.length) throw new AggregateError(failed.flatMap(node => {
-            const error = new CordisError('CLEANUP_FAILED', `Cleanup failed for fiber ${node.id}: ${node.error ?? 'native inverse failure'}`);
-            const callbackError = this._domain.fibers.get(node.id)?._error;
-            return callbackError ? [error,callbackError] : [error];
-          }), 'Native cleanup failed');
+          const failure = this._cleanupFailure();
+          if (failure) throw failure;
           await this._domain.changed(revision);
         }
       }
@@ -812,6 +886,8 @@ export class Fiber {
         this._domain.pump();
         if (this.state === FiberState.LOADING || this.state === FiberState.UNLOADING) {
           if (this._error) throw this._error;
+          const failure = this._cleanupFailure();
+          if (failure) throw failure;
           await this._domain.changed(revision);
           continue;
         }
@@ -943,6 +1019,10 @@ export class Fiber {
     const fiber = this.ctx.fiber;
     fiber._assertRegistered();
     assertNotWaitingForAncestor(fiber,'restart');
+    // Rollback may restart inside an already admitted transaction. Do not erase
+    // the cleanup error or wait forever on a native inverse awaiting explicit retry.
+    const failure = fiber._cleanupFailure();
+    if (failure) throw failure;
     fiber._domain.command({op:'restart',id:fiber.id});
     fiber._error = undefined;
     fiber._domain.schedule();

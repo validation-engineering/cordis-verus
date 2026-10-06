@@ -28,8 +28,9 @@ export class EventsService {
                 ...this._hooks['internal/update'] || []
             ];
             const _next = ()=>{
-                const cb = cbs.shift() ?? next;
-                return cb.call(this, config, noSave, _next);
+                const cb = cbs.shift();
+                if (!cb) return next();
+                return this.ctx.fiber._domain.invokeEvent(this.ctx.fiber, cb, this, [config, noSave, _next], true);
             };
             return _next();
         }, {
@@ -46,7 +47,9 @@ export class EventsService {
         const filter = thisArg?.[Context.filter];
         return [
             thisArg,
-            (this._hooks[name] || []).filter((hook)=>hook.global || !filter || filter.call(thisArg, hook.ctx)).map((hook)=>hook.callback)
+            (this._hooks[name] || []).filter((hook)=>hook.global || !filter || filter.call(thisArg, hook.ctx)).map((hook)=>function(...values) {
+                return hook.ctx.fiber._domain.invokeEvent(hook.ctx.fiber, hook.callback, this, values, type === 'waterfall');
+            })
         ];
     }
     dispatch(type, args) {

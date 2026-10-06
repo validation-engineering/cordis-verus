@@ -104,7 +104,7 @@ await ctx.dispose()        // 同样会等待所有 owned task，然后清理资
 `domainMutation(ctx, callback)` 为同一 Context 域内的多个 JSON Loader、直接 Fiber
 update/restart/dispose/retryCleanup 与最终 `Context.dispose()` 提供统一提交顺序。
 它是兼容层扩展；同步 `ctx.plugin/provide/effect` 仍保留原调用形态，应用可以把外部批量
-操作显式放进事务。官方 Loader 的显式 create/update/remove 现可通过独立事务适配器接入；透明的 ConfigEditor 整条文件事务、Worker supervisor 与模块图 HMR
+操作显式放进事务。官方 Loader 的显式 create/update/remove 和 ConfigEditor/Include.refresh/HMR 队列可通过宿主事务适配器接入；进程 supervisor 与同环境模块替换
 仍需各自适配，不能把这里的 Fiber 级接入称为全部装载协议已经完成。
 
 ```js
@@ -166,7 +166,7 @@ consumer 普通 inverse 全部成功后，才按 acquisition LIFO 释放对象�
 
 [PublicationRegistry](../crates/cordis-kernel/src/publication.rs) 和 [ActionLedger](../crates/cordis-kernel/src/action_ledger.rs) 是 Cargo 与 Verus 编译的同一份代码。它们证明 visibility/lease/reclaim 及 action identity/exactly-once 的记录不变量；动态声明转交与初始预注册是显式 host extension，不能直接称作论文 Step。
 
-[shared Driver](../crates/cordis-driver/src/shared.rs)、availability 版本协议、Rust/JS callback journal、配置/Loader 事务、N-API、Node/V8 与 I/O 仍具有各自未证边界。Rust Runtime 已共用控制 Driver，但 typed Rust 动态服务仍采用原来的 owner anchor/provider 节点表示；静态 `cordis::Plugin` 的 `get/provide/setup/cleanup` 已通过 [typed adapter](typed-rust-plugins.md) 接入同一 publication，动态 API 仍未迁移。新增 cordis-node::plugin SDK 则可通过显式 JSON 服务、双向 pull stream 和 opaque object/callback adapter，让用户编译的 Rust factory 与 JS 插件共享同一图；见 [Rust/JS 插件指南](rust-node-plugins.md)。对象和回调由 factory 方法取得，方法参数与结果仍为 JSON，不是任意句柄混入 DTO 的通道。Rust/Node 公共 trace 测试保护已对齐的场景，不证明两种 backend 的所有 effect 时序相同。
+[shared Driver](../crates/cordis-driver/src/shared.rs)、availability 版本协议、Rust/JS callback journal、配置/Loader 事务、N-API、Node/V8 与 I/O 仍具有各自未证边界。Rust Runtime 已共用控制 Driver，但 typed Rust 动态服务仍采用原来的 owner anchor/provider 节点表示；静态 `cordis::Plugin` 的 `get/provide/setup/cleanup` 已通过 [typed adapter](typed-rust-plugins.md) 接入同一 publication，显式 opt-in 已接入已声明服务的 `provide_checked/set/refresh`，动态 publication 创建/撤销与其他 Runtime 操作仍未迁移。新增 cordis-node::plugin SDK 则可通过显式 JSON 服务、双向 pull stream 和 opaque object/callback adapter，让用户编译的 Rust factory 与 JS 插件共享同一图；见 [Rust/JS 插件指南](rust-node-plugins.md)。对象和回调由 factory 方法取得，方法参数与结果仍为 JSON，不是任意句柄混入 DTO 的通道。Rust/Node 公共 trace 测试保护已对齐的场景，不证明两种 backend 的所有 effect 时序相同。
 
 MIT 上游 utils/service/events/logger 语言层保留版权和许可证；生产路径没有导入原版 Fiber scheduler。
 
@@ -207,8 +207,14 @@ npm run test:upstream-core   # 12 个原文件、87 项核心行为测试
 返回 Promise 不会让异步续程取得权限。适配器检查 owner episode，旧 Include
 删除或重启后拒绝旧对象，根树限定 ID 的删除定位到所属 tree 与局部 ID。
 
-这是显式宿主 API，默认 Settings/PluginManager 不自动改走它。`Include.refresh()`、
-ConfigEditor 的外层 YAML 写入/回滚、HMR 与直接绕过接口的修改仍在范围外。
+`installOfficialTransactions()` 在加载应用前安装官方类的窄适配：ConfigEditor
+在文件锁之前取得域 admission，随后写入、reconcile、回滚与 Include.refresh/HMR
+队列共用同一槽位。配套 Harness 默认启动已安装它，配置 UI 也使用这一合同。
+`steps.observe()` 和事件回调独立执行身份，不能借用已保存的事务步骤；原生
+清理失败会拒绝回滚重启和 readiness，需显式恢复。直接任意修改 JS 对象或文件
+不受这一 API 约束。官方 `partialReload()` 在修改模块缓存前明确拒绝；
+[模块图与 Worker 替换](module-graph-reloads.md)提供可检查的更新计划与制品恢复，
+不宣称主线程原地 HMR 或任意原生 addon 热更。
 合同、错误和示例见 [Loader 包文档](../packages/compat-loader/README.md#explicit-transactions-for-the-official-harness-loader)。
 
 ## 长期方案的剩余门槛
@@ -220,8 +226,8 @@ ConfigEditor 的外层 YAML 写入/回滚、HMR 与直接绕过接口的修改�
 | M2 | publication/lease、跨 owner 转交、check 版本协议、reserve/seal | availability 与宿主对象表的形式连接、动态接口的整条论文投影 |
 | M3 | Native host、错误隔离、owned task、Worker 正常/异常关闭 | 全 environment teardown/引用管理证明与长期驻留成本验收 |
 | M4 | Logger、Service.check、方法 Inject、两个 profile 和类型样例 | 未覆盖公开合同、已知行为差异的应用迁移验证 |
-| M5 | 增量 JSON Loader、稳定 Fiber、事务恢复、Worker 制品重启；官方 Loader 显式 create/update/remove 与 Include 写入屏障 | ConfigEditor 全链路事务、refresh/HMR 接入、完整包管理器安装图 |
-| M6 | Harness 真实插件图差分；同图 Rust factory/JSON、双向背压流及显式 object/callback；真实旧 Plugin 静态 typed adapter；factory revision adapter | typed Runtime 动态能力迁移、更多跨语言接口与 ABI 合同、更广生态图、模块依赖图 HMR |
+| M5 | 增量 JSON Loader、稳定 Fiber、事务恢复、Worker 制品重启；官方 Loader 显式操作及 ConfigEditor/refresh/HMR 队列事务；观测模块图与 Worker 恢复 | 同环境安全模块替换、进程 supervisor、完整包管理器安装图 |
+| M6 | Harness 真实插件图差分；同图 Rust factory/JSON、双向背压流及显式 object/callback；旧 Plugin typed adapter 与 opt-in 动态值/availability；factory revision adapter | 动态 publication 与剩余 typed Runtime 迁移、更多跨语言接口与 ABI 合同、更广生态图 |
 | M7 | 三个 Rust 制品、三个 npm 包的本机独立安装 gate；原生 manifest/哈希/平台选择与离线合包；源码绑定的性能测量工具 | 各预编译平台实际验收、实测基线与长期运行/性能预算、完整负控与 release acceptance |
 
 论文 ledger 的已反驳命题和开放义务保持不变。当前不能宣称长期方案、完整 Cordis/Harness 兼容或整篇论文 refinement 已完成。

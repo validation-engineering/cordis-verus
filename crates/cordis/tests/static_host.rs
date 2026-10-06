@@ -549,3 +549,147 @@ fn late_inverse_notifies_current_cleanup_waker_and_close_releases_it() {
     gate.waker.lock().unwrap().take();
     assert_eq!(Arc::strong_count(&cleanup_wake), 1);
 }
+
+#[test]
+fn opted_in_service_slots_replace_payload_and_check_the_explicit_consumer() {
+    let key = ServiceKey::<usize>::new("live");
+    let retained = Arc::new(Mutex::new(None::<AsyncSetup>));
+    let capture = retained.clone();
+    let mut definition = StaticPlugin::new(
+        Plugin::new("live", move |setup| {
+            setup.provide_checked(key, 4, move |value, context, config| {
+                context.port(key).realm == 17
+                    && *value >= config["minimum"].as_u64().unwrap_or(0) as usize
+            })?;
+            *capture.lock().unwrap() = Some(setup.to_async());
+            Ok(())
+        })
+        .provides(key),
+    )
+    .unwrap();
+    let notifications = Arc::new(AtomicUsize::new(0));
+    let count = notifications.clone();
+    let start = definition
+        .begin_with_service_updates(
+            2,
+            1,
+            Context::new(),
+            vec![],
+            Arc::new(move || {
+                count.fetch_add(1, Ordering::SeqCst);
+            }),
+        )
+        .unwrap();
+    finish(start.setup).unwrap();
+    let slot = start.episode.provided().unwrap().remove(0).1;
+    let original = slot.get::<usize>().unwrap();
+    let consumer = Context::with_realms([(Context::new().port(key).key, 17)]);
+    assert!(slot.has_check());
+    assert!(!slot.accepts(&Context::new(), &serde_json::json!({"minimum": 3})));
+    assert!(!slot.accepts(&consumer, &serde_json::json!({"minimum": 5})));
+    let handle = retained.lock().unwrap().clone().unwrap();
+    handle.set(key, 8).unwrap();
+    assert_eq!(*original, 4); // Existing Arc snapshots retain their payload.
+    assert_eq!(*slot.get::<usize>().unwrap(), 8); // The committed slot is shared.
+    assert!(slot.accepts(&consumer, &serde_json::json!({"minimum": 5})));
+    handle.refresh().unwrap();
+    assert_eq!(notifications.load(Ordering::SeqCst), 2);
+    start.episode.cancel();
+    assert!(handle.set(key, 9).is_err());
+    assert!(handle.refresh().is_err());
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    let next = definition
+        .begin_with_service_updates(2, 2, Context::new(), vec![], Arc::new(|| {}))
+        .unwrap();
+    finish(next.setup).unwrap();
+    assert!(handle.set(key, 10).is_err());
+    assert!(handle.refresh().is_err());
+    assert_eq!(
+        *next.episode.provided().unwrap()[0]
+            .1
+            .get::<usize>()
+            .unwrap(),
+        4
+    );
+    finish(next.episode.cleanup().unwrap()).unwrap();
+}
+
+#[test]
+fn opted_in_checked_slot_contains_predicate_panic_and_keeps_other_guards() {
+    let key = ServiceKey::<usize>::new("checked");
+    let mut definition = StaticPlugin::new(
+        Plugin::new("checked", move |setup| {
+            setup.provide_checked(key, 1, |_, _, _| panic!("predicate failure"))?;
+            Ok(())
+        })
+        .provides(key),
+    )
+    .unwrap();
+    let start = definition
+        .begin_with_service_updates(1, 1, Context::new(), vec![], Arc::new(|| {}))
+        .unwrap();
+    finish(start.setup).unwrap();
+    assert!(!start.episode.provided().unwrap()[0]
+        .1
+        .accepts(&Context::new(), &serde_json::Value::Null));
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    let mut definition = StaticPlugin::new(Plugin::new("unsupported", move |setup| {
+        let _ignored = setup.publish(key, 1);
+        Ok(())
+    }))
+    .unwrap();
+    let start = definition
+        .begin_with_service_updates(1, 1, Context::new(), vec![], Arc::new(|| {}))
+        .unwrap();
+    assert!(finish(start.setup)
+        .unwrap_err()
+        .contains("UnsupportedStaticFeature: publish"));
+    finish(start.episode.cleanup().unwrap()).unwrap();
+}
+
+#[test]
+fn closed_retained_setup_releases_service_notification_resources_outside_journal_lock() {
+    struct NotifyOwner {
+        retained: Arc<Mutex<Option<AsyncSetup>>>,
+        dropped: Arc<AtomicUsize>,
+    }
+    impl Drop for NotifyOwner {
+        fn drop(&mut self) {
+            let handle = self.retained.lock().unwrap().clone().unwrap();
+            // This takes the episode lock. Dropping the host callback under
+            // that lock would deadlock even though cleanup has completed.
+            assert!(handle.is_cancelled());
+            self.dropped.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    let retained = Arc::new(Mutex::new(None::<AsyncSetup>));
+    let capture = retained.clone();
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let owner = NotifyOwner {
+        retained: retained.clone(),
+        dropped: dropped.clone(),
+    };
+    let mut definition = StaticPlugin::new(Plugin::new("notifier-owner", move |setup| {
+        *capture.lock().unwrap() = Some(setup.to_async());
+        Ok(())
+    }))
+    .unwrap();
+    let start = definition
+        .begin_with_service_updates(
+            1,
+            1,
+            Context::new(),
+            vec![],
+            Arc::new(move || {
+                std::hint::black_box(&owner);
+            }),
+        )
+        .unwrap();
+    finish(start.setup).unwrap();
+    assert_eq!(dropped.load(Ordering::SeqCst), 0);
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    let old = retained.lock().unwrap().clone().unwrap();
+    assert!(old.refresh().is_err());
+    assert_eq!(dropped.load(Ordering::SeqCst), 1);
+}

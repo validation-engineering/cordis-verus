@@ -2,7 +2,7 @@
 
 `cordis-node::plugin` 提供可由用户编译扩展的 Rust SDK。Node facade 用 `ctx.rustPlugin(name, config)` 创建普通 Fiber；它和 JS 插件使用**同一个 NativeDriver、依赖图、publication 与 cleanup 屏障**。Rust 插件不在内部创建另一个 `Runtime`。
 
-当前跨语言接口包括 JSON DTO、双向 pull stream，以及显式 opaque object/callback adapter。服务和方法有声明，Rust 内部状态仍为自己的类型，JS 插件之间继续使用原生 JS 对象。对象和回调通过声明的 factory 方法取得；后续方法参数与结果仍是 JSON，不能把任意句柄、闭包或对象引用混入 DTO。既有 `cordis::Plugin` 的静态 typed 服务现在可通过显式绑定接入，见[typed 插件指南](typed-rust-plugins.md)；动态 Runtime 能力仍需迁移。
+当前跨语言接口包括 JSON DTO、双向 pull stream，以及显式 opaque object/callback adapter。服务和方法有声明，Rust 内部状态仍为自己的类型，JS 插件之间继续使用原生 JS 对象。对象和回调通过声明的 factory 方法取得；后续方法参数与结果仍是 JSON，不能把任意句柄、闭包或对象引用混入 DTO。既有 `cordis::Plugin` 的 typed 服务可通过显式绑定接入，且可 opt-in 更新已声明服务的值与 availability，见[typed 插件指南](typed-rust-plugins.md)；动态 publication 与剩余 Runtime 能力仍需迁移。
 
 ## 运行示例
 

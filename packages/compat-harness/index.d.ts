@@ -175,6 +175,10 @@ export const c256: number[];
 
 /** Explicit external revision transaction; lifecycle callbacks cannot nest it. */
 export interface MutationSteps {
+  /** True only in this live coordinator callback, never in managed observers. */
+  isCurrent(): boolean;
+  /** Run a callback with its owner's episode identity and without transaction authority. */
+  observe<T>(fiber: Fiber, execute: () => T): T extends PromiseLike<unknown> ? Promise<Awaited<T>> : T;
   /** Join synchronous adapter lifecycle calls; authority ends before async continuation. */
   capture<T>(execute: () => T): T;
   dispose(fiber: Fiber): Promise<void>;

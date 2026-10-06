@@ -73,7 +73,7 @@ Node backend 的 driver owner 位于对应事件循环线程。一次 native 调
 
 ## 当前跨语言接口与资源合同
 
-`cordis-node::plugin` 已提供可由用户 addon 注册的 factory SDK。它通过现有 Node Driver 挂载；既有 `cordis::Plugin` 的静态服务也已通过无图 episode 执行器接入，保留原 typed slot 与 FnMut 定义。完整动态 Runtime 迁移仍未完成，当前范围见 [typed 插件指南](typed-rust-plugins.md)。
+`cordis-node::plugin` 已提供可由用户 addon 注册的 factory SDK。它通过现有 Node Driver 挂载；既有 `cordis::Plugin` 的静态服务也已通过无图 episode 执行器接入，保留原 typed slot 与 FnMut 定义。完整动态 Runtime 迁移仍未完成，已声明服务的动态值和 availability 可显式启用，当前范围见 [typed 插件指南](typed-rust-plugins.md)。
 
 | 已实现接口 | 值与调用边界 | 生命周期 |
 | --- | --- | --- |
@@ -299,7 +299,7 @@ ModuleHost:
 
 从 setup/cleanup 重入的全局 update/reload 若需要等待当前 action 自己退出，返回明确的 `ReentrantMutation`；同一销毁任务重复请求加入现有任务，但不得允许已知自等待。profile 返回值外形仍保持，必要的错误差异列入矩阵。事务执行上下文携带来源 ticket，不能只用全局布尔锁判断重入。任意 JS Promise 构造的等待环不能普遍检测；只检测框架可观察的等待依赖，其余保持 draining 诊断。
 
-当前实现已将多个 JSON Loader、直接 Fiber 更新/清理和 Context 关闭接入同域 `domainMutation`；内部步骤携带作用域能力，恢复仅允许清理。官方 Include/Group 在 `internal/update` 同步调用栈中发起的子级生命周期操作并入当前事务；精确调用来源与 self/owner/committed-provider 等待检查防止权限逃逸和已知自等待。该权限不跨异步续程。新增的显式 `LoaderTransactions` 将官方 create/update/remove 接入队列，并等待整条 Loader 图的 Include 写入屏障；owner 代次改变时拒绝旧适配器。它通过同步作用域 `steps.capture` 收束被原版忽略的生命周期 Promise，不给异步续程继承权限。ConfigEditor 的外层文件事务、Include.refresh 和模块图 HMR 仍需单独适配；默认官方 UI 尚未自动接入此接口。
+当前实现已将多个 JSON Loader、直接 Fiber 更新/清理和 Context 关闭接入同域 `domainMutation`；内部步骤携带作用域能力，外部恢复步骤仅允许清理；原生清理恢复后真正接纳的 setup 可以正常注册资源，观察者不获得这个权限。官方 Include/Group 在 `internal/update` 同步调用栈中发起的子级生命周期操作并入当前事务；精确调用来源与 self/owner/committed-provider 等待检查防止权限逃逸和已知自等待。该权限不跨异步续程。新增的显式 `LoaderTransactions` 将官方 create/update/remove 接入队列，并等待整条 Loader 图的 Include 写入屏障；owner 代次改变时拒绝旧适配器。它通过同步作用域 `steps.capture` 收束被原版忽略的生命周期 Promise，不给异步续程继承权限。installOfficialTransactions 进一步接入 ConfigEditor 文件锁之前的 admission、写入/reconcile/回滚、Include.refresh 与 HMR 队列；配套 Harness 默认 UI 已安装。事件与 change 回调保持独立观察者身份，跨异步的已知宿主续程须重新检查精确 coordinator 来源。原地模块 partialReload 在修改缓存前拒绝；WorkerDomain 已提供实际观测模块图、影响闭包与整体 Worker 制品恢复，应用 addon 的进程 supervisor 仍需实现。
 
 恢复期间到来的外部 revision 必须排队、合并或明确拒绝，不能覆盖恢复 journal；恢复所需的 episode-local completion 和 cleanup 命令必须仍能推进。普通服务调用继续遵循各自 admission。
 

@@ -522,6 +522,7 @@ struct Episode {
     cancelled_groups: std::collections::BTreeSet<usize>,
     driver: Option<Waker>,
     static_only: bool,
+    service_updates: Option<Arc<dyn Fn() + Send + Sync>>,
     unsupported: Option<String>,
 }
 /// Owned setup context suitable for futures. Dependency slots belong to the
@@ -543,7 +544,10 @@ impl AsyncSetup {
     fn require_dynamic(&self, feature: &str) -> CallbackResult {
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
-        if !state.static_only {
+        if !state.static_only
+            || (state.service_updates.is_some()
+                && matches!(feature, "provide_checked" | "set" | "refresh"))
+        {
             return Ok(());
         }
         let message = format!("UnsupportedStaticFeature: {feature}");
@@ -667,10 +671,19 @@ impl AsyncSetup {
             .get(&slot)
             .cloned()
             .ok_or_else(|| format!("service is not owned here: {}", key.name))?;
+        if state.service_updates.is_some()
+            && !matches!(state.phase, EpisodePhase::Loading | EpisodePhase::Active)
+        {
+            return Err(CANCELLED.into());
+        }
         let previous = slot.replace(Arc::new(value));
+        let notify = state.service_updates.clone();
         let waker = state.driver.take();
         drop(state);
         drop(previous);
+        if let Some(notify) = notify {
+            notify();
+        }
         if let Some(waker) = waker {
             waker.wake();
         }
@@ -681,8 +694,17 @@ impl AsyncSetup {
         self.require_dynamic("refresh")?;
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
+        if state.service_updates.is_some()
+            && !matches!(state.phase, EpisodePhase::Loading | EpisodePhase::Active)
+        {
+            return Err(CANCELLED.into());
+        }
+        let notify = state.service_updates.clone();
         let waker = state.driver.take();
         drop(state);
+        if let Some(notify) = notify {
+            notify();
+        }
         if let Some(waker) = waker {
             waker.wake();
         }
@@ -1789,6 +1811,7 @@ impl Runtime {
             cancelled_groups: Default::default(),
             driver: Some(cx.waker().clone()),
             static_only: false,
+            service_updates: None,
             unsupported: None,
         };
         let mut root = Cleanups::new();

@@ -3,8 +3,9 @@
 //! This module never constructs a Runtime or Driver. The embedding host must
 //! validate owner/generation, committed bindings and publication leases before
 //! calling `begin`, and retain those leases until cleanup really succeeds.
-//! Dynamic publication, children, effect groups, updates and service checks are
-//! explicitly unsupported. Existing `Plugin`, `Setup`, slots and inverse
+//! Dynamic publication, children, effect groups and configuration updates are
+//! explicitly unsupported. Checked declared services and episode-bound payload
+//! updates require the explicit `begin_with_service_updates` host contract. Existing `Plugin`, `Setup`, slots and inverse
 //! journals are used directly; arbitrary callbacks remain unverified host code.
 //!
 //! Keep one [`StaticPlugin`] per logical fiber and retain every [`StaticStart`]
@@ -36,6 +37,13 @@ impl TypedSlot {
     }
     pub fn get<T: Any + Send + Sync>(&self) -> Option<Arc<T>> {
         self.0.get()
+    }
+    pub fn has_check(&self) -> bool {
+        self.0.check.is_some()
+    }
+    /// Evaluates a pure predicate without retaining a bookkeeping lock. Panics reject.
+    pub fn accepts(&self, context: &Context, config: &serde_json::Value) -> bool {
+        self.0.accepts(context, config)
     }
     pub fn value(&self) -> Arc<dyn Any + Send + Sync> {
         lock(&self.0.value).clone()
@@ -88,6 +96,29 @@ impl StaticPlugin {
         generation: u64,
         context: Context,
         imports: Vec<StaticBinding>,
+    ) -> Result<StaticStart, String> {
+        self.begin_inner(owner, generation, context, imports, None)
+    }
+    /// Opt into checked declared services and episode-bound `set`/`refresh`.
+    /// The host must route notifications to its authoritative availability
+    /// protocol. This never enables child publications, effects or new ports.
+    pub fn begin_with_service_updates(
+        &mut self,
+        owner: PluginId,
+        generation: u64,
+        context: Context,
+        imports: Vec<StaticBinding>,
+        notify: Arc<dyn Fn() + Send + Sync>,
+    ) -> Result<StaticStart, String> {
+        self.begin_inner(owner, generation, context, imports, Some(notify))
+    }
+    fn begin_inner(
+        &mut self,
+        owner: PluginId,
+        generation: u64,
+        context: Context,
+        imports: Vec<StaticBinding>,
+        service_updates: Option<Arc<dyn Fn() + Send + Sync>>,
     ) -> Result<StaticStart, String> {
         if generation == 0 {
             return Err("StaticEpisodeRequiresGeneration".into());
@@ -163,6 +194,7 @@ impl StaticPlugin {
                 cancelled_groups: Default::default(),
                 driver: None,
                 static_only: true,
+                service_updates,
                 unsupported: None,
             })),
             group: 0,
@@ -368,7 +400,7 @@ impl Future for StaticCleanupFuture {
         drop(previous);
         for _ in 0..64 {
             if self.running.is_none() {
-                let (action, released, previous) = {
+                let (action, released, previous, notifications) = {
                     let mut state = lock(&self.episode.setup.state);
                     let action = state.cleanups.get_mut(&0).and_then(Cleanups::pop);
                     if action.is_none() {
@@ -380,12 +412,16 @@ impl Future for StaticCleanupFuture {
                             None,
                             Some(std::mem::take(&mut state.values)),
                             state.driver.take(),
+                            state.service_updates.take(),
                         )
                     } else {
-                        (action, None, None)
+                        (action, None, None, None)
                     }
                 };
                 drop(previous);
+                // A retained closed AsyncSetup must not retain host notification
+                // resources. Their destructors may reenter the episode.
+                drop(notifications);
                 if let Some(released) = released {
                     lock(&self.episode.progress).cleanup_running = false;
                     self.finished = true;

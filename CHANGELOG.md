@@ -4,6 +4,19 @@ Changes are recorded before release. There is no published release yet.
 
 ## Unreleased — 0.1.0
 
+- Coordinate official Harness ConfigEditor file locks, reconciliation and rollback,
+  Include refresh and the HMR operation queue with native domain admission. The
+  companion application installs the bridge during default boot. Refuse official
+  in-process module replacement before cache mutation.
+- Isolate event and configuration observers from transaction-step authority;
+  preserve scoped waterfall continuations. Reject unresolved native cleanup in
+  readiness and rollback restart instead of waiting indefinitely.
+- Expose observed ESM/CommonJS module graphs and reviewable Worker reload plans.
+  Follow transitive changes, preserve retained-artifact recovery, and reject
+  application native addons before retiring the active Worker.
+- Add opt-in typed Rust `provide_checked`, `set` and `refresh` on declared services,
+  with actual CheckTicket validation and generation-bound service notifications.
+  Dynamic publication creation and removal remain outside this adapter.
 - Add opt-in transactions for the unchanged official Harness Loader/Include.
   Coordinate create/update/remove with native lifecycle and actual write queues;
   reject stale owner episodes and normalize qualified nested removal. File
@@ -13,7 +26,7 @@ Changes are recorded before release. There is no published release yet.
   callback cannot reuse saved transaction steps after leaving its update frame.
   Keep host scheduling independent of observer episodes while preserving recovery
   admission, and reject retained update continuations after their revision ends.
-  ConfigEditor, Include.refresh and HMR integration remain separate work.
+  The host installer above extends this explicit API to official configuration entrypoints.
 
 - Distinguish an active owned action from its later asynchronous continuations.
   Completed startup callbacks no longer block the official headless runner's

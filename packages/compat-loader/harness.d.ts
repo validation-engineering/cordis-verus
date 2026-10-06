@@ -32,3 +32,8 @@ export class LoaderTransactions {
   /** Closes this adapter's admission and drains earlier work; does not dispose the tree. */
   close(): Promise<void>;
 }
+
+/** Installs transparent host-only domain coordination before mounting pinned official classes. */
+export function installOfficialTransactions(classes: {
+  Entry: Function; EntryGroup: Function; EntryTree: Function; Hmr: Function; ConfigEditor: Function;
+}): void;

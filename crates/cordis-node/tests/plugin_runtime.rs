@@ -1859,3 +1859,105 @@ fn typed_definition_is_retained_after_release_and_dropped_only_when_forgotten() 
     backend.forget_typed(1).unwrap();
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn typed_live_service_check_notifications_preserve_slot_and_episode_boundaries() {
+    let key = cordis::ServiceKey::<AtomicUsize>::new("counter");
+    let retained = Arc::new(Mutex::new(None::<cordis::AsyncSetup>));
+    let saved = retained.clone();
+    let mut registry = FactoryRegistry::new();
+    registry
+        .register_typed(
+            TypedFactory::new("live", move |_| {
+                let saved = saved.clone();
+                Ok(cordis::Plugin::new("live", move |setup| {
+                    setup.provide_checked(
+                        key,
+                        AtomicUsize::new(5),
+                        move |value, context, config| {
+                            context.port(key).realm == 901
+                                && value.load(Ordering::SeqCst)
+                                    >= config["minimum"].as_u64().unwrap_or(0) as usize
+                        },
+                    )?;
+                    *saved.lock().unwrap() = Some(setup.to_async());
+                    Ok(())
+                })
+                .provides(key))
+            })
+            .provides(key, "counter", TypedCounterView::default())
+            .with_service_updates(),
+        )
+        .unwrap();
+    let wakes = Arc::new(AtomicUsize::new(0));
+    let count = wakes.clone();
+    let mut backend = plugin::Backend::new(
+        registry,
+        Arc::new(move || {
+            count.fetch_add(1, Ordering::SeqCst);
+        }),
+    );
+    let port = typed_port(100, 901);
+    let ports = typed_ports(&[("counter", port)]);
+    let start = backend
+        .start_resolved(11, 1, "live", Value::Null, ports.clone(), vec![])
+        .unwrap();
+    let session = typed_publish(&mut backend, &start, 40, port);
+    assert!(backend
+        .typed_check(session, "counter", &ports, &json!({"minimum": 3}))
+        .unwrap());
+    assert!(!backend
+        .typed_check(session, "counter", &ports, &json!({"minimum": 10}))
+        .unwrap());
+    assert!(backend
+        .typed_check(
+            session,
+            "counter",
+            &typed_ports(&[("counter", typed_port(101, 901))]),
+            &Value::Null
+        )
+        .is_err());
+    let handle = retained.lock().unwrap().clone().unwrap();
+    handle.set(key, AtomicUsize::new(12)).unwrap();
+    handle.refresh().unwrap(); // Coalesces with the pending slot update.
+    assert!(!backend
+        .typed_check(session, "counter", &ports, &json!({"minimum": 10}))
+        .unwrap());
+    let notification = backend.poll()["serviceNotifications"].clone();
+    assert_eq!(
+        notification,
+        json!([{"session":session.to_string(),"generation":"1","ports":[port]}])
+    );
+    assert_eq!(backend.poll()["serviceNotifications"], json!([]));
+    assert!(backend
+        .typed_check(session, "counter", &ports, &json!({"minimum": 10}))
+        .unwrap());
+    assert_eq!(
+        backend
+            .call(session, "counter", "read", json!([]), false, false)
+            .unwrap()["value"],
+        12
+    );
+    handle.refresh().unwrap();
+    backend.cancel(session).unwrap();
+    assert_eq!(backend.poll()["serviceNotifications"], json!([]));
+    assert!(backend
+        .typed_check(session, "counter", &ports, &Value::Null)
+        .is_err());
+    assert!(handle.refresh().is_err());
+    assert!(handle.set(key, AtomicUsize::new(99)).is_err());
+    assert!(wakes.load(Ordering::SeqCst) > 0);
+    typed_release(&mut backend, session);
+    let next = backend
+        .start_resolved(11, 2, "live", Value::Null, ports.clone(), vec![])
+        .unwrap();
+    let next_session = typed_publish(&mut backend, &next, 41, port);
+    assert!(handle.refresh().is_err());
+    assert_eq!(
+        backend
+            .call(next_session, "counter", "read", json!([]), false, false)
+            .unwrap()["value"],
+        5
+    );
+    typed_release(&mut backend, next_session);
+}

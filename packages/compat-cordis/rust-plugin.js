@@ -50,6 +50,7 @@ export class RustHost {
     this.jobs = new Map();
     this.results = new Map();
     this.factories = new Map();
+    this.typedChecks = new WeakMap();
     this.scheduled = false;
     this.streams = new JavaScriptStreams(this, jsonValue);
     this.objects = new JavaScriptObjects(this, jsonValue);
@@ -114,7 +115,29 @@ export class RustHost {
       if (waiter) { this.jobs.delete(result.job); this.finish(waiter,result); }
       else this.results.set(result.job,result);
     }
+    this.notifyServices(reply.serviceNotifications);
     this.domain.wake();
+  }
+  notifyServices(notifications) {
+    for (const notice of notifications ?? []) {
+      const session = this.sessions.get(notice.session);
+      if (!session || session.closed || session.cancelled || session.token.generation !== notice.generation
+        || session.token.fiber._generation !== notice.generation) continue;
+      if (notice.ports.length) this.domain.refreshChecks(notice.ports);
+    }
+  }
+  // Ordinary JS Service.check keeps its zero-argument contract. Native typed
+  // checks receive the exact pending ticket, never an unowned root lookup.
+  check(checker,receiver,action) {
+    const typed = this.typedChecks.get(checker);
+    if (!typed) return Reflect.apply(checker,receiver,[]);
+    const {session,service} = typed;
+    if (session.closed || session.cancelled) return false;
+    const ctx = receiver[symbols.caller] ?? receiver.ctx;
+    const names = [...session.factory.inject,...session.factory.services.map(item=>item.name)];
+    const realms = Object.fromEntries(names.map(name=>[name,this.domain.port(ctx,name)]));
+    return this.command({op:'typed_check',session:session.id,service,ticket:action.ticket,
+      realms,config:jsonValue(ctx[symbols.intercept]?.[service] ?? null)}).available;
   }
   finish(waiter,result) {
     if (result.success) waiter.resolve(result.value);
@@ -147,7 +170,7 @@ export class RustHost {
         // A rejected start can still have created a persistent typed definition.
         token.fiber._rustDefinition = true;
         const reply = this.command({op:'start',ticket:token.ticket,factory:name,config:jsonValue(config ?? null),ports});
-        const session = {id:reply.session,ctx,factory,token:{...token},jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
+        const session = {id:reply.session,ctx,factory,token:{...token},setupToken:token,jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
         this.sessions.set(session.id,session);
         // Own teardown before polling setup, including partially failing setup.
         // Rust instances remain available through every ordinary JS inverse and
@@ -206,7 +229,14 @@ export class RustHost {
     if (!session || session.closed) throw new Error('Rust session is closed');
     const job = [...session.jobs].find(job => job.job === request.job);
     if (!job) throw new Error('Rust request belongs to an unknown or completed job');
-    const token = {...(job.kind === 'cleanup' ? session.cleanupToken : {...session.token,kind:'rust-call'}),rustAuthority:{session:session.id,job:job.job,request:request.request},rustResource:job.resource,rustResources:[...new Set([...(job.ancestors ?? []),...(job.resource ? [job.resource] : [])])]};
+    // A setup reverse call may publish after recovery admits a pending restart.
+    // Keep the original invocation reference: its active flag closes when the
+    // real setup lands. A copied active:true flag must not become lasting setup
+    // authority for detached reverse-call continuations or ordinary methods.
+    const scope = job.kind === 'setup'
+      ? {...session.token,kind:'setup',active:false,parentInvocation:session.setupToken}
+      : job.kind === 'cleanup' ? session.cleanupToken : {...session.token,kind:'rust-call'};
+    const token = {...scope,rustAuthority:{session:session.id,job:job.job,request:request.request},rustResource:job.resource,rustResources:[...new Set([...(job.ancestors ?? []),...(job.resource ? [job.resource] : [])])]};
     return this.hooks.run(token,() => {
       if (request.kind === 'provide') {
         const descriptor = session.factory.services.find(service => service.name === request.service);
@@ -224,7 +254,12 @@ export class RustHost {
             return (...args) => host.call(session,service,descriptor,method,ctx,fiber,generation,args);
           }});
         }
-        session.ctx.provide(descriptor.name,service);
+        let checker;
+        if (request.args?.checked) {
+          checker = () => { throw new Error('Typed check requires its native availability ticket'); };
+          this.typedChecks.set(checker,{session,service:descriptor.name});
+        }
+        session.ctx.provide(descriptor.name,service,checker);
         session.services.set(descriptor.name,service);
         const port = this.domain.port(session.ctx,descriptor.name);
         const publication = session.ctx.fiber._publications.get(JSON.stringify(port)).publication;
@@ -272,6 +307,7 @@ export class RustHost {
     const caller = this.caller(fiber,generation);
     const reply = this.command({op:'call',session:session.id,service:descriptor.name,method:method.name,args:jsonValue(args),caller});
     if (method.kind === 'sync') {
+      this.notifyServices(reply.serviceNotifications);
       if (!Object.hasOwn(reply,'value')) throw new Error('Rust sync method returned no value');
       return reply.value;
     }

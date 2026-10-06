@@ -64,7 +64,9 @@ The Loader imports modules and validates candidate JSON inputs before disturbing
 
 The separate `@cordis-verus/compat-loader/harness` entry adapts the **installed,
 unchanged** official Harness `Loader` and `Include` classes. It does not replace
-this package's JSON API or automatically wrap the official Settings UI.
+this package's JSON API. `LoaderTransactions` offers explicit host operations;
+`installOfficialTransactions` additionally connects the official configuration UI
+and refresh/HMR queues when installed by the application before boot.
 The tested contract is Harness Cordis 4.0.4, Loader 1.0.5 and Include 1.0.9.
 Use the native Harness profile and a live, fully initialized tree:
 
@@ -113,17 +115,38 @@ through the callback's synchronous call stack in that domain. A returned Promise
 does not extend that authority; plugin lifecycle callbacks and async update
 continuations cannot borrow it. Ignored lifecycle Promises are still joined.
 
-This opt-in API does not intercept direct official calls, `Include.refresh()`,
-the ConfigEditor's separate profile-file transaction, `hmr.runExclusive()`,
-module-cache invalidation or arbitrary EntryTree subclasses. Do not concurrently
-bypass it with direct writes to the same tree and assume they are serialized.
-Supporting those larger boundaries remains separate work. Runtime shape checks
-are not automatic certification of a different upstream version.
+The explicit adapter does not intercept arbitrary direct object or file mutations.
+Applications can additionally call `installOfficialTransactions` with the pinned
+`Entry`, `EntryGroup`, `EntryTree`, `Hmr` and `ConfigEditor` classes **before boot**.
+The companion Harness application already installs it in its default preload.
+That host bridge admits ConfigEditor edits before acquiring the profile file lock,
+then keeps write/reconcile/rollback and Include refresh in the same domain slot.
+It also orders `hmr.runExclusive` with configuration and shutdown work. The original
+methods still implement the configuration semantics; no upstream source files
+are rewritten. See [official configuration transactions](../../docs/official-config-transactions.md)
+for setup, failure and callback contracts.
 
-The core gate checks admission contracts and type declarations; the companion
-`cordis-harness` official gate executes real installed Loader/Include classes,
-JSON/YAML files, async inverse/write barriers, write failure/retry, qualified
-removal, fresh-context restore, volatile config and stale-owner rejection.
+A failed inverse is not automatically retried by rollback. Readiness and restart
+report the retained native barrier even when a transient JavaScript error has
+already been observed; explicit cleanup recovery is required. Event and edit
+callbacks cannot borrow transaction steps. `steps.observe(fiber, callback)` retains
+the callback's episode identity, and `steps.isCurrent()` lets a trusted bridge
+check its exact coordinator origin before capturing a synchronous continuation.
+These are host APIs, not a sandbox for arbitrary application code.
+
+Official main-thread `partialReload()` rejects with
+`OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED` before changing module caches. Use
+[Worker module graphs and reload plans](../../docs/module-graph-reloads.md) to inspect
+actual dependencies and replace a captured artifact. This still replaces the
+whole Worker; application native addons require a separate process supervisor.
+Runtime shape checks do not certify a different upstream version or arbitrary
+EntryTree subclass.
+
+The core gate checks admission contracts, callback isolation and type declarations;
+the companion `cordis-harness` gate executes installed official classes, default
+boot, real JSON/YAML edits, write/rollback failures, cleanup barriers and stale
+owner rejection. These are behavioral checks, not proofs of filesystem durability
+or arbitrary callback effects.
 
 ## Replace code in a fresh Worker
 

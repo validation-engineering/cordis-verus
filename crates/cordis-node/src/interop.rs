@@ -51,6 +51,13 @@ enum Request {
         #[serde(default)]
         ports: std::collections::BTreeMap<String, cordis_driver::ServicePort>,
     },
+    TypedCheck {
+        session: String,
+        service: String,
+        ticket: cordis_driver::CheckTicket,
+        realms: std::collections::BTreeMap<String, cordis_driver::ServicePort>,
+        config: Value,
+    },
     Forget {
         id: String,
     },
@@ -306,6 +313,45 @@ impl NativeDriver {
                         ports,
                         imports,
                     )
+            }
+            Request::TypedCheck {
+                session,
+                service,
+                ticket,
+                realms,
+                config,
+            } => {
+                let session = identity(&session)?;
+                {
+                    let backend = self
+                        .backend
+                        .try_borrow()
+                        .map_err(|_| "ReentrantRustAction")?;
+                    let (publication, port) = backend.binding(session, &service)?;
+                    if ticket.publication != publication
+                        || ticket.port != port
+                        || realms.get(&service) != Some(&port)
+                    {
+                        return Err("TypedCheckPublicationMismatch".into());
+                    }
+                    let mut driver = self
+                        .driver
+                        .try_borrow_mut()
+                        .map_err(|_| "ReentrantCommand")?;
+                    let current = driver
+                        .execute(cordis_driver::Command::ValidateCheck { ticket })
+                        .map_err(|e| e.to_string())?;
+                    if current["current"] != true {
+                        return Err("StaleCheck".into());
+                    }
+                }
+                // No graph borrow is held while the user's predicate executes.
+                let available = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_check(session, &service, &realms, &config)?;
+                Ok(json!({"available": available}))
             }
             Request::Forget { id } => {
                 let id = identity(&id)?;

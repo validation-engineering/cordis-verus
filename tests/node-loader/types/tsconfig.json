@@ -8,5 +8,5 @@
     "moduleResolution": "NodeNext",
     "types": []
   },
-  "files": ["basic.ts"]
+  "files": ["basic.ts", "module-graph.ts"]
 }

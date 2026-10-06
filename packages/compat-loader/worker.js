@@ -1,10 +1,11 @@
 import { Worker } from 'node:worker_threads';
 import { rm } from 'node:fs/promises';
 import { Artifact } from './artifact.js';
+import { planReplacement } from './module-graph.js';
 import { LoaderError, jsonValue } from './config.js';
 export { Artifact };
 
-function decode(error) { return new LoaderError(error.code ?? 'WORKER_ERROR', error.message, error.details ?? {}); }
+function decode(error) { return new LoaderError(error.code ?? 'WORKER_ERROR', error.message, error.details ?? {}, error.cause ? decode(error.cause) : undefined); }
 function timed(promise, timeout, label) {
   let timer;
   const elapsed = new Promise((_, reject) => { timer = setTimeout(() => reject(new LoaderError('DOMAIN_TIMEOUT', `${label} exceeded ${timeout} ms; cleanup is not confirmed`)), timeout); });
@@ -120,14 +121,39 @@ export class WorkerDomain {
   load(directory) {
     return this._serialize(async () => {
       const artifact = await Artifact.capture(directory, this.options);
+      let plan;
+      try {
+        const graph = this._current ? await this._current.client.request('moduleGraph') : undefined;
+        plan = planReplacement(this._current?.artifact, artifact, graph);
+        if (plan.strategy === 'process-restart-required') throw new LoaderError('PROCESS_RESTART_REQUIRED', 'Application native addons are not certified for Worker replacement; the current domain was retained', { plan });
+      } catch (error) { await artifact.dispose(); throw error; }
       this._artifacts.add(artifact);
-      return this._replace(artifact);
+      const result = await this._replace(artifact);
+      return { ...result, plan };
     });
   }
   reload(directory) {
     if (directory === undefined) directory = this._current?.artifact.source;
     if (!directory) return Promise.reject(new LoaderError('NO_RECIPE', 'load() an artifact before reload()'));
     return this.load(directory);
+  }
+  /** Snapshot and compare only: candidate JavaScript is never imported here. */
+  planReload(directory) {
+    return this._serialize(async () => {
+      directory ??= this._current?.artifact.source;
+      if (!directory) throw new LoaderError('NO_RECIPE', 'load() an artifact or provide a directory before planReload()');
+      const artifact = await Artifact.capture(directory, this.options);
+      try {
+        const graph = this._current ? await this._current.client.request('moduleGraph') : undefined;
+        return planReplacement(this._current?.artifact, artifact, graph);
+      } finally { await artifact.dispose(); }
+    });
+  }
+  moduleGraph() {
+    return this._serialize(async () => {
+      if (this.state !== 'active' || !this._current) throw new LoaderError('DOMAIN_NOT_READY', `WorkerDomain is ${this.state}`);
+      return this._current.client.request('moduleGraph');
+    });
   }
   async _replace(artifact) {
     const previous = this._current;

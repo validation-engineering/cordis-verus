@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { FiberState, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
 import { LoaderError } from './config.js';
 
@@ -15,10 +16,15 @@ function canonicalTree(tree) {
   return tree;
 }
 
+function isInclude(tree) {
+  return tree?.constructor?.name === 'Include' || tree?.constructor?.name === 'HostResolvedRootInclude'
+    && Object.getPrototypeOf(tree.constructor.prototype)?.constructor?.name === 'Include';
+}
+
 function inspectTree(tree, domain, allowRetired = false) {
   if (!tree || typeof tree !== 'object' || !tree.ctx?.fiber?._domain) throw incompatible('Expected an official Harness Loader or Include tree');
   if (tree.ctx.fiber._domain !== domain) throw new LoaderError('FOREIGN_DOMAIN', 'Loader tree belongs to another execution domain');
-  if (!['Loader', 'Include'].includes(tree.constructor?.name)
+  if (!(tree.constructor?.name === 'Loader' || isInclude(tree))
     || methods.some(name => typeof tree[name] !== 'function')
     || tree.root?.tree !== tree || !Array.isArray(tree.root.data) || !tree.store || typeof tree.store !== 'object') {
     throw incompatible('Unsupported official Loader tree contract');
@@ -27,7 +33,7 @@ function inspectTree(tree, domain, allowRetired = false) {
     || [FiberState.DISPOSED, FiberState.UNLOADING].includes(tree.ctx.fiber.state))) {
     throw new LoaderError('STALE_LOADER', 'The official tree owner has been disposed or is unloading');
   }
-  const include = tree.constructor.name === 'Include';
+  const include = isInclude(tree);
   if (include && (typeof tree.filename !== 'string' || typeof tree.flushWrite !== 'function'
     || typeof tree._writeFile !== 'function' || typeof tree.readonly !== 'boolean' || !thenable(tree.writeQueue)
     || !Object.hasOwn(tree, 'pendingWrite') || !Object.hasOwn(tree, 'writeTask'))) {
@@ -234,4 +240,132 @@ export class LoaderTransactions {
     this._closeTask = task;
     return task;
   }
+}
+
+
+// The scope carries no authority by itself. Every bridge checks the runtime's
+// exact coordinator origin again, including after official asynchronous I/O.
+const officialScope = new AsyncLocalStorage();
+const installedContracts = new WeakMap();
+const refreshedTrees = new WeakMap();
+
+function scoped(ctx) {
+  const scope = officialScope.getStore();
+  if (!scope?.steps.isCurrent()) return;
+  if (ctx?.fiber?._domain !== scope.domain) throw new LoaderError('FOREIGN_DOMAIN', 'Official operation crossed execution domains');
+  return scope;
+}
+
+function serviceCheck(service, name) {
+  const ctx = service.ownerContext;
+  const fiber = ctx?.fiber;
+  const original = value => value?.[Symbol.for('cordis.original')] ?? value;
+  if (!fiber || fiber.uid === null || fiber._removedFlag || fiber.state !== FiberState.ACTIVE
+    || original(ctx.get(name)) !== original(service)) {
+    throw new LoaderError('STALE_OFFICIAL_SERVICE', `Official ${name} belongs to an inactive or replaced service`);
+  }
+  return ctx;
+}
+
+function coordinate(ctx, execute) {
+  try { assertDomainMutation(ctx); }
+  catch (error) { return Promise.reject(error); }
+  return domainMutation(ctx, steps => {
+    const adapter = new LoaderTransactions(ctx.root, canonicalTree(ctx.loader));
+    return officialScope.run({ domain: ctx.fiber._domain, steps }, () => adapter._run(steps, execute));
+  });
+}
+
+function installRefresh(tree) {
+  if (!isInclude(tree) || refreshedTrees.has(tree)) return;
+  const original = tree.refresh;
+  if (typeof original !== 'function') throw incompatible('Official Include.refresh is unavailable');
+  const owner = tree.ctx.fiber, generation = owner._generation;
+  const check = () => {
+    if (owner.uid === null || owner._removedFlag || owner._generation !== generation
+      || [FiberState.DISPOSED, FiberState.UNLOADING].includes(owner.state)) {
+      throw new LoaderError('STALE_LOADER', 'Cannot refresh an Include from a previous owner activation');
+    }
+  };
+  const wrapped = function (...args) {
+    const invoke = () => { check(); return Reflect.apply(original, this, args); };
+    try {
+      check();
+      return scoped(tree.ctx) ? invoke() : coordinate(tree.ctx.root, invoke);
+    } catch (error) { return Promise.reject(error); }
+  };
+  Object.defineProperty(tree, 'refresh', { value: wrapped, configurable: true, writable: true });
+  refreshedTrees.set(tree, { original, wrapped });
+}
+
+/**
+ * Install host-only bridges on the pinned official classes before mounting the
+ * application. Official methods, filesystem locks, rollback, watcher dispatch
+ * and config semantics still execute unchanged. The domain queue is outermost.
+ */
+export function installOfficialTransactions({ Entry, EntryGroup, EntryTree, Hmr, ConfigEditor }) {
+  const classes = [Entry, EntryGroup, EntryTree, Hmr, ConfigEditor];
+  if (classes.some(value => typeof value !== 'function' || !value.prototype)) throw incompatible('All five pinned official classes are required');
+  const previous = classes.map(value => installedContracts.get(value)).find(Boolean);
+  if (previous) {
+    if (classes.some((value, index) => value !== previous[index])) throw incompatible('Official transaction installation changed class identities');
+    return;
+  }
+  const contracts = [
+    [Entry.prototype, ['update'], entry => entry.ctx],
+    [EntryGroup.prototype, ['update', 'create', 'remove', 'stop'], group => group.ctx],
+    [EntryTree.prototype, ['create', 'update', 'remove'], tree => tree.ctx],
+  ];
+  for (const [prototype, names] of contracts) for (const name of names) {
+    if (typeof prototype[name] !== 'function') throw incompatible(`Official Loader contract lacks ${name}`);
+  }
+  if (typeof Hmr.prototype.runExclusive !== 'function' || typeof ConfigEditor.prototype.edit !== 'function') {
+    throw incompatible('Official HMR/ConfigEditor transaction entrypoints are unavailable');
+  }
+  for (const [prototype, names, context] of contracts) for (const name of names) {
+    const original = prototype[name];
+    prototype[name] = function (...args) {
+      installRefresh(this.tree ?? this.parent?.tree ?? this);
+      const scope = scoped(context(this));
+      return scope ? scope.steps.capture(() => Reflect.apply(original, this, args)) : Reflect.apply(original, this, args);
+    };
+  }
+  const exclusive = Hmr.prototype.runExclusive;
+  Hmr.prototype.runExclusive = function (operation) {
+    try {
+      const ctx = serviceCheck(this, 'hmr');
+      const generation = ctx.fiber._generation;
+      const invoke = () => {
+        serviceCheck(this, 'hmr');
+        if (ctx.fiber._generation !== generation) throw new LoaderError('STALE_OFFICIAL_SERVICE', 'HMR changed while its operation was queued');
+        return Reflect.apply(exclusive, this, [operation]);
+      };
+      return scoped(ctx) ? invoke() : coordinate(ctx.root, invoke);
+    } catch (error) { return Promise.reject(error); }
+  };
+  // The official in-process replacement mutates Node caches before cleanup and
+  // catches failed disposal. Keep the running generation intact; executable
+  // module replacement belongs to the generation-aware Worker host.
+  Hmr.prototype.partialReload = function () {
+    return Promise.reject(new LoaderError('OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED',
+      'In-process module replacement is not admitted; use WorkerDomain module generations'));
+  };
+  const edit = ConfigEditor.prototype.edit;
+  ConfigEditor.prototype.edit = function (entry, change) {
+    try {
+      const ctx = serviceCheck(this, 'configEditor');
+      const generation = ctx.fiber._generation;
+      if (typeof change !== 'function') throw new TypeError('ConfigEditor.edit requires a change callback');
+      return coordinate(ctx.root, () => {
+        serviceCheck(this, 'configEditor');
+        if (ctx.fiber._generation !== generation) throw new LoaderError('STALE_OFFICIAL_SERVICE', 'ConfigEditor changed while its edit was queued');
+        return Reflect.apply(edit, this, [entry, (...args) => {
+          const scope = scoped(ctx);
+          if (!scope) throw incompatible('ConfigEditor callback escaped its admitted transaction');
+          return scope.steps.observe(entry.fiber, () => change(...args));
+        }]);
+      });
+    } catch (error) { return Promise.reject(error); }
+  };
+  for (const value of classes) installedContracts.set(value, classes);
 }

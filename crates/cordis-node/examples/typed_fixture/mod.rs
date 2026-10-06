@@ -19,6 +19,7 @@ struct Shared {
     events: Vec<Value>,
     counters: BTreeMap<String, Weak<Counter>>,
     gates: BTreeMap<String, Gate>,
+    live_setups: BTreeMap<String, AsyncSetup>,
 }
 #[derive(Clone)]
 struct Control(Arc<Mutex<Shared>>);
@@ -54,7 +55,7 @@ impl Drop for DefinitionGuard {
 struct ControlAdapter;
 impl TypedService<Control> for ControlAdapter {
     fn methods(&self) -> Vec<MethodDescriptor> {
-        ["events", "release", "note"]
+        ["events", "release", "note", "refreshOld"]
             .into_iter()
             .map(|name| MethodDescriptor {
                 name: name.into(),
@@ -76,6 +77,19 @@ impl TypedService<Control> for ControlAdapter {
                 if let Some(wake) = wake {
                     wake.wake();
                 }
+                Ok(Value::Null)
+            }
+            "refreshOld" => {
+                let name = args[0].as_str().ok_or("refreshOld requires a label")?;
+                let setup = value
+                    .0
+                    .lock()
+                    .unwrap()
+                    .live_setups
+                    .get(name)
+                    .cloned()
+                    .ok_or("unknown live setup")?;
+                setup.refresh()?;
                 Ok(Value::Null)
             }
             "note" => {
@@ -326,6 +340,162 @@ fn consumer_plugin(
         Ok(())
     }).requires(control_key).requires(counter_key).provides(consumer_key)
 }
+struct LiveValue(i64);
+struct LiveControl {
+    setup: AsyncSetup,
+    key: ServiceKey<LiveValue>,
+}
+struct LiveView;
+impl TypedService<LiveValue> for LiveView {
+    fn methods(&self) -> Vec<MethodDescriptor> {
+        vec![MethodDescriptor {
+            name: "read".into(),
+            kind: MethodKind::Sync,
+        }]
+    }
+    fn call_sync(&self, value: Arc<LiveValue>, _method: &str, _args: Value) -> PluginResult<Value> {
+        Ok(json!(value.0))
+    }
+}
+struct LiveControlView;
+impl TypedService<LiveControl> for LiveControlView {
+    fn methods(&self) -> Vec<MethodDescriptor> {
+        vec![
+            MethodDescriptor {
+                name: "set".into(),
+                kind: MethodKind::Sync,
+            },
+            MethodDescriptor {
+                name: "setAsync".into(),
+                kind: MethodKind::Async,
+            },
+        ]
+    }
+    fn call_sync(
+        &self,
+        value: Arc<LiveControl>,
+        _method: &str,
+        args: Value,
+    ) -> PluginResult<Value> {
+        value.setup.set(
+            value.key,
+            LiveValue(args[0].as_i64().ok_or("set requires i64")?),
+        )?;
+        Ok(Value::Null)
+    }
+    fn call_async(
+        &self,
+        ctx: PluginContext,
+        value: Arc<LiveControl>,
+        _method: &str,
+        args: Value,
+    ) -> PluginFuture {
+        Box::pin(async move {
+            super::delay(1).await;
+            ctx.cancellation().check()?;
+            value.setup.set(
+                value.key,
+                LiveValue(args[0].as_i64().ok_or("setAsync requires i64")?),
+            )?;
+            Ok(Value::Null)
+        })
+    }
+}
+struct LiveReader {
+    setup: AsyncSetup,
+    key: ServiceKey<LiveValue>,
+    original: Arc<LiveValue>,
+}
+struct LiveReaderView;
+impl TypedService<LiveReader> for LiveReaderView {
+    fn methods(&self) -> Vec<MethodDescriptor> {
+        vec![MethodDescriptor {
+            name: "read".into(),
+            kind: MethodKind::Sync,
+        }]
+    }
+    fn call_sync(
+        &self,
+        value: Arc<LiveReader>,
+        _method: &str,
+        _args: Value,
+    ) -> PluginResult<Value> {
+        let current = value.setup.get(value.key)?;
+        Ok(json!({"current": current.0, "original": value.original.0,
+            "sameArc": Arc::ptr_eq(&current, &value.original)}))
+    }
+}
+fn register_live(
+    registry: &mut FactoryRegistry,
+    control_key: ServiceKey<Control>,
+) -> PluginResult<()> {
+    let key = ServiceKey::<LiveValue>::new("typedLiveValue");
+    let controller = ServiceKey::<LiveControl>::new("typedLiveControl");
+    let reader = ServiceKey::<LiveReader>::new("typedLiveReader");
+    registry.register_typed(
+        TypedFactory::new("fixture.typedLive", move |config| {
+            let label = config["label"].as_str().unwrap_or("live").to_owned();
+            let initial = config["initial"].as_i64().unwrap_or(5);
+            let fail_cleanup = config["failCleanup"] == true;
+            let fail_setup = config["failSetup"] == true;
+            let panic_check = config["panicCheck"] == true;
+            let mut generation = 0;
+            Ok(Plugin::new("live", move |setup| {
+                generation += 1;
+                let control = setup.get(control_key)?;
+                let realm = setup.context().port(key).realm;
+                setup.provide_checked(key, LiveValue(initial), move |value, context, config| {
+                    assert!(!panic_check, "live predicate failure");
+                    context.port(key).realm == realm
+                        && value.0 >= config["minimum"].as_i64().unwrap_or(0)
+                })?;
+                let handle = setup.to_async();
+                control
+                    .0
+                    .lock()
+                    .unwrap()
+                    .live_setups
+                    .insert(format!("{label}:{generation}"), handle.clone());
+                setup.provide(controller, LiveControl { setup: handle, key })?;
+                let label = label.clone();
+                setup.on_cleanup(move || {
+                    control.record(json!({"phase":"live:cleanup","label":label}));
+                    if fail_cleanup {
+                        Err("live cleanup failed".into())
+                    } else {
+                        Ok(())
+                    }
+                });
+                if fail_setup {
+                    Err("live partial setup failed".into())
+                } else {
+                    Ok(())
+                }
+            })
+            .requires(control_key)
+            .provides(key)
+            .provides(controller))
+        })
+        .requires(control_key, "typedControl")
+        .provides(key, "typedLiveValue", LiveView)
+        .provides(controller, "typedLiveControl", LiveControlView)
+        .with_service_updates(),
+    )?;
+    registry.register_typed(TypedFactory::new("fixture.typedLiveReader", move |_| {
+        Ok(Plugin::new("live-reader", move |setup| {
+            let control = setup.get(control_key)?;
+            let original = setup.get(key)?;
+            let handle = setup.to_async();
+            setup.provide(reader, LiveReader { setup: handle.clone(), key, original: original.clone() })?;
+            setup.on_cleanup(move || {
+                control.record(json!({"phase":"live-reader:cleanup", "current":handle.get(key)?.0,"original":original.0}));
+                Ok(())
+            });
+            Ok(())
+        }).requires(control_key).requires(key).provides(reader))
+    }).requires(control_key,"typedControl").requires(key,"typedLiveValue").provides(reader,"typedLiveReader",LiveReaderView))?;
+    Ok(())
+}
 pub(super) fn register(registry: &mut FactoryRegistry) -> PluginResult<()> {
     let shared = Control(Arc::new(Mutex::new(Shared::default())));
     let control_key = ServiceKey::<Control>::new("typedControl");
@@ -372,5 +542,5 @@ pub(super) fn register(registry: &mut FactoryRegistry) -> PluginResult<()> {
         .requires(wrong_counter_key, "typedCounter")
         .provides(consumer_key, "typedConsumer", ConsumerAdapter),
     )?;
-    Ok(())
+    register_live(registry, control_key)
 }

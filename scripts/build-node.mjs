@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +26,18 @@ const report = join(root, 'target/node-compat/build.json');
 for (const path of [report, join(root,'packages/compat-cordis/native/manifest.json')]) {
   try { unlinkSync(path); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
+// Replace generated addons with a fresh inode. Overwriting a previously loaded
+// signed Mach-O in place can leave macOS code-signature caches on the old inode.
+// Rename also lets existing processes retain their mapped generation safely.
+function installAddon(source, destination) {
+  const temporary = `${destination}.${process.pid}.tmp`;
+  try {
+    copyFileSync(source, temporary);
+    renameSync(temporary, destination);
+  } finally {
+    try { unlinkSync(temporary); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+}
 const before = sourceHashes();
 const result = spawnSync('bash', [join(root, 'scripts/build-node.sh'), ...args], { cwd: root, stdio: ['inherit', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 if (result.error) throw result.error;
@@ -45,7 +57,7 @@ if (compilerProfile?.opt_level !== '3' || compilerProfile.debug_assertions !== t
 const source = candidates[0];
 const output = join(root, 'packages/compat-cordis/native/cordis.node');
 mkdirSync(dirname(output), { recursive: true });
-copyFileSync(source, output);
+installAddon(source, output);
 // Reject a cross-target binary that cannot actually load in this Node environment.
 const binding = createRequire(import.meta.url)(output);
 if (JSON.parse(binding.bindingInfo()).abi !== 1 || typeof binding.NativeDriver !== 'function') throw new Error('Incompatible native binding');
@@ -55,7 +67,7 @@ const fixtureArtifacts = messages.filter(item => item.reason === 'compiler-artif
 if (fixtureArtifacts.length !== 1) throw new Error('Cargo did not emit exactly one Rust plugin example addon');
 const fixture = join(root,'target/node-compat/interop-fixture.node');
 mkdirSync(dirname(fixture),{recursive:true});
-copyFileSync(fixtureArtifacts[0],fixture);
+installAddon(fixtureArtifacts[0],fixture);
 const custom = createRequire(import.meta.url)(fixture);
 if (typeof custom.createDriver !== 'function' || !JSON.parse(custom.createDriver().rustInfo()).factories.some(factory => factory.name === 'fixture.counter')) throw new Error('Custom Rust factory addon is not extensible');
 if (JSON.stringify(sourceHashes()) !== JSON.stringify(before)) throw new Error('Native sources changed during build; rerun');

@@ -1,4 +1,4 @@
-# Current status — 2026-10-05
+# Current status — 2026-10-06
 
 This is an experimental development checkpoint for the initially private
 [Stool233/cordis-verus](https://github.com/Stool233/cordis-verus) repository.
@@ -63,8 +63,15 @@ regressions. A shared domain mutation queue now orders multiple JSON Loaders, di
 Context shutdown. Scoped lifecycle steps cannot escape into plugin continuations, failed cleanup
 blocks new revisions, and accepted work drains before close. An opt-in official Loader adapter now coordinates create/update/remove, old/new
 Fibers and actual Include persistence queues, with stale-owner generation checks.
-ConfigEditor file transactions, Include refresh and module-graph/supervisor
-integration remain separate work; the default official UI is not transparently wrapped. Existing paper completion counts are unchanged.
+The official host installer now wraps ConfigEditor admission before file locking,
+write/reconcile/rollback, Include refresh and the HMR operation queue. The
+companion Harness boot installs these bridges for its default UI. Ordinary event
+callbacks cannot borrow transaction steps, and readiness reports a retained native
+cleanup failure instead of waiting forever. Main-thread module-cache replacement
+is explicitly refused before mutation; [observed module graphs](module-graph-reloads.md)
+explain changes executed by full Worker replacement and retained-artifact recovery.
+Application native addons require a separate process supervisor. Existing paper
+completion counts are unchanged.
 
 The [Rust factory SDK](rust-node-plugins.md) adds same-graph JSON services,
 pull streams, explicit opaque object/callback adapters and event-driven Futures
@@ -72,7 +79,13 @@ through user-compiled addons. Objects and callbacks are acquired through declare
 factory methods; arguments and results remain JSON. They are not arbitrary handles
 or closures embedded in DTOs.
 
-The [static typed adapter](typed-rust-plugins.md) now executes real `cordis::Plugin` definitions in the Node graph. It retains original slots and per-Fiber FnMut state, rejects unsupported dynamic operations, and records legacy FnOnce cleanup failure permanently instead of accepting an empty retry. This does not close the remaining dynamic Runtime or paper refinement obligations.
+The [typed adapter](typed-rust-plugins.md) executes real `cordis::Plugin` definitions
+in the Node graph. It retains original slots and per-Fiber FnMut state, with
+explicit opt-in for `provide_checked`, `set` and `refresh` on declared services.
+Availability uses real pending CheckTickets and consumer injection configuration.
+Dynamic publication creation/removal and the remaining typed Runtime operations
+are still outside this adapter. Legacy FnOnce cleanup failure stays permanent
+instead of accepting an empty retry. These host changes are not paper proofs.
 
 Borrowed object release drops an adapter reference; owned release waits for its
 explicit cleanup and retains failed work for retry. Ordinary JS inverses must all
@@ -99,8 +112,9 @@ platform baselines, production workloads and long-running resource tests still
 require separate runs and acceptance.
 
 Remaining integration work includes dynamic typed Runtime/publication migration, broader
-interface and ABI contracts, more Cordis/Harness ecosystem coverage, module-graph
-HMR, actual platform acceptance and host-to-paper refinement. The full long-term
+interface and ABI contracts, more Cordis/Harness ecosystem coverage, safe
+same-environment HMR, a process supervisor, actual platform acceptance and
+host-to-paper refinement. The full long-term
 architecture and release gate remain incomplete.
 
 ## Paper coverage

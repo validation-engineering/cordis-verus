@@ -92,7 +92,12 @@ await loader.dispose();
 await context.dispose();
 const domain = new WorkerDomain({ timeout: 10000 });
 try {
-  await domain.load(project);
+  const loaded = await domain.load(project);
+  assert.equal(loaded.plan.strategy, 'worker-restart');
+  const graph = await domain.moduleGraph();
+  assert.equal(graph.coverage, 'observed');
+  assert.ok(graph.modules.some(module => module.path === 'plugin.mjs'));
+  assert.equal((await domain.planReload()).identical, true);
   assert.equal(await domain.call('message', 'hello', 'worker'), 'packed:worker');
 } finally { await domain.dispose(); }
 console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load'] }));
@@ -103,8 +108,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { Context as PackageContext } from '@cordis-verus/compat-harness';
-import { LoaderTransactions } from '@cordis-verus/compat-loader/harness';
+import { LoaderTransactions, installOfficialTransactions } from '@cordis-verus/compat-loader/harness';
 assert.equal(typeof LoaderTransactions, 'function');
+assert.equal(typeof installOfficialTransactions, 'function');
 const require = createRequire(import.meta.url);
 assert.equal(Context, PackageContext);
 assert.equal(require('@cordis-verus/compat-harness').Context, Context);

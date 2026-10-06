@@ -1,4 +1,4 @@
-//! Explicit views of real `cordis::Plugin` static services in this Driver's graph.
+//! Explicit views of real `cordis::Plugin` declared services in this Driver's graph.
 //! Rust values never cross JSON; adapters borrow the publication's original slot.
 use super::*;
 use cordis::runtime::static_host::{
@@ -121,6 +121,7 @@ pub struct TypedFactory {
     name: String,
     make: Arc<dyn Fn(Value) -> PluginResult<Plugin> + Send + Sync>,
     bindings: Vec<Binding>,
+    service_updates: bool,
 }
 impl TypedFactory {
     pub fn new(
@@ -131,7 +132,14 @@ impl TypedFactory {
             name: name.into(),
             make: Arc::new(make),
             bindings: vec![],
+            service_updates: false,
         }
+    }
+    /// Enable checked declared services and live `AsyncSetup::set/refresh`.
+    /// Does not enable `publish`, child plugins, effects or configuration hooks.
+    pub fn with_service_updates(mut self) -> Self {
+        self.service_updates = true;
+        self
     }
     pub fn requires<T: Any + Send + Sync>(
         mut self,
@@ -228,8 +236,47 @@ pub(super) struct Instance {
     start: Mutex<Option<cordis::runtime::static_host::StaticFuture>>,
     factory: Arc<TypedFactory>,
     ports: BTreeMap<String, cordis_driver::ServicePort>,
+    service_dirty: Arc<AtomicBool>,
 }
 impl Instance {
+    pub(super) fn take_service_notification(&self) -> bool {
+        self.service_dirty.swap(false, Ordering::AcqRel)
+    }
+    pub(super) fn check_service(
+        &self,
+        service: &str,
+        realms: &BTreeMap<String, cordis_driver::ServicePort>,
+        config: &Value,
+    ) -> PluginResult<bool> {
+        if !self.factory.service_updates {
+            return Err("TypedServiceUpdatesDisabled".into());
+        }
+        self.factory.check_ports(realms)?;
+        // Service keys retain their typed identity; realms are explicitly mapped
+        // from the checked consumer's Context by the Node host.
+        if self
+            .factory
+            .bindings
+            .iter()
+            .any(|binding| realms[&binding.name].key != self.ports[&binding.name].key)
+        {
+            return Err("TypedCheckPortMismatch".into());
+        }
+        let context = TypedContext::with_realms(
+            self.factory
+                .bindings
+                .iter()
+                .map(|binding| (binding.key, realms[&binding.name].realm)),
+        );
+        let (_, slot) = self.value(service)?;
+        // A pending notification invalidates this value observation. The next
+        // host poll will issue fresh graph check tickets before reactivation.
+        if self.service_dirty.load(Ordering::Acquire) {
+            return Ok(false);
+        }
+        let available = slot.accepts(&context, config);
+        Ok(available && !self.service_dirty.load(Ordering::Acquire))
+    }
     pub(super) fn cancel(&self) {
         self.episode.cancel();
     }
@@ -293,7 +340,13 @@ impl PluginInstance for Instance {
                 }
             }
             for binding in factory.bindings.iter().filter(|b| b.view.is_some()) {
-                ctx.provide(&binding.name).await?;
+                let native = ports[&binding.name];
+                let slot = supplied
+                    .iter()
+                    .find(|(p, _)| p.key == binding.key && p.realm == native.realm)
+                    .unwrap();
+                ctx.provide_with_check(&binding.name, slot.1.has_check())
+                    .await?;
             }
             Ok(Value::Null)
         })
@@ -449,18 +502,63 @@ impl Backend {
                 .iter()
                 .map(|b| (b.key, ports[&b.name].realm)),
         );
-        let StaticStart { episode, setup } = self
-            .typed_mounts
-            .get_mut(&id)
-            .unwrap()
-            .definition
-            .begin(id, generation, context, imports)?;
+        let dirty = Arc::new(AtomicBool::new(false));
+        let definition = &mut self.typed_mounts.get_mut(&id).unwrap().definition;
+        let StaticStart { episode, setup } = if factory.service_updates {
+            let dirty = dirty.clone();
+            let notify = self.notify.clone();
+            let notifications = self.service_notifications.clone();
+            definition.begin_with_service_updates(
+                id,
+                generation,
+                context,
+                imports,
+                Arc::new(move || {
+                    if !dirty.swap(true, Ordering::AcqRel) {
+                        notifications.store(true, Ordering::Release);
+                        notify();
+                    }
+                }),
+            )?
+        } else {
+            definition.begin(id, generation, context, imports)?
+        };
         Ok(Arc::new(Instance {
             episode,
             start: Mutex::new(Some(setup)),
             factory,
             ports,
+            service_dirty: dirty,
         }))
+    }
+    pub fn typed_check(
+        &self,
+        session: u64,
+        service: &str,
+        realms: &BTreeMap<String, cordis_driver::ServicePort>,
+        config: &Value,
+    ) -> PluginResult<bool> {
+        let session = self.sessions.get(&session).ok_or("UnknownSession")?;
+        session.cancellation.check()?;
+        session
+            .typed
+            .as_ref()
+            .ok_or("TypedProviderRequired")?
+            .check_service(service, realms, config)
+    }
+    pub(super) fn typed_notifications(&self) -> Vec<Value> {
+        // Ordinary calls and idle polls do not scan the retained session graph.
+        if !self.service_notifications.swap(false, Ordering::AcqRel) {
+            return Vec::new();
+        }
+        self.sessions.iter().filter_map(|(id, session)| {
+            let typed = session.typed.as_ref()?;
+            if !typed.take_service_notification() || session.cancellation.is_cancelled() || typed.episode.is_closed() {
+                return None;
+            }
+            Some(serde_json::json!({"session":id.to_string(), "generation":session.generation.to_string(),
+                "ports":session.publications.values().map(|(_,port)| port).collect::<Vec<_>>() }))
+        }).collect()
     }
     pub fn forget_typed(&mut self, id: usize) -> PluginResult<()> {
         if self.sessions.values().any(|s| s.id == id) {

@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import { Context } from '@cordis-verus/compat-cordis';
 import { Loader, ModuleHost, LoaderError } from './index.js';
 import { jsonValue } from './config.js';
+import { ModuleGraph } from './module-graph.js';
 
-const serialize = error => ({ name: error?.name ?? 'Error', message: error?.message ?? String(error), code: error?.code, details: error?.details });
+const serialize = (error, depth = 0) => ({ name: error?.name ?? 'Error', message: error?.message ?? String(error), code: error?.code, details: error?.details, cause: depth < 8 && error?.cause ? serialize(error.cause, depth + 1) : undefined });
+const graph = new ModuleGraph(workerData.directory).install();
 const ctx = new Context();
 const loader = new Loader(ctx, { moduleHost: new ModuleHost({ rootDirectory: workerData.directory }), allowPending: workerData.allowPending });
 let closing = false;
@@ -30,6 +32,7 @@ parentPort.on('message', request => {
     await startup;
     if (startupError) throw startupError;
     if (request.method === 'diagnostics') return loader.diagnostics();
+    if (request.method === 'moduleGraph') return graph.snapshot();
     if (request.method !== 'call') throw new LoaderError('WORKER_METHOD', 'Unsupported Worker request');
     const { service, member, args } = request;
     if (['constructor', '__proto__', 'prototype'].includes(member)) throw new LoaderError('SERVICE_METHOD', 'Reserved service method');

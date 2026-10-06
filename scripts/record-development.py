@@ -253,7 +253,7 @@ def npm_distribution_evidence(path, build_path, node_build):
                 or not isinstance(files, list) or any(not isinstance(name, str) for name in files)
                 or not required.issubset(files)
                 or (item["name"] == NPM_PACKAGES["compat-loader"]
-                    and not {"harness.js", "harness.d.ts"}.issubset(files))
+                    and not {"harness.js", "harness.d.ts", "module-graph.js"}.issubset(files))
                 or (item["name"] == NPM_PACKAGES["compat-cordis"] and (not native_files.issubset(files)
                     or {name for name in files if name.endswith(".node")} != native_binaries))
                 or item.get("sha256") != file_sha256(path.parent / filename)):

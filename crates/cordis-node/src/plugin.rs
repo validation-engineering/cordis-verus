@@ -264,6 +264,9 @@ impl PluginContext {
         self.cancellation.clone()
     }
     pub async fn provide(&self, service: &str) -> PluginResult<Value> {
+        self.provide_with_check(service, false).await
+    }
+    async fn provide_with_check(&self, service: &str, checked: bool) -> PluginResult<Value> {
         if self.cleanup {
             return Err("CleanupCannotPublish".into());
         }
@@ -271,7 +274,13 @@ impl PluginContext {
         if !self.descriptor.services.iter().any(|s| s.name == service) {
             return Err("UndeclaredService".into());
         }
-        self.request("provide", service, None, None)?.await
+        self.request(
+            "provide",
+            service,
+            None,
+            Some(serde_json::json!({"checked": checked})),
+        )?
+        .await
     }
     pub async fn call(&self, service: &str, method: &str, args: Value) -> PluginResult<Value> {
         if !self.cleanup {
@@ -412,6 +421,7 @@ pub(crate) struct CompletedJob {
 pub(crate) struct Backend {
     registry: FactoryRegistry,
     typed_mounts: BTreeMap<usize, typed::Mount>,
+    service_notifications: Arc<AtomicBool>,
     sessions: BTreeMap<u64, Session>,
     jobs: BTreeMap<u64, Job>,
     next_session: u64,
@@ -429,6 +439,7 @@ impl Backend {
         Self {
             registry,
             typed_mounts: BTreeMap::new(),
+            service_notifications: Arc::new(AtomicBool::new(false)),
             sessions: BTreeMap::new(),
             jobs: BTreeMap::new(),
             next_session: 0,
@@ -679,7 +690,10 @@ impl Backend {
         let instance = s.instance.clone();
         match kind {
             MethodKind::Sync => {
-                Ok(serde_json::json!({"value":instance.call_sync(service,method,args)?}))
+                let value = instance.call_sync(service, method, args)?;
+                Ok(
+                    serde_json::json!({"value": value, "serviceNotifications": self.typed_notifications()}),
+                )
             }
             MethodKind::Stream => self.open_rust_stream(session, service, method, args),
             MethodKind::Object => self.open_rust_object(session, service, method, args),
@@ -1031,7 +1045,8 @@ impl Backend {
             .requests
             .drain(..)
             .collect::<Vec<_>>();
-        serde_json::json!({"calls":calls,"jobs":jobs})
+        let notifications = self.typed_notifications();
+        serde_json::json!({"calls":calls,"jobs":jobs,"serviceNotifications":notifications})
     }
 }
 /// User-defined Drop implementations must not unwind across Node's finalizer.
