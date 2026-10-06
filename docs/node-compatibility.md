@@ -143,7 +143,7 @@ await loader.dispose()
 
 这是一套明确的 JSON API，尚未实现原版 Loader/Include API、YAML、lazy/volatile 配置或细粒度 HMR。当前 environment 的 reload 保留 Node 模块缓存。ModuleHost 的 loadModule adapter 可接收外部准备的稳定 factory 和 revision，但不负责清空 ESM/CJS 缓存。代码替换使用 `WorkerDomain`：捕获完整本地制品目录，新 Worker 加载新一代代码，失败时使用保存的旧制品恢复。查询参数不冒充 ESM 缓存清理。符号链接被明确拒绝；制品边界、依赖、资源与持久化目录需按 [Loader 说明](../packages/compat-loader/README.md) 配置。
 
-官方 Harness Loader 使用单独的[原地 HMR 适配器](official-in-place-hmr.md)，保留同一 Context，覆盖已观察的 ESM/CJS 依赖闭包、实际清理和失败恢复。它不改变上面 JSON Loader 的 API，也不把 native addon 代码变成可原地替换的模块。
+官方 Harness Loader 使用单独的[原地 HMR 适配器](official-in-place-hmr.md)，保留同一 Context，覆盖已观察的 ESM/CJS 依赖闭包、实际清理和失败恢复。它不改变上面 JSON Loader 的 API，也不替换常驻 native addon。独立 Rust `cdylib` 插件现在可通过单独的 [C ABI 模块控制器](native-rust-modules.md)在同进程换代；它不依赖 JS 模块缓存清理。
 
 正常关闭必须获得 shutdown 确认，且所有已登记调用和资源清理完成。Worker 异常退出、无确认的 exit(0)、超时强杀均记录为 abandoned，不能报告 clean rollback。跨 Worker 调用使用显式 JSON 边界，不保留任意 JS 对象身份。
 
@@ -183,7 +183,7 @@ npm run test:distribution
 
 native addon 默认使用 Cargo release 的优化级别 3，同时保留 debug assertions 与 overflow checks；构建根据 Cargo 实际报告核对这些设置，避免把未优化的调试制品当作分发制品。性能方法见 [benchmarks](benchmarks.md)。
 
-开发 gate 包括全内核证明、Rust 回归、Node runtime/Loader/Worker/types、三个 Rust crate 的独立解包测试与三个 npm 包的离线独立安装。npm 验收不上传包，只记录实际执行的 OS/arch/Node/ABI。`--check` 要求保留本地默认 addon、interop-fixture.node、build.json、npm report 和三个 tgz；仅从 Git 克隆旧报告不能当作本机成功验收。包仍为 private；manifest、严格产物选择与本地合包已有工具，多平台实际构建结果、发布和完整 release gate 仍是另外的门槛。
+开发 gate 包括全内核证明、Rust 回归、Node runtime/Loader/Worker/types、四个可打包 Rust crate 的独立解包测试与三个 npm 包的离线独立安装。npm 验收不上传包，只记录实际执行的 OS/arch/Node/ABI。`--check` 要求保留本地默认 addon、interop-fixture.node、三版 dynamic-fixture 动态库、build.json、npm report 和三个 tgz；仅从 Git 克隆旧报告不能当作本机成功验收。包仍为 private；manifest、严格产物选择与本地合包已有工具，多平台实际构建结果、发布和完整 release gate 仍是另外的门槛。
 
 需要本地锁定上游源码的额外验收：
 

@@ -51,6 +51,7 @@ export class RustHost {
     this.jobs = new Map();
     this.results = new Map();
     this.factories = new Map();
+    this.moduleFactories = new Map();
     this.typedChecks = new WeakMap();
     this.typedChildPlugins = new WeakMap();
     this.typedChildren = new Map();
@@ -68,10 +69,33 @@ export class RustHost {
       if (this.factories.has(factory.name)) throw new Error('Duplicate Rust factory');
       this.factories.set(factory.name,{...factory,plugin:undefined});
     }
-    if (this.factories.size) {
-      const weak = new WeakRef(this);
-      driver.rustWake(() => weak.deref()?.schedule());
+    if (this.factories.size) this.ensureWake();
+  }
+  ensureWake() {
+    if (this.wakeInstalled) return;
+    const weak = new WeakRef(this);
+    this.domain.driver.rustWake(() => weak.deref()?.schedule());
+    this.wakeInstalled = true;
+  }
+  loadModule(artifact) {
+    const descriptor = this.command({op:'load_module',...artifact});
+    if (descriptor.abi !== 1 || !Array.isArray(descriptor.factories)) throw new Error('Unsupported native module descriptor');
+    this.ensureWake();
+    const factories = new Map();
+    for (const factory of descriptor.factories) {
+      if (typeof factory.ref !== 'string' || !factory.ref || factories.has(factory.name)) throw new Error('Invalid native module factory identity');
+      let known = this.moduleFactories.get(factory.ref);
+      if (!known) {
+        known = {...structuredClone(factory),plugin:undefined};
+        this.moduleFactories.set(factory.ref,known);
+      } else if (JSON.stringify({...known,plugin:undefined}) !== JSON.stringify({...factory,plugin:undefined})) {
+        throw new Error('Native module changed an immutable factory reference');
+      }
+      factories.set(factory.name,known.plugin ?? this.makePlugin(known));
     }
+    // Resource counts are live diagnostics, not immutable artifact metadata.
+    const {resources:_resources,...metadata} = descriptor;
+    return {descriptor:structuredClone(metadata),factories};
   }
   command(command) {
     // Interop can complete work, publish through reverse calls, or fault the
@@ -187,7 +211,7 @@ export class RustHost {
         const ports = this.ports(ctx,activeFactory);
         // A rejected start can still have created a persistent typed definition.
         token.fiber._rustDefinition = true;
-        const reply = this.command({op:'start',ticket:token.ticket,factory:name,config:jsonValue(config ?? null),ports});
+        const reply = this.command({op:'start',ticket:token.ticket,factory:factory.ref ?? name,config:jsonValue(config ?? null),ports});
         const session = {id:reply.session,ctx,factory:activeFactory,token:{...token},setupToken:token,jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
         this.sessions.set(session.id,session);
         token.fiber._typedRealmKeys=reply.realms;

@@ -44,6 +44,11 @@ struct Authority {
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
+    LoadModule {
+        path: String,
+        sha256: String,
+    },
+    ModuleInfo,
     Start {
         ticket: ActionTicket,
         factory: String,
@@ -276,6 +281,29 @@ impl NativeDriver {
     }
     fn native_request(&self, request: Request) -> std::result::Result<Value, String> {
         let result = match request {
+            Request::LoadModule { path, sha256 } => {
+                // Loading may execute native constructors/entry points. Do not
+                // hold a graph or backend borrow while executing foreign code.
+                let cached = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .cached_module(&sha256);
+                if let Some(module) = cached {
+                    crate::plugin::dynamic::verify(&path, &sha256)?;
+                    return Ok(module.info());
+                }
+                let module = crate::plugin::dynamic::load(&path, &sha256)?;
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .install_module(module)
+            }
+            Request::ModuleInfo => Ok(self
+                .backend
+                .try_borrow()
+                .map_err(|_| "ReentrantRustAction")?
+                .module_info()),
             Request::Start {
                 ticket,
                 factory,

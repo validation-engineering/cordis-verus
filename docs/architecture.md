@@ -1,6 +1,6 @@
 # 架构与源码导航
 
-项目分为可执行验证内核、形式语义与桥接，以及普通 Rust 宿主。它们共享生命周期概念，但证明覆盖范围不同。四个 crate 来自独立 Rust workspace。Rust Runtime 与 Node facade 共用 LifecycleDriver 的内核控制和 ActionLedger；值、Future/JS callback 与 backend journal 留在各自宿主。锁定 TypeScript 上游只用于可选差分测试，默认构建不依赖其缓存。
+项目分为可执行验证内核、形式语义与桥接，以及普通 Rust 宿主。它们共享生命周期概念，但证明覆盖范围不同。五个 crate 位于同一个 Rust workspace。Rust Runtime 与 Node facade 共用 LifecycleDriver 的内核控制和 ActionLedger；值、Future/JS callback 与 backend journal 留在各自宿主。锁定 TypeScript 上游只用于可选差分测试，默认构建不依赖其缓存。
 
 ```mermaid
 flowchart TD
@@ -24,6 +24,7 @@ flowchart TD
 | `cordis` | [lib.rs](../crates/cordis/src/lib.rs)、[runtime.rs](../crates/cordis/src/runtime.rs) | typed services、setup、异步 stage、取消和清理；普通 Rust 适配层 |
 | `cordis-driver` | [lib.rs](../crates/cordis-driver/src/lib.rs) | 不持 JS 值的 command/action/ticket/lease 驱动；公共控制已接入原 Runtime，宿主协议仍为普通 Rust |
 | `cordis-node` + JS facade | [Node 指南](node-compatibility.md) | Node-API、JS 对象表、同图 Rust factory SDK、原版语言层、导入入口；FFI 与 callback 属于宿主边界 |
+| `cordis-plugin-api` | [原生模块指南](native-rust-modules.md) | 独立 cdylib authoring、版本化 C ABI、有界 JSON 与 opaque ID；动态库与 FFI 不属于已完成的证明范围 |
 | publication | [publication.rs](../crates/cordis-kernel/src/publication.rs) | 独立服务发布身份、lease、撤销与回收；已验证 primitive，尚无完整论文投影 |
 | 宿主设施 | [events.rs](../crates/cordis/src/events.rs)、[owned_events.rs](../crates/cordis/src/owned_events.rs)、[timer.rs](../crates/cordis/src/timer.rs) | 事件派发、owner admission/drain、定时器；行为与集成测试 |
 | 外部插件 | [process_plugin.rs](../crates/cordis/src/process_plugin.rs) | 有界 JSON-RPC、独立进程、代码快照与变更轮询；操作系统和 I/O 属于宿主边界 |
@@ -42,6 +43,8 @@ flowchart TD
 - **observation** 比较键域与值的可观察行为。它不能自动抹去 parent、freshness 或退休标志对控制规则的影响。
 
 原 Rust Runtime 的动态服务使用显式依赖 owner 内部 anchor 的独立 provider 节点。新增 Node 路径及同图 Rust factory SDK 使用真实逻辑 owner 的动态声明与 PublicationRegistry，具体限制见 [Node 指南](node-compatibility.md)。服务读取共享同一 provider 身份的 payload 槽；替换节点产生新的槽，旧消费者不会转读新 provider。原地配置更新先保存补偿计划，事务成功后更新下次启动使用的 recipe，当前 episode 的更新钩子继续持有当前实例状态。外部插件通过独立进程协议执行，代码 revision 保存可执行文件与显式依赖文件的私有快照；这些都是普通 Rust 宿主机制，未扩大内核形式证明范围。
+
+独立 Rust 动态插件复用常驻 Node Driver，ABI 只传有界字节、整数句柄和明确的唤醒函数，不跨库传 `Arc`、trait object、Future 或 `TypeId`。每个 factory ref 绑定不可变代码映像；reload 沿同域队列排空旧实例并重建服务。旧映像保留到进程退出，诊断与预算作用于同一常驻 addon；跨多个独立 addon 的进程资源不共享这个预算。状态迁移、物理卸载与任意共享动态依赖的版本隔离不在首版合同内。
 
 ## 证明源码路线
 

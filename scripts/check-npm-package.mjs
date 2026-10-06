@@ -34,7 +34,7 @@ async function filesUnder(directory, accept = () => true) {
 
 async function nativeInputs() {
   const files = ['Cargo.toml', 'Cargo.lock', 'toolchain.lock.json', 'scripts/build-node.sh', 'scripts/build-node.mjs', 'scripts/toolchain-env.sh', 'scripts/write-native-manifest.mjs', 'packages/compat-cordis/native-artifacts.js', 'packages/compat-cordis/package.json'];
-  for (const name of ['cordis-kernel', 'cordis-driver', 'cordis', 'cordis-node']) {
+  for (const name of ['cordis-kernel', 'cordis-driver', 'cordis', 'cordis-node', 'cordis-plugin-api']) {
     for (const path of await filesUnder(join(root, 'crates', name), name => /\.(rs|toml)$/.test(name))) files.push(relative(root, path).split('\\').join('/'));
   }
   return Object.fromEntries(await Promise.all(files.sort().map(async name => [name, await fileDigest(join(root, name))])));
@@ -61,12 +61,13 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { realpath, mkdir, writeFile, copyFile } from 'node:fs/promises';
+import { realpath, mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
 import { Context } from '@cordis-verus/compat-cordis';
 import { selectNativeArtifact } from '@cordis-verus/compat-cordis/native-artifacts';
 import { Loader } from '@cordis-verus/compat-loader';
 import { WorkerDomain } from '@cordis-verus/compat-loader/worker';
 import { ProcessDomain } from '@cordis-verus/compat-loader/process';
+import { loadRustModule } from '@cordis-verus/compat-loader/rust-module';
 const require = createRequire(import.meta.url);
 const facade = fileURLToPath(import.meta.resolve('@cordis-verus/compat-cordis'));
 const loaderPath = fileURLToPath(import.meta.resolve('@cordis-verus/compat-loader'));
@@ -112,7 +113,32 @@ try {
   assert.equal(await isolated.call('message', 'abi'), 1);
   assert.ok((await isolated.moduleGraph()).modules.some(module => module.path === 'application.node'));
 } finally { await isolated.dispose(); }
-console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load', 'Process-native-artifact-load'] }));
+const artifacts = JSON.parse(await readFile(join(process.cwd(), 'dynamic-modules.json'), 'utf8'));
+const nativeContext = new Context();
+let nativeModule;
+try {
+  const residentDriver = nativeContext.fiber._domain.driver;
+  nativeModule = await loadRustModule(nativeContext, {...artifacts.v1, plugins:[{id:'text',factory:'native-text-analysis',config:{setup_pending:true,cleanup_pending:true}}]});
+  const oldService = nativeContext.nativeText;
+  assert.deepEqual(oldService.analyze({text:'native code update'}), {version:'v1',words:3,characters:18,text:'native code update'});
+  await nativeModule.reload(artifacts.v2);
+  assert.equal(nativeContext.nativeText.analyze({text:'same process'}).version, 'v2');
+  assert.equal((await nativeContext.nativeText.delayed({text:'async native'})).version, 'v2');
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
+  assert.throws(() => oldService.analyze({text:'old handle'}), { code: 'STALE_EPISODE' });
+  const committed = nativeModule.snapshot();
+  await assert.rejects(nativeModule.reload(artifacts.fail), error => error.code === 'NATIVE_MODULE_RELOAD_FAILED' && error.details.restored);
+  assert.equal(nativeContext.nativeText.analyze({text:'recovered'}).version, 'v2');
+  assert.equal(nativeModule.snapshot().entries[0].factoryRef, committed.entries[0].factoryRef);
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
+  await nativeModule.dispose();
+  assert.ok(nativeModule.inspect().images.modules.every(module => Object.values(module.resources).every(count => count === 0)));
+  assert.equal(nativeContext.snapshot().plugins.length, 1);
+} finally {
+  if (nativeModule) await nativeModule.dispose();
+  await nativeContext.dispose();
+}
+console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load', 'Process-native-artifact-load', 'Rust-module-in-place-reload'] }));
 `;
 
 const harnessSmoke = `
@@ -151,6 +177,19 @@ async function main() {
   assertHashes(selected.provenance.build.sourceHashes, build.sourceHashes, 'Native provenance has a different source snapshot');
   const nativePath = selected.path;
   assert.equal(await fileDigest(nativePath), build.artifactSha256, 'Native binary differs from its build record');
+  const extension = {darwin:'.dylib',linux:'.so',win32:'.dll'}[process.platform];
+  assert.ok(extension, 'Unsupported dynamic plugin fixture platform');
+  assert.deepEqual(Object.keys(build.dynamicFixtures ?? {}).sort(), ['fail','v1','v2'], 'Dynamic plugin fixture build evidence is incomplete');
+  const dynamicSources = {};
+  for (const version of ['v1','v2','fail']) {
+    const artifact = build.dynamicFixtures[version];
+    const expected = `target/node-compat/dynamic-fixture-${version}${extension}`;
+    assert.equal(artifact.path, expected, 'Dynamic fixture path differs from its expected build output');
+    const source = join(root, expected), stat = await lstat(source);
+    assert.ok(stat.isFile() && !stat.isSymbolicLink(), 'Dynamic fixture must be a regular build artifact');
+    assert.equal(await fileDigest(source), artifact.sha256, 'Dynamic plugin fixture is stale');
+    dynamicSources[version] = source;
+  }
   const before = await inputs();
   const temporary = await realpath(await mkdtemp(join(tmpdir(), 'cordis-npm-package-')));
   const packageResults = [];
@@ -198,12 +237,28 @@ async function main() {
       assert.equal((await lstat(installed)).isSymbolicLink(), false, 'Installation must extract tarballs, not link source');
       for (const path of await filesUnder(installed)) assert.ok((await realpath(path)).startsWith(consumer + '/'));
     }
+    // Plugin images are independent application artifacts, not hidden factories
+    // linked into the default addon. Verify and copy them outside the checkout.
+    const dynamicDirectory = join(consumer, 'dynamic-modules');
+    await mkdir(dynamicDirectory);
+    const dynamicArtifacts = {};
+    for (const [version, source] of Object.entries(dynamicSources)) {
+      const path = join(dynamicDirectory, `text-${version}${extension}`);
+      await copyFile(source, path);
+      const sha256 = await fileDigest(path);
+      assert.equal(sha256, build.dynamicFixtures[version].sha256, 'Copied dynamic plugin fixture changed');
+      dynamicArtifacts[version] = {path,sha256};
+    }
+    await writeFile(join(consumer, 'dynamic-modules.json'), JSON.stringify(dynamicArtifacts));
     await writeFile(join(consumer, 'smoke.mjs'), smoke);
     const observation = JSON.parse(run(process.execPath, ['--import', '@cordis-verus/compat-cordis/register', 'smoke.mjs'], consumer, env));
     assert.equal(observation.nativeManifestSha256, selected.manifestSha256, 'Installed native manifest differs from checkout');
     assert.equal(observation.nativeTarget, selected.entry.target);
     await writeFile(join(consumer, 'harness-smoke.mjs'), harnessSmoke);
     const harnessObservation = JSON.parse(run(process.execPath, ['--import', '@cordis-verus/compat-harness/register', 'harness-smoke.mjs'], consumer, env));
+    for (const [version, source] of Object.entries(dynamicSources)) {
+      assert.equal(await fileDigest(source), build.dynamicFixtures[version].sha256, 'Dynamic plugin fixture changed during distribution check');
+    }
     assertHashes(await inputs(), before, 'Package inputs changed during distribution check');
     assertHashes(await nativeInputs(), build.sourceHashes, 'Native sources changed during distribution check');
     for (const item of packageResults) await copyFile(join(archives, item.filename), join(output, item.filename));

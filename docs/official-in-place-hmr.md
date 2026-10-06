@@ -54,3 +54,5 @@ Old module evaluation side effects, unmanaged I/O and external process state can
 ## Validation scope
 
 The companion application executes real pinned Loader, HMR and Timer classes with `--expose-internals`. Tests cover ESM, CJS, `createRequire`, executed dynamic imports, transitive/shared changes, unrelated identity, async inverse ordering, syntax/setup/cleanup/restoration failures, retained recovery, native addons, concurrent ordinary imports, real filesystem watcher dispatch, domain FIFO, shutdown, stale HMR handles and callback reentry. The default Web and headless CLI compositions are checked separately. These are Node-host integration results, not Verus proofs of module evaluation or arbitrary plugin callbacks.
+
+Independent Rust `cdylib` plugins can use the separate [native module reload API](native-rust-modules.md); JS HMR still does not replace the resident `.node` addon.

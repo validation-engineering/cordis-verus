@@ -16,6 +16,7 @@ cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的�
 - **类型化 Rust 插件。** 组合服务、异步初始化与清理、子插件、事件和定时器，显式管理资源所有权。
 - **在 Node 中运行 Cordis。** 由 Rust 决定生命周期动作，运行支持范围内的原版 JS 插件。JavaScript 对象、函数和服务值保留在 Node 中，保持原有身份。Cordis 与 DeepSeek Harness 使用不同的兼容 profile。
 - **组合 Rust 与 JavaScript。** 用户编译的 Rust 插件可通过显式服务、流、对象和回调适配器加入 Node 图；typed binding 保留既有 Rust 服务槽，并可显式开启动态 publication、拥有的子插件、动态值与按 consumer 检查 availability。
+- **可热替换的原生插件。** 通过版本化 C ABI 加载独立构建的 Rust `cdylib`，在同一 Node 进程内替换插件实例；reload 等待真实清理，并可恢复旧代码与配置。
 - **配置与重载。** 加载 JSON 插件树，并通过同一生命周期队列协调官方 Harness 配置编辑与支持范围内的原地模块重载。需要隔离替换时，使用捕获的 Worker 或进程制品，启动失败时恢复旧版本。外部可执行插件使用独立 JSON-RPC 接口。
 
 支持行为和有意保留的差异见[上游对照](docs/upstream-parity.md)，生命周期契约见[语义说明](docs/semantics.md)。
@@ -86,6 +87,7 @@ npm run official
 | [`cordis-driver`](crates/cordis-driver) | Rust 与 Node 宿主共用的生命周期控制 |
 | [`cordis`](crates/cordis) | 类型化服务、插件回调、异步工作、事件、定时器与配置加载 |
 | [`cordis-node`](crates/cordis-node) 和 [`packages/`](packages) | Node-API 绑定、JavaScript facade、兼容 profile 与 Rust 插件适配器 |
+| [`cordis-plugin-api`](crates/cordis-plugin-api) | 独立原生插件 SDK 与版本化 C ABI |
 
 内核管理生命周期状态，各宿主维护自己的值、回调和资源日志。源码导航与信任边界见[架构指南](docs/architecture.md)。
 
@@ -98,9 +100,7 @@ npm run official
 | 检查 | 结果 |
 | --- | ---: |
 | Verus 全库验证，使用 `--no-cheating --compile` | 2,292 项义务通过，0 错误 |
-| Rust 工作区行为测试 | 426 项通过 |
-| Rust 文档测试 | 2 项通过 |
-| Node 行为测试 | 506 项通过 |
+| Rust、文档与 Node 行为测试 | 精确数量见绑定源码的[开发记录](docs/development-report.json) |
 | 解包后的 crate 构建与 npm 安装检查 | 在 macOS ARM64 / Node 22.22.0 通过 |
 
 [开发记录](docs/development-report.json) 将结果绑定到源码和制品哈希。这些数字是验证义务和测试数量，不是已证明的论文定理数量；其他平台需要各自的执行证据。
@@ -128,7 +128,7 @@ python3 scripts/record-development.py --check
 | Rust 服务与资源所有权 | [Runtime](docs/runtime.md) · [Events](docs/events.md) |
 | 配置与外部插件 | [Loader](docs/loader.md) · [Process plugins](docs/process-plugins.md) |
 | 原版 JS 插件与原生包 | [Node compatibility](docs/node-compatibility.md) · [Distribution](docs/native-distribution.md) |
-| Node 应用中的 Rust 插件 | [Factory SDK](docs/rust-node-plugins.md) · [Typed bindings](docs/typed-rust-plugins.md) |
+| Node 应用中的 Rust 插件 | [Factory SDK](docs/rust-node-plugins.md) · [Typed bindings](docs/typed-rust-plugins.md) · [Native module reload](docs/native-rust-modules.md) |
 | 证明、进度与后续工作 | [Refinement](docs/refinement.md) · [Status](docs/status.md) · [Roadmap](docs/roadmap.md) |
 
 更多示例与设计说明见[文档导航](docs/README.md)。专题文档目前包含英文和中文两种语言。

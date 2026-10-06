@@ -13,7 +13,7 @@ SPEC.loader.exec_module(MODULE)
 
 class PackageDependencyTests(unittest.TestCase):
     def test_dependent_is_packaged_after_both_extracted_dependencies(self):
-        self.assertEqual(MODULE.PACKAGE_ORDER, ("cordis-kernel", "cordis-driver", "cordis"))
+        self.assertEqual(MODULE.PACKAGE_ORDER, ("cordis-kernel", "cordis-driver", "cordis", "cordis-plugin-api"))
         with tempfile.TemporaryDirectory(prefix="cordis-patch-space ") as directory:
             paths = {name: Path(directory) / name for name in MODULE.PACKAGE_ORDER[:2]}
             arguments = MODULE.cargo_patches(paths)

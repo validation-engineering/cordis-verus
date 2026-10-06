@@ -16,6 +16,7 @@ Use it to build Rust plugin systems, host supported Cordis JavaScript plugins th
 - **Typed Rust plugins.** Compose services, asynchronous setup and cleanup, child plugins, events, and timers with explicit resource ownership.
 - **Cordis on Node.** Run supported original JS plugins with Rust making lifecycle decisions. JavaScript objects, functions, and service values retain their identity in Node. Cordis and DeepSeek Harness have separate compatibility profiles.
 - **Rust and JavaScript together.** Mount user-compiled Rust plugins in the Node graph through explicit service, stream, object, and callback adapters. Typed bindings preserve existing Rust service slots, with opt-in dynamic publications, owned child plugins, live values and consumer-specific availability checks.
+- **Reloadable native plugins.** Load independently built Rust `cdylib` plugins through a versioned C ABI, then replace their instances in the same Node process. Reload waits for real cleanup and can restore the previous code and configuration.
 - **Configuration and reload.** Load JSON plugin trees and coordinate official Harness configuration edits and supported in-place module reloads through one lifecycle queue. Use captured Worker or OS-process artifacts when an isolated replacement is needed, with recovery after failed startup. External executable plugins use a separate JSON-RPC interface.
 
 See [upstream parity](docs/upstream-parity.md) for supported behavior and deliberate differences, and [semantics](docs/semantics.md) for lifecycle contracts.
@@ -86,6 +87,7 @@ Use the install command without `--offline` when public dependencies are not cac
 | [`cordis-driver`](crates/cordis-driver) | Shared lifecycle control used by the Rust and Node hosts |
 | [`cordis`](crates/cordis) | Typed services, plugin callbacks, async work, events, timers, and configuration loading |
 | [`cordis-node`](crates/cordis-node) and [`packages/`](packages) | Node-API binding, JavaScript facades, compatibility profiles, and Rust plugin adapters |
+| [`cordis-plugin-api`](crates/cordis-plugin-api) | Independent native plugin SDK and versioned C ABI |
 
 The kernel governs lifecycle state. Each host manages its own values, callbacks, and resource journals. Read the [architecture guide](docs/architecture.md) for source navigation and trust boundaries.
 
@@ -98,9 +100,7 @@ The last recorded local development run includes:
 | Check | Result |
 | --- | ---: |
 | Whole-kernel Verus verification, with `--no-cheating --compile` | 2,292 verified obligations; 0 errors |
-| Rust workspace behavior tests | 426 passed |
-| Rust documentation tests | 2 passed |
-| Node behavior tests | 506 passed |
+| Rust, documentation, and Node behavior tests | Source-bound counts in the [development report](docs/development-report.json) |
 | Extracted crate builds and npm installation checks | Passed on macOS ARM64 / Node 22.22.0 |
 
 The [development report](docs/development-report.json) binds results to source and artifact hashes. These are verification obligations and tests, not a count of proved paper theorems. Other platforms require their own execution evidence.
@@ -128,7 +128,7 @@ Add `--offline` to the first command when dependencies are cached. The second co
 | Rust services and resource ownership | [Runtime](docs/runtime.md) · [Events](docs/events.md) |
 | Configuration and external plugins | [Loader](docs/loader.md) · [Process plugins](docs/process-plugins.md) |
 | Original JS plugins and native packages | [Node compatibility](docs/node-compatibility.md) · [Distribution](docs/native-distribution.md) |
-| Rust plugins in a Node application | [Factory SDK](docs/rust-node-plugins.md) · [Typed bindings](docs/typed-rust-plugins.md) |
+| Rust plugins in a Node application | [Factory SDK](docs/rust-node-plugins.md) · [Typed bindings](docs/typed-rust-plugins.md) · [Native module reload](docs/native-rust-modules.md) |
 | Proofs, progress, and remaining work | [Refinement](docs/refinement.md) · [Status](docs/status.md) · [Roadmap](docs/roadmap.md) |
 
 The [documentation index](docs/README.md) includes further examples and design notes. Detailed documentation is currently a mix of English and Chinese.

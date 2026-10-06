@@ -15,6 +15,9 @@ test = false
 doctest = false
 
 [dependencies]
+cordis-plugin-api = { path = "../cordis-plugin-api", version = "=0.1.0" }
+libloading = "=0.9.0"
+sha2 = "=0.10.9"
 cordis = { path = "../cordis", version = "=0.1.0" }
 cordis-driver = { path = "../cordis-driver", version = "=0.1.0" }
 serde = { version = "1", features = ["derive"] }
@@ -27,7 +30,7 @@ napi-derive = "=3.6.10"
 napi-build = "=2.6.0"
 
 # napi/ctor generate the audited FFI glue and internally allow unsafe code.
-# Keep handwritten binding code denied; every other crate retains workspace forbid.
+# Keep handwritten binding code denied except the audited dynamic_ffi module; every other crate retains workspace forbid.
 [lints.rust]
 unsafe_code = "deny"
 

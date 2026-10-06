@@ -20,7 +20,7 @@ export async function filesUnder(root,directory,accept) {
 const hashes=async(root,names)=>Object.fromEntries(await Promise.all([...new Set(names)].sort().map(async name=>[name,digest(await readFile(join(root,name)))])));
 export async function nativeSourceInputs(root) {
   const files=['Cargo.toml','Cargo.lock','toolchain.lock.json','scripts/build-node.sh','scripts/build-node.mjs','scripts/toolchain-env.sh','scripts/write-native-manifest.mjs','packages/compat-cordis/native-artifacts.js','packages/compat-cordis/package.json'];
-  for(const name of ['cordis-kernel','cordis-driver','cordis','cordis-node']) files.push(...await filesUnder(root,'crates/'+name,path=>/\.(rs|toml)$/.test(path)));
+  for(const name of ['cordis-kernel','cordis-driver','cordis','cordis-node','cordis-plugin-api']) files.push(...await filesUnder(root,'crates/'+name,path=>/\.(rs|toml)$/.test(path)));
   return {files,sourceHashes:await hashes(root,files)};
 }
 export async function collectInputs(root) {

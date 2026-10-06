@@ -3,6 +3,11 @@
 //! Services have named, explicit JSON DTO methods. This module never attempts to
 //! serialize an arbitrary Rust value or JavaScript object. Futures are polled
 //! outside the Driver borrow; calls into JavaScript are returned as requests.
+// The backend-only test target imports this module without the NAPI router;
+// actual dynamic library execution is covered by the native integration suite.
+#[cfg_attr(test, allow(dead_code))]
+#[path = "dynamic.rs"]
+pub(crate) mod dynamic;
 #[path = "typed.rs"]
 mod typed;
 pub(crate) use typed::ResolvedImport;
@@ -51,8 +56,9 @@ pub struct FactoryDescriptor {
     pub services: Vec<ServiceDescriptor>,
 }
 
-/// A factory is compiled into the embedding addon, never loaded via Rust's
-/// unstable dynamic-library ABI. Each activation creates a fresh instance.
+/// A factory uses the resident Rust interface. Dynamic plugins adapt their
+/// versioned C ABI into this trait; no Rust ABI or vtable crosses a library.
+/// Each activation creates a fresh instance.
 pub trait PluginFactory: Send + Sync + 'static {
     fn descriptor(&self) -> FactoryDescriptor;
     fn create(&self, config: Value) -> PluginResult<Arc<dyn PluginInstance>>;
@@ -422,6 +428,7 @@ pub(crate) struct CompletedJob {
 /// The host owns this executor separately from the lifecycle Driver borrow.
 pub(crate) struct Backend {
     registry: FactoryRegistry,
+    modules: BTreeMap<String, Arc<dynamic::Module>>,
     typed_mounts: BTreeMap<usize, typed::Mount>,
     typed_children: BTreeMap<String, typed::Child>,
     next_typed_child: u64,
@@ -445,6 +452,7 @@ impl Backend {
     pub fn new(registry: FactoryRegistry, notify: Arc<dyn Fn() + Send + Sync>) -> Self {
         Self {
             registry,
+            modules: BTreeMap::new(),
             typed_mounts: BTreeMap::new(),
             typed_children: BTreeMap::new(),
             next_typed_child: 0,

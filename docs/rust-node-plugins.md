@@ -4,6 +4,8 @@
 
 当前跨语言接口包括 JSON DTO、双向 pull stream，以及显式 opaque object/callback adapter。服务和方法有声明，Rust 内部状态仍为自己的类型，JS 插件之间继续使用原生 JS 对象。对象和回调通过声明的 factory 方法取得；后续方法参数与结果仍是 JSON，不能把任意句柄、闭包或对象引用混入 DTO。既有 `cordis::Plugin` 的 typed 服务可通过显式绑定接入，且可 opt-in 更新已声明服务的值与 availability，见[typed 插件指南](typed-rust-plugins.md)；显式动态接口表也可接入原 `publish` 和子插件，effect group、配置更新 hook 等剩余 Runtime 能力仍需迁移。
 
+如果插件需要在常驻 Node 进程内替换 Rust 代码，使用独立的 [`cordis-plugin-api` / cdylib 路径](native-rust-modules.md)。它支持同步与异步 JSON 服务、setup/cleanup、取消和换代；本页的完整 SDK 仍用于与 addon 一起编译的流、对象、反向 JS 及 typed Runtime 适配。两条路径共用 native 生命周期图，但公开能力不同。
+
 ## 运行示例
 
 ```sh

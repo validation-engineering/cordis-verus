@@ -60,6 +60,7 @@ reconcile/rollback，Include.refresh 和 HMR 队列进入同域事务；真实�
 
 | 下一项 | 需要解决的边界 | 验收条件 |
 | --- | --- | --- |
+| 独立 Rust 模块扩展 | 首版 C ABI 的同进程换代、失败恢复与常驻映像预算已实现；继续处理反向服务、流/对象、显式状态迁移与构建监视器 | 同图真实 native 场景、失败保留、跨平台执行；物理卸载需要额外资源和代码引用证明，不以逻辑清理冒充 |
 | 隔离宿主扩展 | ProcessDomain 与 Harness Web/standard opt-in watcher 已接入；继续扩展 CLI 覆盖和运行保障 | 默认应用的模块更新、客户端重连、候选失败恢复；应用 addon 需真实进程隔离与验收 |
 | 长期运行成本 | 已测量 1,000 次驻留生命周期并自动回收失效 binding；identity/publication/lease tombstone 仍增长 | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
 | 模块依赖图精化 | 当前图只记录已执行的 Node 解析，执行器保守替换整个 Worker | 完整安装图、未执行动态导入、可保留 identity 的模块边界；不能用观测图冒充静态完备图 |

@@ -19,7 +19,7 @@ function sourceHashes() {
       else if (entry.isFile() && /\.(rs|toml)$/.test(name)) files.push(name);
     }
   }
-  for (const name of ['cordis-kernel', 'cordis-driver', 'cordis', 'cordis-node']) visit(`crates/${name}`);
+  for (const name of ['cordis-kernel', 'cordis-driver', 'cordis', 'cordis-node', 'cordis-plugin-api']) visit(`crates/${name}`);
   return Object.fromEntries(files.sort().map(name => [name, sha256(join(root, name))]));
 }
 const report = join(root, 'target/node-compat/build.json');
@@ -70,8 +70,22 @@ mkdirSync(dirname(fixture),{recursive:true});
 installAddon(fixtureArtifacts[0],fixture);
 const custom = createRequire(import.meta.url)(fixture);
 if (typeof custom.createDriver !== 'function' || !JSON.parse(custom.createDriver().rustInfo()).factories.some(factory => factory.name === 'fixture.counter')) throw new Error('Custom Rust factory addon is not extensible');
+// Independent C-ABI plugin generations exercise the resident default addon.
+const dynamicFixtures = {};
+const dynamicExtension = {darwin:'.dylib',linux:'.so',win32:'.dll'}[process.platform];
+for (const version of ['v1','v2','fail']) {
+  const target = `dynamic_fixture_${version}`;
+  const prefix = process.platform === 'win32' ? '' : 'lib';
+  const filename = `${prefix}${target}${dynamicExtension}`;
+  const compiled = messages.filter(item => item.reason === 'compiler-artifact' && item.target?.name === target)
+    .flatMap(item => item.filenames).filter(name => name.endsWith(filename));
+  if (compiled.length !== 1) throw new Error(`Cargo did not emit exactly one dynamic plugin fixture: ${target}`);
+  const path = `target/node-compat/dynamic-fixture-${version}${dynamicExtension}`;
+  installAddon(compiled[0],join(root,path));
+  dynamicFixtures[version] = {path,sha256:sha256(join(root,path))};
+}
 if (JSON.stringify(sourceHashes()) !== JSON.stringify(before)) throw new Error('Native sources changed during build; rerun');
-const evidence = { schema: 'cordis-verus.node-build/v1', sourceHashes: before, interopFixture:{path:'target/node-compat/interop-fixture.node',sha256:sha256(fixture)}, compilerArtifact: source, compilerProfile: artifacts[0].profile, platform: process.platform, architecture: process.arch, node: process.version, artifactSha256: sha256(output), cargoLockSha256: sha256(join(root, 'Cargo.lock')), toolchainLockSha256: sha256(join(root, 'toolchain.lock.json')) };
+const evidence = { schema: 'cordis-verus.node-build/v1', sourceHashes: before, dynamicFixtures, interopFixture:{path:'target/node-compat/interop-fixture.node',sha256:sha256(fixture)}, compilerArtifact: source, compilerProfile: artifacts[0].profile, platform: process.platform, architecture: process.arch, node: process.version, artifactSha256: sha256(output), cargoLockSha256: sha256(join(root, 'Cargo.lock')), toolchainLockSha256: sha256(join(root, 'toolchain.lock.json')) };
 mkdirSync(join(root, 'target/node-compat'), { recursive: true });
 writeFileSync(report, JSON.stringify(evidence, null, 2) + '\n');
 try { writeNativeManifest(root,report); }

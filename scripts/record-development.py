@@ -138,6 +138,16 @@ def node_build_evidence(path):
     if (not isinstance(fixture, dict) or fixture.get("path") != fixture_path
             or fixture.get("sha256") != file_sha256(ROOT / fixture_path)):
         raise RuntimeError("Rust interop fixture evidence is missing or stale")
+    extension = {"darwin": ".dylib", "linux": ".so", "win32": ".dll"}.get(build.get("platform"))
+    fixtures = build.get("dynamicFixtures")
+    if not extension or not isinstance(fixtures, dict) or set(fixtures) != {"v1", "v2", "fail"}:
+        raise RuntimeError("Dynamic Rust fixture evidence is missing or incomplete")
+    for version, artifact in fixtures.items():
+        expected = "target/node-compat/dynamic-fixture-" + version + extension
+        if (not isinstance(artifact, dict) or artifact.get("path") != expected
+                or not (ROOT / expected).is_file() or (ROOT / expected).is_symlink()
+                or artifact.get("sha256") != file_sha256(ROOT / expected)):
+            raise RuntimeError("Dynamic Rust fixture evidence is missing or stale: " + version)
     if build.get("sourceHashes") != native_source_hashes():
         raise RuntimeError("Node build evidence has stale or incomplete native source hashes")
     return build
@@ -180,7 +190,7 @@ def native_source_hashes():
         ["Cargo.toml", "Cargo.lock", "toolchain.lock.json", "scripts/build-node.sh",
          "scripts/build-node.mjs", "scripts/toolchain-env.sh", "scripts/write-native-manifest.mjs",
          "packages/compat-cordis/native-artifacts.js", "packages/compat-cordis/package.json"],
-        ["crates/" + name for name in ("cordis-kernel", "cordis-driver", "cordis", "cordis-node")],
+        ["crates/" + name for name in ("cordis-kernel", "cordis-driver", "cordis", "cordis-node", "cordis-plugin-api")],
         {".rs", ".toml"})
 
 
@@ -264,7 +274,7 @@ def npm_distribution_evidence(path, build_path, node_build):
             or observation.get("nativeManifestSha256") != report["nativeManifestSha256"]
             or observation.get("nativeTarget") != report["nativeTarget"]
             or set(observation.get("tests", [])) != {
-                "native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity", "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load"}
+                "native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity", "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load", "Rust-module-in-place-reload"}
             or harness.get("profile") != "harness"
             or set(harness.get("tests", [])) != {
                 "scoped-original-import", "ESM-CJS-profile-identity", "native-harness-domain", "Service-class", "official-loader-adapter-export"}):

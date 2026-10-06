@@ -8,5 +8,10 @@
     "moduleResolution": "NodeNext",
     "types": []
   },
-  "files": ["basic.ts", "module-graph.ts", "process.ts"]
+  "files": [
+    "basic.ts",
+    "module-graph.ts",
+    "process.ts",
+    "rust-module.ts"
+  ]
 }

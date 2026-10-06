@@ -10,6 +10,7 @@
 | [Events](events.md) | 事件模式、owner admission 与 drain |
 | [Loader](loader.md) | 配置树、原地更新、Include、热更新和持久化 |
 | [Rust/JS plugins](rust-node-plugins.md) | 同图 Rust factory、JSON/流/显式对象与回调、borrowed/owned 及 action/cleanup 合同 |
+| [Native Rust modules](native-rust-modules.md) | 独立 cdylib、C ABI、同进程代码换代、清理失败恢复与常驻版本预算 |
 | [Typed Rust plugins](typed-rust-plugins.md) | 既有 Plugin 接入 Node、共享 typed slot、动态 publication 与子插件、清理失败合同 |
 | [Official in-place HMR](official-in-place-hmr.md) | 官方模块依赖闭包、原地替换、缓存恢复和失败后继续恢复 |
 | [Official configuration transactions](official-config-transactions.md) | 默认 Harness 配置 UI、Include/HMR 队列与失败恢复 |

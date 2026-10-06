@@ -23,6 +23,10 @@
     "./process": {
       "types": "./process.d.ts",
       "import": "./process.js"
+    },
+    "./rust-module": {
+      "types": "./rust-module.d.ts",
+      "import": "./rust-module.js"
     }
   },
   "peerDependencies": {

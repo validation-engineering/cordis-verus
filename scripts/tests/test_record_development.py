@@ -53,7 +53,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
         (self.root / "toolchain.lock.json").write_text("test toolchain lock")
         for name in ("Cargo.toml", "package.json", "package-lock.json", "LICENSE", "NOTICE"):
             (self.root / name).write_text("test " + name)
-        for name in ("cordis-kernel", "cordis-driver", "cordis", "cordis-node"):
+        for name in ("cordis-kernel", "cordis-driver", "cordis", "cordis-node", "cordis-plugin-api"):
             directory = self.root / "crates" / name
             directory.mkdir(parents=True, exist_ok=True)
             (directory / "Cargo.toml").write_text("test " + name)
@@ -114,6 +114,13 @@ class DevelopmentEvidenceTests(unittest.TestCase):
                                     "sha256": module.file_sha256(self.interop_fixture)},
                  "architecture": host_arch, "node": "v22.22.0", "sourceHashes": module.native_source_hashes(),
                  **{name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in files.items()}}
+        extension = {"darwin": ".dylib", "linux": ".so", "win32": ".dll"}[host_platform]
+        build["dynamicFixtures"] = {}
+        for version in ("v1", "v2", "fail"):
+            relative = "target/node-compat/dynamic-fixture-" + version + extension
+            artifact = self.root / relative
+            artifact.write_bytes(("dynamic " + version).encode())
+            build["dynamicFixtures"][version] = {"path": relative, "sha256": module.file_sha256(artifact)}
         self.node_build.write_text(json.dumps(build))
         native_target = host_platform + "-" + host_arch + ("-gnu" if host_platform == "linux" else "") + "-napi8"
         native_provenance = "provenance/" + native_target + ".json"
@@ -145,7 +152,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
             "nativeSourceHashes": build["sourceHashes"], "sourceHashes": module.npm_source_hashes(),
             "observation": {"binding": {"abi": 1}, "nativeManifestSha256": manifest_hash, "nativeTarget": native_target,
                             "tests": ["native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity",
-                "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load"]},
+                "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load", "Rust-module-in-place-reload"]},
             "harnessObservation": {"profile": "harness", "tests": ["scoped-original-import", "ESM-CJS-profile-identity",
                 "native-harness-domain", "Service-class", "official-loader-adapter-export"]},
         }))
@@ -250,6 +257,40 @@ class DevelopmentEvidenceTests(unittest.TestCase):
                 module.record_development(offline=True)
             self.assert_failed()
 
+    def test_dynamic_fixture_evidence_cannot_be_missing_changed_or_redirected(self):
+        mutations = {
+            "missing map": lambda build: build.pop("dynamicFixtures"),
+            "missing version": lambda build: build["dynamicFixtures"].pop("v2"),
+            "unexpected version": lambda build: build["dynamicFixtures"].update(extra={}),
+            "missing digest": lambda build: build["dynamicFixtures"]["v1"].pop("sha256"),
+            "stale digest": lambda build: build["dynamicFixtures"]["v2"].update(sha256="stale"),
+            "path escape": lambda build: build["dynamicFixtures"]["fail"].update(path="../elsewhere.dylib"),
+            "other version": lambda build: build["dynamicFixtures"]["v2"].update(path=build["dynamicFixtures"]["v1"]["path"]),
+            "missing file": lambda build: (self.root / build["dynamicFixtures"]["v1"]["path"]).unlink(),
+            "changed file": lambda build: (self.root / build["dynamicFixtures"]["v2"]["path"]).write_bytes(b"replaced native plugin"),
+        }
+        for label, mutate in mutations.items():
+            def corrupted(command, environment, log):
+                result = self.successful_checks(command, environment, log)
+                build = json.loads(self.node_build.read_text())
+                mutate(build)
+                self.node_build.write_text(json.dumps(build))
+                return result
+            with self.subTest(label=label), patch.object(module, "run_checks", side_effect=corrupted), \
+                 self.assertRaisesRegex(RuntimeError, "Dynamic Rust fixture"):
+                module.record_development(offline=True)
+            self.assert_failed()
+
+    def test_hash_check_rejects_changed_dynamic_plugin_without_running_a_process(self):
+        with patch.object(module, "run_checks", side_effect=self.successful_checks):
+            module.record_development(offline=True)
+        build = json.loads(self.node_build.read_text())
+        artifact = self.root / build["dynamicFixtures"]["v2"]["path"]
+        artifact.write_bytes(b"changed dynamic code")
+        with patch.object(module, "run_checks") as run, self.assertRaisesRegex(RuntimeError, "Dynamic Rust fixture"):
+            module.check_record()
+        run.assert_not_called()
+
     def test_node_build_evidence_binds_the_custom_factory_source(self):
         with patch.object(module, "run_checks", side_effect=self.successful_checks):
             module.record_development(offline=True)
@@ -339,6 +380,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
             "missing adapter smoke": lambda report: report["harnessObservation"]["tests"].remove("official-loader-adapter-export"),
             "missing adapter file": lambda report: next(item for item in report["packages"] if item["name"] == "@cordis-verus/compat-loader")["files"].remove("harness.js"),
             "missing process smoke": lambda report: report["observation"]["tests"].remove("Process-native-artifact-load"),
+            "missing Rust module smoke": lambda report: report["observation"]["tests"].remove("Rust-module-in-place-reload"),
             "missing process entry": lambda report: next(item for item in report["packages"] if item["name"] == "@cordis-verus/compat-loader")["files"].remove("process-entry.js"),
             "missing module graph": lambda report: next(item for item in report["packages"] if item["name"] == "@cordis-verus/compat-loader")["files"].remove("module-graph.js"),
             "missing native": lambda report: report["packages"][0]["files"].remove("native/cordis.node"),
