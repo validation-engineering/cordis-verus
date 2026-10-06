@@ -89,7 +89,7 @@ through user-compiled addons. Objects and callbacks are acquired through declare
 factory methods; arguments and results remain JSON. They are not arbitrary handles
 or closures embedded in DTOs.
 
-The [native module SDK](native-rust-modules.md) adds independent Rust `cdylib` plugins to the resident Node Driver through C ABI v1. Immutable factory references, synchronous/asynchronous JSON services, cooperative cancellation, actual cleanup barriers and candidate-failure recovery support same-process code replacement. The first ABI retains code images, exposes resource diagnostics and a per-addon image limit, and rejects reverse JS imports, streams, objects and typed children. It does not automatically migrate state, physically unload images or prove native callbacks.
+The [native module SDK](native-rust-modules.md) adds independent Rust `cdylib` plugins to the resident Node Driver through C ABI v1. Immutable factory references, synchronous/asynchronous JSON services, cooperative cancellation, actual cleanup barriers and candidate-failure recovery support same-process code replacement. The ABI also supports declared reverse JS JSON calls, streams and object interfaces in both directions, and explicit JS callbacks, with action-scoped acquisition, real operation drain and retryable close. It retains code images and exposes resource diagnostics and a per-addon image limit. Dynamic publication and typed children remain outside this ABI. It does not automatically migrate state, physically unload images or prove native callbacks.
 
 The [typed adapter](typed-rust-plugins.md) executes real `cordis::Plugin` definitions
 in the Node graph. It retains original slots and per-Fiber FnMut state, with

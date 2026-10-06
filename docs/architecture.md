@@ -44,7 +44,7 @@ flowchart TD
 
 原 Rust Runtime 的动态服务使用显式依赖 owner 内部 anchor 的独立 provider 节点。新增 Node 路径及同图 Rust factory SDK 使用真实逻辑 owner 的动态声明与 PublicationRegistry，具体限制见 [Node 指南](node-compatibility.md)。服务读取共享同一 provider 身份的 payload 槽；替换节点产生新的槽，旧消费者不会转读新 provider。原地配置更新先保存补偿计划，事务成功后更新下次启动使用的 recipe，当前 episode 的更新钩子继续持有当前实例状态。外部插件通过独立进程协议执行，代码 revision 保存可执行文件与显式依赖文件的私有快照；这些都是普通 Rust 宿主机制，未扩大内核形式证明范围。
 
-独立 Rust 动态插件复用常驻 Node Driver，ABI 只传有界字节、整数句柄和明确的唤醒函数，不跨库传 `Arc`、trait object、Future 或 `TypeId`。每个 factory ref 绑定不可变代码映像；reload 沿同域队列排空旧实例并重建服务。旧映像保留到进程退出，诊断与预算作用于同一常驻 addon；跨多个独立 addon 的进程资源不共享这个预算。状态迁移、物理卸载与任意共享动态依赖的版本隔离不在首版合同内。
+独立 Rust 动态插件复用常驻 Node Driver，ABI 只传有界字节、整数句柄和明确的唤醒函数，不跨库传 `Arc`、trait object、Future 或 `TypeId`。每个 factory ref 绑定不可变代码映像；reload 沿同域队列排空旧实例并重建服务。旧映像保留到进程退出，诊断与预算作用于同一常驻 addon；跨多个独立 addon 的进程资源不共享这个预算。受管根插件可显式迁移有版本的 JSON 业务状态；采集发生在实际排空后、原生 cleanup 前，恢复发生在新 setup 前。跨库对象身份、物理卸载与任意共享动态依赖的版本隔离不在合同内。
 
 ## 证明源码路线
 

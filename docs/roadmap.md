@@ -56,11 +56,28 @@
 reconcile/rollback，Include.refresh 和 HMR 队列进入同域事务；真实官方类的
 测试覆盖失败恢复与旧代次拒绝。WorkerDomain 提供实际观测模块图、影响闭包与
 整体替换恢复，官方 Loader 另有支持范围内的原地模块替换路径。typed Rust adapter 显式支持动态 publication、子插件及已声明服务的动态值与 availability。
-这三项交付没有关闭完整 M5/M6 或论文 refinement。
+这些交付没有关闭完整 M5/M6 或论文 refinement。
+
+本轮继续补齐独立原生模块的宿主入口：Controller 的 `reconcile` 同时捕获
+制品与 recipes，支持配置变更、增删和空列表停用；`createRustModulePlugin`
+提供普通 Loader 插件，配置校验在旧实例退役前验证制品，setup 仅挂载已准备的
+owned children。`officialTransaction` 可把官方 ConfigEditor 修改、指定消费者
+就绪检查和应用恢复放在同一 FIFO revision，回调仍不能借用宿主权限。
+随后接入独立 C ABI 的声明式服务注入与异步反向 JS 调用，复用已有作用域、
+committed provider、重入和清理屏障。真实 cdylib 验收覆盖 provider 更新、
+取消后排空、丢弃调用 Future 与有界结果。独立库进一步提供 Rust-owned 流与对象，
+按需拉取、并发方法、关闭重试及代码换代复用现有资源生命周期。反向 JS 流、
+对象和 callback 也已通过动态 SDK 接入，同一 action journal 管理迟到获取、
+取消排空与关闭重试。跨 ABI 的 mount 与动态 factory publication 进一步接入真实
+owned child、独立 owner anchor、ready/retire/join 与 cleanup retry；定义随原始库固定，
+直到实际 Removed 才释放。它没有跨库共享 typed slot，也不等价于 ServiceHandle::set。
+显式状态迁移现支持 factory schema、版本化 JSON checkpoint、排空后采集、setup 前恢复，
+以及普通 Loader 与官方消费者验收期间固定的回滚快照；失败和重试保留同一恢复源。
+这些宿主改动没有新增论文证明。
 
 | 下一项 | 需要解决的边界 | 验收条件 |
 | --- | --- | --- |
-| 独立 Rust 模块扩展 | 首版 C ABI 的同进程换代、失败恢复与常驻映像预算已实现；继续处理反向服务、流/对象、显式状态迁移与构建监视器 | 同图真实 native 场景、失败保留、跨平台执行；物理卸载需要额外资源和代码引用证明，不以逻辑清理冒充 |
+| 独立 Rust 模块扩展 | 首版 C ABI 的同进程换代、失败恢复、配置 reconcile、普通 Loader 插件与常驻映像预算已实现；反向 JSON 服务与双向流/对象及 JS callback 已接入；真实 owned child 与动态 factory publication 已接入；显式状态迁移和事务回滚快照已接入；继续处理跨平台运行保障与长期驻留成本 | 同图真实 native 场景、失败保留、跨平台执行；物理卸载需要额外资源和代码引用证明，不以逻辑清理冒充 |
 | 隔离宿主扩展 | ProcessDomain 与 Harness Web/standard opt-in watcher 已接入；继续扩展 CLI 覆盖和运行保障 | 默认应用的模块更新、客户端重连、候选失败恢复；应用 addon 需真实进程隔离与验收 |
 | 长期运行成本 | 已测量 1,000 次驻留生命周期并自动回收失效 binding；identity/publication/lease tombstone 仍增长 | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
 | 模块依赖图精化 | 当前图只记录已执行的 Node 解析，执行器保守替换整个 Worker | 完整安装图、未执行动态导入、可保留 identity 的模块边界；不能用观测图冒充静态完备图 |

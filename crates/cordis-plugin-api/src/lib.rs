@@ -13,8 +13,24 @@ use std::future::Future;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::task::{Context, Poll, Wake, Waker};
+
+mod checkpoint;
+pub use checkpoint::{Checkpoint, CheckpointSchema};
+
+mod children;
+pub use children::{ChildHandle, ChildStatus, ChildTarget};
+use children::{ChildScope, Definition};
+mod reverse;
+use reverse::CallAction;
+pub use reverse::{
+    JsCallback, JsObject, JsStream, ReverseCall, ReverseItem, ReverseOperation, ReverseResult,
+};
+
+mod resources;
+pub use resources::{ObjectDescriptor, ObjectOwnership, PluginObject, PluginStream, StreamFuture};
+use resources::{ResourceAction, ResourceEntry};
 
 pub const ABI_MAGIC: [u8; 8] = *b"CRDSPLG1";
 pub const ABI_VERSION: u32 = 1;
@@ -22,6 +38,14 @@ pub const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
 /// Maximum nested array/object containers in a service or job result. Leaves
 /// room for the ABI envelope under the host JSON parser's recursion limit.
 pub const MAX_VALUE_DEPTH: usize = 64;
+/// Outstanding calls are tracked even if the plugin drops their awaiter.
+pub const MAX_PENDING_CALLS: usize = 64;
+/// Cumulative reverse resource acquisition attempts admitted by one action.
+pub const MAX_REVERSE_RESOURCES: usize = 1024;
+/// Cumulative child mount / retained-definition attempts per instance.
+pub const MAX_CHILDREN: usize = 1024;
+/// Each request and each batch fit beneath this limit, leaving protocol room.
+pub const MAX_CALL_BATCH_BYTES: usize = MAX_MESSAGE_BYTES / 2;
 pub const STATUS_OK: u32 = 0;
 pub const STATUS_INVALID_BUFFER: u32 = 1;
 pub type PluginResult<T> = Result<T, String>;
@@ -58,6 +82,8 @@ pub struct PluginApiV1 {
 pub enum MethodKind {
     Sync,
     Async,
+    Stream,
+    Object,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -75,7 +101,7 @@ pub struct ServiceDescriptor {
 #[serde(deny_unknown_fields)]
 pub struct FactoryDescriptor {
     pub name: String,
-    /// Reserved for a later reverse-call ABI; must be empty in version 1.
+    /// Declared JS dependencies available to asynchronous context calls.
     pub inject: Vec<String>,
     pub services: Vec<ServiceDescriptor>,
 }
@@ -84,12 +110,19 @@ pub struct ModuleDescriptor {
     pub module_id: String,
     pub version: String,
     pub factories: Vec<FactoryDescriptor>,
+    /// Opt-in pure-data migration schemas, keyed by module factory name.
+    #[serde(default)]
+    pub checkpoint_schemas: BTreeMap<String, CheckpointSchema>,
 }
 
 /// Creation must be free of externally visible effects. Acquire resources in
 /// `setup`, and retain enough state to clean up partial or cancelled setup.
 pub trait PluginFactory: Send + Sync + 'static {
     fn descriptor(&self) -> FactoryDescriptor;
+    /// Declare checkpoint support once at module registration.
+    fn checkpoint_schema(&self) -> Option<CheckpointSchema> {
+        None
+    }
     fn create(&self, config: Value) -> PluginResult<Arc<dyn PluginInstance>>;
 }
 /// Every resource and background task must be joined by `cleanup`. Returning
@@ -98,12 +131,38 @@ pub trait PluginFactory: Send + Sync + 'static {
 /// Futures own their state and must not borrow this object. Cancellation is
 /// cooperative; the host continues polling until the actual future lands.
 pub trait PluginInstance: Send + Sync + 'static {
+    /// Read local logical state after real consumer/resource drain. Must not
+    /// mutate business state, perform external I/O, or create new work.
+    fn checkpoint(&self) -> PluginResult<Value> {
+        Err("CheckpointUnsupported".into())
+    }
+    /// Restore local logical state before setup. External effects belong in
+    /// setup; on error the instance is cleanup-only and cannot be retried.
+    fn restore(&self, _checkpoint: Checkpoint) -> PluginResult<()> {
+        Err("CheckpointUnsupported".into())
+    }
     fn setup(&self, ctx: PluginContext) -> PluginFuture;
     fn cleanup(&self, _ctx: PluginContext) -> PluginFuture {
         Box::pin(async { Ok(Value::Null) })
     }
     fn call_sync(&self, _service: &str, _method: &str, _args: Value) -> PluginResult<Value> {
         Err("UnknownSyncMethod".into())
+    }
+    fn open_stream(
+        &self,
+        _service: &str,
+        _method: &str,
+        _args: Value,
+    ) -> PluginResult<Arc<dyn PluginStream>> {
+        Err("UnknownStreamMethod".into())
+    }
+    fn open_object(
+        &self,
+        _service: &str,
+        _method: &str,
+        _args: Value,
+    ) -> PluginResult<Arc<dyn PluginObject>> {
+        Err("UnknownObjectMethod".into())
     }
     fn call_async(
         &self,
@@ -159,16 +218,10 @@ impl CancellationToken {
 #[derive(Clone, Default)]
 pub struct PluginContext {
     pub cancellation: CancellationToken,
+    calls: Option<Arc<CallAction>>,
+    cleanup: bool,
+    children: Option<Arc<ChildScope>>,
 }
-impl PluginContext {
-    pub fn is_cancelled(&self) -> bool {
-        self.cancellation.is_cancelled()
-    }
-    pub async fn cancelled(&self) {
-        self.cancellation.cancelled().await;
-    }
-}
-
 /// A module exports one or more factories through one retained library image.
 pub struct Module {
     id: String,
@@ -193,9 +246,33 @@ impl Module {
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Request {
     Describe {},
+    DescribeDefinition {
+        parent: u64,
+        definition: u64,
+    },
+    CreateChild {
+        parent: u64,
+        target: ChildTarget,
+        config: Value,
+    },
+    DropDefinition {
+        parent: u64,
+        definition: u64,
+    },
+    ChildRemoved {
+        parent: u64,
+        child: u64,
+    },
     Create {
         factory: String,
         config: Value,
+    },
+    Checkpoint {
+        instance: u64,
+    },
+    Restore {
+        instance: u64,
+        checkpoint: Checkpoint,
     },
     Setup {
         instance: u64,
@@ -215,6 +292,48 @@ enum Request {
         method: String,
         args: Value,
     },
+    OpenStream {
+        instance: u64,
+        service: String,
+        method: String,
+        args: Value,
+    },
+    OpenObject {
+        instance: u64,
+        service: String,
+        method: String,
+        args: Value,
+    },
+    StreamNext {
+        instance: u64,
+        stream: u64,
+    },
+    StreamCancel {
+        instance: u64,
+        stream: u64,
+    },
+    StreamClose {
+        instance: u64,
+        stream: u64,
+    },
+    DestroyStream {
+        instance: u64,
+        stream: u64,
+    },
+    ObjectCall {
+        instance: u64,
+        object: u64,
+        method: String,
+        args: Value,
+    },
+    ObjectClose {
+        instance: u64,
+        object: u64,
+    },
+    DestroyObject {
+        instance: u64,
+        object: u64,
+    },
     Poll {
         job: u64,
     },
@@ -223,6 +342,11 @@ enum Request {
     },
     DropJob {
         job: u64,
+    },
+    ResolveCall {
+        job: u64,
+        request: u64,
+        result: ReverseResult,
     },
     Destroy {
         instance: u64,
@@ -233,6 +357,7 @@ enum Phase {
     Created,
     Setup,
     Active,
+    Checkpointed,
     SetupFailed,
     Cleanup,
     CleanupFailed,
@@ -245,19 +370,38 @@ enum JobKind {
     Setup,
     Call,
     Cleanup,
+    Resource(ResourceAction),
+}
+impl JobKind {
+    fn is_cleanup(self) -> bool {
+        self == Self::Cleanup || matches!(self,Self::Resource(action) if action.is_close())
+    }
 }
 struct InstanceState {
     phase: Phase,
     jobs: BTreeSet<u64>,
+    resources: BTreeSet<u64>,
+    child_instances: BTreeSet<u64>,
+    controls: BTreeMap<u64, ChildStatus>,
+    control_acks: BTreeSet<u64>,
+    definitions: BTreeSet<u64>,
+    child_attempts: usize,
+    definition_attempts: usize,
+    checkpoint: Option<Checkpoint>,
+    restore_attempted: bool,
 }
 struct InstanceEntry {
     value: Mutex<Option<Arc<dyn PluginInstance>>>,
     descriptor: FactoryDescriptor,
     state: Mutex<InstanceState>,
     gate: Mutex<()>,
+    children: Arc<ChildScope>,
+    parent: Option<u64>,
+    definition: Option<u64>,
 }
 struct JobState {
     future: Option<PluginFuture>,
+    main_result: Option<PluginResult<Value>>,
     landed: bool,
     faulted: bool,
 }
@@ -266,19 +410,23 @@ struct JobEntry {
     kind: JobKind,
     cancellation: CancellationToken,
     wake: Arc<HostWake>,
+    calls: Arc<CallAction>,
     state: Mutex<JobState>,
 }
 struct Records {
     next: u64,
     instances: BTreeMap<u64, Arc<InstanceEntry>>,
     jobs: BTreeMap<u64, Arc<JobEntry>>,
+    resources: BTreeMap<u64, Arc<ResourceEntry>>,
+    owned_objects: Vec<Weak<dyn PluginObject>>,
+    definitions: BTreeMap<u64, Arc<Definition>>,
 }
 /// Public only for the export macro. Hosts use the C table, not this Rust type.
 #[doc(hidden)]
 pub struct Runtime {
     descriptor: ModuleDescriptor,
     factories: BTreeMap<String, Arc<dyn PluginFactory>>,
-    records: Mutex<Records>,
+    records: Arc<Mutex<Records>>,
 }
 impl Runtime {
     fn new(module: Module) -> PluginResult<Self> {
@@ -287,13 +435,17 @@ impl Runtime {
         }
         let mut factories = BTreeMap::new();
         let mut descriptors = Vec::new();
+        let mut checkpoint_schemas = BTreeMap::new();
         for factory in module.factories {
             let descriptor = factory.descriptor();
             if descriptor.name.is_empty() || factories.contains_key(&descriptor.name) {
                 return Err("DuplicateOrEmptyFactory".into());
             }
-            if !descriptor.inject.is_empty() {
-                return Err("UnsupportedNativeInjection".into());
+            let mut injections = BTreeSet::new();
+            for injection in &descriptor.inject {
+                if injection.is_empty() || !injections.insert(injection) {
+                    return Err("DuplicateOrEmptyInjection".into());
+                }
             }
             let mut services = BTreeSet::new();
             for service in &descriptor.services {
@@ -307,6 +459,10 @@ impl Runtime {
                     }
                 }
             }
+            if let Some(schema) = factory.checkpoint_schema() {
+                schema.validate()?;
+                checkpoint_schemas.insert(descriptor.name.clone(), schema);
+            }
             factories.insert(descriptor.name.clone(), factory);
             descriptors.push(descriptor);
         }
@@ -314,6 +470,7 @@ impl Runtime {
             module_id: module.id,
             version: module.version,
             factories: descriptors,
+            checkpoint_schemas,
         };
         if serde_json::to_vec(&descriptor)
             .map_err(|_| "InvalidDescriptor")?
@@ -325,11 +482,14 @@ impl Runtime {
         Ok(Self {
             descriptor,
             factories,
-            records: Mutex::new(Records {
+            records: Arc::new(Mutex::new(Records {
                 next: 1,
                 instances: BTreeMap::new(),
                 jobs: BTreeMap::new(),
-            }),
+                resources: BTreeMap::new(),
+                owned_objects: Vec::new(),
+                definitions: BTreeMap::new(),
+            })),
         })
     }
     fn allocate(&self) -> PluginResult<u64> {
@@ -362,9 +522,11 @@ impl Runtime {
                 serde_json::to_value(&self.descriptor).map_err(|_| "InvalidDescriptor".into())
             }
             Request::Create { factory, config } => {
-                let factory_impl = self.factories.get(&factory).ok_or("UnknownFactory")?;
-                let id = self.allocate()?;
-                let value = catch_user(|| factory_impl.create(config))??;
+                let factory_impl = self
+                    .factories
+                    .get(&factory)
+                    .ok_or("UnknownFactory")?
+                    .clone();
                 let descriptor = self
                     .descriptor
                     .factories
@@ -372,18 +534,25 @@ impl Runtime {
                     .find(|entry| entry.name == factory)
                     .unwrap()
                     .clone();
-                let entry = Arc::new(InstanceEntry {
-                    value: Mutex::new(Some(value)),
-                    descriptor,
-                    state: Mutex::new(InstanceState {
-                        phase: Phase::Created,
-                        jobs: BTreeSet::new(),
-                    }),
-                    gate: Mutex::new(()),
-                });
-                self.records.lock().unwrap().instances.insert(id, entry);
-                Ok(json!({ "instance": id }))
+                self.create_instance(factory_impl, descriptor, config, None, None)
             }
+            Request::DescribeDefinition { parent, definition } => {
+                self.describe_definition(parent, definition)
+            }
+            Request::CreateChild {
+                parent,
+                target,
+                config,
+            } => self.create_child(parent, target, config),
+            Request::DropDefinition { parent, definition } => {
+                self.drop_definition(parent, definition)
+            }
+            Request::ChildRemoved { parent, child } => self.child_removed(parent, child),
+            Request::Checkpoint { instance } => self.checkpoint(instance),
+            Request::Restore {
+                instance,
+                checkpoint,
+            } => self.restore(instance, checkpoint),
             Request::Setup { instance } => self.begin(instance, JobKind::Setup, None),
             Request::Cleanup { instance } => self.begin(instance, JobKind::Cleanup, None),
             Request::CallAsync {
@@ -413,7 +582,53 @@ impl Runtime {
                     }
                 }
             }
+            Request::OpenStream {
+                instance,
+                service,
+                method,
+                args,
+            } => self.open_resource(instance, &service, &method, args, false),
+            Request::OpenObject {
+                instance,
+                service,
+                method,
+                args,
+            } => self.open_resource(instance, &service, &method, args, true),
+            Request::StreamNext { instance, stream } => {
+                self.resource_job(instance, ResourceAction::StreamNext(stream), None)
+            }
+            Request::StreamCancel { instance, stream } => self.cancel_stream(instance, stream),
+            Request::StreamClose { instance, stream } => {
+                self.resource_job(instance, ResourceAction::StreamClose(stream), None)
+            }
+            Request::DestroyStream { instance, stream } => {
+                self.destroy_resource(instance, stream, false)
+            }
+            Request::ObjectCall {
+                instance,
+                object,
+                method,
+                args,
+            } => self.resource_job(
+                instance,
+                ResourceAction::ObjectCall(object),
+                Some((method, args)),
+            ),
+            Request::ObjectClose { instance, object } => {
+                self.resource_job(instance, ResourceAction::ObjectClose(object), None)
+            }
+            Request::DestroyObject { instance, object } => {
+                self.destroy_resource(instance, object, true)
+            }
             Request::Poll { job } => self.poll(job, wake),
+            Request::ResolveCall {
+                job,
+                request,
+                result,
+            } => {
+                self.job(job)?.calls.resolve(request, result)?;
+                Ok(Value::Null)
+            }
             Request::Cancel { job } => {
                 let entry = self.job(job)?;
                 // Waking executes external code; never hold SDK locks here.
@@ -433,6 +648,7 @@ impl Runtime {
                     return Err("UnknownJob".into());
                 }
                 entry.owner.state.lock().unwrap().jobs.remove(&job);
+                self.drop_resource_job(entry.kind, job);
                 Ok(Value::Null)
             }
             Request::Destroy { instance } => {
@@ -442,6 +658,12 @@ impl Runtime {
                     let mut state = entry.state.lock().unwrap();
                     if !state.jobs.is_empty() {
                         return Err("InstanceHasJobs".into());
+                    }
+                    if !state.resources.is_empty() {
+                        return Err("InstanceHasResources".into());
+                    }
+                    if !children::is_drained(&state) {
+                        return Err("InstanceHasChildren".into());
                     }
                     if !matches!(state.phase, Phase::Created | Phase::Cleaned) {
                         return Err("InstanceNotCleaned".into());
@@ -454,6 +676,7 @@ impl Runtime {
                     return Err(error);
                 }
                 self.records.lock().unwrap().instances.remove(&instance);
+                self.child_instance_destroyed(&entry, instance);
                 Ok(Value::Null)
             }
         }
@@ -478,8 +701,13 @@ impl Runtime {
                 JobKind::Cleanup
                     if matches!(
                         state.phase,
-                        Phase::Active | Phase::SetupFailed | Phase::CleanupFailed
-                    ) && state.jobs.is_empty() =>
+                        Phase::Active
+                            | Phase::Checkpointed
+                            | Phase::SetupFailed
+                            | Phase::CleanupFailed
+                    ) && state.jobs.is_empty()
+                        && state.resources.is_empty()
+                        && children::is_drained(&state) =>
                 {
                     state.phase = Phase::Cleanup
                 }
@@ -487,25 +715,43 @@ impl Runtime {
             }
             state.jobs.insert(id);
         }
-        let cancellation = CancellationToken::default();
-        let context = PluginContext {
-            cancellation: cancellation.clone(),
-        };
         let value = entry.value.lock().unwrap().as_ref().unwrap().clone();
-        let future = catch_user(|| match kind {
+        self.start_reserved_job(entry.clone(), kind, id, move |context| match kind {
             JobKind::Setup => value.setup(context),
             JobKind::Cleanup => value.cleanup(context),
             JobKind::Call => {
                 let (service, method, args) = call.unwrap();
                 value.call_async(context, &service, &method, args)
             }
-        });
-        let future = match future {
+            JobKind::Resource(_) => unreachable!("resource jobs use resource constructors"),
+        })
+    }
+    fn start_reserved_job(
+        &self,
+        entry: Arc<InstanceEntry>,
+        kind: JobKind,
+        id: u64,
+        create: impl FnOnce(PluginContext) -> PluginFuture,
+    ) -> PluginResult<Value> {
+        let cancellation = CancellationToken::default();
+        let wake = Arc::new(HostWake(Mutex::new(None)));
+        let calls = Arc::new(CallAction::for_instance(
+            &entry.descriptor.inject,
+            wake.clone(),
+            entry.children.clone(),
+        ));
+        let context = PluginContext {
+            cancellation: cancellation.clone(),
+            calls: Some(calls.clone()),
+            cleanup: kind.is_cleanup(),
+            children: Some(entry.children.clone()),
+        };
+        let future = match catch_user(|| create(context)) {
             Ok(future) => future,
             Err(error) => {
-                // Keep the reservation and fault: construction may have had
-                // side effects and cannot be represented as successful cleanup.
+                calls.close();
                 entry.state.lock().unwrap().phase = Phase::Faulted;
+                self.fault_resource_job(kind);
                 return Err(error);
             }
         };
@@ -515,9 +761,11 @@ impl Runtime {
                 owner: entry.clone(),
                 kind,
                 cancellation,
-                wake: Arc::new(HostWake(Mutex::new(None))),
+                wake,
+                calls,
                 state: Mutex::new(JobState {
                     future: Some(future),
+                    main_result: None,
                     landed: false,
                     faulted: false,
                 }),
@@ -537,46 +785,83 @@ impl Runtime {
         *entry.wake.0.lock().unwrap() = Some(wake);
         let waker = Waker::from(entry.wake.clone());
         let mut context = Context::from_waker(&waker);
-        let result = catch_user(|| state.future.as_mut().unwrap().as_mut().poll(&mut context));
-        match result {
-            Ok(Poll::Pending) => Ok(json!({ "state": "pending" })),
-            Ok(Poll::Ready(result)) => {
-                let future = state.future.take();
-                if let Err(error) = catch_user(|| drop(future)) {
+        if state.main_result.is_none() {
+            let result = catch_user(|| state.future.as_mut().unwrap().as_mut().poll(&mut context));
+            match result {
+                Ok(Poll::Pending) => {}
+                Ok(Poll::Ready(result)) => {
+                    // Closing is atomic with call admission. Escaped contexts
+                    // cannot start more work while already-admitted calls drain.
+                    entry.calls.close();
+                    let future = state.future.take();
+                    if let Err(error) = catch_user(|| drop(future)) {
+                        state.faulted = true;
+                        entry.owner.state.lock().unwrap().phase = Phase::Faulted;
+                        self.fault_resource_job(entry.kind);
+                        return Err(error);
+                    }
+                    // Stream items were bounded before their small done/value
+                    // envelope was built, so do not apply the item limit twice.
+                    state.main_result = Some(
+                        if matches!(entry.kind, JobKind::Resource(ResourceAction::StreamNext(_)))
+                            && result.is_ok()
+                        {
+                            result
+                        } else {
+                            bounded_result(result)
+                        },
+                    );
+                }
+                Err(error) => {
+                    entry.calls.close();
                     state.faulted = true;
                     entry.owner.state.lock().unwrap().phase = Phase::Faulted;
+                    self.fault_resource_job(entry.kind);
                     return Err(error);
                 }
-                let result = bounded_result(result);
-                state.landed = true;
-                let mut owner = entry.owner.state.lock().unwrap();
-                if owner.phase != Phase::Faulted {
-                    match entry.kind {
-                        JobKind::Setup => {
-                            owner.phase = if result.is_ok() {
-                                Phase::Active
-                            } else {
-                                Phase::SetupFailed
-                            }
-                        }
-                        JobKind::Cleanup => {
-                            owner.phase = if result.is_ok() {
-                                Phase::Cleaned
-                            } else {
-                                Phase::CleanupFailed
-                            }
-                        }
-                        JobKind::Call => {}
-                    }
-                }
-                Ok(json!({ "state": "ready", "result": response(result) }))
-            }
-            Err(error) => {
-                state.faulted = true;
-                entry.owner.state.lock().unwrap().phase = Phase::Faulted;
-                Err(error)
             }
         }
+        let (calls, pending) = entry.calls.take_batch();
+        if state.main_result.is_none() || pending != 0 {
+            let mut reply = json!({"state":"pending"});
+            if !calls.is_empty() {
+                reply["calls"] = json!(calls);
+            }
+            if state.main_result.is_some() {
+                // The body has closed admission. Once every batch has been
+                // delivered, the host may start its journal before pending
+                // next() replies land (return() may be what unblocks them).
+                reply["draining"] = json!(true);
+                if entry.calls.has_queued() {
+                    reply["queuedCalls"] = json!(true);
+                }
+            }
+            return Ok(reply);
+        }
+        let result = state.main_result.take().unwrap();
+        self.finish_resource_job(entry.kind, &result);
+        state.landed = true;
+        let mut owner = entry.owner.state.lock().unwrap();
+        if owner.phase != Phase::Faulted {
+            match entry.kind {
+                JobKind::Setup => {
+                    owner.phase = if result.is_ok() {
+                        Phase::Active
+                    } else {
+                        Phase::SetupFailed
+                    }
+                }
+                JobKind::Cleanup => {
+                    owner.phase = if result.is_ok() {
+                        Phase::Cleaned
+                    } else {
+                        Phase::CleanupFailed
+                    }
+                }
+                JobKind::Call | JobKind::Resource(_) => {}
+            }
+        }
+        Ok(json!({"state":"ready","result":response(result)}))
     }
 }
 fn check_method(
@@ -779,3 +1064,9 @@ macro_rules! export_plugin {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod reverse_tests;
+
+#[cfg(test)]
+mod resource_tests;

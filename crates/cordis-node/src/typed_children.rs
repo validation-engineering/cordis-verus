@@ -68,13 +68,13 @@ impl Backend {
         Ok(())
     }
     pub fn typed_job_wait_sources(&self) -> Vec<JobWaitSource> {
-        if self.typed_children.is_empty() {
+        if self.typed_children.is_empty() && self.native_children.is_empty() {
             return Vec::new();
         }
         self.jobs
             .iter()
             .map(|(id, job)| {
-                let own_publications = if job.kind == JobKind::Setup {
+                let mut own_publications = if job.kind == JobKind::Setup {
                     self.typed_children
                         .values()
                         .filter(|child| {
@@ -85,6 +85,9 @@ impl Backend {
                 } else {
                     Vec::new()
                 };
+                if job.kind == JobKind::Setup {
+                    own_publications.extend(self.native_children.owned_ids(job.session));
+                }
                 let source = job
                     .wait_source
                     .or_else(|| {
@@ -105,6 +108,7 @@ impl Backend {
     }
     pub fn typed_job_join_blocks(&mut self, job: u64, blocked: BTreeSet<usize>) {
         if let Some(job) = self.jobs.get_mut(&job) {
+            *job.context.join_blocked.lock().unwrap() = blocked.clone();
             job.join_blocked = blocked;
         }
     }

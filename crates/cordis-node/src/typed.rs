@@ -788,6 +788,7 @@ impl Backend {
         if self.sessions.values().any(|s| s.id == id) {
             return Err("SessionBusy".into());
         }
+        self.native_child_removed(id)?;
         if let Some(mount) = self.typed_mounts.remove(&id) {
             if let Some(anchor) = &mount.adapter.anchor {
                 self.typed_realms.retain(|(key, _), _| *key != anchor.key);

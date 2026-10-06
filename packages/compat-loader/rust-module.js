@@ -1,6 +1,7 @@
 import { isAbsolute } from 'node:path';
 import { FiberState, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
 import { LoaderError, jsonValue } from './config.js';
+import { StateJournal, checkpointsOf, sourceOf, validateStateRecipe, validateStateTransfer } from './rust-module-state.js';
 
 const fail = (code, message, details = {}, cause) => new LoaderError(code, message, details, cause);
 const freeze = value => {
@@ -14,12 +15,12 @@ function artifactOf(value) {
   return Object.freeze({ path, sha256 });
 }
 function recipesOf(value) {
-  if (!Array.isArray(value) || !value.length) throw fail('NATIVE_MODULE_RECIPE', 'At least one managed plugin entry is required');
+  if (!Array.isArray(value)) throw fail('NATIVE_MODULE_RECIPE', 'Managed plugin entries must be an array');
   const recipes = jsonValue(value), ids = new Set();
   for (const item of recipes) {
     if (!item || typeof item !== 'object' || Array.isArray(item) || typeof item.id !== 'string' || !item.id
       || ids.has(item.id) || typeof item.factory !== 'string' || !item.factory
-      || Object.keys(item).some(key => !['id','factory','config'].includes(key))) throw fail('NATIVE_MODULE_RECIPE', 'Entries require unique ids, factory names, and optional JSON config');
+      || Object.keys(item).some(key => !['id','factory','config','state'].includes(key))) throw fail('NATIVE_MODULE_RECIPE', 'Entries require unique ids, factory names, and optional JSON config');
     ids.add(item.id);
   }
   return freeze(recipes);
@@ -35,6 +36,8 @@ export class RustModuleController {
     this._owner = ctx.fiber;
     this._ownerGeneration = ctx.fiber._generation;
     this._recipes = recipesOf(options?.plugins);
+    this._journal = new StateJournal(this._domain.rust);
+    this._unwatch = this._domain.rust.onRemoved(this._owner, () => this._journal.clear());
     this._accepting = true;
     this.state = 'empty';
     this.revision = 0;
@@ -56,12 +59,13 @@ export class RustModuleController {
       return task(steps);
     }, { recovery });
   }
-  _prepare(artifact) {
+  _prepare(artifact, recipes) {
     const module = this._domain.rust.loadModule(artifact);
-    for (const recipe of this._recipes) if (!module.factories.has(recipe.factory)) {
+    for (const recipe of recipes) if (!module.factories.has(recipe.factory)) {
       throw fail('NATIVE_MODULE_FACTORY', `Candidate does not export ${recipe.factory}`, { factory: recipe.factory });
     }
-    const previous = this._active?.module ?? this._pending?.previous;
+    for (const recipe of recipes) validateStateRecipe(module, recipe);
+    const previous = this._active?.module ?? this._pending?.previous?.module;
     if (previous && module.descriptor.pluginId !== previous.descriptor.pluginId) {
       throw fail('NATIVE_MODULE_IDENTITY', 'Candidate plugin identity differs from the active module');
     }
@@ -76,16 +80,21 @@ export class RustModuleController {
       throw error;
     }
   }
-  async _activate(module, state) {
+  async _activate(generation, state) {
     this._check();
+    const { module, recipes } = generation;
     state.module = module;
+    state.recipes = recipes;
     state.entries = new Map();
+    // A disabled generation keeps its validated code/configuration identity but
+    // owns no Fiber. A later reload preserves this committed empty recipe.
+    if (!recipes.length) return;
     const plugin = { name: `native-module:${module.descriptor.pluginId}`, apply: async ctx => {
       const tasks = [];
-      for (const recipe of this._recipes) {
+      for (const recipe of recipes) {
         const record = { recipe };
         state.entries.set(recipe.id, record);
-        this._install(ctx, module.factories.get(recipe.factory), recipe.config === undefined ? undefined : jsonValue(recipe.config), record);
+        this._install(ctx, this._journal.plugin(module, recipe, record, generation.source ?? generation), recipe.config === undefined ? undefined : jsonValue(recipe.config), record);
         const task = record.fiber.await();
         task.catch(() => {});
         tasks.push(task);
@@ -146,36 +155,51 @@ export class RustModuleController {
     }
     this._pending = undefined;
     this.state = this._active ? 'active' : 'empty';
+    this._journal.retain(checkpointsOf(this._active));
   }
-  reload(artifact) {
+  reload(artifact) { return this._revise(artifact); }
+  reconcile(options) {
+    let recipes;
+    try { recipes = recipesOf(options?.plugins); }
+    catch (error) { this.lastReloadFailure = error; return Promise.reject(error); }
+    return this._revise(options, recipes);
+  }
+  _revise(artifact, recipes) {
     let captured;
     try { captured = artifactOf(artifact); } catch (error) { this.lastReloadFailure = error; return Promise.reject(error); }
     return this._submit(async steps => {
       // Recovery is an ordinary admitted transaction after explicit cleanup
       // retry, so it never borrows permission to create from a recovery token.
-      const module = this._prepare(captured);
+      // reload follows the latest successful FIFO commit; reconcile supplies a
+      // deeply captured recipe. Every activation and rollback retains its own
+      // immutable generation, never a mutable controller-wide recipe lookup.
+      const prepared = { module: this._prepare(captured, recipes ?? this._recipes), recipes: recipes ?? this._recipes };
+      validateStateTransfer(this._active ?? this._pending?.previous, prepared);
       const retired = await this._recover(steps, true), previous = this._active;
-      const rollback = previous?.module ?? retired;
+      const rollback = previous ? sourceOf(previous) : retired;
+      const generation = Object.freeze({ ...prepared, source: rollback });
       this.state = 'reloading';
       if (previous) {
         try { await this._drain(steps, [previous]); }
         catch (cause) {
-          this._pending = { previous: previous.module, retained: [previous], cause, stage: 'retiring' };
+          this._pending = { previous: rollback, retained: [previous], cause, stage: 'retiring' };
           this.state = 'blocked';
           throw this.lastReloadFailure = fail('NATIVE_MODULE_CLEANUP_BLOCKED', 'Old generation cleanup is unconfirmed; candidate setup has not run', { restored: false }, cause);
         }
       }
       const candidate = {};
-      try { await this._activate(module, candidate); }
+      try { await this._activate(generation, candidate); }
       catch (cause) {
         this._pending = { previous: rollback, retained: [candidate], cause };
         await this._recover(steps);
         throw this.lastReloadFailure = fail('NATIVE_MODULE_RELOAD_FAILED', rollback ? 'Candidate failed; old code and config were reactivated' : 'Initial activation failed and was cleaned up', { restored: !!rollback }, cause);
       }
       this._active = candidate;
+      this._recipes = generation.recipes;
       this.state = 'active';
       this.revision++;
       this.lastReloadFailure = undefined;
+      this._journal.retain(checkpointsOf(candidate));
       return this.snapshot();
     }).catch(error => { this.lastReloadFailure = error; throw error; });
   }
@@ -194,7 +218,11 @@ export class RustModuleController {
       }
       await this._drain(steps, [this._active,...this._pending?.retained ?? []]);
       // Do not reactivate here: recovery transactions only release resources.
-      if (!this._pending) { this._active = undefined; this.state = this._accepting ? 'empty' : 'closed'; }
+      if (!this._pending) {
+        this._active = undefined; this.state = this._accepting ? 'empty' : 'closed';
+        this._journal.clear();
+        if (!this._accepting) this._unwatch?.();
+      }
       return this.snapshot();
     }, true);
   }
@@ -206,10 +234,14 @@ export class RustModuleController {
     if (this._disposal) return this._disposal;
     this._accepting = false;
     const task = this._submit(async steps => {
+      // Terminal closure no longer needs a replacement checkpoint.
+      this._journal.clear();
       await this._drain(steps, [this._active,...this._pending?.retained ?? []]);
       this._active = undefined;
       this._pending = undefined;
       this.state = 'closed';
+      this._journal.clear();
+      this._unwatch?.();
     }, true);
     this._disposal = task;
     task.catch(error => { this.state = 'blocked'; this.lastReloadFailure = error; this._disposal = undefined; });

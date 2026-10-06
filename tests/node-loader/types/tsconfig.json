@@ -12,6 +12,7 @@
     "basic.ts",
     "module-graph.ts",
     "process.ts",
-    "rust-module.ts"
+    "rust-module.ts",
+    "rust-module-plugin.ts"
   ]
 }

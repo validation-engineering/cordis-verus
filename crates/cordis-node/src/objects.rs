@@ -78,6 +78,18 @@ pub trait PluginObject: Send + Sync + 'static {
     fn close(&self, _ctx: PluginContext) -> PluginFuture {
         Box::pin(async { Ok(Value::Null) })
     }
+    /// Finalize this adapter reference after all admitted calls land. The host
+    /// passes ownership captured when the object opened, rather than rereading
+    /// mutable user metadata. The default preserves ordinary Rust semantics:
+    /// owned objects run their close hook; borrowed references only release.
+    /// Native-library adapters override this to acknowledge reference release
+    /// (and possible destructor failure) before the host removes the resource.
+    fn release(&self, ctx: PluginContext, ownership: ObjectOwnership) -> PluginFuture {
+        match ownership {
+            ObjectOwnership::Owned => self.close(ctx),
+            ObjectOwnership::Borrowed => Box::pin(async { Ok(Value::Null) }),
+        }
+    }
 }
 /// A JS object capability scoped to one managed Rust action. Cloning this value
 /// does not transfer ownership or extend that action's admission lifetime.
@@ -466,7 +478,7 @@ impl Backend {
             return Ok(serde_json::json!({"job":job.to_string()}));
         }
         let implementation = resource.implementation.clone();
-        let owned = resource.descriptor.ownership == ObjectOwnership::Owned;
+        let ownership = resource.descriptor.ownership;
         let calls = resource.calls.iter().copied().collect::<Vec<_>>();
         let landings = calls
             .iter()
@@ -486,11 +498,7 @@ impl Backend {
                 for landing in landings {
                     landing.wait().await;
                 }
-                if owned {
-                    implementation.close(close_ctx).await
-                } else {
-                    Ok(Value::Null)
-                }
+                implementation.release(close_ctx, ownership).await
             }),
         );
         self.jobs.get_mut(&job).unwrap().object = Some(ObjectAction::Close(object));

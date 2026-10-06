@@ -14,14 +14,25 @@ function errorText(error) {
   try { return String(error); } catch { return 'JavaScript service threw an unprintable value'; }
 }
 
-export function jsonValue(value) {
+function dynamicErrorText(error) {
+  const message = errorText(error);
+  if (!message.isWellFormed()) return 'PluginErrorInvalidUnicode';
+  return Buffer.byteLength(message) > 4096 ? 'PluginErrorTooLarge' : message;
+}
+
+export function jsonValue(value, limits) {
   // Reject lossy or executable coercions rather than silently JSON-roundtripping
   // arbitrary JS values (Date, BigInt, toJSON, undefined, cycles, etc.).
   const seen = new Set();
-  const visit = item => {
-    if (item === null || typeof item === 'string' || typeof item === 'boolean') return item;
+  const visit = (item, depth = 0) => {
+    if (typeof item === 'string') {
+      if (limits && !item.isWellFormed()) throw new TypeError('InvalidUnicode');
+      return item;
+    }
+    if (item === null || typeof item === 'boolean') return item;
     if (typeof item === 'number' && Number.isFinite(item)) return item;
     if (typeof item !== 'object' || item === null) throw new TypeError('Rust service values must be finite JSON data');
+    if (limits && depth >= limits.depth) throw new TypeError('ValueTooDeep');
     if (isOpaqueValue(item)) throw new TypeError('Opaque capabilities cannot be passed as JSON data');
     if (types.isProxy(item)) throw new TypeError('Rust service values cannot contain proxies');
     if (seen.has(item)) throw new TypeError('Rust service values cannot contain cycles');
@@ -33,14 +44,29 @@ export function jsonValue(value) {
     const allowed = new Set(Array.isArray(item) ? [...keys,'length'] : keys);
     if (Reflect.ownKeys(item).some(key => !allowed.has(key))) throw new TypeError('Rust service values cannot contain hidden or extra properties');
     for (const key of keys) {
+      if (limits && !key.isWellFormed()) throw new TypeError('InvalidUnicode');
       const descriptor = Object.getOwnPropertyDescriptor(item,key);
       if (!descriptor || !('value' in descriptor)) throw new TypeError('Rust service values cannot contain holes or accessors');
-      result[key] = visit(descriptor.value);
+      result[key] = visit(descriptor.value, depth + 1);
     }
     seen.delete(item);
     return result;
   };
-  return visit(value);
+  const result = visit(value);
+  if (limits && Buffer.byteLength(JSON.stringify(result)) > limits.bytes) throw new TypeError('ResultTooLarge');
+  return result;
+}
+
+// The iterator/object envelope belongs to the bridge, not the user's JSON
+// payload. Reserve bounded wire space while preserving the payload contract.
+function dynamicReplyValue(kind, value) {
+  const limits = { depth: 64, bytes: 512 * 1024 };
+  if (kind === 'stream_next' || kind === 'object_open') {
+    const reply = jsonValue(value, { depth: limits.depth + 1, bytes: limits.bytes + 1024 });
+    jsonValue(kind === 'stream_next' ? reply.value : reply.descriptor, limits);
+    return reply;
+  }
+  return jsonValue(value ?? null, limits);
 }
 
 export class RustHost {
@@ -55,6 +81,8 @@ export class RustHost {
     this.typedChecks = new WeakMap();
     this.typedChildPlugins = new WeakMap();
     this.typedChildren = new Map();
+    this.nativeChildren = new Map();
+    this.removalCallbacks = new Map();
     this.typedRealms = new Map();
     this.typedInjectionConfigs = new WeakMap();
     this.scheduled = false;
@@ -134,9 +162,17 @@ export class RustHost {
     const reply = this.command({op:'poll'});
     for (const request of reply.calls ?? []) {
       // This promise boundary releases all Rust borrows before arbitrary JS.
-      Promise.resolve().then(() => this.dispatch(request)).then(
-        value => this.command({op:'reply',request:request.request,success:true,value:jsonValue(value ?? null)}),
-        error => this.command({op:'reply',request:request.request,success:false,error:errorText(error)}),
+      const dynamic = this.sessions.get(request.session)?.factory.ref !== undefined;
+      // Bound dynamic-library replies before the resident Rust JSON parser.
+      // Validation failure is an ordinary error reply, not a lost completion.
+      Promise.resolve().then(() => this.dispatch(request)).then(value =>
+        dynamic ? dynamicReplyValue(request.kind, value) : jsonValue(value ?? null),
+      ).then(
+        value => this.command({op:'reply',request:request.request,success:true,value}),
+        error => {
+          return this.command({op:'reply',request:request.request,success:false,
+            error:dynamic ? dynamicErrorText(error) : errorText(error)});
+        },
       ).then(() => this.schedule(),error => { if (!this.fault) { this.domain.errors.push(error); this.domain.wake(); } });
     }
     for (const result of reply.jobs ?? []) {
@@ -198,7 +234,7 @@ export class RustHost {
     if (factory.plugin) return factory.plugin;
     return this.makePlugin(factory);
   }
-  makePlugin(factory) {
+  makePlugin(factory, migration) {
     const name = factory.name;
     const plugin = {
       name:`rust:${name}`, inject:factory.injectConfig
@@ -211,7 +247,8 @@ export class RustHost {
         const ports = this.ports(ctx,activeFactory);
         // A rejected start can still have created a persistent typed definition.
         token.fiber._rustDefinition = true;
-        const reply = this.command({op:'start',ticket:token.ticket,factory:factory.ref ?? name,config:jsonValue(config ?? null),ports});
+        const checkpoint = migration?.restore();
+        const reply = this.command({op:'start',ticket:token.ticket,factory:factory.ref ?? name,config:jsonValue(config ?? null),ports,...(checkpoint ? {checkpoint} : {})});
         const session = {id:reply.session,ctx,factory:activeFactory,token:{...token},setupToken:token,jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
         this.sessions.set(session.id,session);
         token.fiber._typedRealmKeys=reply.realms;
@@ -239,21 +276,29 @@ export class RustHost {
           token.fiber._rustSessions.delete(session);
         };
         await this.wait(reply.job,session,'setup');
+        if (migration) {
+          const {token:checkpoint} = this.command({op:'checkpoint_arm',session:session.id});
+          try { migration.armed(checkpoint); }
+          catch (error) { this.command({op:'checkpoint_drop',token:checkpoint}); throw error; }
+        }
+        // A native child explicitly depends on this episode's private anchor.
+        // Publish it only after the originating library's setup really lands.
+        if (activeFactory.nativeChildren) session.ctx.provide(activeFactory.anchor.name, Object.freeze({}));
       },
     };
     // Pending consumers have no Rust session yet. Tie their fixed declaration
     // to this actual callback, preserving explicit null over inherited config.
     if (factory.injectConfig) this.typedInjectionConfigs.set(plugin.apply,structuredClone(factory.injectConfig));
-    factory.plugin = plugin;
+    if (!migration) factory.plugin = plugin;
     return plugin;
   }
   ports(ctx,factory) {
     return Object.fromEntries((factory.ports ?? [...factory.inject,...factory.services.map(service=>service.name)]).map(name=>[name,this.domain.port(ctx,name)]));
   }
   anchorFactory(factory,fiber) {
-    if (!factory.dynamic || factory.anchor) return factory;
-    const anchor = fiber._typedAnchor ??= {name:`__cordis_typed_anchor_${randomUUID()}`,realm:Symbol('typed owner anchor')};
-    return {...factory,anchor,ports:[...factory.ports,anchor.name],services:[...factory.services,{name:anchor.name,methods:[]}]};
+    if ((!factory.dynamic && !factory.nativeChildren) || factory.anchor) return factory;
+    const anchor = fiber._typedAnchor ??= {name:`${factory.nativeChildren ? '__cordis_native_anchor_' : '__cordis_typed_anchor_'}${randomUUID()}`,realm:Symbol('Rust owner anchor')};
+    return {...factory,anchor,ports:[...(factory.ports ?? [...factory.inject,...factory.services.map(service=>service.name)]),anchor.name],services:[...factory.services,{name:anchor.name,methods:[]}]};
   }
   allocated(callback,fiber) {
     this.typedChildPlugins.get(callback)?.allocated(fiber);
@@ -262,63 +307,93 @@ export class RustHost {
     const child = this.typedChildPlugins.get(callback);
     if (!child) return ports;
     const result = [...ports];
-    for (const port of child.inherited) if (!result.some(item=>item.key===port.key && item.realm===port.realm)) result.push(port);
+    const provided = (child.nativeProvisions ?? []).map(name=>this.domain.port(fiber.ctx,name));
+    for (const port of child.inherited) {
+      // A child providing this exact port must not depend on its own provision.
+      // The same service name in another realm remains a real dependency.
+      if (provided.some(item=>item.key===port.key && item.realm===port.realm)) continue;
+      if (!result.some(item=>item.key===port.key && item.realm===port.realm)) result.push(port);
+    }
     return result;
   }
   childActions(actions) {
     for (const action of actions ?? []) {
       const parent = this.sessions.get(action.session);
+      const native = action.native === true;
+      const children = native ? this.nativeChildren : this.typedChildren;
+      const operation = native ? 'native_child_' : 'typed_child_';
       if (action.kind==='error') { this.domain.errors.push(new Error(action.error)); this.domain.schedule(); continue; }
-      if (action.kind==='retire') {
-        const child=this.typedChildren.get(action.child);
-        if (!child || child.parent!==parent || child.fiber.id!==action.id) throw new Error('Typed child retirement identity mismatch');
+      if (action.kind==='retire' || native && action.kind==='retry') {
+        const child=children.get(action.child);
+        if (!child || child.parent!==parent || child.fiber.id!==action.id) throw new Error('Rust child retirement identity mismatch');
         try {
-          const result=this.hooks.childRetire(parent,()=>child.fiber._dispose());
+          const result=this.hooks.childRetire(parent,()=>action.kind==='retry' ? child.fiber._retryCleanup() : child.fiber._dispose());
           Promise.resolve(result).catch(error=>{ if (!child.fiber._removedFlag) this.domain.errors.push(error); }).finally(()=>this.schedule());
         } catch(error) { this.domain.errors.push(error); }
         continue;
       }
-      if (action.kind!=='mount') throw new Error('Unknown typed child action');
+      if (action.kind!=='mount') throw new Error('Unknown Rust child action');
       let fiber;
       try {
         this.hooks.child(parent,()=>{
           let ctx=parent.ctx;
-          for(const realm of action.factory.realms) {
+          for(const realm of action.factory.realms ?? []) {
             const key=`${realm.key}:${realm.realm}`;
             if(!this.typedRealms.has(key)) this.typedRealms.set(key,Symbol(`typed realm:${key}`));
             ctx=ctx.isolate(realm.name,this.typedRealms.get(key));
           }
           const plugin=this.makePlugin(action.factory);
-          this.typedChildPlugins.set(plugin.apply,{inherited:action.factory.inherited,allocated:created=>{
+          this.typedChildPlugins.set(plugin.apply,{inherited:action.factory.inherited ?? [],nativeProvisions:native ? action.factory.services.map(service=>service.name) : undefined,allocated:created=>{
             fiber=created;
             const factory=this.anchorFactory(action.factory,fiber);
             const childCtx=fiber.ctx.isolate(factory.anchor.name,factory.anchor.realm);
             fiber._rustDefinition=true;
-            fiber._typedChild=action.child;
-            this.typedChildren.set(action.child,{parent,fiber,factory});
-            this.command({op:'typed_child_mounted',child:action.child,id:fiber.id,ports:this.ports(childCtx,factory)});
+            if (native) fiber._nativeChild=action.child;
+            else fiber._typedChild=action.child;
+            children.set(action.child,{parent,fiber,factory});
+            this.command({op:operation+'mounted',child:action.child,id:fiber.id,ports:this.ports(childCtx,factory)});
           }});
-          ctx.plugin(plugin);
-          if(!fiber) throw new Error('Typed native allocation was not acknowledged');
+          ctx.plugin(plugin,action.config);
+          if(!fiber) throw new Error('Rust child allocation was not acknowledged');
         });
       } catch(error) {
-        if(!fiber) this.command({op:'typed_child_rejected',child:action.child,error:errorText(error)});
+        if(!fiber) this.command({op:operation+'rejected',child:action.child,error:native ? dynamicErrorText(error) : errorText(error)});
         else {
           // Allocation has happened; never report it as an unallocated rejection.
           this.domain.errors.push(error);
-          if (!fiber._removedFlag) {
-            this.command({op:'typed_child_aborted',child:action.child,error:errorText(error)});
-            this.hooks.childRetire(parent,()=>fiber._dispose()).catch(error=>this.domain.errors.push(error));
-          }
+          // An observer can cause immediate Removed before throwing. Native
+          // control tombstones must still retain that allocated failure.
+          if (native || !fiber._removedFlag) this.command({op:operation+'aborted',child:action.child,error:native ? dynamicErrorText(error) : errorText(error)});
+          if (!fiber._removedFlag) this.hooks.childRetire(parent,()=>fiber._dispose()).catch(error=>this.domain.errors.push(error));
         }
       }
     }
   }
+  onRemoved(fiber, callback) {
+    if (fiber._removedFlag) { callback(); return () => {}; }
+    let callbacks = this.removalCallbacks.get(fiber);
+    if (!callbacks) this.removalCallbacks.set(fiber, callbacks = new Set());
+    callbacks.add(callback);
+    return () => { callbacks.delete(callback); if (!callbacks.size) this.removalCallbacks.delete(fiber); };
+  }
   removed(fiber) {
-    if (fiber._rustDefinition) {
-      this.command({op:'forget',id:fiber.id});
+    const callbacks = this.removalCallbacks.get(fiber);
+    this.removalCallbacks.delete(fiber);
+    for (const callback of callbacks ?? []) {
+      try { callback(); } catch (error) { this.domain.errors.push(error); }
+    }
+    if (!fiber._rustDefinition) return;
+    try { this.command({op:'forget',id:fiber.id}); }
+    catch (error) {
+      // Native control records remain responsible for failed finalization. The
+      // graph's Removed event is nevertheless final for this JS Fiber.
+      this.domain.diagnostics?.push({kind:'rust-definition-finalization',fiber:fiber.id,
+        cleanup:'unconfirmed',error:errorText(error)});
+      throw error;
+    } finally {
       fiber._rustDefinition = false;
       if (fiber._typedChild) this.typedChildren.delete(fiber._typedChild);
+      if (fiber._nativeChild) this.nativeChildren.delete(fiber._nativeChild);
       if (fiber._typedAnchor) {
         const {name,realm}=fiber._typedAnchor;
         for(const entry of fiber._typedRealmKeys ?? []) if(entry.name===name) this.typedRealms.delete(`${entry.key}:${entry.realm}`);
@@ -345,6 +420,10 @@ export class RustHost {
     if(fiber?._typedChild) {
       const state=JSON.stringify([item.generation,item.state,item.cleanupFailed,item.error]);
       if(state!==fiber._typedObserved) { fiber._typedObserved=state;this.command({op:'typed_child_observed',child:fiber._typedChild}); }
+    }
+    if(fiber?._nativeChild) {
+      const state=JSON.stringify([item.generation,item.state,item.cleanupFailed,item.error]);
+      if(state!==fiber._nativeObserved) { fiber._nativeObserved=state;this.command({op:'native_child_observed',child:fiber._nativeChild}); }
     }
     if (item.retired || String(item.state).toLowerCase() === 'unloading') {
       for (const session of this.sessions.values()) if (session.token.fiber.id === item.id) this.cancel(session);

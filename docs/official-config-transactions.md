@@ -1,8 +1,9 @@
 # Coordinating official Harness configuration changes
 
-`@cordis-verus/compat-loader/harness` provides two related interfaces:
+`@cordis-verus/compat-loader/harness` provides three related interfaces:
 
 - `LoaderTransactions` explicitly coordinates a host-owned official Loader or Include tree.
+- `officialTransaction(ctx, execute)` composes host operations and application readiness checks inside one admitted revision.
 - `installOfficialTransactions()` installs transparent coordination for the pinned official ConfigEditor, Include refresh and HMR configuration queue. The `cordis-harness` native bootstrap installs it before mounting the default application.
 
 The adapter keeps one native Harness Context graph. Official files remain unchanged. The installed methods still perform the official profile merge, schema validation, YAML expression handling, filesystem locking, atomic replacement and rollback. This is a host execution contract backed by tests, not a proof of those JavaScript callbacks or filesystem operations.
@@ -38,6 +39,53 @@ An Include refresh enters the same queue before reading its file. After the offi
 The admitted slot remains occupied until the official operation returns, its discovered Loader tasks and Fiber readiness complete, and observed Include write queues finish. This includes the original ConfigEditor rollback when reconciliation rejects. The current implementation conservatively observes the entire Loader graph, so unrelated pending Include writes can delay or reject completion. Context shutdown waits behind admitted work and rejects new external revisions.
 
 Service identities are checked both before admission and at execution. A removed or replaced ConfigEditor/HMR instance fails with `STALE_OFFICIAL_SERVICE`. A retained Include from an old activation fails with `STALE_LOADER`.
+
+## Composing host operations
+
+A host that replaces a provider and requires specific application consumers to
+be ready can hold the same domain revision through configuration editing,
+readiness checks and restoration:
+
+```js
+import { officialTransaction } from '@cordis-verus/compat-loader/harness';
+
+await officialTransaction(ctx, async () => {
+  const previous = structuredClone(entry.options.config);
+  try {
+    await ctx.configEditor.edit(entry, () => nextConfig);
+    await assertApplicationReady();
+  } catch (error) {
+    try {
+      await ctx.configEditor.edit(entry, () => previous);
+      await assertApplicationReady();
+    } catch (restoreError) {
+      throw new AggregateError([error, restoreError], 'Update and restoration failed');
+    }
+    throw error;
+  }
+});
+```
+
+`assertApplicationReady()` is an application-defined check: resolve the required
+current Loader entries, await their Fibers, and require Active (or test the
+application-specific service contract). Do not reuse old Fiber handles across
+replacement, or count only the provider's configured native children as consumer
+readiness. Scope the check to the entries required for this operation.
+
+Installed `ConfigEditor.edit()` and HMR methods join only the exact current host
+coordinator, including after its asynchronous work. They do not enqueue another
+revision behind themselves. The transaction remains occupied while the callback
+checks consumers or restores configuration, so a competing edit cannot interleave.
+The final Loader and persistence checks still run before completion. The helper
+returns the callback's result and does not supply lifecycle steps to user callbacks.
+
+Call `officialTransaction()` from the host. It does not allow managed setup,
+cleanup, a ConfigEditor change callback, or their asynchronous descendants to
+acquire transaction authority. Calling it from another transaction is also
+rejected; compose official operations inside the original callback instead.
+A failed cleanup can block restoration and must remain visible for explicit
+retry. This helper supplies ordering, not automatic application rollback, physical
+library unloading or rollback of external I/O.
 
 ## Callback boundaries
 

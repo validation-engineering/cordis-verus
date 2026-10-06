@@ -16,7 +16,7 @@ cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的�
 - **类型化 Rust 插件。** 组合服务、异步初始化与清理、子插件、事件和定时器，显式管理资源所有权。
 - **在 Node 中运行 Cordis。** 由 Rust 决定生命周期动作，运行支持范围内的原版 JS 插件。JavaScript 对象、函数和服务值保留在 Node 中，保持原有身份。Cordis 与 DeepSeek Harness 使用不同的兼容 profile。
 - **组合 Rust 与 JavaScript。** 用户编译的 Rust 插件可通过显式服务、流、对象和回调适配器加入 Node 图；typed binding 保留既有 Rust 服务槽，并可显式开启动态 publication、拥有的子插件、动态值与按 consumer 检查 availability。
-- **可热替换的原生插件。** 通过版本化 C ABI 加载独立构建的 Rust `cdylib`，在同一 Node 进程内替换插件实例；reload 等待真实清理，并可恢复旧代码与配置。
+- **可热替换的原生插件。** 通过版本化 C ABI 加载独立构建的 Rust `cdylib`，在同一 Node 进程内替换插件实例。声明式 JS 依赖、双向流和对象、动态发布的子插件 factory 共用同一生命周期图；显式版本化 JSON checkpoint 可在换代时保留业务状态；失败后等待真实清理，再恢复旧代码、配置和快照。
 - **配置与重载。** 加载 JSON 插件树，并通过同一生命周期队列协调官方 Harness 配置编辑与支持范围内的原地模块重载。需要隔离替换时，使用捕获的 Worker 或进程制品，启动失败时恢复旧版本。外部可执行插件使用独立 JSON-RPC 接口。
 
 支持行为和有意保留的差异见[上游对照](docs/upstream-parity.md)，生命周期契约见[语义说明](docs/semantics.md)。

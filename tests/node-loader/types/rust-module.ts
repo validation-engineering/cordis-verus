@@ -11,6 +11,12 @@ const budget: number = controller.inspect().images.retainedImageLimit;
 void budget;
 const retained: true = snapshot.retained;
 void retained;
+await controller.reconcile({ path: '/plugin-v3.dylib', sha256: 'digest-v3', plugins: [{ id: 'changed', factory: 'native-text-analysis', config: { threshold: 4 } }] });
+await controller.reconcile({ path: '/plugin-v3.dylib', sha256: 'digest-v3', plugins: [] });
+// @ts-expect-error Reconciliation requires a complete replacement recipe.
+controller.reconcile({ path: '/plugin-v3.dylib', sha256: 'digest-v3' });
+// @ts-expect-error Reconciled config remains JSON.
+controller.reconcile({ path: '/plugin-v3.dylib', sha256: 'digest-v3', plugins: [{ id: 'text', factory: 'native-text-analysis', config: () => {} }] });
 await controller.retryCleanup();
 await controller.dispose();
 new RustModuleController(ctx, { plugins: [{ id: 'text', factory: 'native-text-analysis' }] });
@@ -22,3 +28,9 @@ new RustModuleController(ctx, { plugins: [{ id: 'text', factory: 'native-text-an
 snapshot.module!.factories[0].ref = 'next';
 // @ts-expect-error Controllers do not expose physical image unloading.
 controller.unload();
+
+const resources = controller.inspect().images.modules[0].resources;
+const tracked: number[] = [resources.streams, resources.objects, resources.retainedStreams, resources.retainedObjects];
+void tracked;
+const methodKind: "sync" | "async" | "stream" | "object" = controller.inspect().images.modules[0].factories[0].services[0].methods[0].kind;
+void methodKind;

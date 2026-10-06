@@ -2200,3 +2200,104 @@ fn typed_child_protocol_preserves_definition_slots_allocation_and_removal() {
     typed_release(&mut backend, session);
     backend.forget_typed(1).unwrap();
 }
+
+#[test]
+fn borrowed_adapter_release_failure_is_retryable_after_calls_land_with_captured_ownership() {
+    #[derive(Default)]
+    struct Probe {
+        releases: AtomicUsize,
+        changed: std::sync::atomic::AtomicBool,
+    }
+    struct Adapter(Arc<Probe>);
+    impl PluginObject for Adapter {
+        fn descriptor(&self) -> ObjectDescriptor {
+            ObjectDescriptor::callback(
+                "release.Probe",
+                if self.0.changed.load(Ordering::Relaxed) {
+                    ObjectOwnership::Owned
+                } else {
+                    ObjectOwnership::Borrowed
+                },
+            )
+            .unwrap()
+        }
+        fn call(&self, ctx: PluginContext, _: &str, args: Value) -> PluginFuture {
+            Box::pin(async move { ctx.call("input", "query", args).await })
+        }
+        fn close(&self, _: PluginContext) -> PluginFuture {
+            panic!("borrowed user close must never run")
+        }
+        fn release(&self, _: PluginContext, ownership: ObjectOwnership) -> PluginFuture {
+            assert_eq!(ownership, ObjectOwnership::Borrowed);
+            let attempt = self.0.releases.fetch_add(1, Ordering::Relaxed);
+            Box::pin(async move {
+                if attempt == 0 {
+                    Err("retry adapter release".into())
+                } else {
+                    Ok(Value::Null)
+                }
+            })
+        }
+    }
+    struct AdapterFactory(Arc<Probe>);
+    impl PluginFactory for AdapterFactory {
+        fn descriptor(&self) -> FactoryDescriptor {
+            let mut descriptor = ReadyFactory.descriptor();
+            descriptor.services[0].methods.push(MethodDescriptor {
+                name: "object".into(),
+                kind: MethodKind::Object,
+            });
+            descriptor
+        }
+        fn create(&self, _: Value) -> PluginResult<Arc<dyn PluginInstance>> {
+            Ok(Arc::new(Adapter(self.0.clone())))
+        }
+    }
+    impl PluginInstance for Adapter {
+        fn setup(&self, ctx: PluginContext) -> PluginFuture {
+            ReadyInstance.setup(ctx)
+        }
+        fn open_object(&self, _: &str, _: &str, _: Value) -> PluginResult<Arc<dyn PluginObject>> {
+            Ok(Arc::new(Adapter(self.0.clone())))
+        }
+    }
+    let probe = Arc::new(Probe::default());
+    let mut registry = FactoryRegistry::new();
+    registry.register(AdapterFactory(probe.clone())).unwrap();
+    let mut backend = plugin::Backend::new(registry, Arc::new(|| {}));
+    let session = number(
+        &backend.start(1, 1, "test", Value::Null).unwrap(),
+        "session",
+    );
+    let provide = expect_call(&mut backend, "provide");
+    backend
+        .reply(
+            number(&provide, "request"),
+            Ok(json!({"publication":"3","port":{"key":"4","realm":"0"}})),
+        )
+        .unwrap();
+    assert_eq!(backend.poll()["jobs"][0]["success"], true);
+    let object = number(
+        &backend
+            .call(session, "service", "object", json!([]), false, false)
+            .unwrap(),
+        "object",
+    );
+    probe.changed.store(true, Ordering::Relaxed);
+    backend
+        .object_call(session, object, "call", json!([]), false, false)
+        .unwrap();
+    let call = expect_call(&mut backend, "call");
+    backend.object_close(session, object).unwrap();
+    assert_eq!(backend.poll()["jobs"], json!([]));
+    assert_eq!(probe.releases.load(Ordering::Relaxed), 0);
+    backend
+        .reply(number(&call, "request"), Ok(Value::Null))
+        .unwrap();
+    backend.poll();
+    assert_eq!(backend.poll()["jobs"][0]["success"], false);
+    assert!(backend.cleanup(session).is_err());
+    backend.object_close(session, object).unwrap();
+    assert_eq!(backend.poll()["jobs"][0]["success"], true);
+    assert_eq!(probe.releases.load(Ordering::Relaxed), 2);
+}

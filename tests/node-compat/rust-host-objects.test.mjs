@@ -296,10 +296,12 @@ test('unknown jobs, other sessions and another ordinary job cannot consume or re
   wire.admit('21', 'call', other);
   wire.admit('22', 'call');
   wire.admit('31', 'cleanup');
-  for (const fields of [{ session: other.id }, { job: '22' }, { job: '31', restoring: true }, { job: 'missing' }]) {
+  wire.admit('32', 'object-close');
+  wire.admit('33', 'stream-close');
+  for (const fields of [{ session: other.id }, { job: '22' }, { job: '31', restoring: true }, { job: '32', restoring: true }, { job: '33', restoring: true }, { job: 'missing' }]) {
     await assert.rejects(wire.call(object, 'read', [], fields));
   }
-  for (const fields of [{ session: other.id }, { job: '22' }, { job: 'missing' }]) {
+  for (const fields of [{ session: other.id }, { job: '22' }, { job: '22', restoring: true }, { job: '32', restoring: false }, { job: '33', restoring: false }, { job: 'missing' }]) {
     await assert.rejects(wire.close(object, fields));
   }
   assert.equal(calls, 0);

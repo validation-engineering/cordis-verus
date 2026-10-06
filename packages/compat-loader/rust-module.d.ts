@@ -1,7 +1,8 @@
 import type { Context } from '@cordis-verus/compat-cordis';
 import type { JSONValue } from './index.js';
 export interface RustModuleArtifact { path: string; sha256: string; }
-export interface RustModuleEntry { id: string; factory: string; config?: JSONValue; }
+export interface RustModuleEntry { id: string; factory: string; config?: JSONValue; state?: 'migrate'; }
+export interface RustModuleRevision extends RustModuleArtifact { plugins: RustModuleEntry[]; }
 export interface RustModuleDescriptor {
   readonly abi: 1;
   readonly module: string;
@@ -15,7 +16,8 @@ export interface RustModuleDescriptor {
     readonly name: string;
     readonly ref: string;
     readonly inject: readonly string[];
-    readonly services: readonly { readonly name: string; readonly methods: readonly { readonly name: string; readonly kind: 'sync' | 'async' }[] }[];
+    readonly checkpointSchema?: { readonly schema: string; readonly version: number; readonly accepts: readonly number[] } | null;
+    readonly services: readonly { readonly name: string; readonly methods: readonly { readonly name: string; readonly kind: 'sync' | 'async' | 'stream' | 'object' }[] }[];
   }[];
 }
 export interface RustModuleSnapshot {
@@ -32,6 +34,12 @@ export interface RustModuleResources {
   readonly jobs: number;
   readonly retainedInstances: number;
   readonly retainedJobs: number;
+  readonly reverseCalls: number;
+  readonly retainedReverseCalls: number;
+  readonly streams: number;
+  readonly objects: number;
+  readonly retainedStreams: number;
+  readonly retainedObjects: number;
 }
 export interface RustModuleInventory {
   readonly retained: true;
@@ -40,6 +48,7 @@ export interface RustModuleInventory {
   readonly retainedImageCount: number;
   readonly retainedImageLimit: number;
   /** Modules registered in this Context's native Driver. */
+  readonly checkpoints: { readonly tokens: number; readonly bytes: number; readonly tokenLimit: number; readonly byteLimit: number };
   readonly modules: readonly (RustModuleDescriptor & { readonly resources: RustModuleResources })[];
 }
 export interface RustModuleInspection extends RustModuleSnapshot { readonly images: RustModuleInventory; }
@@ -50,8 +59,11 @@ export class RustModuleController {
   readonly state: RustModuleSnapshot['state'];
   readonly revision: number;
   readonly lastReloadFailure: Error | undefined;
+  /** Replace code, preserving the latest successfully committed recipes in FIFO order. */
   reload(artifact: RustModuleArtifact): Promise<RustModuleSnapshot>;
-  /** Explicit cleanup retry only. The next ordinary reload performs restoration. */
+  /** Reconcile code and captured recipes with rollback. Empty plugins disables the owned group. */
+  reconcile(revision: RustModuleRevision): Promise<RustModuleSnapshot>;
+  /** Explicit cleanup retry only. The next reload or reconcile performs restoration. */
   retryCleanup(): Promise<RustModuleSnapshot>;
   dispose(): Promise<void>;
   snapshot(): RustModuleSnapshot;
@@ -59,4 +71,4 @@ export class RustModuleController {
   inspect(): RustModuleInspection;
 }
 /** On activation failure, the rejected Error.controller retains cleanup/recovery access. */
-export function loadRustModule(context: Context, options: RustModuleArtifact & { plugins: RustModuleEntry[] }): Promise<RustModuleController>;
+export function loadRustModule(context: Context, options: RustModuleRevision): Promise<RustModuleController>;

@@ -48,3 +48,10 @@ export interface OfficialHmrTransactions {
   partialReload(): Promise<void>;
   runExclusive<T>(operation: () => T | Promise<T>): Promise<T>;
 }
+
+/** Admit one host revision around official ConfigEditor/HMR calls and readiness
+ * checks. Official methods join this exact coordinator after awaits; lifecycle
+ * and config-change callbacks remain observers and cannot borrow its authority.
+ * The callback must perform its own application-level restoration on failure.
+ */
+export function officialTransaction<T>(context: Context, execute: () => T | PromiseLike<T>): Promise<Awaited<T>>;

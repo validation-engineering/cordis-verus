@@ -27,6 +27,10 @@
     "./rust-module": {
       "types": "./rust-module.d.ts",
       "import": "./rust-module.js"
+    },
+    "./rust-module-plugin": {
+      "types": "./rust-module-plugin.d.ts",
+      "import": "./rust-module-plugin.js"
     }
   },
   "peerDependencies": {

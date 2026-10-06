@@ -274,7 +274,7 @@ def npm_distribution_evidence(path, build_path, node_build):
             or observation.get("nativeManifestSha256") != report["nativeManifestSha256"]
             or observation.get("nativeTarget") != report["nativeTarget"]
             or set(observation.get("tests", [])) != {
-                "native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity", "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load", "Rust-module-in-place-reload"}
+                "native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity", "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load", "Rust-module-in-place-reload", "Rust-module-reverse-JS", "Rust-module-resources", "Rust-module-JS-resources", "Rust-module-children", "Rust-module-checkpoint"}
             or harness.get("profile") != "harness"
             or set(harness.get("tests", [])) != {
                 "scoped-original-import", "ESM-CJS-profile-identity", "native-harness-domain", "Service-class", "official-loader-adapter-export"}):

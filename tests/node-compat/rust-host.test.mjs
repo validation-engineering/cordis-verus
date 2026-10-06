@@ -213,3 +213,32 @@ test('a native domain fault rejects owned waiters and prevents further native wo
   await turn();
   assert.equal(wire.commands.length, admittedCommands, 'faulted hosts must not reenter the native executor');
 });
+
+
+test('dynamic reverse replies are bounded before native decoding and complete once on rejection', async () => {
+  const nested = depth => Array.from({ length: depth }).reduce(value => [value], null);
+  const near = 'a'.repeat(512 * 1024 - 2);
+  const scenarios = [
+    { method: () => near, success: true, value: near },
+    { method: () => nested(64), success: true, value: nested(64) },
+    { method: () => nested(65), success: false, error: /ValueTooDeep/ },
+    { method: () => nested(130), success: false, error: /ValueTooDeep/ },
+    { method: () => '\ud800', success: false, error: /InvalidUnicode/ },
+    { method: () => ({['\ud800']: null}), success: false, error: /InvalidUnicode/ },
+    { method: () => { throw '\ud800'; }, success: false, error: /PluginErrorInvalidUnicode/ },
+    { method: () => 'a'.repeat(512 * 1024), success: false, error: /ResultTooLarge/ },
+    { method: () => { throw '界'.repeat(4096); }, success: false, error: /PluginErrorTooLarge/ },
+  ];
+  for (const scenario of scenarios) {
+    const wire = bridge({ method: scenario.method });
+    wire.session.factory.ref = '@cordis/dynamic/1/test';
+    wire.admit();
+    wire.enqueue(wire.request('method'));
+    await turn();
+    assert.equal(wire.replies.length, 1);
+    assert.equal(wire.replies[0].success, scenario.success);
+    if (scenario.success) assert.deepEqual(wire.replies[0].value, scenario.value);
+    else assert.match(wire.replies[0].error, scenario.error);
+    assert.deepEqual(wire.errors, []);
+  }
+});

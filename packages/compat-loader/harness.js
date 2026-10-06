@@ -284,6 +284,14 @@ function coordinate(ctx, execute) {
   });
 }
 
+/** Compose official host operations and application readiness checks in one
+ * domain revision. Managed callbacks cannot borrow this transaction's authority.
+ */
+export function officialTransaction(ctx, execute) {
+  if (typeof execute !== 'function') return Promise.reject(new TypeError('officialTransaction requires a callback'));
+  return coordinate(ctx, execute);
+}
+
 function installRefresh(tree) {
   if (!isInclude(tree) || refreshedTrees.has(tree)) return;
   const original = tree.refresh;
@@ -370,7 +378,7 @@ export function installOfficialTransactions({ Entry, EntryGroup, EntryTree, Hmr,
       const ctx = serviceCheck(this, 'configEditor');
       const generation = ctx.fiber._generation;
       if (typeof change !== 'function') throw new TypeError('ConfigEditor.edit requires a change callback');
-      return coordinate(ctx.root, () => {
+      const invoke = () => {
         serviceCheck(this, 'configEditor');
         if (ctx.fiber._generation !== generation) throw new LoaderError('STALE_OFFICIAL_SERVICE', 'ConfigEditor changed while its edit was queued');
         return Reflect.apply(edit, this, [entry, (...args) => {
@@ -378,7 +386,8 @@ export function installOfficialTransactions({ Entry, EntryGroup, EntryTree, Hmr,
           if (!scope) throw incompatible('ConfigEditor callback escaped its admitted transaction');
           return scope.steps.observe(entry.fiber, () => change(...args));
         }]);
-      });
+      };
+      return scoped(ctx) ? invoke() : coordinate(ctx.root, invoke);
     } catch (error) { return Promise.reject(error); }
   };
   for (const value of classes) installedContracts.set(value, classes);

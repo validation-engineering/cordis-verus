@@ -108,12 +108,19 @@ rejection. The existing Worker lifecycle suite covers in-flight call draining,
 cleanup failure, crash/exit acknowledgement, and retained-artifact integrity.
 Actual declarations are compiled in `tests/node-loader/types/module-graph.ts`.
 
-Still separate work: same-environment ESM/CJS module replacement with identity
-contracts, certification of arbitrary application native addons, complete
-static graph extraction for an arbitrary build tool, and connecting the official Harness module watcher to a Worker/process boundary.
-The [official configuration bridge](official-config-transactions.md) coordinates
-configuration revisions and rejects main-thread module-cache replacement. This feature is not a paper proof of module loading
-or arbitrary plugin code.
+Supported same-environment ESM/CJS replacement is now provided by the
+[official in-place HMR adapter](official-in-place-hmr.md), with explicit ownership,
+identity and cleanup contracts. The [official configuration bridge](official-config-transactions.md)
+coordinates configuration revisions and the admitted HMR path. The Harness
+application also offers an opt-in Web/standard process supervisor. These are
+separate strategies from the Worker graph replacement described above.
+
+Remaining work includes complete static graph extraction for arbitrary build
+tools, unexecuted dynamic imports, broader application supervisor coverage and
+cross-platform acceptance. Arbitrary native addons still require a process
+boundary; independently compiled plugins can instead use the explicit
+[native module ABI](native-rust-modules.md). None of these mechanisms establishes
+a paper proof of module loading or arbitrary plugin code.
 
 The mechanism follows Node's documented [synchronous customization hooks](https://nodejs.org/api/module.html#synchronous-customization-hooks)
 and the distinction between [ESM and CommonJS caches](https://nodejs.org/api/esm.html#no-requirecache).

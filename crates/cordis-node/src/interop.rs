@@ -49,10 +49,21 @@ enum Request {
         sha256: String,
     },
     ModuleInfo,
+    CheckpointArm {
+        session: String,
+    },
+    CheckpointRead {
+        token: String,
+    },
+    CheckpointDrop {
+        token: String,
+    },
     Start {
         ticket: ActionTicket,
         factory: String,
         config: Value,
+        #[serde(default)]
+        checkpoint: Option<String>,
         #[serde(default)]
         ports: std::collections::BTreeMap<String, cordis_driver::ServicePort>,
     },
@@ -70,6 +81,22 @@ enum Request {
         error: String,
     },
     TypedChildObserved {
+        child: String,
+    },
+    NativeChildMounted {
+        child: String,
+        id: String,
+        ports: std::collections::BTreeMap<String, cordis_driver::ServicePort>,
+    },
+    NativeChildAborted {
+        child: String,
+        error: String,
+    },
+    NativeChildRejected {
+        child: String,
+        error: String,
+    },
+    NativeChildObserved {
         child: String,
     },
     TypedCheck {
@@ -304,10 +331,50 @@ impl NativeDriver {
                 .try_borrow()
                 .map_err(|_| "ReentrantRustAction")?
                 .module_info()),
+            Request::CheckpointArm { session } => {
+                let session = identity(&session)?;
+                let (id, generation) = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .owner(session)?;
+                let snapshot = self
+                    .driver
+                    .try_borrow()
+                    .map_err(|_| "ReentrantCommand")?
+                    .snapshot();
+                if !snapshot["plugins"].as_array().unwrap().iter().any(|node| {
+                    node["id"].as_str() == Some(&id.to_string())
+                        && node["generation"].as_str() == Some(&generation.to_string())
+                        && node["retired"] != true
+                        && node["state"]
+                            .as_str()
+                            .is_some_and(|state| !state.eq_ignore_ascii_case("unloading"))
+                }) {
+                    return Err("StaleEpisode".into());
+                }
+                self.backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .checkpoint_arm(session)
+            }
+            Request::CheckpointRead { token } => self
+                .backend
+                .try_borrow()
+                .map_err(|_| "ReentrantRustAction")?
+                .checkpoint_read(&token),
+            Request::CheckpointDrop { token } => {
+                self.backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .checkpoint_drop(&token)?;
+                Ok(json!({}))
+            }
             Request::Start {
                 ticket,
                 factory,
                 config,
+                checkpoint,
                 ports,
             } => {
                 self.valid_ticket(&ticket, ActionKind::Setup)?;
@@ -321,7 +388,17 @@ impl NativeDriver {
                         .backend
                         .try_borrow_mut()
                         .map_err(|_| "ReentrantRustAction")?
-                        .start(ticket.id, ticket.generation, &factory, config);
+                        .native_start(
+                            ticket.id,
+                            ticket.generation,
+                            &factory,
+                            config,
+                            ports,
+                            checkpoint.as_deref(),
+                        );
+                }
+                if checkpoint.is_some() {
+                    return Err("NativeCheckpointUnsupported".into());
                 }
                 let mut imports = Vec::new();
                 if let Some(descriptor) = descriptor {
@@ -434,6 +511,86 @@ impl NativeDriver {
                     .try_borrow()
                     .map_err(|_| "ReentrantRustAction")?
                     .typed_child_observed(
+                        &child,
+                        node["state"]
+                            .as_str()
+                            .is_some_and(|s| s.eq_ignore_ascii_case("active")),
+                        failure,
+                        node["cleanupFailed"] == true,
+                    )?;
+                Ok(json!({}))
+            }
+            Request::NativeChildMounted { child, id, ports } => {
+                let id = identity(&id)?;
+                let (owner, generation, mounted) = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .native_child_owner(&child)?;
+                if mounted.is_some() {
+                    return Err("NativeChildAlreadyMounted".into());
+                }
+                let snapshot = self
+                    .driver
+                    .try_borrow()
+                    .map_err(|_| "ReentrantCommand")?
+                    .snapshot();
+                let nodes = snapshot["plugins"].as_array().unwrap();
+                let valid_parent = nodes.iter().any(|n| {
+                    n["id"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(owner)
+                        && n["generation"].as_str().and_then(|v| v.parse::<u64>().ok())
+                            == Some(generation)
+                });
+                let valid_child = nodes.iter().any(|n| {
+                    n["id"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(id)
+                        && n["parent"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(owner)
+                });
+                if !valid_parent || !valid_child {
+                    return Err("NativeChildOwnerMismatch".into());
+                }
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .native_child_mounted(&child, id, ports)?;
+                Ok(json!({}))
+            }
+            Request::NativeChildAborted { child, error } => {
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .native_child_aborted(&child, error)?;
+                Ok(json!({}))
+            }
+            Request::NativeChildRejected { child, error } => {
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .native_child_rejected(&child, error)?;
+                Ok(json!({}))
+            }
+            Request::NativeChildObserved { child } => {
+                let (_, _, id) = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .native_child_owner(&child)?;
+                let id = id.ok_or("NativeChildNotMounted")?;
+                let snapshot = self
+                    .driver
+                    .try_borrow()
+                    .map_err(|_| "ReentrantCommand")?
+                    .snapshot();
+                let node = snapshot["plugins"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|n| n["id"].as_str().and_then(|s| s.parse::<usize>().ok()) == Some(id))
+                    .ok_or("NativeChildRemoved")?;
+                let failure = node["error"].as_str().map(str::to_owned);
+                self.backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .native_child_observed(
                         &child,
                         node["state"]
                             .as_str()

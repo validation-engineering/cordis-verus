@@ -2,13 +2,32 @@
 //! Libraries stay mapped for process lifetime; releasing a session only asks
 //! its originating SDK to destroy objects after real cleanup has succeeded.
 
+#[path = "dynamic_checkpoint.rs"]
+pub(crate) mod checkpoint;
+#[cfg(test)]
+#[path = "dynamic_checkpoint_tests.rs"]
+mod checkpoint_tests;
+#[path = "dynamic_children.rs"]
+pub(crate) mod children;
+#[cfg(test)]
+#[path = "dynamic_children_tests.rs"]
+mod children_tests;
 #[path = "dynamic_ffi.rs"]
 mod ffi;
+#[path = "dynamic_resources.rs"]
+mod resources;
+#[path = "dynamic_reverse.rs"]
+mod reverse;
+#[cfg(test)]
+#[path = "dynamic_reverse_tests.rs"]
+mod reverse_tests;
 use super::{
     CancellationToken, FactoryDescriptor, FactoryRegistry, PluginContext, PluginFactory,
     PluginFuture, PluginInstance, PluginResult,
 };
-use cordis_plugin_api::WakeV1;
+use cordis_plugin_api::{
+    ReverseCall, WakeV1, MAX_MESSAGE_BYTES, MAX_PENDING_CALLS, MAX_VALUE_DEPTH,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -65,6 +84,8 @@ struct Description {
     module_id: String,
     version: String,
     factories: Vec<FactoryDescriptor>,
+    #[serde(default)]
+    checkpoint_schemas: BTreeMap<String, cordis_plugin_api::CheckpointSchema>,
 }
 
 pub(crate) struct Module {
@@ -77,6 +98,12 @@ pub(crate) struct Module {
     jobs: AtomicUsize,
     retained_instances: AtomicUsize,
     retained_jobs: AtomicUsize,
+    reverse_calls: AtomicUsize,
+    retained_reverse_calls: AtomicUsize,
+    streams: AtomicUsize,
+    objects: AtomicUsize,
+    retained_streams: AtomicUsize,
+    retained_objects: AtomicUsize,
 }
 impl Module {
     fn request(&self, request: Value) -> PluginResult<Value> {
@@ -91,8 +118,10 @@ impl Module {
             .factories
             .iter()
             .map(|descriptor| {
-                let mut value = json!(descriptor);
-                value["ref"] = json!(self.factory_ref(&descriptor.name));
+                let mut value = children::metadata(descriptor, &self.factory_ref(&descriptor.name));
+                if let Some(schema) = self.description.checkpoint_schemas.get(&descriptor.name) {
+                    value["checkpointSchema"] = json!(schema);
+                }
                 value
             })
             .collect();
@@ -103,7 +132,13 @@ impl Module {
                 "instances":self.instances.load(Ordering::Acquire),
                 "jobs":self.jobs.load(Ordering::Acquire),
                 "retainedInstances":self.retained_instances.load(Ordering::Acquire),
-                "retainedJobs":self.retained_jobs.load(Ordering::Acquire)}})
+                "retainedJobs":self.retained_jobs.load(Ordering::Acquire),
+                "reverseCalls":self.reverse_calls.load(Ordering::Acquire),
+                "retainedReverseCalls":self.retained_reverse_calls.load(Ordering::Acquire),
+                "streams":self.streams.load(Ordering::Acquire),
+                "objects":self.objects.load(Ordering::Acquire),
+                "retainedStreams":self.retained_streams.load(Ordering::Acquire),
+                "retainedObjects":self.retained_objects.load(Ordering::Acquire)}})
     }
 }
 
@@ -135,6 +170,12 @@ pub(crate) fn load(path: &str, expected: &str) -> PluginResult<Arc<Module>> {
         jobs: AtomicUsize::new(0),
         retained_instances: AtomicUsize::new(0),
         retained_jobs: AtomicUsize::new(0),
+        reverse_calls: AtomicUsize::new(0),
+        retained_reverse_calls: AtomicUsize::new(0),
+        streams: AtomicUsize::new(0),
+        objects: AtomicUsize::new(0),
+        retained_streams: AtomicUsize::new(0),
+        retained_objects: AtomicUsize::new(0),
     }))
 }
 
@@ -145,17 +186,14 @@ fn validate(description: &Description) -> PluginResult<()> {
     {
         return Err("NativeModuleEmptyDescriptor".into());
     }
+    for (factory, schema) in &description.checkpoint_schemas {
+        schema.validate()?;
+        if !description.factories.iter().any(|d| &d.name == factory) {
+            return Err("NativeCheckpointUnknownFactory".into());
+        }
+    }
     let mut registry = FactoryRegistry::new();
     for descriptor in &description.factories {
-        if !descriptor.inject.is_empty()
-            || descriptor
-                .services
-                .iter()
-                .flat_map(|s| &s.methods)
-                .any(|m| !matches!(m.kind, super::MethodKind::Sync | super::MethodKind::Async))
-        {
-            return Err("NativeModuleUnsupportedCapability".into());
-        }
         // Reuse the same duplicate/name validation as ordinary Rust factories.
         registry.register(DescriptorOnly(descriptor.clone()))?;
     }
@@ -236,6 +274,8 @@ fn snapshot(source: &Path, expected: &str, id: &str) -> PluginResult<(PathBuf, S
 
 struct Factory {
     module: Arc<Module>,
+    children: Arc<children::Children>,
+    checkpoints: Arc<checkpoint::Journal>,
     descriptor: FactoryDescriptor,
 }
 impl PluginFactory for Factory {
@@ -255,6 +295,15 @@ impl PluginFactory for Factory {
                 module: self.module.clone(),
                 handle,
                 destroyed: AtomicBool::new(false),
+                cleaned: AtomicBool::new(false),
+                finalization: Finalization::default(),
+                children: self.children.clone(),
+                checkpoint: checkpoint::InstanceState::new(
+                    self.checkpoints.clone(),
+                    &self.module,
+                    &self.descriptor.name,
+                    true,
+                ),
             }),
             services: self
                 .descriptor
@@ -269,13 +318,43 @@ struct InstanceLease {
     module: Arc<Module>,
     handle: u64,
     destroyed: AtomicBool,
+    cleaned: AtomicBool,
+    finalization: Finalization,
+    children: Arc<children::Children>,
+    checkpoint: Arc<checkpoint::InstanceState>,
+}
+
+/// A native cleanup hook may finish before the host journal can finish. Keep
+/// that phase and its original action id so an explicit retry drains the old
+/// obligation using the new cleanup context, without repeating the native hook.
+#[derive(Default)]
+struct Finalization(Mutex<Option<u64>>);
+impl Finalization {
+    fn begin(&self, context: &PluginContext) {
+        *self.0.lock().unwrap() = Some(context.job);
+    }
+    fn pending(&self) -> bool {
+        self.0.lock().unwrap().is_some()
+    }
+    async fn drain(&self, context: &PluginContext, retry: bool) -> PluginResult<()> {
+        let job = *self.0.lock().unwrap();
+        if let Some(job) = job {
+            context.drain_js_resources(Some(job), retry).await?;
+            *self.0.lock().unwrap() = None;
+        }
+        Ok(())
+    }
 }
 impl InstanceLease {
     fn destroy(&self) -> PluginResult<()> {
+        if self.finalization.pending() {
+            return Err("NativeModuleFinalizationPending".into());
+        }
         if !self.destroyed.load(Ordering::Acquire) {
             self.module
                 .request(json!({"op":"destroy","instance":self.handle}))?;
             self.destroyed.store(true, Ordering::Release);
+            self.checkpoint.destroyed();
         }
         Ok(())
     }
@@ -297,18 +376,31 @@ struct Instance {
     services: Vec<String>,
 }
 impl Instance {
-    fn job(&self, request: Value, cancellation: CancellationToken) -> PluginResult<Job> {
+    fn job(&self, request: Value, context: PluginContext) -> PluginResult<Job> {
+        self.lease.job(request, context)
+    }
+}
+impl InstanceLease {
+    fn job(self: &Arc<Self>, request: Value, context: PluginContext) -> PluginResult<Job> {
         let token = allocate(&NEXT_WAKE, "NativeModuleWakeCapacity")?;
-        let result = self.lease.module.request(request)?;
+        let result = self.module.request(request)?;
         let handle = handle(&result, "job")?;
-        self.lease.module.jobs.fetch_add(1, Ordering::AcqRel);
+        self.module.jobs.fetch_add(1, Ordering::AcqRel);
         Ok(Job {
-            lease: self.lease.clone(),
+            lease: self.clone(),
             handle,
             token,
-            cancellation,
+            cancellation: context.cancellation(),
+            context: Some(context),
+            calls: BTreeMap::new(),
+            resources: reverse::Resources::default(),
+            last_request: 0,
+            failure: None,
             cancelled: false,
             ready: false,
+            native_result: None,
+            drain: None,
+            draining: false,
             dropped: false,
         })
     }
@@ -322,31 +414,41 @@ fn handle(value: &Value, key: &str) -> PluginResult<u64> {
 }
 impl PluginInstance for Instance {
     fn setup(&self, ctx: PluginContext) -> PluginFuture {
-        let job = self.job(
-            json!({"op":"setup","instance":self.lease.handle}),
-            ctx.cancellation(),
-        );
+        self.lease.checkpoint.bind(ctx.session);
+        let lease = self.lease.clone();
         let services = self.services.clone();
         Box::pin(async move {
-            let result = job?.await?;
+            lease.checkpoint.restore(&lease.module, lease.handle)?;
+            let result = lease
+                .job(json!({"op":"setup","instance":lease.handle}), ctx.clone())?
+                .await?;
             for service in services {
                 ctx.provide(&service).await?;
             }
+            lease.checkpoint.setup_done();
             Ok(result)
         })
     }
     fn cleanup(&self, ctx: PluginContext) -> PluginFuture {
-        let job = self.job(
-            json!({"op":"cleanup","instance":self.lease.handle}),
-            ctx.cancellation(),
-        );
         let lease = self.lease.clone();
         Box::pin(async move {
-            let result = job?.await?;
-            // Destruction is part of successful finalization. A destructor
-            // failure must be visible before the graph accepts cleanup.
+            lease.finalization.drain(&ctx, true).await?;
+            if !lease.cleaned.load(Ordering::Acquire) {
+                lease.checkpoint.capture(&lease.module, lease.handle)?;
+                let job =
+                    lease.job(json!({"op":"cleanup","instance":lease.handle}), ctx.clone())?;
+                lease.finalization.begin(&ctx);
+                let result = job.await;
+                if result.is_ok() {
+                    lease.cleaned.store(true, Ordering::Release);
+                }
+                lease.finalization.drain(&ctx, false).await?;
+                result?;
+            }
+            // Destruction follows both native cleanup and actual JS resource
+            // finalization. Neither Drop nor retry may bypass the journal.
             lease.destroy()?;
-            Ok(result)
+            Ok(Value::Null)
         })
     }
     fn call_sync(&self, service: &str, method: &str, args: Value) -> PluginResult<Value> {
@@ -360,6 +462,22 @@ impl PluginInstance for Instance {
             .cloned()
             .ok_or("NativeModuleInvalidCallResult".into())
     }
+    fn open_stream(
+        &self,
+        service: &str,
+        method: &str,
+        args: Value,
+    ) -> PluginResult<Arc<dyn super::PluginStream>> {
+        resources::open_stream(self.lease.clone(), service, method, args)
+    }
+    fn open_object(
+        &self,
+        service: &str,
+        method: &str,
+        args: Value,
+    ) -> PluginResult<Arc<dyn super::PluginObject>> {
+        resources::open_object(self.lease.clone(), service, method, args)
+    }
     fn call_async(
         &self,
         ctx: PluginContext,
@@ -370,7 +488,7 @@ impl PluginInstance for Instance {
         let job = self.job(
             json!({"op":"call_async","instance":self.lease.handle,
             "service":service,"method":method,"args":args}),
-            ctx.cancellation(),
+            ctx.clone(),
         );
         Box::pin(async move { job?.await })
     }
@@ -380,15 +498,147 @@ struct Job {
     handle: u64,
     token: u64,
     cancellation: CancellationToken,
+    context: Option<PluginContext>,
+    calls: BTreeMap<u64, reverse::ReverseFuture>,
+    resources: reverse::Resources,
+    last_request: u64,
+    failure: Option<String>,
     cancelled: bool,
     ready: bool,
+    native_result: Option<PluginResult<Value>>,
+    drain: Option<PluginFuture>,
+    draining: bool,
     dropped: bool,
+}
+/// Check application data before putting it inside a wire envelope. A rejected
+/// JS result still resolves its native request; it never becomes a transport
+/// error which could strand an already completed external call.
+fn bounded_reverse_result(result: PluginResult<Value>) -> PluginResult<Value> {
+    let value = match result {
+        Err(error) if error.len() > 4096 => return Err("PluginErrorTooLarge".into()),
+        result => result?,
+    };
+    let mut pending = vec![(&value, 0)];
+    while let Some((value, depth)) = pending.pop() {
+        match value {
+            Value::Array(items) => {
+                if depth == MAX_VALUE_DEPTH {
+                    return Err("ValueTooDeep".into());
+                }
+                pending.extend(items.iter().map(|value| (value, depth + 1)));
+            }
+            Value::Object(items) => {
+                if depth == MAX_VALUE_DEPTH {
+                    return Err("ValueTooDeep".into());
+                }
+                pending.extend(items.values().map(|value| (value, depth + 1)));
+            }
+            _ => {}
+        }
+    }
+    if serde_json::to_vec(&value).map_or(true, |bytes| bytes.len() > MAX_MESSAGE_BYTES / 2) {
+        return Err("ResultTooLarge".into());
+    }
+    Ok(value)
+}
+impl Job {
+    fn poll_drain(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        if let Some(drain) = &mut self.drain {
+            if drain.as_mut().poll(cx).is_pending() {
+                return Poll::Pending;
+            }
+            // A failure remains in the resident journal. The outer action (or
+            // the explicit native cleanup phase) propagates it without retry.
+            self.drain = None;
+        }
+        Poll::Ready(())
+    }
+    fn finish_native(&mut self, cx: &mut Context<'_>) -> Poll<PluginResult<Value>> {
+        if self.poll_drain(cx).is_pending() {
+            return Poll::Pending;
+        }
+        Poll::Ready(
+            self.native_result
+                .take()
+                .unwrap_or_else(|| Err("NativeModuleJobAlreadyReady".into())),
+        )
+    }
+    fn receive_calls(&mut self, value: Option<&Value>) -> PluginResult<()> {
+        let Some(value) = value else {
+            return Ok(());
+        };
+        let calls: Vec<ReverseCall> =
+            serde_json::from_value(value.clone()).map_err(|_| "NativeModuleInvalidReverseCalls")?;
+        if self.calls.len() + calls.len() > MAX_PENDING_CALLS {
+            return Err("NativeModuleReverseCallCapacity".into());
+        }
+        // Validate the whole batch before polling any external operation. IDs
+        // are monotonic per native job, so a duplicate cannot dispatch twice.
+        let mut last = self.last_request;
+        for call in &calls {
+            if call.request <= last {
+                return Err("NativeModuleDuplicateReverseCall".into());
+            }
+            last = call.request;
+        }
+        let context = self.context.as_ref().ok_or("NativeModuleMissingContext")?;
+        for call in calls {
+            let request = call.request;
+            let future = self
+                .resources
+                .dispatch(self.lease.clone(), context.clone(), call);
+            self.calls.insert(request, future);
+            self.lease
+                .module
+                .reverse_calls
+                .fetch_add(1, Ordering::AcqRel);
+        }
+        self.last_request = last;
+        Ok(())
+    }
+    fn poll_calls(&mut self, cx: &mut Context<'_>) {
+        let mut completed = Vec::new();
+        for (&request, future) in &mut self.calls {
+            if let Poll::Ready(result) = future.as_mut().poll(cx) {
+                completed.push((request, result));
+            }
+        }
+        for (request, result) in completed {
+            self.calls.remove(&request);
+            self.lease
+                .module
+                .reverse_calls
+                .fetch_sub(1, Ordering::AcqRel);
+            if let Err(error) = self.lease.module.request(json!({"op":"resolve_call",
+                "job":self.handle,"request":request,"result":self.resources.resolve(result)}))
+            {
+                self.lease
+                    .module
+                    .retained_reverse_calls
+                    .fetch_add(1, Ordering::AcqRel);
+                self.failure.get_or_insert(error);
+            }
+        }
+    }
+    fn fail_after_drain(
+        &mut self,
+        error: String,
+        cx: &mut Context<'_>,
+    ) -> Poll<PluginResult<Value>> {
+        self.failure.get_or_insert(error);
+        self.poll_calls(cx);
+        if self.calls.is_empty() {
+            Poll::Ready(Err(self.failure.take().unwrap()))
+        } else {
+            Poll::Pending
+        }
+    }
 }
 impl Future for Job {
     type Output = PluginResult<Value>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.ready {
-            return Poll::Ready(Err("NativeModuleJobAlreadyReady".into()));
+            return self.finish_native(cx);
         }
         wakes()
             .lock()
@@ -401,8 +651,13 @@ impl Future for Job {
                 .module
                 .request(json!({"op":"cancel","job":self.handle}))
             {
-                return Poll::Ready(Err(error));
+                return self.fail_after_drain(error, cx);
             }
+        }
+        self.poll_calls(cx);
+        let _ = self.poll_drain(cx);
+        if let Some(error) = self.failure.clone() {
+            return self.fail_after_drain(error, cx);
         }
         let reply = self.lease.module.image.invoke(
             &json!({"op":"poll","job":self.handle}),
@@ -412,15 +667,43 @@ impl Future for Job {
             },
         );
         let value = match reply {
-            Ok(v) => v,
-            Err(e) => return Poll::Ready(Err(e)),
+            Ok(value) => value,
+            Err(error) => return self.fail_after_drain(error, cx),
         };
+        if let Err(error) = self.receive_calls(value.get("calls")) {
+            return self.fail_after_drain(error, cx);
+        }
         match value.get("state").and_then(Value::as_str) {
-            Some("pending") => Poll::Pending,
+            Some("pending") => {
+                // Creation of these futures only uses the existing host RPC
+                // queue. JavaScript executes after the native poll releases its
+                // borrows, and completion wakes this exact action's task.
+                self.poll_calls(cx);
+                if value.get("draining") == Some(&Value::Bool(true))
+                    && value.get("queuedCalls") != Some(&Value::Bool(true))
+                    && !self.draining
+                {
+                    self.draining = true;
+                    if let Some(mut context) = self.context.clone() {
+                        context.cleanup = true;
+                        let job = context.job;
+                        self.drain = Some(Box::pin(async move {
+                            context.drain_js_resources(Some(job), false).await
+                        }));
+                    }
+                }
+                let _ = self.poll_drain(cx);
+                if let Some(error) = self.failure.clone() {
+                    self.fail_after_drain(error, cx)
+                } else {
+                    Poll::Pending
+                }
+            }
             Some("ready") => {
+                if !self.calls.is_empty() {
+                    return self.fail_after_drain("NativeModuleReadyWithReverseCalls".into(), cx);
+                }
                 self.ready = true;
-                // Surface a failed native job release before reporting action
-                // success, especially for cleanup. Never hide it in Drop.
                 if let Err(error) = self
                     .lease
                     .module
@@ -432,29 +715,42 @@ impl Future for Job {
                 let Some(result) = value
                     .get("result")
                     .and_then(Value::as_object)
-                    .filter(|v| v.len() == 1)
+                    .filter(|value| value.len() == 1)
                 else {
                     return Poll::Ready(Err("NativeModuleInvalidJobResult".into()));
                 };
-                if let Some(value) = result.get("ok") {
-                    return Poll::Ready(Ok(value.clone()));
-                }
-                Poll::Ready(Err(result
-                    .get("error")
-                    .and_then(Value::as_str)
-                    .unwrap_or("NativeModuleInvalidJobResult")
-                    .to_owned()))
+                self.native_result = Some(if let Some(value) = result.get("ok") {
+                    Ok(value.clone())
+                } else {
+                    Err(result
+                        .get("error")
+                        .and_then(Value::as_str)
+                        .unwrap_or("NativeModuleInvalidJobResult")
+                        .to_owned())
+                });
+                self.finish_native(cx)
             }
-            _ => Poll::Ready(Err("NativeModuleInvalidJobState".into())),
+            _ => self.fail_after_drain("NativeModuleInvalidJobState".into(), cx),
         }
     }
 }
+
 impl Drop for Job {
     fn drop(&mut self) {
         wakes()
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .remove(&self.token);
+        if !self.calls.is_empty() {
+            self.lease
+                .module
+                .reverse_calls
+                .fetch_sub(self.calls.len(), Ordering::AcqRel);
+            self.lease
+                .module
+                .retained_reverse_calls
+                .fetch_add(self.calls.len(), Ordering::AcqRel);
+        }
         // Backend finalization cancels host tokens but cannot poll abandoned
         // futures again. Forward cooperative cancellation before retaining the
         // unresolved native job. No map/backend/native job lock is held here;
@@ -484,6 +780,8 @@ impl super::Backend {
             let factory = Factory {
                 module: module.clone(),
                 descriptor: descriptor.clone(),
+                children: self.native_children.clone(),
+                checkpoints: self.native_checkpoints.clone(),
             };
             if self
                 .registry
@@ -509,7 +807,7 @@ impl super::Backend {
     pub(crate) fn module_info(&self) -> Value {
         json!({"modules":self.modules.values().map(|m|m.info()).collect::<Vec<_>>(),
             "retained":true,"unloadSupported":false,
-            "retainedImageCount":ffi::image_count(),"retainedImageLimit":ffi::IMAGE_LIMIT})
+            "retainedImageCount":ffi::image_count(),"retainedImageLimit":ffi::IMAGE_LIMIT,"checkpoints":self.native_checkpoints.info()})
     }
 }
 
@@ -532,15 +830,18 @@ mod tests {
         let mut description = Description {
             module_id: "test".into(),
             version: "1".into(),
+            checkpoint_schemas: BTreeMap::new(),
             factories: vec![FactoryDescriptor {
                 name: "test".into(),
                 inject: vec!["js".into()],
                 services: vec![],
             }],
         };
+        validate(&description).unwrap();
+        description.factories[0].inject.push("js".into());
         assert!(validate(&description)
             .unwrap_err()
-            .contains("UnsupportedCapability"));
+            .contains("DuplicateOrEmptyInjection"));
         description.factories[0].inject.clear();
         description.factories.push(description.factories[0].clone());
         assert!(validate(&description).unwrap_err().contains("Duplicate"));
@@ -574,17 +875,33 @@ mod tests {
                 module_id: "probe".into(),
                 version: "1".into(),
                 factories: vec![],
+                checkpoint_schemas: BTreeMap::new(),
             },
             image: ffi::cancellation_probe(),
             instances: AtomicUsize::new(1),
             jobs: AtomicUsize::new(1),
             retained_instances: AtomicUsize::new(0),
             retained_jobs: AtomicUsize::new(0),
+            reverse_calls: AtomicUsize::new(0),
+            retained_reverse_calls: AtomicUsize::new(0),
+            streams: AtomicUsize::new(0),
+            objects: AtomicUsize::new(0),
+            retained_streams: AtomicUsize::new(0),
+            retained_objects: AtomicUsize::new(0),
         });
         let lease = Arc::new(InstanceLease {
             module: module.clone(),
             handle: 1,
             destroyed: AtomicBool::new(true),
+            cleaned: AtomicBool::new(false),
+            finalization: Finalization::default(),
+            children: Arc::new(children::Children::new(Arc::new(|| {}))),
+            checkpoint: checkpoint::InstanceState::new(
+                Arc::new(checkpoint::Journal::default()),
+                &module,
+                "probe",
+                true,
+            ),
         });
         let token = allocate(&NEXT_WAKE, "probe wake").unwrap();
         wakes().lock().unwrap().insert(token, Waker::noop().clone());
@@ -594,8 +911,16 @@ mod tests {
             handle: 7,
             token,
             cancellation: CancellationToken::default(),
+            context: None,
+            calls: BTreeMap::new(),
+            resources: reverse::Resources::default(),
+            last_request: 0,
+            failure: None,
             cancelled: false,
             ready: false,
+            native_result: None,
+            drain: None,
+            draining: false,
             dropped: false,
         });
         assert_eq!(ffi::probe_observation(), (1, true, true));
@@ -616,5 +941,380 @@ mod tests {
     fn late_wakes_are_safe_after_token_retirement() {
         wake(u64::MAX);
         wake(0);
+    }
+    pub(super) fn reverse_backend() -> (super::super::Backend, Arc<Module>, u64) {
+        reverse_backend_config(Value::Null)
+    }
+    pub(super) fn reverse_backend_config(
+        config: Value,
+    ) -> (super::super::Backend, Arc<Module>, u64) {
+        let image = ffi::reverse_probe();
+        let description = serde_json::from_value(
+            image
+                .invoke(&json!({"op":"describe"}), quiet_wake())
+                .unwrap(),
+        )
+        .unwrap();
+        let module = Arc::new(Module {
+            id: allocate(&NEXT_MODULE, "probe").unwrap().to_string(),
+            path: PathBuf::new(),
+            sha256: String::new(),
+            description,
+            image,
+            instances: AtomicUsize::new(0),
+            jobs: AtomicUsize::new(0),
+            retained_instances: AtomicUsize::new(0),
+            retained_jobs: AtomicUsize::new(0),
+            reverse_calls: AtomicUsize::new(0),
+            retained_reverse_calls: AtomicUsize::new(0),
+            streams: AtomicUsize::new(0),
+            objects: AtomicUsize::new(0),
+            retained_streams: AtomicUsize::new(0),
+            retained_objects: AtomicUsize::new(0),
+        });
+        let mut backend = super::super::Backend::new(FactoryRegistry::new(), Arc::new(|| {}));
+        backend.install_module(module.clone()).unwrap();
+        let start = backend
+            .start(1, 1, &module.factory_ref("reverse"), config)
+            .unwrap();
+        let session = number(&start, "session");
+        let poll = backend.poll();
+        assert_eq!(poll["calls"][0]["method"], "setup");
+        assert_eq!(poll["calls"][0]["restoring"], false);
+        backend
+            .reply(number(&poll["calls"][0], "request"), Ok(Value::Null))
+            .unwrap();
+        let mut complete = false;
+        for _ in 0..10 {
+            let poll = backend.poll();
+            for call in poll["calls"].as_array().unwrap() {
+                assert_eq!(call["kind"], "provide");
+                backend
+                    .reply(
+                        number(call, "request"),
+                        Ok(json!({"publication":"3","port":{"key":"4","realm":"0"}})),
+                    )
+                    .unwrap();
+            }
+            if !poll["jobs"].as_array().unwrap().is_empty() {
+                assert_eq!(poll["jobs"][0]["success"], true);
+                complete = true;
+                break;
+            }
+        }
+        assert!(complete);
+        (backend, module, session)
+    }
+    pub(super) fn number(value: &Value, name: &str) -> u64 {
+        value[name].as_str().unwrap().parse().unwrap()
+    }
+    pub(super) fn cleanup_reverse(
+        backend: &mut super::super::Backend,
+        module: &Module,
+        session: u64,
+    ) {
+        backend.cleanup(session).unwrap();
+        let mut complete = false;
+        let mut observed_cleanup = false;
+        for _ in 0..10 {
+            let poll = backend.poll();
+            for call in poll["calls"].as_array().unwrap() {
+                if call["kind"] == "call" {
+                    assert_eq!(call["method"], "cleanup");
+                    assert_eq!(call["restoring"], true);
+                    observed_cleanup = true;
+                }
+                backend
+                    .reply(number(call, "request"), Ok(Value::Null))
+                    .unwrap();
+            }
+            if !poll["jobs"].as_array().unwrap().is_empty() {
+                assert_eq!(poll["jobs"][0]["success"], true, "{poll}");
+                complete = true;
+                break;
+            }
+        }
+        assert!(complete && observed_cleanup);
+        backend.release(session).unwrap();
+        assert!(module.info()["resources"]
+            .as_object()
+            .unwrap()
+            .values()
+            .all(|count| count == 0));
+    }
+    pub(super) fn call_result(backend: &mut super::super::Backend) -> Value {
+        for _ in 0..10 {
+            let poll = backend.poll();
+            if let Some(result) = poll["jobs"].as_array().unwrap().first() {
+                return result.clone();
+            }
+            assert_eq!(poll["calls"], json!([]));
+        }
+        panic!("native call did not finish after its actual replies");
+    }
+    #[test]
+    fn reverse_calls_wait_for_out_of_order_js_completion() {
+        let (mut backend, module, session) = reverse_backend();
+        let started = backend
+            .call(session, "native", "parallel", json!([]), false, false)
+            .unwrap();
+        let poll = backend.poll();
+        assert_eq!(poll["calls"].as_array().unwrap().len(), 2);
+        assert_eq!(module.info()["resources"]["reverseCalls"], 2);
+        let first = number(&poll["calls"][0], "request");
+        let second = number(&poll["calls"][1], "request");
+        backend.reply(second, Ok(json!("second"))).unwrap();
+        assert_eq!(backend.poll()["jobs"], json!([]));
+        assert_eq!(module.info()["resources"]["reverseCalls"], 1);
+        backend.reply(first, Ok(json!("first"))).unwrap();
+        assert!(backend
+            .reply(first, Ok(Value::Null))
+            .unwrap_err()
+            .contains("StaleRequest"));
+        let result = call_result(&mut backend);
+        assert_eq!(result["job"], started["job"]);
+        assert_eq!(result["value"], json!(["first", "second"]));
+        cleanup_reverse(&mut backend, &module, session);
+    }
+    #[test]
+    fn identical_native_request_numbers_stay_isolated_between_jobs() {
+        let (mut backend, module, session) = reverse_backend();
+        let first = backend
+            .call(session, "native", "forward", json!(["first"]), false, false)
+            .unwrap();
+        let second = backend
+            .call(
+                session,
+                "native",
+                "forward",
+                json!(["second"]),
+                false,
+                false,
+            )
+            .unwrap();
+        let poll = backend.poll();
+        let calls = poll["calls"].as_array().unwrap();
+        assert_eq!(calls.len(), 2);
+        assert_ne!(calls[0]["request"], calls[1]["request"]);
+        assert_eq!(calls[0]["job"], first["job"]);
+        assert_eq!(calls[1]["job"], second["job"]);
+        backend
+            .reply(number(&calls[1], "request"), Ok(json!("second result")))
+            .unwrap();
+        let result = call_result(&mut backend);
+        assert_eq!(result["job"], second["job"]);
+        assert_eq!(result["value"], "second result");
+        assert_eq!(module.info()["resources"]["reverseCalls"], 1);
+        backend
+            .reply(number(&calls[0], "request"), Ok(json!("first result")))
+            .unwrap();
+        let result = call_result(&mut backend);
+        assert_eq!(result["job"], first["job"]);
+        assert_eq!(result["value"], "first result");
+        cleanup_reverse(&mut backend, &module, session);
+    }
+    #[test]
+    fn dropped_reverse_future_and_cancellation_still_wait_for_real_js_reply() {
+        let (mut backend, module, session) = reverse_backend();
+        let started = backend
+            .call(session, "native", "dropped", json!([]), false, false)
+            .unwrap();
+        let poll = backend.poll();
+        let request = number(&poll["calls"][0], "request");
+        backend.cancel_job(number(&started, "job")).unwrap();
+        assert_eq!(backend.poll()["jobs"], json!([]));
+        assert_eq!(module.info()["resources"]["reverseCalls"], 1);
+        assert!(backend.cleanup(session).is_err());
+        backend
+            .reply(request, Ok(json!("actual completion")))
+            .unwrap();
+        let result = call_result(&mut backend);
+        assert_eq!(result["success"], true);
+        assert_eq!(result["value"], "returned");
+        cleanup_reverse(&mut backend, &module, session);
+    }
+    #[test]
+    fn reverse_reply_bounds_are_application_errors_and_do_not_strand_native_jobs() {
+        let (mut backend, module, session) = reverse_backend();
+        let near = Value::String("x".repeat(MAX_MESSAGE_BYTES / 2 - 2));
+        let mut deep = Value::Null;
+        for _ in 0..MAX_VALUE_DEPTH + 1 {
+            deep = json!([deep]);
+        }
+        for (reply, expected) in [
+            (Ok(near.clone()), Ok(near)),
+            (
+                Ok(Value::String("x".repeat(MAX_MESSAGE_BYTES))),
+                Err("ResultTooLarge"),
+            ),
+            (Ok(deep), Err("ValueTooDeep")),
+            (
+                Err("x".repeat(MAX_MESSAGE_BYTES)),
+                Err("PluginErrorTooLarge"),
+            ),
+        ] {
+            backend
+                .call(session, "native", "forward", json!([]), false, false)
+                .unwrap();
+            let poll = backend.poll();
+            backend
+                .reply(number(&poll["calls"][0], "request"), reply)
+                .unwrap();
+            let result = call_result(&mut backend);
+            match expected {
+                Ok(value) => {
+                    assert_eq!(result["success"], true);
+                    assert_eq!(result["value"], value);
+                }
+                Err(error) => {
+                    assert_eq!(result["success"], false);
+                    assert_eq!(result["error"], error);
+                }
+            }
+            assert_eq!(module.info()["resources"]["jobs"], 0);
+            assert_eq!(module.info()["resources"]["reverseCalls"], 0);
+            assert_eq!(module.info()["resources"]["retainedJobs"], 0);
+        }
+        cleanup_reverse(&mut backend, &module, session);
+    }
+    pub(super) fn resource_call(backend: &mut super::super::Backend, method: &str) -> Value {
+        for _ in 0..10 {
+            let poll = backend.poll();
+            assert_eq!(poll["jobs"], json!([]), "{poll}");
+            if let Some(call) = poll["calls"].as_array().unwrap().first() {
+                assert_eq!(poll["calls"].as_array().unwrap().len(), 1);
+                assert_eq!(call["method"], method);
+                return call.clone();
+            }
+        }
+        panic!("native resource did not issue {method}");
+    }
+    #[test]
+    fn native_stream_close_joins_reverse_pull_and_retries_failed_close() {
+        let (mut backend, module, session) = reverse_backend();
+        let stream = number(
+            &backend
+                .call(session, "native", "stream", json!([]), false, false)
+                .unwrap(),
+            "stream",
+        );
+        assert_eq!(module.info()["resources"]["streams"], 1);
+        backend.stream_next(session, stream, false, false).unwrap();
+        let pull = resource_call(&mut backend, "streamNext");
+        backend.stream_close(session, stream).unwrap();
+        assert_eq!(backend.poll()["jobs"], json!([]));
+        assert!(backend.cleanup(session).is_err());
+        backend
+            .reply(number(&pull, "request"), Ok(json!("landed")))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["value"]["value"], "landed");
+        let close = resource_call(&mut backend, "streamClose");
+        assert_eq!(close["restoring"], true);
+        backend
+            .reply(number(&close, "request"), Err("retry native close".into()))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["success"], false);
+        assert_eq!(module.info()["resources"]["streams"], 1);
+        assert!(backend.stream_next(session, stream, false, false).is_err());
+        backend.stream_close(session, stream).unwrap();
+        let close = resource_call(&mut backend, "streamClose");
+        backend
+            .reply(number(&close, "request"), Ok(Value::Null))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["success"], true);
+        assert_eq!(module.info()["resources"]["streams"], 0);
+        cleanup_reverse(&mut backend, &module, session);
+    }
+    #[test]
+    fn native_object_releases_borrowed_reference_without_user_close_and_retries_owned() {
+        let (mut backend, module, session) = reverse_backend();
+        let borrowed = number(
+            &backend
+                .call(
+                    session,
+                    "native",
+                    "object",
+                    json!(["borrowed"]),
+                    false,
+                    false,
+                )
+                .unwrap(),
+            "object",
+        );
+        backend.object_close(session, borrowed).unwrap();
+        assert_eq!(call_result(&mut backend)["success"], true);
+        assert_eq!(module.info()["resources"]["objects"], 0);
+        let object = number(
+            &backend
+                .call(session, "native", "object", json!([]), false, false)
+                .unwrap(),
+            "object",
+        );
+        backend
+            .object_call(session, object, "call", json!([1]), false, false)
+            .unwrap();
+        let first = resource_call(&mut backend, "objectCall");
+        backend
+            .object_call(session, object, "call", json!([2]), false, false)
+            .unwrap();
+        let second = resource_call(&mut backend, "objectCall");
+        backend.object_close(session, object).unwrap();
+        assert_eq!(backend.poll()["jobs"], json!([]));
+        backend
+            .reply(number(&second, "request"), Ok(json!(2)))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["value"], 2);
+        assert_eq!(backend.poll()["calls"], json!([]));
+        backend
+            .reply(number(&first, "request"), Ok(json!(1)))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["value"], 1);
+        let close = resource_call(&mut backend, "objectClose");
+        assert_eq!(close["restoring"], true);
+        backend
+            .reply(number(&close, "request"), Err("retry native close".into()))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["success"], false);
+        assert_eq!(module.info()["resources"]["objects"], 1);
+        backend.object_close(session, object).unwrap();
+        let close = resource_call(&mut backend, "objectClose");
+        backend
+            .reply(number(&close, "request"), Ok(Value::Null))
+            .unwrap();
+        assert_eq!(call_result(&mut backend)["success"], true);
+        cleanup_reverse(&mut backend, &module, session);
+    }
+    #[test]
+    fn native_object_destructor_failure_cannot_report_release_or_cleanup_success() {
+        let (mut backend, module, session) = reverse_backend();
+        let object = number(
+            &backend
+                .call(
+                    session,
+                    "native",
+                    "object",
+                    json!(["panic-drop"]),
+                    false,
+                    false,
+                )
+                .unwrap(),
+            "object",
+        );
+        backend.object_close(session, object).unwrap();
+        let close = resource_call(&mut backend, "objectClose");
+        backend
+            .reply(number(&close, "request"), Ok(Value::Null))
+            .unwrap();
+        let result = call_result(&mut backend);
+        assert_eq!(result["success"], false);
+        assert_eq!(module.info()["resources"]["objects"], 1);
+        assert!(backend.cleanup(session).is_err());
+        backend.object_close(session, object).unwrap();
+        assert_eq!(call_result(&mut backend)["success"], false);
+        drop(backend);
+        let resources = module.info()["resources"].clone();
+        assert_eq!(resources["objects"], 0);
+        assert_eq!(resources["retainedObjects"], 1);
+        assert_eq!(resources["retainedInstances"], 1);
     }
 }

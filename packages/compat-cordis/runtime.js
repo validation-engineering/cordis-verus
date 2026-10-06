@@ -216,6 +216,17 @@ class Domain {
       throw new CordisError('DOMAIN_CLOSED', 'The domain no longer accepts external revisions');
     }
   }
+  transactionGuard() {
+    const token = mutation.getStore();
+    const check = () => {
+      if (!token || token !== this.currentMutation || !token.isCurrent?.()) {
+        throw new CordisError('REENTRANT_MUTATION', 'State migration requires the active host transaction callback');
+      }
+      if (token.recovery) throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions cannot begin state migration');
+    };
+    check();
+    return check;
+  }
   enqueueMutation(execute, options = {}) {
     this.assertMutationAdmission(options);
     if (options.closing) this.acceptingMutations = false;
@@ -242,6 +253,7 @@ class Domain {
     };
     const isCurrent = () => token.active && mutation.getStore() === token
       && invocation.getStore() === token.origin && !liveInvocation(this) && !this.updateFrames.length;
+    token.isCurrent = isCurrent;
     const assertStep = () => {
       if (!isCurrent()) {
         throw new CordisError('REENTRANT_MUTATION', 'Transaction steps are only valid in their active coordinator callback');
@@ -579,7 +591,14 @@ class Domain {
       try {
       const fiber = this.fibers.get(action.id);
       if (!fiber) throw new Error(`Native action has no JS owner: ${action.id}`);
-      if (action.kind === 'removed') { this.rust.removed(fiber); fiber._removed(); continue; }
+      if (action.kind === 'removed') {
+        // The graph has already removed this node. A failed native definition
+        // finalizer must retain its own journal, but cannot undo that fact or
+        // make JS miss the one Removed acknowledgement.
+        try { this.rust.removed(fiber); } catch (error) { this.errors.push(error); }
+        fiber._removed();
+        continue;
+      }
       if (action.kind === 'setup' || action.kind === 'cleanup') {
         // Official Loader observes inertia, including from status/service hooks
         // fired before the callback's promise can be assigned to _task. Publish

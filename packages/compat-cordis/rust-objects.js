@@ -51,7 +51,12 @@ export class JavaScriptObjects {
     else state.borrowed.add(record);
     targets.set(source.target,state);
     this.resources.set(id,record);
+    let descriptor;
     try {
+      // A descriptor rejected at the native boundary still represents an
+      // acquired object. Dispose it here (or retain an orphan for retry), before
+      // a failed reply could make the resident journal lose its identity.
+      descriptor = this.jsonValue(source.descriptor, session.factory.ref !== undefined ? {depth:64,bytes:512 * 1024} : undefined);
       for (const name of source.descriptor.methods) {
         const callback = source.callback ? source.target : source.target[name];
         if (typeof callback !== 'function') throw new TypeError(`Unknown object method: ${name}`);
@@ -62,13 +67,15 @@ export class JavaScriptObjects {
       try { await this.close(record); } catch (cleanupError) { throw new AggregateError([error,cleanupError],'Invalid JS object and failed disposal'); }
       throw error;
     }
-    return {object:id,descriptor:source.descriptor};
+    return {object:id,descriptor};
   }
   get(session, request, close = false) {
     const record = this.resources.get(request.object);
     if (!record || record.session !== session.id) throw new Error('StaleObject');
     const job = [...session.jobs].find(job => job.job === request.job);
-    if (record.job !== request.job && !(close && job?.kind === 'cleanup')) throw new Error('StaleObjectAuthority');
+    const cleanup = job?.kind === 'cleanup'
+      || (request.restoring && ['stream-close', 'object-close'].includes(job?.kind));
+    if (record.job !== request.job && !(close && cleanup)) throw new Error('StaleObjectAuthority');
     return record;
   }
   call(record, method, args) {

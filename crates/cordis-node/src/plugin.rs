@@ -264,6 +264,8 @@ pub struct PluginContext {
     alive: Arc<AtomicBool>,
     cleanup: bool,
     notify: Arc<dyn Fn() + Send + Sync>,
+    join_blocked: Arc<Mutex<std::collections::BTreeSet<usize>>>,
+    setup: bool,
 }
 impl PluginContext {
     pub fn cancellation(&self) -> CancellationToken {
@@ -415,6 +417,8 @@ struct Session {
     cancellation: CancellationToken,
     cleanup_done: bool,
     publications: BTreeMap<String, (usize, cordis_driver::ServicePort)>,
+    ports: BTreeMap<String, cordis_driver::ServicePort>,
+    inherited: Vec<(String, cordis_driver::ServicePort)>,
 }
 #[derive(Serialize)]
 pub(crate) struct CompletedJob {
@@ -429,6 +433,8 @@ pub(crate) struct CompletedJob {
 pub(crate) struct Backend {
     registry: FactoryRegistry,
     modules: BTreeMap<String, Arc<dynamic::Module>>,
+    native_children: Arc<dynamic::children::Children>,
+    native_checkpoints: Arc<dynamic::checkpoint::Journal>,
     typed_mounts: BTreeMap<usize, typed::Mount>,
     typed_children: BTreeMap<String, typed::Child>,
     next_typed_child: u64,
@@ -453,6 +459,8 @@ impl Backend {
         Self {
             registry,
             modules: BTreeMap::new(),
+            native_checkpoints: Arc::new(dynamic::checkpoint::Journal::default()),
+            native_children: Arc::new(dynamic::children::Children::new(notify.clone())),
             typed_mounts: BTreeMap::new(),
             typed_children: BTreeMap::new(),
             next_typed_child: 0,
@@ -566,7 +574,9 @@ impl Backend {
             cancellation: CancellationToken::default(),
             alive: Arc::new(AtomicBool::new(true)),
             cleanup,
+            setup: false,
             notify: self.notify.clone(),
+            join_blocked: Arc::new(Mutex::new(Default::default())),
         })
     }
     fn job_id(&mut self) -> PluginResult<u64> {
@@ -680,9 +690,12 @@ impl Backend {
                 cancellation: CancellationToken::default(),
                 cleanup_done: false,
                 publications: BTreeMap::new(),
+                ports: BTreeMap::new(),
+                inherited: Vec::new(),
             },
         );
-        let ctx = self.context(session, job, false)?;
+        let mut ctx = self.context(session, job, false)?;
+        ctx.setup = true;
         let future = instance.setup(ctx.clone());
         self.add_job(ctx, JobKind::Setup, future);
         Ok(
@@ -832,6 +845,8 @@ impl Backend {
             return Err("SessionBusy".into());
         }
         self.sessions.remove(&session);
+        self.native_children.release_session(session);
+        self.native_checkpoints.release_session(session);
         Ok(())
     }
     pub fn reply(&mut self, request: u64, result: PluginResult<Value>) -> PluginResult<()> {
@@ -1103,7 +1118,8 @@ impl Backend {
             .drain(..)
             .collect::<Vec<_>>();
         let notifications = self.typed_notifications();
-        let children = self.typed_child_actions();
+        let mut children = self.typed_child_actions();
+        children.extend(self.native_child_actions());
         serde_json::json!({"calls":calls,"jobs":jobs,"serviceNotifications":notifications,"children":children})
     }
 }

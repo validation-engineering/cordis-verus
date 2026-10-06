@@ -62,7 +62,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { realpath, mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
-import { Context } from '@cordis-verus/compat-cordis';
+import { Context, adaptObject, adaptCallback } from '@cordis-verus/compat-cordis';
 import { selectNativeArtifact } from '@cordis-verus/compat-cordis/native-artifacts';
 import { Loader } from '@cordis-verus/compat-loader';
 import { WorkerDomain } from '@cordis-verus/compat-loader/worker';
@@ -134,11 +134,91 @@ try {
   await nativeModule.dispose();
   assert.ok(nativeModule.inspect().images.modules.every(module => Object.values(module.resources).every(count => count === 0)));
   assert.equal(nativeContext.snapshot().plugins.length, 1);
+  const reverseTrace = [];
+  let reverseStreamCloses = 0, reverseObjectCloses = 0;
+  nativeContext.provide('jsHost', {
+    record: event => { reverseTrace.push(event); return null; },
+    query: async value => ({ value, from: 'installed-js' }),
+    stream: () => {
+      let index = 0;
+      return { next: async () => index++ < 2 ? {done:false,value:index} : {done:true},
+        return: async () => { reverseStreamCloses++; return {done:true}; } };
+    },
+    object: () => adaptObject({ read: () => 'installed-object' }, {
+      typeName:'InstalledObject',methods:['read'],ownership:'owned',dispose:() => { reverseObjectCloses++; },
+    }),
+    callback: () => adaptCallback(value => value + 1),
+  });
+  nativeModule = await loadRustModule(nativeContext, {...artifacts.v1, plugins:[{id:'consumer',factory:'native-js-consumer'}]});
+  assert.deepEqual(await nativeContext.nativeJs.call({method:'query',args:['packed']}), {value:'packed',from:'installed-js'});
+  await nativeModule.reload(artifacts.v2);
+  assert.deepEqual(await nativeContext.nativeJs.call({method:'query',args:['updated']}), {value:'updated',from:'installed-js'});
+  await nativeModule.dispose();
+  assert.deepEqual(reverseTrace, [
+    {phase:'setup',version:'v1'}, {phase:'cleanup',version:'v1'},
+    {phase:'setup',version:'v2'}, {phase:'cleanup',version:'v2'},
+  ]);
+  assert.ok(nativeModule.inspect().images.modules.every(module => Object.values(module.resources).every(count => count === 0)));
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
+  nativeModule = await loadRustModule(nativeContext, {...artifacts.v1, plugins:[{id:'resources',factory:'native-resource-consumer'}]});
+  const packedStream = nativeContext.nativeResources.stream({values:['packed', 'stream']});
+  const packedObject = nativeContext.nativeResources.object({start:10});
+  assert.deepEqual(await packedStream.next(), {done:false,value:{version:'v1',index:0,value:'packed'}});
+  assert.deepEqual(await packedObject.call('add', 5), {version:'v1',value:15});
+  await nativeModule.reload(artifacts.v2);
+  await assert.rejects(packedStream.next(), /STALE|no longer admitted/);
+  await assert.rejects(packedObject.call('read'), /STALE|no longer admitted/);
+  const updatedObject = nativeContext.nativeResources.object({start:20});
+  assert.deepEqual(await updatedObject.call('read'), {version:'v2',value:20});
+  await updatedObject.close();
+  await nativeModule.dispose();
+  assert.ok(nativeModule.inspect().images.modules.every(module => Object.values(module.resources).every(count => count === 0)));
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
+  nativeModule = await loadRustModule(nativeContext, {...artifacts.v1, plugins:[{id:'js-resources',factory:'native-js-resources'}]});
+  assert.deepEqual((await nativeContext.nativeJsResources.stream({escape:true})).values, [1,2]);
+  assert.equal(reverseStreamCloses, 1);
+  await assert.rejects(nativeContext.nativeJsResources.stale_stream(), /ActionClosed/);
+  assert.deepEqual((await nativeContext.nativeJsResources.object({})).results, ['installed-object']);
+  assert.equal(reverseObjectCloses, 1);
+  assert.deepEqual((await nativeContext.nativeJsResources.callback({calls:[[4]]})).results, [5]);
+  await nativeModule.reload(artifacts.v2);
+  assert.equal((await nativeContext.nativeJsResources.stream({limit:1})).version, 'v2');
+  assert.equal(reverseStreamCloses, 2);
+  await nativeModule.dispose();
+  assert.equal(nativeContext.fiber._domain.rust.streams.resources.size, 0);
+  assert.equal(nativeContext.fiber._domain.rust.objects.resources.size, 0);
+  assert.ok(nativeModule.inspect().images.modules.every(module => Object.values(module.resources).every(count => count === 0)));
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
+  nativeModule = await loadRustModule(nativeContext, {...artifacts.v1, plugins:[{id:'children',factory:'native-children'}]});
+  await nativeContext.nativeChildren.publish({key:'packed',service:'packedPublication',label:'packed'});
+  await nativeContext.nativeChildren.ready({key:'packed'});
+  assert.equal((await nativeContext.packedPublication.read(7)).value, 7);
+  const published = await nativeContext.nativeChildren.status({key:'packed'});
+  assert.ok(nativeContext.snapshot().plugins.some(node => node.id === published.id));
+  await nativeContext.nativeChildren.dispose({key:'packed'});
+  await nativeContext.nativeChildren.join({key:'packed'});
+  assert.equal((await nativeContext.nativeChildren.status({key:'packed'})).removed, true);
+  await nativeContext.nativeChildren.mount({key:'named',factory:'native-child-leaf',config:{label:'packed-child'}});
+  await nativeContext.nativeChildren.ready({key:'named'});
+  assert.equal((await nativeContext.nativeNamedChild.read(null)).label, 'packed-child');
+  await nativeModule.dispose();
+  assert.equal(nativeContext.fiber._domain.rust.nativeChildren.size, 0);
+  assert.ok(nativeModule.inspect().images.modules.every(module => Object.values(module.resources).every(count => count === 0)));
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
+  nativeModule = await loadRustModule(nativeContext, {...artifacts.v1, plugins:[{id:'state',factory:'native-checkpoint',state:'migrate'}]});
+  nativeContext.nativeCheckpoint.mutate(37);
+  await nativeModule.reload(artifacts.v2);
+  assert.deepEqual(nativeContext.nativeCheckpoint.read(), {version:'v2',value:37,restoredFrom:1});
+  assert.equal(nativeModule.inspect().images.checkpoints.tokens, 1);
+  await nativeModule.dispose();
+  assert.equal(nativeModule.inspect().images.checkpoints.tokens, 0);
+  assert.equal(nativeModule.inspect().images.checkpoints.bytes, 0);
+  assert.equal(nativeContext.fiber._domain.driver, residentDriver);
 } finally {
   if (nativeModule) await nativeModule.dispose();
   await nativeContext.dispose();
 }
-console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load', 'Process-native-artifact-load', 'Rust-module-in-place-reload'] }));
+console.log(JSON.stringify({ binding: info, nativeManifestSha256:selected.manifestSha256, nativeTarget:selected.entry.target, tests: ['native-manifest-selection', 'default-core-only', 'packed-native-load', 'ESM-CJS-identity', 'original-cordis-import', 'JSON-loader-update', 'Worker-artifact-load', 'Process-native-artifact-load', 'Rust-module-in-place-reload', 'Rust-module-reverse-JS', 'Rust-module-resources', 'Rust-module-JS-resources', 'Rust-module-children', 'Rust-module-checkpoint'] }));
 `;
 
 const harnessSmoke = `

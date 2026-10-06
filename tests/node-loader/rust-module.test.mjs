@@ -17,15 +17,15 @@ function fixture(profile = 'cordis', options = {}) {
     loaded.push(version);
     if (version === 'missing') throw new Error('DigestMismatch');
     const name = 'native-text-analysis', ref = `image:${version}:${name}`;
-    if (!factories.has(version)) factories.set(version, {name:`mock-native:${version}`, apply: async child => {
+    if (!factories.has(version)) factories.set(version, {name:`mock-native:${version}`, apply: async (child, config) => {
       events.push(`start:${version}`);
       child.effect(() => async () => {
         events.push(`stop:${version}`);
-        await options.cleanup?.(version, child);
+        await options.cleanup?.(version, child, config);
       });
-      await options.setup?.(version, child);
+      await options.setup?.(version, child, config);
       if (version === 'fail') throw new Error('CandidateSetupFailed');
-      child.provide('nativeText',{analyze:()=>({version})});
+      child.provide(config?.service ?? 'nativeText',{analyze:()=>({version,config})});
     }});
     return { descriptor: {abi:1,module:version,pluginId:version === 'foreign'?'foreign':'text',buildId:version,path:request.path,sha256:request.sha256,retained:true,unloadSupported:false,
       factories:[{name,ref,inject:[],services:[{name:'nativeText',methods:[{name:'analyze',kind:'sync'}]}]}]},factories:new Map([[name,factories.get(version)]]) };
@@ -160,11 +160,13 @@ test('previous owner generation and managed callbacks cannot mutate controller',
     const controller=f.create(owner.ctx);await controller.reload(artifact('v1'));
     const probe=f.ctx.plugin(async()=>{
       await assert.rejects(controller.reload(artifact('v2')),error=>error.code==='REENTRANT_MUTATION');
+      await assert.rejects(controller.reconcile({...artifact('v2'),plugins:[]}),error=>error.code==='REENTRANT_MUTATION');
       await assert.rejects(controller.dispose(),error=>error.code==='REENTRANT_MUTATION');
     });await probe.await();
     assert.equal(controller.state,'active');
     await owner.restart();
     await assert.rejects(controller.reload(artifact('v2')),error=>error.code==='NATIVE_MODULE_OWNER_REMOVED');
+    await assert.rejects(controller.reconcile({...artifact('v2'),plugins:[]}),error=>error.code==='NATIVE_MODULE_OWNER_REMOVED');
     await controller.dispose();await probe.dispose();await owner.dispose();
   }finally{await f.dispose();}
 });
@@ -244,4 +246,153 @@ test('controller commits its configured entries while external consumer failures
     assert.equal(failed.state.toLowerCase(),'failed');
     await consumer.dispose();await controller.dispose();
   }finally{await f.dispose();}
+});
+
+
+const recipe = (id = 'text', config = {}) => ({id,factory:'native-text-analysis',config});
+for (const profile of ['cordis','harness']) {
+  test(`reconcile commits changed configuration and the complete owned entry set (${profile})`, async () => {
+    const f=fixture(profile),controller=f.create();
+    try {
+      await controller.reconcile({...artifact('v1'),plugins:[recipe('first',{service:'firstText',value:1})]});
+      const previous=controller.snapshot().entries[0].fiberId;
+      await controller.reconcile({...artifact('v1'),plugins:[recipe('first',{service:'firstText',value:2}),recipe('second',{service:'secondText',value:3})]});
+      assert.equal(f.ctx.firstText.analyze().config.value,2);
+      assert.equal(f.ctx.secondText.analyze().config.value,3);
+      assert.notEqual(controller.snapshot().entries[0].fiberId,previous);
+      assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['first','second']);
+      await controller.reconcile({...artifact('v2'),plugins:[recipe('second',{service:'secondText',value:4})]});
+      assert.equal(f.ctx.get('firstText'),undefined);
+      assert.equal(f.ctx.secondText.analyze().config.value,4);
+      assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['second']);
+      await controller.reload(artifact('v1'));
+      assert.equal(f.ctx.secondText.analyze().config.value,4,'reload keeps the successfully committed config');
+      assert.equal(controller.revision,4);
+      await controller.dispose();
+    } finally {await f.dispose();}
+  });
+
+  test(`failed reconcile restores the old immutable recipes and committed revision (${profile})`, async () => {
+    const f=fixture(profile),controller=f.create(),old=recipe('original',{nested:{value:'original'}});
+    try {
+      await controller.reconcile({...artifact('v1'),plugins:[old]});
+      old.config.nested.value='caller mutation';
+      f.ctx.nativeText.analyze().config.nested.value='plugin mutation';
+      const before=controller.snapshot();
+      await assert.rejects(controller.reconcile({...artifact('fail'),plugins:[recipe('candidate',{nested:{value:'candidate'}})]}),error=>error.code==='NATIVE_MODULE_RELOAD_FAILED'&&error.details.restored);
+      assert.equal(f.ctx.nativeText.analyze().config.nested.value,'original');
+      assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['original']);
+      assert.notEqual(controller.snapshot().entries[0].fiberId,before.entries[0].fiberId);
+      assert.equal(controller.revision,1);
+      await controller.reload(artifact('v2'));
+      assert.equal(f.ctx.nativeText.analyze().config.nested.value,'original');
+      await controller.dispose();
+    } finally {await f.dispose();}
+  });
+
+  test(`empty reconciliation disables and later re-enables a validated module (${profile})`, async () => {
+    const f=fixture(profile),controller=f.create();
+    try {
+      await controller.reload(artifact('v1'));
+      await controller.reconcile({...artifact('v1'),plugins:[]});
+      assert.equal(controller.state,'active');
+      assert.equal(controller.snapshot().module.buildId,'v1');
+      assert.deepEqual(controller.snapshot().entries,[]);
+      assert.equal(f.ctx.get('nativeText'),undefined);
+      assert.equal(f.ctx.snapshot().plugins.length,1,'a disabled generation owns no group Fiber');
+      await controller.reload(artifact('v2'));
+      assert.deepEqual(f.events,['start:v1','stop:v1'],'reload preserves the disabled recipe');
+      await assert.rejects(controller.reconcile({...artifact('fail'),plugins:[recipe('new')]}),error=>error.code==='NATIVE_MODULE_RELOAD_FAILED'&&error.details.restored);
+      assert.equal(controller.snapshot().module.buildId,'v2');
+      assert.deepEqual(controller.snapshot().entries,[]);
+      assert.equal(controller.revision,3);
+      await controller.reconcile({...artifact('v1'),plugins:[recipe('enabled',{value:5})]});
+      assert.equal(f.ctx.nativeText.analyze().config.value,5);
+      await controller.dispose();
+    } finally {await f.dispose();}
+  });
+}
+
+test('reconcile captures queued recipes while queued reload observes the preceding successful commit',async()=>{
+  const gate=Promise.withResolvers(),f=fixture(),controller=f.create();
+  try {
+    await controller.reload(artifact('v1'));
+    const blocker=domainMutation(f.ctx,()=>gate.promise);
+    const input={...artifact('v2'),plugins:[recipe('captured',{nested:{value:7}})]};
+    const changed=controller.reconcile(input),reload=controller.reload(artifact('v1'));
+    input.path='/fixture-foreign.dylib';input.plugins[0].config.nested.value=99;input.plugins[0].id='mutated';input.plugins.push(recipe('extra'));
+    gate.resolve();await Promise.all([blocker,changed,reload]);
+    assert.equal(f.ctx.nativeText.analyze().version,'v1');
+    assert.equal(f.ctx.nativeText.analyze().config.nested.value,7);
+    assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['captured']);
+    assert.deepEqual(f.loaded,['v1','v2','v1']);
+    await controller.dispose();
+  } finally {gate.resolve();await f.dispose();}
+});
+
+test('invalid reconcile recipes and missing candidate factories never retire the active group',async()=>{
+  const f=fixture(),controller=f.create();
+  try {
+    await controller.reload(artifact('v1'));const before=controller.snapshot();
+    for (const plugins of [undefined,{},[recipe(),recipe()], [{id:'bad',factory:'missing'}], [recipe('invalid',()=>{})]]) {
+      await assert.rejects(controller.reconcile({...artifact('v2'),plugins}));
+    }
+    assert.equal(controller.snapshot().entries[0].fiberId,before.entries[0].fiberId);
+    assert.deepEqual(f.events,['start:v1']);
+    await controller.reload(artifact('v2'));
+    assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['text']);
+    await controller.dispose();
+  } finally {await f.dispose();}
+});
+
+test('retained candidate cleanup and failed restoration keep the original config through recovery',async()=>{
+  let cleanupFails=true,restoreFails=false;
+  const restored=[];
+  const f=fixture('cordis',{
+    cleanup:version=>{if(version==='fail'&&cleanupFails){cleanupFails=false;throw new Error('CandidateCleanupFailed');}},
+    setup:(version,child,config)=>{if(version==='v1'){restored.push(config.value);if(restoreFails)throw new Error('RestoreFailed');}},
+  }),controller=f.create();
+  try {
+    await controller.reconcile({...artifact('v1'),plugins:[recipe('old',{value:'old'})]});
+    await assert.rejects(controller.reconcile({...artifact('fail'),plugins:[recipe('failed',{value:'failed'})]}),error=>error.code==='NATIVE_MODULE_RECOVERY_BLOCKED');
+    await controller.retryCleanup();
+    restoreFails=true;
+    await assert.rejects(controller.reconcile({...artifact('v2'),plugins:[recipe('next',{value:'next'})]}),error=>error.code==='NATIVE_MODULE_RESTORE_FAILED');
+    assert.deepEqual(restored,['old','old']);
+    await controller.retryCleanup();restoreFails=false;
+    await controller.reload(artifact('v2'));
+    assert.deepEqual(restored,['old','old','old']);
+    assert.equal(f.ctx.nativeText.analyze().config.value,'old');
+    assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['old']);
+    assert.equal(controller.revision,2);
+    await controller.dispose();
+  } finally {restoreFails=false;await f.dispose();}
+});
+
+test('failed retirement keeps old config as rollback after cleanup-only recovery',async()=>{
+  let once=true;
+  const f=fixture('cordis',{cleanup:version=>{if(version==='v1'&&once){once=false;throw new Error('OldCleanupFailed');}}}),controller=f.create();
+  try {
+    await controller.reconcile({...artifact('v1'),plugins:[recipe('old',{value:'old'})]});
+    await assert.rejects(controller.reconcile({...artifact('v2'),plugins:[recipe('uncommitted',{value:'new'})]}),error=>error.code==='NATIVE_MODULE_CLEANUP_BLOCKED');
+    await controller.retryCleanup();
+    await assert.rejects(controller.reconcile({...artifact('fail'),plugins:[recipe('failed',{value:'failed'})]}),error=>error.code==='NATIVE_MODULE_RELOAD_FAILED'&&error.details.restored);
+    assert.equal(f.ctx.nativeText.analyze().config.value,'old');
+    assert.deepEqual(controller.snapshot().entries.map(entry=>entry.id),['old']);
+    assert.equal(controller.revision,1);
+    await controller.dispose();
+  } finally {await f.dispose();}
+});
+
+test('loadRustModule accepts a disabled initial generation without allocating Fibers',async()=>{
+  const f=fixture();
+  try {
+    const controller=await loadRustModule(f.ctx,{...artifact('v1'),plugins:[]});
+    assert.equal(controller.state,'active');
+    assert.deepEqual(controller.snapshot().entries,[]);
+    assert.equal(f.ctx.snapshot().plugins.length,1);
+    await controller.reconcile({...artifact('v2'),plugins:[recipe('first')]});
+    assert.equal(f.ctx.nativeText.analyze().version,'v2');
+    await controller.dispose();
+  } finally {await f.dispose();}
 });
