@@ -10,7 +10,9 @@ Changes are recorded before release. There is no published release yet.
   in-process module replacement before cache mutation.
 - Isolate event and configuration observers from transaction-step authority;
   preserve scoped waterfall continuations. Reject unresolved native cleanup in
-  readiness and rollback restart instead of waiting indefinitely.
+  readiness and rollback restart instead of waiting indefinitely. Keep host pumps
+  in an explicit empty invocation scope so nested status observers cannot restore
+  an already removed owner identity during shutdown.
 - Expose observed ESM/CommonJS module graphs and reviewable Worker reload plans.
   Follow transitive changes, preserve retained-artifact recovery, and reject
   application native addons before retiring the active Worker.

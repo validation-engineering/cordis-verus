@@ -509,7 +509,10 @@ class Domain {
     const token = mutation.getStore();
     const admission = token && {domain:token.domain,
       get active() { return token.active; }, get recovery() { return token.recovery; }};
-    return invocation.exit(() => mutation.run(admission, () => this._pump()));
+    // exit() disables the ALS globally; a nested observer run() can re-enable it
+    // and reveal the resource's old store. An explicit empty store stays empty
+    // after nested callbacks restore their parent scope.
+    return invocation.run(undefined, () => mutation.run(admission, () => this._pump()));
   }
   _pump() {
     const outerPump = this.pumping;
