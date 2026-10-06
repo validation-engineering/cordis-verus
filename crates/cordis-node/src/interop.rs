@@ -51,6 +51,22 @@ enum Request {
         #[serde(default)]
         ports: std::collections::BTreeMap<String, cordis_driver::ServicePort>,
     },
+    TypedChildMounted {
+        child: String,
+        id: String,
+        ports: std::collections::BTreeMap<String, cordis_driver::ServicePort>,
+    },
+    TypedChildAborted {
+        child: String,
+        error: String,
+    },
+    TypedChildRejected {
+        child: String,
+        error: String,
+    },
+    TypedChildObserved {
+        child: String,
+    },
     TypedCheck {
         session: String,
         service: String,
@@ -259,7 +275,7 @@ impl NativeDriver {
             .transpose()
     }
     fn native_request(&self, request: Request) -> std::result::Result<Value, String> {
-        match request {
+        let result = match request {
             Request::Start {
                 ticket,
                 factory,
@@ -282,8 +298,13 @@ impl NativeDriver {
                 let mut imports = Vec::new();
                 if let Some(descriptor) = descriptor {
                     let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
-                    for name in descriptor.inject {
-                        let port = ports[&name];
+                    let _ = descriptor;
+                    let required = self
+                        .backend
+                        .try_borrow()
+                        .map_err(|_| "ReentrantRustAction")?
+                        .typed_import_ports(&factory, &ports)?;
+                    for (name, port) in required {
                         let binding = driver
                             .resolve(port, Some(ticket.id), Some(ticket.generation))
                             .map_err(|e| e.to_string())?
@@ -313,6 +334,86 @@ impl NativeDriver {
                         ports,
                         imports,
                     )
+            }
+            Request::TypedChildMounted { child, id, ports } => {
+                let id = identity(&id)?;
+                let (owner, generation, mounted) = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_child_owner(&child)?;
+                if mounted.is_some() {
+                    return Err("TypedChildAlreadyMounted".into());
+                }
+                let snapshot = self
+                    .driver
+                    .try_borrow()
+                    .map_err(|_| "ReentrantCommand")?
+                    .snapshot();
+                let nodes = snapshot["plugins"].as_array().unwrap();
+                let valid_parent = nodes.iter().any(|n| {
+                    n["id"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(owner)
+                        && n["generation"].as_str().and_then(|v| v.parse::<u64>().ok())
+                            == Some(generation)
+                });
+                let valid_child = nodes.iter().any(|n| {
+                    n["id"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(id)
+                        && n["parent"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(owner)
+                });
+                if !valid_parent || !valid_child {
+                    return Err("TypedChildOwnerMismatch".into());
+                }
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_child_mounted(&child, id, ports)?;
+                Ok(json!({}))
+            }
+            Request::TypedChildAborted { child, error } => {
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_child_aborted(&child, error)?;
+                Ok(json!({}))
+            }
+            Request::TypedChildRejected { child, error } => {
+                self.backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_child_rejected(&child, error)?;
+                Ok(json!({}))
+            }
+            Request::TypedChildObserved { child } => {
+                let (_, _, id) = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_child_owner(&child)?;
+                let id = id.ok_or("TypedChildNotMounted")?;
+                let snapshot = self
+                    .driver
+                    .try_borrow()
+                    .map_err(|_| "ReentrantCommand")?
+                    .snapshot();
+                let node = snapshot["plugins"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|n| n["id"].as_str().and_then(|s| s.parse::<usize>().ok()) == Some(id))
+                    .ok_or("TypedChildRemoved")?;
+                let failure = node["error"].as_str().map(str::to_owned);
+                self.backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_child_observed(
+                        &child,
+                        node["state"]
+                            .as_str()
+                            .is_some_and(|s| s.eq_ignore_ascii_case("active")),
+                        failure,
+                        node["cleanupFailed"] == true,
+                    )?;
+                Ok(json!({}))
             }
             Request::TypedCheck {
                 session,
@@ -348,7 +449,7 @@ impl NativeDriver {
                 // No graph borrow is held while the user's predicate executes.
                 let available = self
                     .backend
-                    .try_borrow()
+                    .try_borrow_mut()
                     .map_err(|_| "ReentrantRustAction")?
                     .typed_check(session, &service, &realms, &config)?;
                 Ok(json!({"available": available}))
@@ -428,6 +529,12 @@ impl NativeDriver {
                     .map_err(|_| "ReentrantRustAction")?;
                 let reply =
                     backend.call(session, &service, &method, args, restoring, continuing)?;
+                if let Some(job) = reply.get("job").and_then(Value::as_str) {
+                    backend.typed_bind_job_caller(
+                        job.parse().map_err(|_| "InvalidIdentity")?,
+                        identity,
+                    )?;
+                }
                 if let Some(stream) = reply.get("stream").and_then(Value::as_str) {
                     backend
                         .bind_stream(stream.parse().map_err(|_| "InvalidIdentity")?, identity)?;
@@ -539,12 +646,82 @@ impl NativeDriver {
                 *self.wake.lock().map_err(|_| "WakePoisoned")? = None;
                 Ok(json!({}))
             }
-            Request::Poll => Ok(self
+            Request::Poll => {
+                let sources = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?
+                    .typed_job_wait_sources();
+                let mut blocks = Vec::new();
+                if !sources.is_empty() {
+                    let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
+                    let snapshot = driver.snapshot();
+                    let nodes = snapshot["plugins"].as_array().unwrap();
+                    let parents = nodes
+                        .iter()
+                        .map(|n| {
+                            Ok((
+                                identity::<usize>(n["id"].as_str().ok_or("InvalidIdentity")?)?,
+                                n["parent"].as_str().map(identity::<usize>).transpose()?,
+                            ))
+                        })
+                        .collect::<std::result::Result<std::collections::BTreeMap<_, _>, String>>(
+                        )?;
+                    for (job, source, own_publications) in sources {
+                        let mut blocked = own_publications
+                            .into_iter()
+                            .collect::<std::collections::BTreeSet<_>>();
+                        if let Some((source, generation)) = source {
+                            for id in parents.keys() {
+                                if *id == source
+                                    || driver
+                                        .committed_reaches(source, generation, *id)
+                                        .unwrap_or(false)
+                                {
+                                    let mut parent = Some(*id);
+                                    while let Some(id) = parent {
+                                        blocked.insert(id);
+                                        parent = parents.get(&id).copied().flatten();
+                                    }
+                                }
+                            }
+                        }
+                        blocks.push((job, blocked));
+                    }
+                }
+                let mut backend = self
+                    .backend
+                    .try_borrow_mut()
+                    .map_err(|_| "ReentrantRustAction")?;
+                for (job, blocked) in blocks {
+                    backend.typed_job_join_blocks(job, blocked);
+                }
+                Ok(backend.poll())
+            }
+        };
+        let failures = self
+            .backend
+            .try_borrow_mut()
+            .map_err(|_| "ReentrantRustAction")?
+            .take_typed_failures();
+        for (session, error) in failures {
+            let (id, generation) = self
                 .backend
-                .try_borrow_mut()
+                .try_borrow()
                 .map_err(|_| "ReentrantRustAction")?
-                .poll()),
+                .owner(session)?;
+            if let Err(error) = self
+                .driver
+                .try_borrow_mut()
+                .map_err(|_| "ReentrantCommand")?
+                .fail_episode(id, generation, error)
+            {
+                if !matches!(error.code, "AdmissionClosed" | "StaleEpisode") {
+                    return Err(error.to_string());
+                }
+            }
         }
+        result
     }
     pub(crate) fn native_command(&self, env: Env, input: String) -> Result<String> {
         self.check_fault()?;

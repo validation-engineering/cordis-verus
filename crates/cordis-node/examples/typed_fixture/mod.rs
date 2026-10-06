@@ -1,4 +1,5 @@
 //! Real cordis::Plugin definitions and explicit Node views of their original Arc slots.
+mod dynamic;
 use cordis::{AsyncSetup, Effect, Plugin, ServiceKey};
 use cordis_node::plugin::{
     FactoryRegistry, MethodDescriptor, MethodKind, PluginContext, PluginFuture, PluginResult,
@@ -607,5 +608,6 @@ pub(super) fn register(registry: &mut FactoryRegistry) -> PluginResult<()> {
         .requires(wrong_counter_key, "typedCounter")
         .provides(consumer_key, "typedConsumer", ConsumerAdapter),
     )?;
-    register_live(registry, control_key)
+    register_live(registry, control_key)?;
+    dynamic::register(registry, control_key)
 }

@@ -37,3 +37,14 @@ export class LoaderTransactions {
 export function installOfficialTransactions(classes: {
   Entry: Function; EntryGroup: Function; EntryTree: Function; Hmr: Function; ConfigEditor: Function;
 }): void;
+
+/** Additional structural HMR surface installed on the pinned official service. */
+export interface OfficialHmrTransactions {
+  /** Current retained cleanup/restoration failure; cleared when its journal recovers. */
+  readonly lastReloadFailure: (Error & { code: string; details: { restored?: boolean; cacheChanged?: boolean } }) | undefined;
+  /** Canonical file URLs changed since the last admitted batch. */
+  readonly stashed: Set<string>;
+  /** Joins an existing official transaction or admits through the domain FIFO. */
+  partialReload(): Promise<void>;
+  runExclusive<T>(operation: () => T | Promise<T>): Promise<T>;
+}

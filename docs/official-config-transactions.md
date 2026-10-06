@@ -55,9 +55,9 @@ These rules protect lifecycle admission. They are not a JavaScript sandbox: trus
 
 ## Module replacement
 
-The pinned official `Hmr.partialReload()` clears Node caches before replacement and continues past a failed disposal. The native adapter rejects this path immediately with `OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED`, before analyzing or modifying the live cache. The running generation remains intact.
+The native preload replaces the pinned implementation's unsafe cache/disposal path with an admitted, dependency-closed in-place reload. Real ESM/CJS module jobs are invalidated only after confirmed old cleanup. Candidate failure cleans up before restoring old cache identities and factories; cleanup and restoration failures retain a resumable journal. Unrelated plugin and unchanged dependency identities remain intact.
 
-Use the separate [Worker host](../packages/compat-loader/README.md) for module graph generations and replacement in a separate Node Worker environment. A Worker generation restart can refresh the complete dependency graph while keeping old-generation cleanup and activation outcomes explicit. This is not automatic migration of the default official application into a Worker, and this iteration does not claim transparent in-process module HMR.
+The official watcher and queue still drive the operation, in the same native Context. Executed dynamic import and require edges are observed; application native addons and unsupported host ownership require an explicit restart boundary. See [official in-place module reload](official-in-place-hmr.md) for usage, cache concurrency, errors and recovery. Worker and Process domains remain alternatives for whole-environment replacement.
 
 ## Evidence
 

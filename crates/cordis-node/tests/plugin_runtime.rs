@@ -1871,11 +1871,12 @@ fn typed_live_service_check_notifications_preserve_slot_and_episode_boundaries()
             TypedFactory::new("live", move |_| {
                 let saved = saved.clone();
                 Ok(cordis::Plugin::new("live", move |setup| {
+                    let expected_realm = setup.context().port(key).realm;
                     setup.provide_checked(
                         key,
                         AtomicUsize::new(5),
                         move |value, context, config| {
-                            context.port(key).realm == 901
+                            context.port(key).realm == expected_realm
                                 && value.load(Ordering::SeqCst)
                                     >= config["minimum"].as_u64().unwrap_or(0) as usize
                         },
@@ -2045,4 +2046,157 @@ fn typed_dependency_configuration_is_advertised_and_matches_the_original_plugin(
         matches!(backend.start_resolved(4,1,"mismatch",Value::Null,ports,import()),Err(error) if error == "StaticInjectionConfigurationMismatch")
     );
     typed_release(&mut backend, session);
+}
+
+#[test]
+fn typed_child_protocol_preserves_definition_slots_allocation_and_removal() {
+    let key = cordis::ServiceKey::<AtomicUsize>::new("dynamic-counter");
+    let setup_store = Arc::new(std::sync::Mutex::new(None));
+    let handle_store = Arc::new(std::sync::Mutex::new(None));
+    let setups = setup_store.clone();
+    let handles = handle_store.clone();
+    let mut registry = FactoryRegistry::new();
+    registry
+        .register_typed(
+            TypedFactory::new("dynamic", move |_| {
+                let setups = setups.clone();
+                let handles = handles.clone();
+                Ok(cordis::Plugin::new("owner", move |setup| {
+                    *setups.lock().unwrap() = Some(setup.to_async());
+                    *handles.lock().unwrap() = Some(setup.publish(key, AtomicUsize::new(17))?);
+                    Ok(())
+                }))
+            })
+            .child_service(key, "counter", TypedCounterView::default())
+            .with_dynamic_children(),
+        )
+        .unwrap();
+    let mut backend = plugin::Backend::new(registry, Arc::new(|| {}));
+    let anchor = "__cordis_typed_anchor_owner";
+    let child_anchor = "__cordis_typed_anchor_child";
+    let ports = typed_ports(&[("counter", typed_port(1, 1)), (anchor, typed_port(2, 2))]);
+    let start = backend
+        .start_resolved(1, 1, "dynamic", Value::Null, ports.clone(), vec![])
+        .unwrap();
+    let session = number(&start, "session");
+    let job = number(&start, "job");
+    backend.typed_bind_job_caller(job, Some((1, 1))).unwrap();
+    assert!(backend.typed_job_wait_sources().is_empty()); // no child identity yet: no graph scan
+
+    backend.typed_job_join_blocks(job, Default::default());
+    let first = backend.poll();
+    let child = first["children"][0]["child"].as_str().unwrap().to_string();
+    assert_eq!(backend.typed_job_wait_sources()[0].1, Some((1, 1)));
+    assert_eq!(backend.typed_child_owner(&child).unwrap(), (1, 1, None));
+    assert!(backend
+        .typed_child_aborted(&child, "before allocation".into())
+        .is_err());
+    let call = &first["calls"][0];
+    backend
+        .reply(
+            number(call, "request"),
+            Ok(json!({"publication":"20","port":ports[anchor]})),
+        )
+        .unwrap();
+    assert_eq!(backend.poll()["jobs"][0]["success"], true);
+    let mut child_ports = ports.clone();
+    child_ports.insert(child_anchor.into(), typed_port(3, 3));
+    backend
+        .typed_child_mounted(&child, 2, child_ports.clone())
+        .unwrap();
+    assert_eq!(backend.typed_child_owner(&child).unwrap(), (1, 1, Some(2)));
+    assert!(backend
+        .typed_child_mounted(&child, 2, child_ports.clone())
+        .is_err());
+    assert!(backend
+        .typed_child_rejected(&child, "too late".into())
+        .is_err());
+    assert_eq!(
+        backend.typed_import_ports(&child, &child_ports).unwrap(),
+        vec![(anchor.into(), ports[anchor])]
+    );
+    let child_start = backend
+        .start_resolved(
+            2,
+            1,
+            &child,
+            Value::Null,
+            child_ports.clone(),
+            vec![ResolvedImport {
+                name: anchor.into(),
+                port: ports[anchor],
+                owner: 1,
+                publication: 20,
+            }],
+        )
+        .unwrap();
+    let child_session = number(&child_start, "session");
+    for publication in [21, 22] {
+        let call = expect_call(&mut backend, "provide");
+        let service = call["service"].as_str().unwrap();
+        backend
+            .reply(
+                number(&call, "request"),
+                Ok(json!({"publication":publication.to_string(),"port":child_ports[service]})),
+            )
+            .unwrap();
+    }
+    assert_eq!(backend.poll()["jobs"][0]["success"], true);
+    backend
+        .typed_child_observed(&child, true, None, false)
+        .unwrap();
+    let handle = handle_store.lock().unwrap().clone().unwrap();
+    assert!(handle.initialized());
+    assert_eq!(
+        backend
+            .call(child_session, "counter", "read", json!([]), false, false)
+            .unwrap()["value"],
+        17
+    );
+    handle.set(AtomicUsize::new(23)).unwrap();
+    assert_eq!(
+        backend
+            .call(child_session, "counter", "read", json!([]), false, false)
+            .unwrap()["value"],
+        23
+    );
+    handle.dispose();
+    assert_eq!(backend.poll()["children"][0]["kind"], "retire");
+    assert!(!handle.finished());
+    typed_release(&mut backend, child_session);
+    backend.forget_typed(2).unwrap();
+    assert!(handle.finished());
+    let other = setup_store
+        .lock()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .publish(key, AtomicUsize::new(4))
+        .unwrap();
+    let action = backend.poll()["children"][0].clone();
+    backend
+        .typed_child_rejected(
+            action["child"].as_str().unwrap(),
+            "native admission rejected".into(),
+        )
+        .unwrap();
+    assert!(other.finished());
+    assert_eq!(other.errors(), vec!["native admission rejected"]);
+    assert!(backend.take_typed_failures().is_empty());
+    let missing = cordis::ServiceKey::<AtomicUsize>::new("not in catalog");
+    let failed = setup_store
+        .lock()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .mount(cordis::Plugin::new("bad child", |_| Ok(())).requires(missing))
+        .unwrap();
+    assert_eq!(backend.poll()["children"][0]["kind"], "error");
+    assert!(failed.id().is_none());
+    assert_eq!(
+        backend.take_typed_failures(),
+        vec![(session, "UnknownTypedChildService".into())]
+    );
+    typed_release(&mut backend, session);
+    backend.forget_typed(1).unwrap();
 }

@@ -73,9 +73,10 @@ The official host installer now wraps ConfigEditor admission before file locking
 write/reconcile/rollback, Include refresh and the HMR operation queue. The
 companion Harness boot installs these bridges for its default UI. Ordinary event
 callbacks cannot borrow transaction steps, and readiness reports a retained native
-cleanup failure instead of waiting forever. Main-thread module-cache replacement
-is explicitly refused before mutation; [observed module graphs](module-graph-reloads.md)
-explain changes executed by full Worker replacement and retained-artifact recovery.
+cleanup failure instead of waiting forever. The [official module adapter](official-config-transactions.md) coordinates supported
+in-place replacements with real cleanup before cache changes and explicit recovery
+after candidate failure. [Observed module graphs](module-graph-reloads.md) also
+support full Worker replacement and retained-artifact recovery.
 `ProcessDomain` supplies a real OS-process boundary for application native addons,
 with accepted-call drain, cleanup acknowledgement plus normal exit, and restoration
 from retained artifacts after candidate failure. The companion Harness provides
@@ -94,8 +95,10 @@ explicit opt-in for `provide_checked`, `set` and `refresh` on declared services.
 Availability uses real pending CheckTickets and consumer injection configuration.
 Fixed-per-factory `requires_with_config` declarations now apply while Pending and
 are checked against the original Plugin before setup, including explicit JSON null.
-Dynamic publication creation/removal and the remaining typed Runtime operations
-are still outside this adapter. Legacy FnOnce cleanup failure stays permanent
+An explicit dynamic service catalog also enables original publication handles
+and owned child plugins in the same native graph, preserving owner anchors,
+exact inherited dependency ports and original slots. Effect groups, configuration
+update hooks and other remaining typed Runtime operations are still outside this adapter. Legacy FnOnce cleanup failure stays permanent
 instead of accepting an empty retry. These host changes are not paper proofs.
 
 Borrowed object release drops an adapter reference; owned release waits for its
@@ -122,9 +125,9 @@ a stable baseline or an accepted budget. Tool tests are not measurement evidence
 platform baselines, production workloads and long-running resource tests still
 require separate runs and acceptance.
 
-Remaining integration work includes dynamic typed Runtime/publication migration, broader
-interface and ABI contracts, more Cordis/Harness ecosystem coverage, safe
-same-environment HMR, broader supervisor/CLI coverage, actual platform acceptance and
+Remaining integration work includes the other typed Runtime operations, broader
+interface and ABI contracts, more Cordis/Harness ecosystem and module-boundary
+coverage, broader supervisor/CLI coverage, actual platform acceptance and
 host-to-paper refinement. The full long-term
 architecture and release gate remain incomplete.
 

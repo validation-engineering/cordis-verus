@@ -385,6 +385,8 @@ enum JobKind {
 struct Job {
     session: u64,
     kind: JobKind,
+    wait_source: Option<(usize, u64)>,
+    join_blocked: std::collections::BTreeSet<usize>,
     future: PluginFuture,
     wake: Arc<JobWake>,
     alive: Arc<AtomicBool>,
@@ -421,7 +423,12 @@ pub(crate) struct CompletedJob {
 pub(crate) struct Backend {
     registry: FactoryRegistry,
     typed_mounts: BTreeMap<usize, typed::Mount>,
+    typed_children: BTreeMap<String, typed::Child>,
+    next_typed_child: u64,
+    typed_failures: Vec<(u64, String)>,
+    typed_realms: BTreeMap<(u64, u64), u64>,
     service_notifications: Arc<AtomicBool>,
+    child_notifications: Arc<AtomicBool>,
     sessions: BTreeMap<u64, Session>,
     jobs: BTreeMap<u64, Job>,
     next_session: u64,
@@ -439,7 +446,12 @@ impl Backend {
         Self {
             registry,
             typed_mounts: BTreeMap::new(),
+            typed_children: BTreeMap::new(),
+            next_typed_child: 0,
+            typed_failures: Vec::new(),
+            typed_realms: BTreeMap::new(),
             service_notifications: Arc::new(AtomicBool::new(false)),
+            child_notifications: Arc::new(AtomicBool::new(false)),
             sessions: BTreeMap::new(),
             jobs: BTreeMap::new(),
             next_session: 0,
@@ -461,6 +473,7 @@ impl Backend {
             .map(|(descriptor, factory)| {
                 let mut value = serde_json::json!(descriptor);
                 if let RegisteredFactory::Typed(factory) = factory {
+                    value = factory.metadata().expect("validated typed factory");
                     let config = factory.injection_config();
                     if !config.is_empty() {
                         value["injectConfig"] = serde_json::json!(config);
@@ -558,6 +571,8 @@ impl Backend {
             Job {
                 session: context.session,
                 kind,
+                wait_source: None,
+                join_blocked: std::collections::BTreeSet::new(),
                 future,
                 wake: Arc::new(JobWake {
                     ready: AtomicBool::new(true),
@@ -601,13 +616,28 @@ impl Backend {
         {
             return Err("EpisodeAlreadyStarted".into());
         }
-        let (descriptor, factory) = self
-            .registry
-            .factories
-            .get(factory)
-            .ok_or("UnknownFactory")?;
-        let descriptor = descriptor.clone();
-        let factory = factory.clone();
+        let (descriptor, factory) = if let Some(mount) = self.typed_mounts.get(&id) {
+            if mount.factory != factory {
+                return Err("TypedMountDefinitionChanged".into());
+            }
+            (
+                mount.adapter.descriptor()?,
+                RegisteredFactory::Typed(mount.adapter.clone()),
+            )
+        } else {
+            let (descriptor, registered) = self
+                .registry
+                .factories
+                .get(factory)
+                .ok_or("UnknownFactory")?;
+            match registered {
+                RegisteredFactory::Typed(factory) if factory.dynamic_children => {
+                    let adapter = Arc::new(factory.with_native_anchor(&ports)?);
+                    (adapter.descriptor()?, RegisteredFactory::Typed(adapter))
+                }
+                _ => (descriptor.clone(), registered.clone()),
+            }
+        };
         // Reserve numeric capacity before running real legacy setup callbacks.
         let session = self.next_session.checked_add(1).ok_or("SessionCapacity")?;
         let job = self.next_job.checked_add(1).ok_or("JobCapacity")?;
@@ -648,7 +678,7 @@ impl Backend {
         let future = instance.setup(ctx.clone());
         self.add_job(ctx, JobKind::Setup, future);
         Ok(
-            serde_json::json!({"session":session.to_string(),"job":job.to_string(),"persistent":typed.is_some()}),
+            serde_json::json!({"session":session.to_string(),"job":job.to_string(),"persistent":typed.is_some(),"realms":typed.as_ref().map(|instance| instance.realm_metadata())}),
         )
     }
     pub fn cleanup(&mut self, session: u64) -> PluginResult<Value> {
@@ -706,8 +736,10 @@ impl Backend {
         match kind {
             MethodKind::Sync => {
                 let value = instance.call_sync(service, method, args)?;
+                let notifications = self.typed_notifications();
+                let children = self.typed_child_actions();
                 Ok(
-                    serde_json::json!({"value": value, "serviceNotifications": self.typed_notifications()}),
+                    serde_json::json!({"value": value, "serviceNotifications": notifications,"children":children}),
                 )
             }
             MethodKind::Stream => self.open_rust_stream(session, service, method, args),
@@ -975,7 +1007,9 @@ impl Backend {
             if job.result.is_none() && job.wake.ready.swap(false, Ordering::AcqRel) {
                 let waker = Waker::from(job.wake.clone());
                 if let Poll::Ready(result) =
-                    job.future.as_mut().poll(&mut Context::from_waker(&waker))
+                    cordis::runtime::static_host::with_child_join_guard(&job.join_blocked, || {
+                        job.future.as_mut().poll(&mut Context::from_waker(&waker))
+                    })
                 {
                     let _transport = self.transport.lock().unwrap();
                     job.alive.store(false, Ordering::Release);
@@ -1061,7 +1095,8 @@ impl Backend {
             .drain(..)
             .collect::<Vec<_>>();
         let notifications = self.typed_notifications();
-        serde_json::json!({"calls":calls,"jobs":jobs,"serviceNotifications":notifications})
+        let children = self.typed_child_actions();
+        serde_json::json!({"calls":calls,"jobs":jobs,"serviceNotifications":notifications,"children":children})
     }
 }
 /// User-defined Drop implementations must not unwind across Node's finalizer.
@@ -1124,6 +1159,9 @@ impl Drop for Backend {
         }
         for (_, mount) in std::mem::take(&mut self.typed_mounts) {
             contain_drop(mount);
+        }
+        for (_, child) in std::mem::take(&mut self.typed_children) {
+            contain_drop(child);
         }
         for (_, factory) in std::mem::take(&mut self.registry.factories) {
             contain_drop(factory);

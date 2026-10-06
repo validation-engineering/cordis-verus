@@ -170,7 +170,42 @@ class Domain {
     this.checkQueue = [];
     this.checking = false;
     this.diagnostics = [];
-    this.rust = new RustHost(this, {invocation:()=>invocation.getStore(),run:(token,callback)=>invocation.run(token,callback),assertCurrent:assertCurrentInvocation,stale:()=>new CordisError('STALE_EPISODE','Rust service handle is no longer admitted')});
+    this.rust = new RustHost(this, {
+      invocation:()=>invocation.getStore(), run:(token,callback)=>invocation.run(token,callback),
+      child:(session,callback)=>this.rustChild(session,callback),
+      childRetire:(session,callback)=>this.rustChild(session,callback,true),
+      assertCurrent:assertCurrentInvocation,
+      stale:()=>new CordisError('STALE_EPISODE','Rust service handle is no longer admitted'),
+    });
+  }
+  // These callbacks are internal Rust child dispatch, never user callbacks.
+  // The backend validates each request's session/episode and actual native
+  // parent. Strip the poll's incidental ALS origin and expose only the current
+  // recovery restriction, not its coordinator steps. Descendant setup/observers
+  // establish their own authority in the ordinary Fiber path.
+  rustChild(session, callback, retiring = false) {
+    const fiber = session?.token?.fiber;
+    if (this.rust.sessions.get(session?.id) !== session || session.closed
+      || !fiber || fiber._domain !== this || this.fibers.get(fiber.id) !== fiber
+      || fiber._generation !== session.token.generation || fiber._removedFlag) {
+      throw new CordisError('STALE_EPISODE', 'Rust child request belongs to an old episode');
+    }
+    const coordinator = this.currentMutation;
+    const admission = coordinator && {domain:this,
+      get active() { return coordinator.active; }, get recovery() { return coordinator.recovery; }};
+    // Retirement drains the recorded native child even after owner withdrawal;
+    // it must not queue behind the revision whose cleanup is waiting for it.
+    if (retiring) return invocation.run(undefined, () => mutation.run(admission, callback));
+    if (session.cancelled || session.cleaning) throw new CordisError('INACTIVE_EFFECT', 'Rust owner no longer accepts child plugins');
+    const setup = session.setupToken;
+    const liveSetup = setup?.active === true && setup.kind === 'setup' && setup.ticket
+      && setup.fiber === fiber && setup.generation === session.token.generation;
+    const origin = {fiber,generation:session.token.generation,kind:liveSetup ? 'setup' : 'rust-child',active:false,
+      ...(liveSetup ? {parentInvocation:setup} : {})};
+    return invocation.run(origin, () => mutation.run(admission, () => {
+      fiber.assertActive(); // Recheck native admission and recovery restrictions.
+      return callback();
+    }));
   }
   assertMutationAdmission({recovery = false, closing = false} = {}) {
     assertCurrentInvocation(this);
@@ -1137,6 +1172,9 @@ export class RegistryService {
     defineProperty(fiber.dispose,symbols.effect,ownedChild[symbols.effect]);
     fiber._releaseParent = () => fiber.parent.fiber._disposables.delete(ownedChild);
     try {
+      // Bind a typed request to the real node before synchronous observers can
+      // throw or withdraw it. Allocation failure and cleanup are distinct.
+      domain.rust.allocated(callback,fiber);
       this.ctx.emit('internal/plugin',fiber);
       if (!fiber._removedFlag && fiber.uid !== null) {
         fiber.inject = Inject.resolve(fiber.inject);
@@ -1144,7 +1182,11 @@ export class RegistryService {
           fiber.ctx[symbols.intercept]=Object.create(this.ctx[symbols.intercept]);
           for(const [name,value] of Object.entries(fiber.inject)) if(value!=null) fiber.ctx[symbols.intercept][name]=value;
         }
-        domain.command({op:'seal',id,dependencies:Object.keys(fiber.inject).map(name=>domain.port(fiber.ctx,name))});
+        // Original typed children inherit exact committed dependency ports in
+        // addition to their named declarations, including another realm of the
+        // same service. Resolve them before native admission, never afterward.
+        const dependencies = domain.rust.dependencies(callback,fiber,Object.keys(fiber.inject).map(name=>domain.port(fiber.ctx,name)));
+        domain.command({op:'seal',id,dependencies});
         domain.refreshChecks();
       }
     } catch(error) { fiber.dispose(); throw error; }

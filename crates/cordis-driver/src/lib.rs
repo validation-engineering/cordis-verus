@@ -201,6 +201,28 @@ impl Driver {
         Ok(())
     }
 
+    /// Latch a failure of the current host episode and close its admission.
+    /// This is for episode-owned work (such as a rejected child request), not a
+    /// fabricated action completion. An outstanding setup ticket remains owned
+    /// by its executor and must actually land before cleanup can begin. Normal
+    /// committed-consumer and cleanup-failure guards still govern restoration.
+    pub fn fail_episode(
+        &mut self,
+        id: usize,
+        generation: u64,
+        error: String,
+    ) -> Result<(), DriverError> {
+        self.validate(id, generation)?;
+        if !matches!(self.kernel.phase(id), Some(Phase::Loading | Phase::Active)) {
+            return Err(DriverError::new(
+                "AdmissionClosed",
+                "no active episode to fail",
+            ));
+        }
+        self.nodes.get_mut(&id).unwrap().failed.get_or_insert(error);
+        self.withdraw(id)
+    }
+
     /// Admit host effects for a reserved fiber before its first activation.
     /// Retirement drains this journal through a generation-zero cleanup ticket.
     pub fn prepare(&mut self, id: usize) -> Result<u64, DriverError> {

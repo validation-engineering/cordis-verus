@@ -226,9 +226,12 @@ struct EffectStatus {
     initialized: bool,
     finished: bool,
     errors: Vec<String>,
+    terminal_error: Option<String>,
+    external_child_id: Option<PluginId>,
     next_waiter: u64,
     wakers: BTreeMap<u64, Waker>,
     driver: Option<Waker>,
+    notify: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 fn wake_waiters(wakers: BTreeMap<u64, Waker>) {
     for waker in wakers.into_values() {
@@ -236,12 +239,17 @@ fn wake_waiters(wakers: BTreeMap<u64, Waker>) {
     }
 }
 fn finish_service(service: &EffectHandle) {
-    let (waiters, driver) = {
+    let (waiters, driver, notify) = {
         let mut status = lock(&service.status);
         status.finished = true;
-        (std::mem::take(&mut status.wakers), status.driver.take())
+        (
+            std::mem::take(&mut status.wakers),
+            status.driver.take(),
+            status.notify.take(),
+        )
     };
     drop(driver);
+    drop(notify);
     wake_waiters(waiters);
 }
 /// A cancellation/join handle for one owner-bound effect group. Cancellation is
@@ -255,7 +263,11 @@ impl EffectHandle {
         let mut status = lock(&self.status);
         status.cancelled = true;
         let driver = status.driver.take();
+        let notify = status.notify.clone();
         drop(status);
+        if let Some(notify) = notify {
+            notify();
+        }
         if let Some(waker) = driver {
             waker.wake();
         }
@@ -294,7 +306,7 @@ impl Future for EffectJoin {
         let mut waker = Some(cx.waker().clone());
         let (result, previous) = {
             let mut status = lock(&this.handle.status);
-            if status.finished {
+            if status.finished || status.terminal_error.is_some() {
                 let result = if status.errors.is_empty() {
                     Ok(())
                 } else {
@@ -302,6 +314,14 @@ impl Future for EffectJoin {
                 };
                 let previous = this.waiter.take().and_then(|id| status.wakers.remove(&id));
                 (Poll::Ready(result), previous)
+            } else if status
+                .external_child_id
+                .is_some_and(static_host::child_join_blocked)
+            {
+                // A pending join cannot retain a provider whose removal it
+                // awaits. This rejects only this wait, not the child's cleanup.
+                let previous = this.waiter.take().and_then(|id| status.wakers.remove(&id));
+                (Poll::Ready(Err("ReentrantServiceJoin".into())), previous)
             } else {
                 let id = *this.waiter.get_or_insert_with(|| {
                     let id = status.next_waiter;
@@ -333,6 +353,7 @@ impl Drop for EffectJoin {
 #[derive(Clone)]
 pub struct ChildHandle {
     state: Arc<Mutex<Result<Option<PluginId>, String>>>,
+    external: Option<static_host::StaticChildControl>,
 }
 impl ChildHandle {
     pub fn id(&self) -> Option<PluginId> {
@@ -522,6 +543,8 @@ struct Episode {
     cancelled_groups: std::collections::BTreeSet<usize>,
     driver: Option<Waker>,
     static_only: bool,
+    dynamic_host: Option<Arc<dyn Fn() + Send + Sync>>,
+    external_children: Vec<static_host::StaticChildControl>,
     service_updates: Option<Arc<dyn Fn() + Send + Sync>>,
     unsupported: Option<String>,
 }
@@ -545,6 +568,7 @@ impl AsyncSetup {
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
         if !state.static_only
+            || (state.dynamic_host.is_some() && matches!(feature, "publish" | "mount"))
             || (state.service_updates.is_some()
                 && matches!(feature, "provide_checked" | "set" | "refresh"))
         {
@@ -744,7 +768,10 @@ impl AsyncSetup {
         .provides(key);
         plugin.dependencies.push(self.anchor.key);
         let status = EffectHandle {
-            status: Arc::new(Mutex::new(EffectStatus::default())),
+            status: Arc::new(Mutex::new(EffectStatus {
+                notify: lock(&self.state).dynamic_host.clone(),
+                ..EffectStatus::default()
+            })),
         };
         let child = self.mount_request(&self.context, plugin, Some(status.clone()))?;
         Ok(ServiceHandle {
@@ -799,14 +826,29 @@ impl AsyncSetup {
         if state.phase == EpisodePhase::Restoring || state.cancelled_groups.contains(&self.group) {
             return Err(CANCELLED.into());
         }
+        let identity = Arc::new(Mutex::new(Ok(None)));
+        let external = state.dynamic_host.as_ref().map(|notify| {
+            static_host::StaticChildControl::new(
+                self.owner,
+                self.generation,
+                identity.clone(),
+                service.clone(),
+                notify.clone(),
+            )
+        });
+        if let Some(control) = &external {
+            state.external_children.push(control.clone());
+        }
         let handle = ChildHandle {
-            state: Arc::new(Mutex::new(Ok(None))),
+            state: identity,
+            external,
         };
         state
             .cleanups
             .get_mut(&self.group)
             .ok_or("effect group has completed")?
             .push(CleanupAction::Child(handle.clone()));
+        let notify = state.dynamic_host.clone();
         state.children.push(ChildRequest {
             context: context.clone(),
             plugin,
@@ -815,6 +857,9 @@ impl AsyncSetup {
         });
         let waker = state.driver.take();
         drop(state);
+        if let Some(notify) = notify {
+            notify();
+        }
         if let Some(waker) = waker {
             waker.wake();
         }
@@ -895,15 +940,25 @@ impl<T: Any + Send + Sync> ServiceHandle<T> {
         }
         let previous = self.slot.replace(Arc::new(value));
         let driver = status.driver.take();
+        let notify = status.notify.clone();
         drop(status);
         drop(previous);
+        if let Some(notify) = notify {
+            notify();
+        }
         if let Some(driver) = driver {
             driver.wake();
         }
         Ok(())
     }
     pub fn refresh(&self) {
-        let driver = lock(&self.status.status).driver.take();
+        let (driver, notify) = {
+            let mut status = lock(&self.status.status);
+            (status.driver.take(), status.notify.clone())
+        };
+        if let Some(notify) = notify {
+            notify();
+        }
         if let Some(driver) = driver {
             driver.wake();
         }
@@ -1362,6 +1417,7 @@ impl Runtime {
                         .unwrap()
                         .push(CleanupAction::Child(ChildHandle {
                             state: Arc::new(Mutex::new(Ok(Some(id)))),
+                            external: None,
                         }));
                 } else {
                     owner.owned.push(id);
@@ -1811,6 +1867,8 @@ impl Runtime {
             cancelled_groups: Default::default(),
             driver: Some(cx.waker().clone()),
             static_only: false,
+            dynamic_host: None,
+            external_children: Vec::new(),
             service_updates: None,
             unsupported: None,
         };
@@ -1818,6 +1876,7 @@ impl Runtime {
         for child in plugin.owned.drain(..) {
             root.push(CleanupAction::Child(ChildHandle {
                 state: Arc::new(Mutex::new(Ok(Some(child)))),
+                external: None,
             }));
         }
         state.cleanups.insert(0, root);

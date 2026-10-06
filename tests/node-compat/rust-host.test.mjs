@@ -20,7 +20,7 @@ function bridge(service = {}) {
   let cancelResult;
   const factory = { name: 'external-fixture', inject: ['js'], services: [] };
   const domain = {
-    errors, diagnostics,
+    errors, diagnostics, fibers: new Map(),
     wake() {},
     driver: {
       rustInfo: () => JSON.stringify({ abi: 1, factories: [factory] }),

@@ -754,3 +754,557 @@ fn configured_dependencies_require_exact_host_declarations_before_callbacks() {
     )
     .is_err());
 }
+
+fn dynamic_begin(plugin: &mut StaticPlugin) -> cordis::runtime::static_host::StaticStart {
+    let anchor = Context::new().port(ServiceKey::<()>::new("host-owner-anchor"));
+    plugin
+        .begin_with_dynamic_host(10, 5, Context::new(), vec![], anchor, Arc::new(|| {}))
+        .unwrap()
+}
+
+#[test]
+fn dynamic_publication_retains_real_slot_and_explicit_owner_anchor() {
+    let key = ServiceKey::<usize>::new("dynamic");
+    let anchor = Context::new().port(ServiceKey::<()>::new("anchor"));
+    let handles = Arc::new(Mutex::new(None));
+    let capture = handles.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        *capture.lock().unwrap() = Some(setup.publish_checked(key, 7, |value, _, config| {
+            config.as_u64() == Some(*value as u64)
+        })?);
+        Ok(())
+    }))
+    .unwrap();
+    let start = plugin
+        .begin_with_dynamic_host(10, 5, Context::new(), vec![], anchor, Arc::new(|| {}))
+        .unwrap();
+    finish(start.setup).unwrap();
+    let handle = handles.lock().unwrap().take().unwrap();
+    assert_eq!(handle.id(), None);
+    assert!(!handle.initialized());
+    let mut request = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    assert_eq!(request.plugin.declarations().dependencies, vec![anchor.key]);
+    assert_eq!(
+        request.plugin.declarations().provisions,
+        vec![Context::new().port(key).key]
+    );
+    assert_eq!(request.control.owner(), 10);
+    assert_eq!(request.control.generation(), 5);
+    assert!(request
+        .plugin
+        .begin(11, 1, request.context.clone(), vec![])
+        .is_err());
+    request.control.complete_mount(Ok(11)).unwrap();
+    assert_eq!(handle.id(), Some(11));
+    assert!(request.control.complete_mount(Ok(12)).is_err());
+    let child = request
+        .plugin
+        .begin_with_service_updates(
+            11,
+            1,
+            request.context,
+            vec![StaticBinding {
+                port: anchor,
+                provider: 10,
+                slot: TypedSlot::from_arc(Arc::new(())),
+            }],
+            Arc::new(|| {}),
+        )
+        .unwrap();
+    finish(child.setup).unwrap();
+    request.control.mark_initialized().unwrap();
+    assert!(handle.initialized());
+    let slot = child.episode.provided().unwrap().pop().unwrap().1;
+    assert!(Arc::ptr_eq(
+        &slot.get::<usize>().unwrap(),
+        &handle.get().unwrap()
+    ));
+    assert!(slot.accepts(&Context::new(), &serde_json::json!(7)));
+    assert!(!slot.accepts(&Context::new(), &serde_json::json!(8)));
+    let old = handle.get().unwrap();
+    handle.set(8).unwrap();
+    assert_eq!(*old, 7);
+    assert_eq!(*slot.get::<usize>().unwrap(), 8);
+    assert!(slot.accepts(&Context::new(), &serde_json::json!(8)));
+    handle.dispose();
+    assert!(request.control.retirement_requested());
+    assert!(handle.set(9).is_err());
+    let mut join = Box::pin(handle.join());
+    assert!(join
+        .as_mut()
+        .poll(&mut TaskContext::from_waker(Waker::noop()))
+        .is_pending());
+    finish(child.episode.cleanup().unwrap()).unwrap();
+    assert!(!handle.finished());
+    request.control.removed().unwrap();
+    assert_eq!(
+        join.as_mut()
+            .poll(&mut TaskContext::from_waker(Waker::noop())),
+        Poll::Ready(Ok(()))
+    );
+    finish(start.episode.cleanup().unwrap()).unwrap();
+}
+
+#[test]
+fn external_child_inverse_waits_for_removed_before_earlier_owner_inverse() {
+    let earlier = Arc::new(AtomicBool::new(false));
+    let copy = earlier.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        let earlier = copy.clone();
+        setup.on_cleanup(move || {
+            earlier.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+        setup.mount(Plugin::new("child", |_| Ok(())))?;
+        Ok(())
+    }))
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    finish(start.setup).unwrap();
+    let request = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    request.control.complete_mount(Ok(20)).unwrap();
+    let mut cleanup = start.episode.cleanup().unwrap();
+    assert!(poll(&mut cleanup).is_pending());
+    assert!(request.control.retirement_requested());
+    assert!(!earlier.load(Ordering::SeqCst));
+    request.control.removed().unwrap();
+    finish(cleanup).unwrap();
+    assert!(earlier.load(Ordering::SeqCst));
+    assert!(start.episode.is_closed());
+}
+
+#[test]
+fn child_cleanup_failure_keeps_parent_values_and_original_inverse() {
+    let value = ServiceKey::<usize>::new("owner-value");
+    let earlier = Arc::new(AtomicBool::new(false));
+    let copy = earlier.clone();
+    let mut plugin = StaticPlugin::new(
+        Plugin::new("owner", move |setup| {
+            setup.provide(value, 19)?;
+            let earlier = copy.clone();
+            setup.on_cleanup(move || {
+                earlier.store(true, Ordering::SeqCst);
+                Ok(())
+            });
+            setup.mount(Plugin::new("bad child", |setup| {
+                setup.on_cleanup(|| Err("child inverse did not restore".into()));
+                Ok(())
+            }))?;
+            Ok(())
+        })
+        .provides(value),
+    )
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    finish(start.setup).unwrap();
+    let mut child = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    child.control.complete_mount(Ok(20)).unwrap();
+    let child_start = child.plugin.begin(20, 1, child.context, vec![]).unwrap();
+    finish(child_start.setup).unwrap();
+    let mut cleanup = start.episode.cleanup().unwrap();
+    assert!(poll(&mut cleanup).is_pending());
+    let error = finish(child_start.episode.cleanup().unwrap()).unwrap_err();
+    child.control.cleanup_failed(error);
+    assert_eq!(finish(cleanup), Err("child inverse did not restore".into()));
+    assert_eq!(
+        start.episode.cleanup().err().unwrap(),
+        "child inverse did not restore"
+    );
+    assert_eq!(
+        *start.episode.provided().unwrap()[0]
+            .1
+            .get::<usize>()
+            .unwrap(),
+        19
+    );
+    assert!(!start.episode.is_closed());
+    assert!(!earlier.load(Ordering::SeqCst));
+    assert!(child.control.removed().is_err());
+    assert!(!child.control.is_removed());
+}
+
+#[test]
+fn cancellation_after_drain_keeps_late_allocated_child_until_actual_removal() {
+    let context = Arc::new(Mutex::new(None::<AsyncSetup>));
+    let capture = context.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        *capture.lock().unwrap() = Some(setup.to_async());
+        setup.mount(Plugin::new("child", |_| Ok(())))?;
+        Ok(())
+    }))
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    finish(start.setup).unwrap();
+    let child = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    start.episode.cancel();
+    assert!(child.control.retirement_requested());
+    assert!(context
+        .lock()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .mount(Plugin::new("late", |_| Ok(())))
+        .is_err());
+    let mut cleanup = start.episode.cleanup().unwrap();
+    assert!(poll(&mut cleanup).is_pending());
+    child.control.complete_mount(Ok(37)).unwrap();
+    assert_eq!(child.control.id(), Some(37));
+    assert!(poll(&mut cleanup).is_pending());
+    child.control.removed().unwrap();
+    finish(cleanup).unwrap();
+}
+
+#[test]
+fn queued_cancelled_publication_never_allocates_or_leaves_join_pending() {
+    let key = ServiceKey::<usize>::new("queued");
+    let handle = Arc::new(Mutex::new(None));
+    let capture = handle.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        *capture.lock().unwrap() = Some(setup.publish(key, 1)?);
+        Ok(())
+    }))
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    finish(start.setup).unwrap();
+    let handle = handle.lock().unwrap().take().unwrap();
+    start.episode.cancel();
+    assert!(handle.set(2).is_err());
+    assert!(start.episode.drain_child_requests().unwrap().is_empty());
+    assert_eq!(handle.id(), None);
+    assert!(handle.finished());
+    let mut join = Box::pin(handle.join());
+    assert_eq!(
+        join.as_mut()
+            .poll(&mut TaskContext::from_waker(Waker::noop())),
+        Poll::Ready(Ok(()))
+    );
+    finish(start.episode.cleanup().unwrap()).unwrap();
+}
+
+#[test]
+fn active_dynamic_handle_notifies_every_change_and_closed_owner_releases_host() {
+    let key = ServiceKey::<usize>::new("active");
+    let stored = Arc::new(Mutex::new(None::<AsyncSetup>));
+    let capture = stored.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        *capture.lock().unwrap() = Some(setup.to_async());
+        Ok(())
+    }))
+    .unwrap();
+    let notifications = Arc::new(AtomicUsize::new(0));
+    let copy = notifications.clone();
+    let anchor = Context::new().port(ServiceKey::<()>::new("anchor"));
+    let start = plugin
+        .begin_with_dynamic_host(
+            10,
+            5,
+            Context::new(),
+            vec![],
+            anchor,
+            Arc::new(move || {
+                copy.fetch_add(1, Ordering::SeqCst);
+            }),
+        )
+        .unwrap();
+    finish(start.setup).unwrap();
+    let retained = stored.lock().unwrap().take().unwrap();
+    let handle = retained.publish(key, 1).unwrap();
+    let request = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    request.control.complete_mount(Ok(11)).unwrap();
+    let before = notifications.load(Ordering::SeqCst);
+    handle.set(2).unwrap();
+    handle.set(3).unwrap();
+    handle.refresh();
+    assert_eq!(notifications.load(Ordering::SeqCst), before + 3);
+    request.control.removed().unwrap();
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    assert_eq!(Arc::strong_count(&notifications), 1);
+    assert!(retained.publish(key, 4).is_err());
+    assert!(handle.set(4).is_err());
+}
+
+#[test]
+fn dynamic_child_preserves_context_realms_and_declared_injection_config() {
+    let key = ServiceKey::<usize>::new("configured-child-import");
+    let context = Context::new().isolate(key);
+    let expected_port = context.port(key);
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        setup.mount_in(
+            &context,
+            Plugin::new("child", |_| Ok(()))
+                .requires_with_config(key, serde_json::json!({"allow": true})),
+        )?;
+        Ok(())
+    }))
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    finish(start.setup).unwrap();
+    let child = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    assert_eq!(child.context.port(key), expected_port);
+    assert_eq!(
+        child.plugin.declarations().injection_config[&expected_port.key],
+        serde_json::json!({"allow": true})
+    );
+    child
+        .control
+        .complete_mount(Err("host declined unavailable context".into()))
+        .unwrap();
+    finish(start.episode.cleanup().unwrap()).unwrap();
+}
+
+#[test]
+fn failed_publication_join_reports_error_without_claiming_finished_or_removal() {
+    let key = ServiceKey::<usize>::new("failed-publication");
+    let handle = Arc::new(Mutex::new(None));
+    let capture = handle.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        *capture.lock().unwrap() = Some(setup.publish(key, 1)?);
+        Ok(())
+    }))
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    finish(start.setup).unwrap();
+    let handle = handle.lock().unwrap().take().unwrap();
+    let child = start.episode.drain_child_requests().unwrap().pop().unwrap();
+    child.control.complete_mount(Ok(11)).unwrap();
+    let mut join = Box::pin(handle.join());
+    assert!(join
+        .as_mut()
+        .poll(&mut TaskContext::from_waker(Waker::noop()))
+        .is_pending());
+    child
+        .control
+        .cleanup_failed("consumer cannot restore".into());
+    assert_eq!(
+        join.as_mut()
+            .poll(&mut TaskContext::from_waker(Waker::noop())),
+        Poll::Ready(Err("consumer cannot restore".into()))
+    );
+    assert!(!handle.finished());
+    assert!(handle.set(9).is_err());
+    assert!(!child.control.is_removed());
+    assert_eq!(handle.errors(), ["consumer cannot restore"]);
+    assert!(child.control.removed().is_err());
+    assert_eq!(
+        finish(start.episode.cleanup().unwrap()),
+        Err("consumer cannot restore".into())
+    );
+    assert!(!start.episode.is_closed());
+}
+
+#[test]
+fn rejected_child_batch_resolves_every_original_request_without_running_callbacks() {
+    let entered = Arc::new(AtomicUsize::new(0));
+    let handles = Arc::new(Mutex::new(Vec::new()));
+    let capture = handles.clone();
+    let copy = entered.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+        for updated in [false, true, false] {
+            let count = copy.clone();
+            let mut child = Plugin::new("child", move |_| {
+                count.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            });
+            if updated {
+                child = child.on_config_update(|_, _, _| Err("unused".into()));
+            }
+            capture.lock().unwrap().push(setup.mount(child)?);
+        }
+        Ok(())
+    }))
+    .unwrap();
+    let start = dynamic_begin(&mut plugin);
+    assert_eq!(
+        start.episode.drain_child_requests().err().unwrap(),
+        "UnsupportedStaticFeature: config_update"
+    );
+    assert!(finish(start.setup).is_err());
+    assert_eq!(entered.load(Ordering::SeqCst), 0);
+    for child in handles.lock().unwrap().iter() {
+        assert!(child.error().unwrap().contains("config_update"));
+        assert_eq!(child.id(), None);
+    }
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    assert!(start.episode.child_controls().is_empty());
+}
+
+#[test]
+fn dynamic_service_notifications_reenter_owner_without_episode_or_status_locks() {
+    let key = ServiceKey::<usize>::new("reentrant");
+    let setup = Arc::new(Mutex::new(None::<AsyncSetup>));
+    let capture = setup.clone();
+    let mut plugin = StaticPlugin::new(Plugin::new("owner", move |ctx| {
+        *capture.lock().unwrap() = Some(ctx.to_async());
+        Ok(())
+    }))
+    .unwrap();
+    let callbacks = Arc::new(AtomicUsize::new(0));
+    let count = callbacks.clone();
+    let copy = setup.clone();
+    let anchor = Context::new().port(ServiceKey::<()>::new("anchor"));
+    let start = plugin
+        .begin_with_dynamic_host(
+            10,
+            5,
+            Context::new(),
+            vec![],
+            anchor,
+            Arc::new(move || {
+                let owner = copy.lock().unwrap().clone().unwrap();
+                let _ = owner.is_cancelled();
+                count.fetch_add(1, Ordering::SeqCst);
+            }),
+        )
+        .unwrap();
+    finish(start.setup).unwrap();
+    let owner = setup.lock().unwrap().clone().unwrap();
+    let handle = owner.publish(key, 1).unwrap();
+    handle.set(2).unwrap();
+    handle.refresh();
+    handle.dispose();
+    assert_eq!(callbacks.load(Ordering::SeqCst), 4);
+    assert!(start.episode.drain_child_requests().unwrap().is_empty());
+    finish(start.episode.cleanup().unwrap()).unwrap();
+}
+
+#[test]
+fn external_child_inherits_parent_actual_and_child_isolated_ports_without_self_cycle() {
+    let key = ServiceKey::<usize>::new("inherited");
+    let own = ServiceKey::<usize>::new("own");
+    let parent_context = Context::new();
+    let child_context = parent_context.isolate(key).isolate(own);
+    let parent_port = parent_context.port(key);
+    let child_port = child_context.port(key);
+    let parent_owned_port = parent_context.port(own);
+    let child_owned_port = child_context.port(own);
+    let mut child = StaticPlugin::new_with_injection_config(
+        Plugin::new("child", move |setup| {
+            assert_eq!(*setup.get(key)?, 2);
+            setup.provide(own, 3)?;
+            Ok(())
+        })
+        .requires_with_config(key, serde_json::json!("child"))
+        .provides(own),
+        [(parent_port.key, serde_json::json!("child"))].into(),
+    )
+    .unwrap();
+    child
+        .inherit_dependencies(
+            &child_context,
+            vec![parent_port, parent_owned_port],
+            [
+                (parent_port.key, serde_json::json!("parent")),
+                (parent_owned_port.key, serde_json::json!("inherited")),
+            ]
+            .into(),
+        )
+        .unwrap();
+    assert_eq!(
+        child.inherited_dependencies(),
+        &[parent_port, child_port, parent_owned_port]
+    );
+    assert!(!child.inherited_dependencies().contains(&child_owned_port));
+    assert_eq!(
+        child.declarations().injection_config[&parent_port.key],
+        serde_json::json!("child")
+    );
+    assert_eq!(
+        child.declarations().injection_config[&parent_owned_port.key],
+        serde_json::json!("inherited")
+    );
+    let original = Arc::new(1usize);
+    let imports = vec![
+        StaticBinding {
+            port: parent_port,
+            provider: 1,
+            slot: TypedSlot::from_arc(original.clone()),
+        },
+        StaticBinding {
+            port: child_port,
+            provider: 2,
+            slot: TypedSlot::from_arc(Arc::new(2usize)),
+        },
+        StaticBinding {
+            port: parent_owned_port,
+            provider: 3,
+            slot: TypedSlot::from_arc(Arc::new(3usize)),
+        },
+    ];
+    assert!(child
+        .begin(10, 1, child_context.clone(), imports[1..].to_vec())
+        .is_err());
+    let start = child.begin(10, 1, child_context.clone(), imports).unwrap();
+    finish(start.setup).unwrap();
+    assert_eq!(Arc::strong_count(&original), 2);
+    assert!(child
+        .inherit_dependencies(&child_context, vec![], Default::default())
+        .is_err());
+    finish(start.episode.cleanup().unwrap()).unwrap();
+    assert_eq!(Arc::strong_count(&original), 1);
+}
+
+#[test]
+fn inherited_context_cannot_change_between_definition_and_episode() {
+    let dependency = ServiceKey::<usize>::new("inherited");
+    let own = ServiceKey::<usize>::new("own");
+    let context = Context::new().isolate(dependency);
+    let mut child = StaticPlugin::new(
+        Plugin::new("child", move |setup| {
+            setup.provide(own, 1)?;
+            Ok(())
+        })
+        .provides(own),
+    )
+    .unwrap();
+    child
+        .inherit_dependencies(
+            &context,
+            vec![Context::new().port(dependency)],
+            Default::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        child
+            .inherit_dependencies(&context, vec![], Default::default())
+            .unwrap_err(),
+        "StaticDependenciesAlreadyInherited"
+    );
+    let imports = vec![
+        StaticBinding {
+            port: Context::new().port(dependency),
+            provider: 1,
+            slot: TypedSlot::from_arc(Arc::new(1usize)),
+        },
+        StaticBinding {
+            port: context.port(dependency),
+            provider: 2,
+            slot: TypedSlot::from_arc(Arc::new(2usize)),
+        },
+    ];
+    // An inherited-only key is not in declared dependencies. Changing its realm
+    // must still reject; merely checking declared imports misses this case.
+    assert_eq!(
+        child
+            .begin(10, 1, context.isolate(dependency), imports.clone())
+            .err()
+            .unwrap(),
+        "StaticInheritedContextChanged"
+    );
+    // A changed own provision could alter which inherited port was excluded.
+    assert_eq!(
+        child
+            .begin(10, 1, context.isolate(own), imports.clone())
+            .err()
+            .unwrap(),
+        "StaticInheritedContextChanged"
+    );
+    // A later private owner anchor is independent of the inherited port mapping.
+    let anchor_key = ServiceKey::<()>::new("new-private-anchor");
+    let anchored_context = context.isolate(anchor_key);
+    let anchor = anchored_context.port(anchor_key);
+    let start = child
+        .begin_with_dynamic_host(10, 1, anchored_context, imports, anchor, Arc::new(|| {}))
+        .unwrap();
+    finish(start.setup).unwrap();
+    finish(start.episode.cleanup().unwrap()).unwrap();
+}

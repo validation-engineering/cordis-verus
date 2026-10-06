@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { FiberState, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
 import { LoaderError } from './config.js';
+import { installModuleObservation, reloadModules } from './official-hmr.js';
 
 const methods = ['entries', 'getTasks', 'await', 'resolve', 'resolveGroup', 'create', 'update', 'remove', 'write'];
 const incompatible = message => new LoaderError('INCOMPATIBLE_OFFICIAL_LOADER', message);
@@ -197,6 +198,9 @@ export class LoaderTransactions {
       try { await this.ctx.settle(); } catch (error) { remember(error); }
       try { discover(); } catch (error) { remember(error); }
       for (const fiber of fibers) {
+        // HMR explicitly joined this disposal; a removed prior generation's
+        // historical setup error must not poison a successful recovery.
+        if (fiber._removedFlag && scoped(this.ctx)?.retired.has(fiber)) continue;
         try { await fiber.await(); } catch (error) { remember(error); }
       }
     } catch (error) { remember(error); }
@@ -220,6 +224,10 @@ export class LoaderTransactions {
       const errors = [...new Set([...failures, ...persistenceFailures.map(({ error }) => error)])];
       throw new LoaderError('OFFICIAL_PERSISTENCE_FAILED', 'Official Include persistence failed; in-memory changes have not been rolled back',
         { files: [...new Set(persistenceFailures.map(({ tree }) => tree.filename))] }, new AggregateError(errors, 'Loader revision and persistence errors'));
+    }
+    if (failures.length > 1 && failures[0] instanceof LoaderError && failures[0].code.startsWith('OFFICIAL_HMR_')) {
+      const first = failures[0];
+      throw new LoaderError(first.code, first.message, first.details, new AggregateError(failures, 'HMR revision and lifecycle errors'));
     }
     if (failures.length === 1) throw failures[0];
     if (failures.length) throw new AggregateError(failures, 'Official Loader revision failed');
@@ -272,7 +280,7 @@ function coordinate(ctx, execute) {
   catch (error) { return Promise.reject(error); }
   return domainMutation(ctx, steps => {
     const adapter = new LoaderTransactions(ctx.root, canonicalTree(ctx.loader));
-    return officialScope.run({ domain: ctx.fiber._domain, steps }, () => adapter._run(steps, execute));
+    return officialScope.run({ domain: ctx.fiber._domain, steps, retired: new Set() }, () => adapter._run(steps, execute));
   });
 }
 
@@ -343,12 +351,18 @@ export function installOfficialTransactions({ Entry, EntryGroup, EntryTree, Hmr,
       return scoped(ctx) ? invoke() : coordinate(ctx.root, invoke);
     } catch (error) { return Promise.reject(error); }
   };
-  // The official in-process replacement mutates Node caches before cleanup and
-  // catches failed disposal. Keep the running generation intact; executable
-  // module replacement belongs to the generation-aware Worker host.
+  installModuleObservation(Hmr);
   Hmr.prototype.partialReload = function () {
-    return Promise.reject(new LoaderError('OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED',
-      'In-process module replacement is not admitted; use WorkerDomain module generations'));
+    try {
+      const ctx = serviceCheck(this, 'hmr');
+      const changed = [...this.stashed];
+      const execute = () => {
+        const scope = scoped(ctx);
+        if (!scope) throw incompatible('HMR escaped its admitted transaction');
+        return reloadModules(this, scope.steps, changed, scope.retired);
+      };
+      return scoped(ctx) ? execute() : this.runExclusive(execute);
+    } catch (error) { return Promise.reject(error); }
   };
   const edit = ConfigEditor.prototype.edit;
   ConfigEditor.prototype.edit = function (entry, change) {

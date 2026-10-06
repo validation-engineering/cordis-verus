@@ -1,6 +1,6 @@
 # 既有 typed Rust 插件接入 Node
 
-`FactoryRegistry::register_typed` 可以把真实 `cordis::Plugin` 的**声明式服务子集**放进 Node 的同一张生命周期图。默认保持静态合同；显式启用 `TypedFactory::with_service_updates()` 后，可更新已声明服务的 payload 并使用动态 availability。插件继续使用 `Setup` / `AsyncSetup` 的 `get`、`provide` 和清理注册；不创建另一个 `Runtime`，不把 typed payload 序列化后复制到另一张图。
+`FactoryRegistry::register_typed` 可以把真实 `cordis::Plugin` 放进 Node 的同一张生命周期图。默认保持静态合同；`.with_service_updates()` 开启声明服务的 payload 更新和 availability；`.with_dynamic_children()` 进一步开启原 `publish/publish_checked`、`mount/mount_in`、`ServiceHandle` 与 typed 子插件。插件继续使用 `Setup` / `AsyncSetup` 的 `get`、`provide` 和清理注册；不创建另一个 `Runtime`，不把 typed payload 序列化后复制到另一张图。
 
 ## 注册与使用
 
@@ -148,25 +148,83 @@ registry.register_typed(
 
 [配置依赖回归](../tests/node-compat/rust-typed-injection.test.mjs)使用真实原 Plugin，覆盖启动前 Pending、通知后激活、精确声明错配、显式 null、schema 不匹配、realm 隔离、失败 consumer 的 committed slot 保留、显式恢复和旧服务句柄失效。
 
-## 动态 publication 的后续实现合同
+## 动态 publication 与子插件
 
-`Setup::publish` / `AsyncSetup::publish` **尚未接入 Node adapter**。原 Rust Runtime 会创建独立 provider child，并用显式 owner-anchor 依赖保留父插件资源；`ServiceHandle` 同时表示该 child 的初始化、撤销与真实清理结果。把它改写成 owner 上的 `provide/revoke` 或一个可删除的 key map，会丢失这些语义。
+在 factory 上显式调用 `.with_dynamic_children()`，并用 `.child_service(key, name, view)` 登记子插件可能提供的接口。父插件已有的 `requires/provides` 绑定也进入目录；`child_service` 本身不为父插件增加依赖或发布服务。每个子插件仍通过它自己的原 `Plugin` 声明决定实际依赖与提供关系，配置依赖直接来自该 child 的 `requires_with_config`，在分配和 Pending availability 检查前完成预检。
 
-后续实现需要一套同图协议，至少同时满足以下合同：
+下面沿用前文的 `CounterView`：
 
-| 阶段 | 必要行为 | 必须验证的边界 |
-| --- | --- | --- |
-| 声明 | 区分始终存在的 `provides` 与允许动态发布的 typed key/interface；明确允许的名称、类型和 realm。 | 未声明 key、同名不同 ServiceKey、端口冲突不得发布。 |
-| 请求 | `publish` 返回原 ServiceHandle，把原 SharedSlot 和 owner episode 绑定的请求交给外部 host；不创建第二个 Runtime。 | 请求必须有独立身份；取消或重启后的晚到请求不得挂到下一代 owner。 |
-| 分配 | 在当前 NativeDriver 中分配真实 child，建立显式 owner-anchor 依赖。child 的可见性等待 owner 初始化完成。 | ownership 不替代服务依赖；父 setup 内等待这个 child 初始化仍不能伪造完成。 |
-| 发布 | child 的真实 setup ticket 绑定原 typed slot、View、publication 和 native port。JS 与 Rust 消费者使用这个 child 的 committed publication。 | 导入失败、publish 冲突、取消中的部分 setup 都必须保留已取得资源的 inverse。 |
-| 撤销 | handle.dispose 关闭新业务准入，由同一 Driver 撤销 child、等待所有 committed 消费者和资源调用落地。 | 不能在依赖自身的 consumer action 中等待 handle.join，造成自等待。 |
-| 完成 | 只有 child 的真实 cleanup 成功后，handle.join/status 才报告完成；父清理等该 anchor 的所有使用者完成。 | FnOnce inverse 失败必须保持 sticky failure；进程退出和 GC 不代表恢复成功。 |
-| 更新 | handle.set/refresh 只影响这次 publication 的 SharedSlot/check，并按 owner generation 与 child/publication 身份过滤通知。 | 旧 handle 不转向替代 publication；旧 Arc 和旧 committed lease 仍保留到实际释放。 |
+```rust
+let counter = ServiceKey::<AtomicI64>::new("dynamic-counter");
+registry.register_typed(
+    TypedFactory::new("example.dynamic", move |_| {
+        Ok(Plugin::new("dynamic-owner", move |setup| {
+            // This is the original ServiceHandle and original SharedSlot.
+            let handle = setup.publish_checked(
+                counter,
+                AtomicI64::new(12),
+                |value, _consumer, injection| {
+                    value.load(Ordering::SeqCst)
+                        >= injection["minimum"].as_i64().unwrap_or(0)
+                },
+            )?;
+            setup.mount(
+                Plugin::new("typed-child", move |child| {
+                    let current = child.get(counter)?;
+                    assert!(Arc::ptr_eq(&current, &handle.get()?));
+                    child.on_cleanup(move || {
+                        let _last = current.load(Ordering::SeqCst);
+                        Ok(())
+                    });
+                    Ok(())
+                }).requires_with_config(counter, json!({"minimum": 10})),
+            )?;
+            Ok(())
+        }))
+    })
+    .child_service(counter, "counter", CounterView)
+    .with_dynamic_children(),
+)?;
+```
 
-实现前还需要明确 Node host 对“无活跃 Rust action 的后台 publish/dispose”的事务排队，以及已开始的请求如何与 shutdown、ConfigEditor revision、失败恢复互相等待。不能借用已完成的 setup token 或在恢复 coordinator 中任意新增资源。应先补齐 queued request → native child → typed child session →真实 cleanup completion 的单向状态记录，再开启原 API 的 feature gate。
+```js
+await ctx.rustPlugin('example.dynamic')
+await ctx.settle()
+await ctx.plugin({
+  inject: { counter: { minimum: 10 } },
+  apply(c) { console.log(c.counter.read()) },
+})
+```
 
-验收应包括真实 JS 和 typed Rust 消费者同时保留一个动态 publication、在消费者清理挂起时 dispose/re-publish、owner restart、发布冲突、异步 setup 取消、失败清理不伪造 join 成功，以及旧句柄和晚到通知。当前 `with_service_updates` 和配置依赖能力不表示这些验收已完成。
+原 `AsyncSetup` 可保存在声明的 controller 服务中，在 owner 当前 episode 的 Loading/Active 阶段创建新 publication 或挂载子插件。`TypedService` 的异步方法也可这样调用；后台线程通过已有 wake 机制提交请求。controller 必须使用原句柄，并为自己的后台任务登记 cleanup；它不保存 setup action 的永久权限。
+
+可直接运行的 [dynamic fixture](../crates/cordis-node/examples/typed_fixture/dynamic.rs) 展示 controller、checked publication、typed reader、隔离 child 和 pending setup：
+
+```js
+// With the repository's interop-fixture.node addon:
+await ctx.rustPlugin('fixture.typedControl')
+const owner = await ctx.rustPlugin('fixture.typedDynamic')
+const manager = ctx.typedDynamicManager
+manager.publish('first', 3)
+await ctx.settle()
+console.log(ctx.typedDynamicValue.read()) // 3
+manager.set('first', 8)
+manager.dispose('first')
+await manager.join('first')
+manager.publish('second', 12, true) // A new provider child and publication.
+await ctx.settle()
+await owner.dispose()
+```
+
+每次 `publish` 创建**真实 native child Fiber**，其真实 setup ticket 发布原 SharedSlot；不会在父节点上模拟 key map。该 child 显式依赖父节点的私有 owner-anchor。anchor 使用真实 fresh Rust key、每个逻辑 Fiber 独立的服务名和隔离 realm，不能与目录中的用户服务混同。初始化完成以 native Active 为准；`dispose` 请求实际撤销；只有真实 cleanup 与 Removed 后 `finished/join` 才确认完成。分配前拒绝和分配后失败分开处理，已分配的 child 必须经过实际退休和清理。
+
+`mount_in` 的原 Rust realm 经显式映射进入同一 Node 图，Rust 与 Node realm 的数值不被当成相同身份。子插件继承父插件的实际依赖端口及配置；隔离时保留父端口，并解析子 Context 对应端口，排除子插件自身提供的同一个端口，保持原 Runtime 的保留规则。嵌套 child 继续拥有原 `FnMut` 定义；失败或 Pending 不等于删除。
+
+`ServiceHandle::set/refresh` 更新原 slot 与 availability，旧 `Arc<T>` 保留原 payload，已 committed 的消费者在清理时仍读取其旧 provider。同步 controller 方法在返回前提交本次 child 工作和通知，随后 `ctx.settle()` 等待图变化。过期 owner、setup 取消或 teardown 后的创建请求被拒绝，不转发到新 episode。恢复事务中只有真实仍在执行的 setup 可创建资源，普通后台请求和恢复 coordinator 没有该权限。
+
+消费者 action 不能等待其 committed provider 或 provider 祖先的 publication `join`；owner setup 也不能等待依赖其自身 anchor 的 publication 完成。服务方法、对象方法和流操作的 native caller scope 在每次 Future poll 时执行此检查，返回 `ReentrantServiceJoin`，不假装 publication 已完成。清理失败仍保留真实节点和依赖；原 `FnOnce` inverse 不能重放。公开的 `ServiceHandle::errors` 和 join 错误用于观察失败，`finished == false` 仍表示尚未确认清理。
+
+[双 profile 验收](../tests/node-compat/rust-typed-dynamic.test.mjs)覆盖原 Arc 共享、动态发布/撤销/再次发布、owner restart、发布冲突、checked availability 与两套 realm、嵌套隔离子插件、消费者清理屏障、pending setup 取消、旧句柄拒绝、自等待保护和不可重放的清理失败。
 
 ## 取消与清理
 
@@ -180,8 +238,8 @@ withdrawal 同时更新 SDK token 和旧 `AsyncSetup` 的 episode 状态。已�
 
 ## 当前范围
 
-支持静态 `requires/provides`、显式预登记配置的 `requires_with_config`、`get/provide`、同步或异步 setup、同步或异步 cleanup；显式 opt-in 支持已声明服务的 `provide_checked` 和 `set/refresh`。`publish`、子插件、effect group 和配置更新 hook 尚未接入这个 adapter，均明确拒绝；setup 期间忽略不支持操作的返回值，也不会使该次 setup 成功。
+支持静态 `requires/provides`、显式预登记配置的 `requires_with_config`、`get/provide`、同步或异步 setup/cleanup。`.with_service_updates()` 开启声明服务的 `provide_checked` 和 `set/refresh`；`.with_dynamic_children()` 同时开启服务更新、原动态 publication 与子插件。默认静态入口仍拒绝这些 opt-in 操作；setup 吞掉不支持操作的返回值也不会被记录为成功。
 
-这是真实旧 API 的一个同图实现切片，不是完整 typed Runtime 迁移。创建/撤销动态 publication、Loader 更新、更完整的 context/realm 映射与反向 typed JS 服务仍需逐项接入。当前更新同一个 publication 的槽位及 availability 不等于支持 `Setup::publish` 的动态 provider 子图。普通 Rust Runtime 保持其原有完整宿主入口和合同。
+effect group、typed 配置更新 hook、任意纯 JS 服务自动转换成 `T`，以及 factory 按每个根 Fiber 配置动态生成依赖 descriptor，尚未接入这一 adapter。根 factory 的代码仍通过 Cargo 编译进 addon，修改 Rust 源码需要重新构建；Node 模块 HMR 不等于 Rust 动态库代码替换。普通 Rust Runtime 保持原有完整宿主入口。
 
 `static_host` 不自建图、不持有第二份 publication lease，其公开入口要求嵌入方已验证 owner、generation、依赖和真实清理结果。Node 适配器执行这些检查；模块 API 本身不能成为绕过 Driver 的证明。任意回调、Future、槽位适配和 N-API 仍属于宿主边界，行为测试不构成整篇论文 refinement。

@@ -32,11 +32,11 @@ test('repeated official host installation preserves wrappers and rejects changed
   assert.equal(classes.Entry.prototype.update, wrapped);
 });
 
-test('unsupported official in-process HMR is rejected before its implementation executes', async () => {
+test('official in-process HMR requires a current native service before touching caches', async () => {
   const classes = contract();
   let touched = false;
   classes.Hmr.prototype.partialReload = () => { touched = true; };
   installOfficialTransactions(classes);
-  await assert.rejects(new classes.Hmr().partialReload(), { code: 'OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED' });
+  await assert.rejects(new classes.Hmr().partialReload(), { code: 'STALE_OFFICIAL_SERVICE' });
   assert.equal(touched, false);
 });

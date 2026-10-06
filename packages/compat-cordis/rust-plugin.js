@@ -2,6 +2,7 @@
 // Futures and values; the ordinary Fiber journal owns their graph lifetime.
 import { symbols } from './utils.js';
 import { types } from 'node:util';
+import { randomUUID } from 'node:crypto';
 import { JavaScriptStreams, rustStream } from './rust-streams.js';
 import { JavaScriptObjects, isOpaqueValue, rustObject } from './rust-objects.js';
 
@@ -51,6 +52,9 @@ export class RustHost {
     this.results = new Map();
     this.factories = new Map();
     this.typedChecks = new WeakMap();
+    this.typedChildPlugins = new WeakMap();
+    this.typedChildren = new Map();
+    this.typedRealms = new Map();
     this.typedInjectionConfigs = new WeakMap();
     this.scheduled = false;
     this.streams = new JavaScriptStreams(this, jsonValue);
@@ -116,6 +120,7 @@ export class RustHost {
       if (waiter) { this.jobs.delete(result.job); this.finish(waiter,result); }
       else this.results.set(result.job,result);
     }
+    this.childActions(reply.children);
     this.notifyServices(reply.serviceNotifications);
     this.domain.wake();
   }
@@ -135,7 +140,7 @@ export class RustHost {
     const {session,service} = typed;
     if (session.closed || session.cancelled) return false;
     const ctx = receiver[symbols.caller] ?? receiver.ctx;
-    const names = [...session.factory.inject,...session.factory.services.map(item=>item.name)];
+    const names = session.factory.ports ?? [...session.factory.inject,...session.factory.services.map(item=>item.name)];
     const realms = Object.fromEntries(names.map(name=>[name,this.domain.port(ctx,name)]));
     const declared = this.typedInjectionConfigs.get(ctx.fiber.runtime?.callback);
     const config = declared && Object.hasOwn(declared,service)
@@ -167,18 +172,26 @@ export class RustHost {
     const factory = this.factories.get(name);
     if (!factory) throw new Error(`Rust factory is not registered in this addon: ${name}`);
     if (factory.plugin) return factory.plugin;
+    return this.makePlugin(factory);
+  }
+  makePlugin(factory) {
+    const name = factory.name;
     const plugin = {
       name:`rust:${name}`, inject:factory.injectConfig
         ? Object.fromEntries(factory.inject.map(service=>[service,structuredClone(factory.injectConfig[service] ?? null)]))
         : [...factory.inject],
       apply:async (ctx,config) => {
         const token = this.hooks.invocation();
-        const ports = Object.fromEntries([...factory.inject,...factory.services.map(service => service.name)].map(name => [name,this.domain.port(ctx,name)]));
+        const activeFactory = this.anchorFactory(factory,token.fiber);
+        if (activeFactory.anchor) ctx = ctx.isolate(activeFactory.anchor.name,activeFactory.anchor.realm);
+        const ports = this.ports(ctx,activeFactory);
         // A rejected start can still have created a persistent typed definition.
         token.fiber._rustDefinition = true;
         const reply = this.command({op:'start',ticket:token.ticket,factory:name,config:jsonValue(config ?? null),ports});
-        const session = {id:reply.session,ctx,factory,token:{...token},setupToken:token,jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
+        const session = {id:reply.session,ctx,factory:activeFactory,token:{...token},setupToken:token,jobs:new Set(),services:new Map(),resources:new Set(),objects:new Set(),cancelled:false,closed:false,cleaning:false};
         this.sessions.set(session.id,session);
+        token.fiber._typedRealmKeys=reply.realms;
+        for (const realm of reply.realms ?? []) this.typedRealms.set(`${realm.key}:${realm.realm}`,ctx[symbols.isolate][realm.name]);
         // Own teardown before polling setup, including partially failing setup.
         // Rust instances remain available through every ordinary JS inverse and
         // object release. Failed inverses must not destroy a retry dependency.
@@ -210,10 +223,85 @@ export class RustHost {
     factory.plugin = plugin;
     return plugin;
   }
+  ports(ctx,factory) {
+    return Object.fromEntries((factory.ports ?? [...factory.inject,...factory.services.map(service=>service.name)]).map(name=>[name,this.domain.port(ctx,name)]));
+  }
+  anchorFactory(factory,fiber) {
+    if (!factory.dynamic || factory.anchor) return factory;
+    const anchor = fiber._typedAnchor ??= {name:`__cordis_typed_anchor_${randomUUID()}`,realm:Symbol('typed owner anchor')};
+    return {...factory,anchor,ports:[...factory.ports,anchor.name],services:[...factory.services,{name:anchor.name,methods:[]}]};
+  }
+  allocated(callback,fiber) {
+    this.typedChildPlugins.get(callback)?.allocated(fiber);
+  }
+  dependencies(callback,fiber,ports) {
+    const child = this.typedChildPlugins.get(callback);
+    if (!child) return ports;
+    const result = [...ports];
+    for (const port of child.inherited) if (!result.some(item=>item.key===port.key && item.realm===port.realm)) result.push(port);
+    return result;
+  }
+  childActions(actions) {
+    for (const action of actions ?? []) {
+      const parent = this.sessions.get(action.session);
+      if (action.kind==='error') { this.domain.errors.push(new Error(action.error)); this.domain.schedule(); continue; }
+      if (action.kind==='retire') {
+        const child=this.typedChildren.get(action.child);
+        if (!child || child.parent!==parent || child.fiber.id!==action.id) throw new Error('Typed child retirement identity mismatch');
+        try {
+          const result=this.hooks.childRetire(parent,()=>child.fiber._dispose());
+          Promise.resolve(result).catch(error=>{ if (!child.fiber._removedFlag) this.domain.errors.push(error); }).finally(()=>this.schedule());
+        } catch(error) { this.domain.errors.push(error); }
+        continue;
+      }
+      if (action.kind!=='mount') throw new Error('Unknown typed child action');
+      let fiber;
+      try {
+        this.hooks.child(parent,()=>{
+          let ctx=parent.ctx;
+          for(const realm of action.factory.realms) {
+            const key=`${realm.key}:${realm.realm}`;
+            if(!this.typedRealms.has(key)) this.typedRealms.set(key,Symbol(`typed realm:${key}`));
+            ctx=ctx.isolate(realm.name,this.typedRealms.get(key));
+          }
+          const plugin=this.makePlugin(action.factory);
+          this.typedChildPlugins.set(plugin.apply,{inherited:action.factory.inherited,allocated:created=>{
+            fiber=created;
+            const factory=this.anchorFactory(action.factory,fiber);
+            const childCtx=fiber.ctx.isolate(factory.anchor.name,factory.anchor.realm);
+            fiber._rustDefinition=true;
+            fiber._typedChild=action.child;
+            this.typedChildren.set(action.child,{parent,fiber,factory});
+            this.command({op:'typed_child_mounted',child:action.child,id:fiber.id,ports:this.ports(childCtx,factory)});
+          }});
+          ctx.plugin(plugin);
+          if(!fiber) throw new Error('Typed native allocation was not acknowledged');
+        });
+      } catch(error) {
+        if(!fiber) this.command({op:'typed_child_rejected',child:action.child,error:errorText(error)});
+        else {
+          // Allocation has happened; never report it as an unallocated rejection.
+          this.domain.errors.push(error);
+          if (!fiber._removedFlag) {
+            this.command({op:'typed_child_aborted',child:action.child,error:errorText(error)});
+            this.hooks.childRetire(parent,()=>fiber._dispose()).catch(error=>this.domain.errors.push(error));
+          }
+        }
+      }
+    }
+  }
   removed(fiber) {
     if (fiber._rustDefinition) {
       this.command({op:'forget',id:fiber.id});
       fiber._rustDefinition = false;
+      if (fiber._typedChild) this.typedChildren.delete(fiber._typedChild);
+      if (fiber._typedAnchor) {
+        const {name,realm}=fiber._typedAnchor;
+        for(const entry of fiber._typedRealmKeys ?? []) if(entry.name===name) this.typedRealms.delete(`${entry.key}:${entry.realm}`);
+        this.domain.services.delete(name);
+        this.domain.realms.delete(realm);
+        delete fiber.ctx.root[symbols.isolate][name];
+      }
     }
   }
   close() {
@@ -229,6 +317,11 @@ export class RustHost {
     this.schedule();
   }
   sync(item) {
+    const fiber=this.domain.fibers.get(item.id);
+    if(fiber?._typedChild) {
+      const state=JSON.stringify([item.generation,item.state,item.cleanupFailed,item.error]);
+      if(state!==fiber._typedObserved) { fiber._typedObserved=state;this.command({op:'typed_child_observed',child:fiber._typedChild}); }
+    }
     if (item.retired || String(item.state).toLowerCase() === 'unloading') {
       for (const session of this.sessions.values()) if (session.token.fiber.id === item.id) this.cancel(session);
       for (const resource of this.domain.fibers?.get(item.id)?._rustResources ?? []) {
@@ -319,6 +412,7 @@ export class RustHost {
     const caller = this.caller(fiber,generation);
     const reply = this.command({op:'call',session:session.id,service:descriptor.name,method:method.name,args:jsonValue(args),caller});
     if (method.kind === 'sync') {
+      this.childActions(reply.children);
       this.notifyServices(reply.serviceNotifications);
       if (!Object.hasOwn(reply,'value')) throw new Error('Rust sync method returned no value');
       return reply.value;

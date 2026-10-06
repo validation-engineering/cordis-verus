@@ -143,6 +143,8 @@ await loader.dispose()
 
 这是一套明确的 JSON API，尚未实现原版 Loader/Include API、YAML、lazy/volatile 配置或细粒度 HMR。当前 environment 的 reload 保留 Node 模块缓存。ModuleHost 的 loadModule adapter 可接收外部准备的稳定 factory 和 revision，但不负责清空 ESM/CJS 缓存。代码替换使用 `WorkerDomain`：捕获完整本地制品目录，新 Worker 加载新一代代码，失败时使用保存的旧制品恢复。查询参数不冒充 ESM 缓存清理。符号链接被明确拒绝；制品边界、依赖、资源与持久化目录需按 [Loader 说明](../packages/compat-loader/README.md) 配置。
 
+官方 Harness Loader 使用单独的[原地 HMR 适配器](official-in-place-hmr.md)，保留同一 Context，覆盖已观察的 ESM/CJS 依赖闭包、实际清理和失败恢复。它不改变上面 JSON Loader 的 API，也不把 native addon 代码变成可原地替换的模块。
+
 正常关闭必须获得 shutdown 确认，且所有已登记调用和资源清理完成。Worker 异常退出、无确认的 exit(0)、超时强杀均记录为 abandoned，不能报告 clean rollback。跨 Worker 调用使用显式 JSON 边界，不保留任意 JS 对象身份。
 
 运行 [配置示例](../examples/node-loader/main.mjs) 和 [Worker 示例](../examples/node-loader/worker.mjs)：
@@ -166,7 +168,7 @@ consumer 普通 inverse 全部成功后，才按 acquisition LIFO 释放对象�
 
 [PublicationRegistry](../crates/cordis-kernel/src/publication.rs) 和 [ActionLedger](../crates/cordis-kernel/src/action_ledger.rs) 是 Cargo 与 Verus 编译的同一份代码。它们证明 visibility/lease/reclaim 及 action identity/exactly-once 的记录不变量；动态声明转交与初始预注册是显式 host extension，不能直接称作论文 Step。
 
-[shared Driver](../crates/cordis-driver/src/shared.rs)、availability 版本协议、Rust/JS callback journal、配置/Loader 事务、N-API、Node/V8 与 I/O 仍具有各自未证边界。Rust Runtime 已共用控制 Driver，但 typed Rust 动态服务仍采用原来的 owner anchor/provider 节点表示；静态 `cordis::Plugin` 的 `get/provide/setup/cleanup` 已通过 [typed adapter](typed-rust-plugins.md) 接入同一 publication，显式 opt-in 已接入已声明服务的 `provide_checked/set/refresh`，动态 publication 创建/撤销与其他 Runtime 操作仍未迁移。新增 cordis-node::plugin SDK 则可通过显式 JSON 服务、双向 pull stream 和 opaque object/callback adapter，让用户编译的 Rust factory 与 JS 插件共享同一图；见 [Rust/JS 插件指南](rust-node-plugins.md)。对象和回调由 factory 方法取得，方法参数与结果仍为 JSON，不是任意句柄混入 DTO 的通道。Rust/Node 公共 trace 测试保护已对齐的场景，不证明两种 backend 的所有 effect 时序相同。
+[shared Driver](../crates/cordis-driver/src/shared.rs)、availability 版本协议、Rust/JS callback journal、配置/Loader 事务、N-API、Node/V8 与 I/O 仍具有各自未证边界。Rust Runtime 已共用控制 Driver，但 typed Rust 动态服务仍采用原来的 owner anchor/provider 节点表示；静态 `cordis::Plugin` 的 `get/provide/setup/cleanup` 已通过 [typed adapter](typed-rust-plugins.md) 接入同一 publication，显式 opt-in 已接入已声明服务的 `provide_checked/set/refresh`，显式动态接口表进一步接入原 `publish/publish_checked` 和子插件，仍保留真实 owner-anchor、子节点与原句柄；effect group、配置更新 hook 等其他 Runtime 操作仍未迁移。新增 cordis-node::plugin SDK 则可通过显式 JSON 服务、双向 pull stream 和 opaque object/callback adapter，让用户编译的 Rust factory 与 JS 插件共享同一图；见 [Rust/JS 插件指南](rust-node-plugins.md)。对象和回调由 factory 方法取得，方法参数与结果仍为 JSON，不是任意句柄混入 DTO 的通道。Rust/Node 公共 trace 测试保护已对齐的场景，不证明两种 backend 的所有 effect 时序相同。
 
 MIT 上游 utils/service/events/logger 语言层保留版权和许可证；生产路径没有导入原版 Fiber scheduler。
 
@@ -226,8 +228,8 @@ npm run test:upstream-core   # 12 个原文件、87 项核心行为测试
 | M2 | publication/lease、跨 owner 转交、check 版本协议、reserve/seal | availability 与宿主对象表的形式连接、动态接口的整条论文投影 |
 | M3 | Native host、错误隔离、owned task、Worker 正常/异常关闭 | 全 environment teardown/引用管理证明与长期驻留成本验收 |
 | M4 | Logger、Service.check、方法 Inject、两个 profile 和类型样例 | 未覆盖公开合同、已知行为差异的应用迁移验证 |
-| M5 | 增量 JSON Loader、稳定 Fiber、事务恢复、Worker 制品重启；官方 Loader 显式操作及 ConfigEditor/refresh/HMR 队列事务；观测模块图与 Worker 恢复 | 同环境安全模块替换、进程 supervisor、完整包管理器安装图 |
-| M6 | Harness 真实插件图差分；同图 Rust factory/JSON、双向背压流及显式 object/callback；旧 Plugin typed adapter 与 opt-in 动态值/availability；factory revision adapter | 动态 publication 与剩余 typed Runtime 迁移、更多跨语言接口与 ABI 合同、更广生态图 |
+| M5 | 增量 JSON Loader、稳定 Fiber、事务恢复、Worker 制品重启；官方 Loader 显式操作及 ConfigEditor/refresh/HMR 队列事务；支持范围内的原地模块替换；Worker/Process 制品恢复 | 更广模块边界、完整包管理器安装图与 supervisor 场景 |
+| M6 | Harness 真实插件图差分；同图 Rust factory/JSON、双向背压流及显式 object/callback；旧 Plugin typed adapter 与 opt-in 动态 publication/子插件/值/availability；factory revision adapter | 剩余 typed Runtime 迁移、更多跨语言接口与 ABI 合同、更广生态图 |
 | M7 | 三个 Rust 制品、三个 npm 包的本机独立安装 gate；原生 manifest/哈希/平台选择与离线合包；源码绑定的性能测量工具 | 各预编译平台实际验收、实测基线与长期运行/性能预算、完整负控与 release acceptance |
 
 论文 ledger 的已反驳命题和开放义务保持不变。当前不能宣称长期方案、完整 Cordis/Harness 兼容或整篇论文 refinement 已完成。

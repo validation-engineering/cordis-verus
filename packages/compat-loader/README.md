@@ -134,11 +134,14 @@ the callback's episode identity, and `steps.isCurrent()` lets a trusted bridge
 check its exact coordinator origin before capturing a synchronous continuation.
 These are host APIs, not a sandbox for arbitrary application code.
 
-Official main-thread `partialReload()` rejects with
-`OFFICIAL_IN_PROCESS_HMR_UNSUPPORTED` before changing module caches. Use
-[Worker module graphs and reload plans](../../docs/module-graph-reloads.md) to inspect
-actual dependencies and replace a captured artifact. This still replaces the
-whole environment; application native addons use `ProcessDomain` below.
+Official main-thread `partialReload()` now performs dependency-closed ESM/CJS
+replacement in the existing Context. It waits for old cleanup before changing
+caches, preserves unrelated identities and retains a recovery journal when
+candidate cleanup or old restoration fails. The official watcher includes pure
+CJS leaves. See [in-place HMR](../../docs/official-in-place-hmr.md) for observed
+graph coverage, concurrency, failure and native-addon boundaries.
+[Worker module graphs](../../docs/module-graph-reloads.md) replace a complete
+captured environment; application native addons use `ProcessDomain` below.
 Runtime shape checks do not certify a different upstream version or arbitrary
 EntryTree subclass.
 

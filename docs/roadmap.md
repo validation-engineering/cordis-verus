@@ -55,7 +55,7 @@
 2026-10-06 本轮已接入默认 Harness 配置 UI：ConfigEditor 的文件锁、写入、
 reconcile/rollback，Include.refresh 和 HMR 队列进入同域事务；真实官方类的
 测试覆盖失败恢复与旧代次拒绝。WorkerDomain 提供实际观测模块图、影响闭包与
-整体替换恢复。typed Rust adapter 显式支持已声明服务的动态值与 availability。
+整体替换恢复，官方 Loader 另有支持范围内的原地模块替换路径。typed Rust adapter 显式支持动态 publication、子插件及已声明服务的动态值与 availability。
 这三项交付没有关闭完整 M5/M6 或论文 refinement。
 
 | 下一项 | 需要解决的边界 | 验收条件 |
@@ -63,6 +63,6 @@ reconcile/rollback，Include.refresh 和 HMR 队列进入同域事务；真实�
 | 隔离宿主扩展 | ProcessDomain 与 Harness Web/standard opt-in watcher 已接入；继续扩展 CLI 覆盖和运行保障 | 默认应用的模块更新、客户端重连、候选失败恢复；应用 addon 需真实进程隔离与验收 |
 | 长期运行成本 | 已测量 1,000 次驻留生命周期并自动回收失效 binding；identity/publication/lease tombstone 仍增长 | 源码绑定的反复装卸数据、驻留资源与变更耗时；回收设计不能破坏旧 handle 失效保证 |
 | 模块依赖图精化 | 当前图只记录已执行的 Node 解析，执行器保守替换整个 Worker | 完整安装图、未执行动态导入、可保留 identity 的模块边界；不能用观测图冒充静态完备图 |
-| 动态 typed Rust 插件 | 新建/撤销 publication、子插件、effect group、每 Fiber 动态 injection config 和更新 hook；已支持固定 requires_with_config | 同图 Rust/JS 生命周期与权限一致，真实子图及失败路径验收；保留现有槽位和 cleanup 合同 |
+| 剩余 typed Rust 接口 | 已接入新建/撤销 publication 与子插件；继续处理 effect group、每 Fiber 动态 injection config、更新 hook 与反向 typed JS 服务 | 同图 Rust/JS 生命周期与权限一致，真实子图及失败路径验收；保留现有槽位和 cleanup 合同 |
 
 跨平台制品实际安装、完整发布负控及宿主到论文的整体 refinement 继续按各自门槛执行。
