@@ -1,5 +1,7 @@
 # Reviewing paper claims against executable Verus code
 
+English · [简体中文](paper-review-guide.zh-CN.md)
+
 This guide follows five claims from *A Programming Paradigm for Spatiotemporal
 Composability*, [arXiv:2608.25512v1](https://arxiv.org/abs/2608.25512v1), to contracts,
 executable calls and regression tests. It is a starting point for independent
@@ -15,8 +17,9 @@ all consumers of that encoding.
 
 1. Read the fixed paper version and the cited clause. Page numbers below are
    one-based PDF pages, matching the page markers in the local text extraction.
-   Consult the PDF for mathematical layout. The PDF hash and toolchain versions
-   are in [upstream.lock.json](../upstream.lock.json).
+   Consult the PDF for mathematical layout. The PDF hash is in
+   [upstream.lock.json](../upstream.lock.json); pinned toolchain versions are in
+   [toolchain.lock.json](../toolchain.lock.json).
 2. Read the function's **whole `requires` and `ensures`**, its invariants and
    projection. Follow the executable call into that function. A linked theorem
    alone does not establish that an application meets its premises.
@@ -315,7 +318,3 @@ unconnected executable path, invalid evidence, or an application behavior gap.
 Include a small trace or command when possible. Keep engineering-only additions,
 such as native ABI limits and resource-accounting counters, labeled as engineering
 contracts unless an actual paper correspondence is established.
-
-中文说明：本页是论文—合同—执行代码—复现用例的审查入口。定义已编码、受限证明、
-修订策略和原文反例分别标注；它不改变逐项清单状态，也不将宿主测试或负控候选
-计作已完成的形式化证明。

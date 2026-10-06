@@ -6,7 +6,7 @@
 
 cordis-verus 用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 的插件生命周期与可逆效果。插件声明服务和依赖，运行时协调激活、提供者变化和清理。内核是可执行的 Rust：同一份源码接受 [Verus](https://github.com/verus-lang/verus) 验证，并由 Cargo 编译。
 
-项目的主线是将形式化方法落实到运行代码，同时对齐 Cordis 功能。通过[论文到代码的审查路径](docs/paper-review-guide.md)检查生命周期合同，通过原版插件和官方 Harness 工作流检验[功能对齐](docs/comparison.md)。
+项目的主线是将形式化方法落实到运行代码，同时对齐 Cordis 功能。通过[论文到代码的审查路径](docs/paper-review-guide.zh-CN.md)检查生命周期合同，通过原版插件和官方 Harness 工作流检验[功能对齐](docs/comparison.zh-CN.md)。
 
 你可以用它构建 Rust 插件系统，通过原生 Node 适配器运行支持范围内的 Cordis JavaScript 插件，或将 Rust 与 JavaScript 插件组合到同一个生命周期图中。
 
@@ -48,7 +48,7 @@ provider cleanup follows the consumer
 
 消费者在清理期间仍能使用当前生命周期已经取得的服务，提供者随后才被释放。示例自带一个小型 executor；Rust 运行时不替应用选择异步 executor。
 
-### Node 兼容层
+### Node 兼容层（可选）
 
 安装 Rust 工具链后，使用 Node **22.22.0** 和 npm：
 
@@ -85,19 +85,54 @@ npm run official
 
 ## 架构
 
-| 组件 | 职责 |
-| --- | --- |
-| [`cordis-kernel`](crates/cordis-kernel) | 可执行 Verus 规范、生命周期转换、动作所有权与服务发布契约 |
-| [`cordis-driver`](crates/cordis-driver) | Rust 与 Node 宿主共用的生命周期控制 |
-| [`cordis`](crates/cordis) | 类型化服务、插件回调、异步工作、事件、定时器与配置加载 |
-| [`cordis-node`](crates/cordis-node) 和 [`packages/`](packages) | Node-API 绑定、JavaScript facade、兼容 profile 与 Rust 插件适配器 |
-| [`cordis-plugin-api`](crates/cordis-plugin-api) | 独立原生插件 SDK 与版本化 C ABI |
+**Node 是可选依赖。** Rust 应用可直接使用 `cordis`，无需 Node 或 npm。Node 宿主是独立的集成层，用于支持范围内的原版 Cordis JS/TS 插件、官方 Harness 工作流，以及 Rust/JS 混合应用。
 
-内核管理生命周期状态，各宿主维护自己的值、回调和资源日志。源码导航与信任边界见[架构指南](docs/architecture.md)。
+```mermaid
+flowchart TD
+    RustApp["Rust 应用与类型化插件"] --> RustHost["cordis：Rust 宿主"]
+    JSApp["原版 JS 插件 / 官方 Harness"] --> Facade["兼容 profile 与 JS facade"]
+    subgraph OptionalNode["可选的 Node 宿主"]
+        Facade --> NodeHost["cordis-node：Node-API addon"]
+    end
+    RustHost --> Driver["cordis-driver：共享生命周期控制"]
+    NodeHost --> Driver
+    Driver --> Kernel["cordis-kernel：可执行 Verus 合同"]
+```
+
+箭头概括生命周期调用路径。内核管理生命周期状态，各宿主拥有自己的值、回调、调度与资源日志。JavaScript 值保留在 Node 中，生命周期转换由 Rust 内核决定。
+
+| 组件 | 职责与依赖范围 |
+| --- | --- |
+| [`cordis-kernel`](crates/cordis-kernel) | 可执行的生命周期、动作所有权和服务发布合同；使用锁定版本的 `vstd` 库 |
+| [`cordis-driver`](crates/cordis-driver) | 基于内核的共享生命周期控制；属于普通 Rust 宿主代码 |
+| [`cordis`](crates/cordis) | Rust 应用 API：类型化服务、插件回调、异步工作、事件、定时器与配置；依赖 driver 和 kernel |
+| [`cordis-node`](crates/cordis-node) 和 [`packages/`](packages) | 可选的 Node-API 绑定、JavaScript facade、兼容 profile 与 Rust 插件适配器 |
+| [`cordis-plugin-api`](crates/cordis-plugin-api) | 不依赖 Node 的独立 Rust 插件 SDK 与版本化 C ABI；当前动态库加载器位于 `cordis-node` |
+
+workspace 的默认成员是 `cordis-kernel`、`cordis-driver` 和 `cordis`。Node 支持通过独立 crate 和包接入。随应用一起编译的 Rust 插件直接使用 Rust API。可选的[进程插件协议](docs/process-plugins.md)通过 JSON-RPC 运行外部可执行文件，只要求该插件自身选用的运行环境。独立构建的 Rust `cdylib` 目前加载到 Node 宿主中，替换和生命周期合同见[原生模块指南](docs/native-rust-modules.md)。
+
+| 用途 | 环境要求 |
+| --- | --- |
+| 构建并运行 Rust 应用 | 锁定的 Rust/Cargo 与依赖；仓库准备脚本还会安装锁定的 Verus 工具链。无需 Node 或 npm。 |
+| 运行原版 JS 插件或官方 Harness | Rust 原生 addon、兼容的 Node 与 JS 依赖；TypeScript 插件须先编译为 JS。 |
+| 验证内核 | 锁定的 Verus 及其求解器，验证的内核源码与 Cargo 编译的是同一份。 |
+| 执行完整仓库开发检查或发布检查 | Rust/Verus 和 Node/npm 均需准备，因为检查也覆盖兼容层。 |
+
+Verus 是开发阶段的验证器。已编译的 Rust 应用直接运行可执行代码，无需启动 Verus 或其求解器。源码导航、其他插件路径与信任边界见[架构指南](docs/architecture.md)。
 
 ## 验证范围
 
-形式化保证适用于内核中明确写出的契约及其前提。任意 Rust 或 JavaScript 回调、宿主异步执行、FFI 边界以及文件和网络 I/O，仍在已完成的证明范围之外。这些层次通过行为测试和上游对照提供独立证据。
+形式化保证适用于明确写出的合同及其前提。同一份 `cordis-kernel` 源码包含可执行操作、规范与证明：Cargo 将可执行部分编译进运行时，Verus 检查相应合同。仅用于证明的定义不会作为另一套生命周期引擎运行。
+
+| 层次 | 证据与边界 |
+| --- | --- |
+| 可执行内核与已验证的闭合程序驱动 | Verus 在各函数的 `requires` 下检查不变式与后置条件，包括 provider 身份、受守卫约束的清理和支持范围内的恢复协议。 |
+| 论文模型与 refinement 桥接 | 证明连接具体定义、投影与受限执行模型；前提和反例均明确保留，尚未构成整篇论文或所有宿主执行的完整证明。 |
+| 共享 driver、Rust/JS 宿主与插件 | 行为测试、未经修改的上游套件和 Harness 验收检查集成；任意回调、异步调度、FFI、动态库、进程协议及文件／网络 I/O 仍在已完成的形式证明范围之外。 |
+
+例如，内核合同可要求 provider 的资源保持有效，直到依赖它的消费者完成清理。[生命周期案例](docs/cases/lifecycle-cleanup.md)使用真实 JS 回调与文件流检验这一行为，但不证明任意文件操作。普通宿主调用者仍需满足内核前置条件；闭合驱动的证明不会自动建立每个宿主到这些合同的对应关系。
+
+这些保证还依赖规范符合预期行为、锁定的 Verus／编译器／求解器工具链以及执行平台。`--no-cheating` 禁止 `assume`、`admit`、`external_body` 等证明绕过方式，但不会将外部代码纳入证明范围。[论文审查指南](docs/paper-review-guide.zh-CN.md)提供了检查这些前提与实际执行路径的入口。
 
 最近一次记录的本机开发检查包括：
 

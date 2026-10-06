@@ -1,6 +1,55 @@
 # 架构与源码导航
 
-项目分为可执行验证内核、形式语义与桥接，以及普通 Rust 宿主。它们共享生命周期概念，但证明覆盖范围不同。五个 crate 位于同一个 Rust workspace。Rust Runtime 与 Node facade 共用 LifecycleDriver 的内核控制和 ActionLedger；值、Future/JS callback 与 backend journal 留在各自宿主。锁定 TypeScript 上游只用于可选差分测试，默认构建不依赖其缓存。
+项目的主线是把形式化方法落实到运行代码，同时对齐 Cordis 功能。论文到代码的审查路径检查生命周期合同；原版插件、上游测试和官方 Harness 工作流检验功能对齐。两类证据互相补充，不能相互替代。
+
+项目分为可执行验证内核、普通 Rust 宿主，以及可选的 Node 兼容宿主。**Rust 应用可以直接使用 `cordis`，不需要 Node.js、npm 或 TypeScript。** Node 层用于运行已有 Cordis 的 JS/TS 插件和 Harness 工作流；它调用同一个 Rust 生命周期内核，不是内核的运行前提。
+
+## 运行架构与可选集成
+
+下图表示运行时调用路径，不是完整的 Cargo 依赖图。虚线是应用按需启用的集成。
+
+```mermaid
+flowchart TD
+    App["Rust 应用与 typed 插件"] --> Runtime["cordis: Rust Runtime"]
+    Existing["原版 Cordis 插件 / 官方 Harness"] --> Facade["可选: Node.js + JS 兼容包"]
+    Facade --> Node["cordis-node: Node-API 宿主"]
+    Runtime --> Shared["cordis-driver: 共享生命周期控制"]
+    Node --> Shared
+    Shared --> Kernel["cordis-kernel: 可执行 Verus 内核"]
+    Runtime -. "JSON-RPC" .-> Process["可选: 独立进程插件"]
+    Node -. "版本化 C ABI" .-> Native["可选: 独立 Rust cdylib"]
+```
+
+五个 crate 位于同一 workspace，但并不要求应用全部采用。依赖关系以各自 `Cargo.toml` 为准：
+
+| 入口 | 实际依赖与适用场景 |
+| --- | --- |
+| [`cordis`](../crates/cordis/Cargo.toml) | 依赖 `cordis-driver` 和 `cordis-kernel`；提供 typed Rust 插件、服务、异步 stage、事件、定时器和配置设施，没有 Node-API 依赖 |
+| [`cordis-driver`](../crates/cordis-driver/Cargo.toml) | 依赖 `cordis-kernel`；让 Rust Runtime 和 Node 宿主共用控制与动作身份协议，宿主适配代码本身是普通 Rust |
+| [`cordis-node`](../crates/cordis-node/Cargo.toml) | 依赖 `cordis`、`cordis-driver`、`cordis-plugin-api` 和 Node-API；兼容包保留 JS 对象与语言行为，并驱动 Rust 控制层 |
+| [`cordis-plugin-api`](../crates/cordis-plugin-api/Cargo.toml) | 独立 Rust 动态插件 SDK，不依赖 Node 或内核；当前提供的动态库加载器位于 `cordis-node`，使用这条加载与替换路径仍需 Node 宿主 |
+
+Node 兼容层由单独的 crate 和 JS 包组成，不是必须开启的 `cordis` Cargo feature。[workspace 默认成员](../Cargo.toml)只有 `cordis-kernel`、`cordis-driver` 和 `cordis`，不包含 `cordis-node`。纯 Rust 应用中的 typed 插件通常随应用编译；使用 Rust 编写插件本身不意味着需要 C ABI 或 Node。原版 TS 插件需要先编译为 JS，兼容注册入口不是 TS 编译器。
+
+另一条可选路径是 [`ProcessPlugin`](process-plugins.md)：Rust 宿主通过有界 JSON-RPC 启动独立可执行文件。它可以使用其他语言，只需要该插件自身要求的运行环境；协议并不要求 Node，也不能直接把任意原版 Cordis 插件当作进程插件运行。
+
+Rust Runtime 与 Node facade 共用 [`LifecycleDriver`](../crates/cordis-driver/src/shared.rs) 的内核控制和 `ActionLedger`；值、Future/JS callback 与 backend journal 留在各自宿主。生命周期内核决定可接受的转换，宿主执行 setup、回调与真实资源清理。这种分层让兼容工作集中在语言和宿主边界，同时保留独立的 Rust 使用路径。
+
+## 构建、运行与验证的依赖
+
+| 任务 | 所需环境与边界 |
+| --- | --- |
+| 运行已编译的纯 Rust 应用 | 不需要 Node、npm 或运行 Verus；仍需应用和所选插件自身的系统依赖 |
+| 在本仓库构建或修改 Rust 源码 | 使用锁定 Rust 工具链及 Cargo 依赖；内核依赖锁定的 `vstd`。仓库的 `toolchain-env.sh` 还检查已安装的 Verus，详见 [README 快速开始](../README.zh-CN.md#快速开始) |
+| 重新检查内核证明 | 使用锁定的 Verus 工具链；`scripts/verify.sh` 对同一内核源码运行 `--no-cheating --compile`，不调用 Node |
+| 使用原版插件、官方 Harness 或当前 cdylib 加载器 | 需要 Node、兼容包及 `cordis-node` 原生产物；本地构建该产物还需要 Rust 工具链，详见 [Node 指南](node-compatibility.md) |
+| 完整仓库开发与发布验收 | `check-development.sh`、`quality.sh` 包含 Node 构建和兼容测试，因此需要 Node/npm 依赖；发布门槛还包括完整负控，不能用纯 Rust 检查代替 |
+
+锁定 TypeScript 上游是差分测试和官方工作流的参考输入，不是纯 Rust 应用的运行依赖。已有离线缓存时可按 [验证说明](validation.md)运行相应检查；离线参数不负责安装缺失的工具或依赖。
+
+## 形式化连接概览
+
+下面单独展示证明源码的连接。它与上面的运行架构有关联，但一条运行时调用边本身不构成 refinement 证明。
 
 ```mermaid
 flowchart TD
@@ -12,7 +61,20 @@ flowchart TD
     Paper[Paper definitions and typed interpretations] -. explicit conditional bridges .-> Grammar
 ```
 
-虚线表示需要具体合同的证明连接。图中没有从任意宿主 callback 到完整论文语义的已完成箭头。
+虚线表示需要具体合同的证明连接。图中没有从任意宿主 callback 到完整论文语义的已完成箭头。具体定义、合同、调用点与回归的对应关系见[论文到代码审查指南](paper-review-guide.zh-CN.md)。
+
+## 验证边界与信任前提
+
+| 层次 | 已有保证与证据 | 不由该证据推出的结论 |
+| --- | --- | --- |
+| 可执行内核 | `cordis-kernel` 的实现同时供 Verus 检查和 Cargo 编译；合同覆盖具体生命周期转换、动作身份、资源协议与 publication primitive | 整个 Rust/JS 应用或任意插件都已被证明正确 |
+| 论文模型与闭合驱动 | 对指定模型、实际执行历史和显式 `requires` 建立 `ensures`；部分结果仍要求固定程序、私有 provision、受限调度或条件化的 Component 假设 | 论文所有结论成立、任意回调都满足这些前提，或所有宿主执行都自动对应论文轨迹 |
+| 普通 Rust 控制与宿主 | `cordis-driver`、`cordis` 调用内核 API，靠类型、错误处理、行为回归和集成测试检查衔接 | 共享已验证 primitive 就等于这些 crate 及 Future、事件、配置、进程 I/O 已完成形式化验证 |
+| Node、FFI 与应用 | 原版插件测试、差分记录、跨语言回归和官方 Harness 工作流提供指定版本与场景的功能证据 | 任意生态插件兼容、C ABI 内存安全证明、无限调度公平性或外部副作用恢复保证 |
+
+验证结论以具体函数合同及其模型为单位。`spec`／`proof` 与可执行部分写在同一内核源码中，避免另写一套未经连接的运行实现；这仍不是对编译后的机器码、Rust 编译器、Verus/求解器或所用库规格本身的验证。它们的正确性以及合同中明确列出的前提构成信任边界。宿主是否满足全部前提需要逐条建立连接，不能用“测试通过”替代这一步。
+
+`--no-cheating` 禁止在验证目标中用 `assume`、`admit`、`external_body` 等绕过合同检查；它不会消除模型假设、宿主边界或工具链信任。当前[覆盖清单](paper-coverage.md)中的 `whole-lifecycle`、`corrected-specification`、`executable-simulation`、`host-boundary` 四项整体义务仍然开放，不能把局部定理数量或应用验收成功解释为整篇论文 refinement 完成。
 
 ## Rust crate 与 Node 宿主
 

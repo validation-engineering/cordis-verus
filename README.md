@@ -48,7 +48,7 @@ provider cleanup follows the consumer
 
 The consumer can still use its committed service during cleanup. The provider is released afterwards. The example includes a small executor; the Rust runtime itself does not select an async executor for your application.
 
-### Node compatibility
+### Node compatibility (optional)
 
 With the Rust toolchain installed, use Node **22.22.0** and npm:
 
@@ -85,19 +85,54 @@ Use the install command without `--offline` when public dependencies are not cac
 
 ## Architecture
 
-| Component | Responsibility |
-| --- | --- |
-| [`cordis-kernel`](crates/cordis-kernel) | Executable Verus specifications, lifecycle transitions, action ownership, and publication contracts |
-| [`cordis-driver`](crates/cordis-driver) | Shared lifecycle control used by the Rust and Node hosts |
-| [`cordis`](crates/cordis) | Typed services, plugin callbacks, async work, events, timers, and configuration loading |
-| [`cordis-node`](crates/cordis-node) and [`packages/`](packages) | Node-API binding, JavaScript facades, compatibility profiles, and Rust plugin adapters |
-| [`cordis-plugin-api`](crates/cordis-plugin-api) | Independent native plugin SDK and versioned C ABI |
+**Node is optional.** Rust applications use `cordis` directly, with no Node or npm dependency. The Node host is a separate integration layer for supported original Cordis JS/TS plugins, official Harness workflows, and mixed Rust/JS applications.
 
-The kernel governs lifecycle state. Each host manages its own values, callbacks, and resource journals. Read the [architecture guide](docs/architecture.md) for source navigation and trust boundaries.
+```mermaid
+flowchart TD
+    RustApp["Rust application and typed plugins"] --> RustHost["cordis: Rust host"]
+    JSApp["Original JS plugins / official Harness"] --> Facade["Compatibility profiles and JS facade"]
+    subgraph OptionalNode["Optional Node host"]
+        Facade --> NodeHost["cordis-node: Node-API addon"]
+    end
+    RustHost --> Driver["cordis-driver: shared lifecycle control"]
+    NodeHost --> Driver
+    Driver --> Kernel["cordis-kernel: executable Verus contracts"]
+```
+
+The arrows summarize lifecycle call paths. The kernel governs lifecycle state; each host owns its values, callbacks, scheduling and resource journals. JavaScript values stay in Node, while the Rust kernel decides lifecycle transitions.
+
+| Component | Responsibility and dependency scope |
+| --- | --- |
+| [`cordis-kernel`](crates/cordis-kernel) | Executable lifecycle, action-ownership and publication contracts; uses the pinned `vstd` library |
+| [`cordis-driver`](crates/cordis-driver) | Shared lifecycle control over the kernel; ordinary Rust host code |
+| [`cordis`](crates/cordis) | Rust application API: typed services, plugin callbacks, async work, events, timers and configuration; depends on the driver and kernel |
+| [`cordis-node`](crates/cordis-node) and [`packages/`](packages) | Optional Node-API binding, JavaScript facades, compatibility profiles and Rust plugin adapters |
+| [`cordis-plugin-api`](crates/cordis-plugin-api) | Node-independent SDK and versioned C ABI for separately built Rust plugins; the current dynamic-library loader is in `cordis-node` |
+
+The workspace's default members are `cordis-kernel`, `cordis-driver` and `cordis`. Node support is selected through separate crates and packages. Rust plugins compiled into an application use the Rust API directly. The optional [process-plugin protocol](docs/process-plugins.md) runs external executables over JSON-RPC and requires only the runtime chosen by that plugin. Independently built Rust `cdylib` plugins currently load into the Node host; see the [native module guide](docs/native-rust-modules.md) for replacement and lifetime contracts.
+
+| Usage | Requirements |
+| --- | --- |
+| Build and run a Rust application | Pinned Rust/Cargo and dependencies; repository setup scripts also prepare the pinned Verus toolchain. No Node or npm is needed. |
+| Run original JS plugins or official Harness | Rust-backed native addon, compatible Node and JS dependencies; TypeScript plugins must first be compiled to JS. |
+| Verify the kernel | Pinned Verus and its solver, using the same kernel source that Cargo compiles. |
+| Run the complete repository development or release checks | Both Rust/Verus and Node/npm, because these checks also exercise the compatibility layer. |
+
+Verus is a development-time verifier. A compiled Rust application runs the executable code without launching Verus or its solver. See the [architecture guide](docs/architecture.md) for source navigation, additional plugin paths and trust boundaries.
 
 ## Verification scope
 
-Formal guarantees apply to the kernel's specified contracts and their stated assumptions. Arbitrary Rust or JavaScript callbacks, asynchronous host execution, the FFI boundary, and file or network I/O are outside the completed proof scope. Behavior tests and upstream comparisons provide separate evidence for those layers.
+Formal guarantees apply to explicit contracts and their stated assumptions. The same `cordis-kernel` source contains executable operations, specifications and proofs; Cargo compiles the executable parts into the runtime, while Verus checks their contracts. Proof-only definitions do not run as a separate lifecycle engine.
+
+| Layer | Evidence and boundary |
+| --- | --- |
+| Executable kernel and verified closed program drivers | Verus checks invariants and postconditions under each function's `requires`, including provider identity, guarded cleanup and the supported recovery protocols. |
+| Paper models and refinement bridges | Proofs connect specific definitions, projections and restricted execution models. Their premises and counterexamples remain explicit; this is not yet a complete proof of the paper or all host executions. |
+| Shared driver, Rust/JS hosts and plugins | Behavior tests, unchanged upstream suites and Harness acceptance exercise integration. Arbitrary callbacks, asynchronous scheduling, FFI, dynamic libraries, process protocols and file/network I/O remain outside the completed formal proof. |
+
+For example, the kernel contract can require provider resources to remain live until dependent consumers finish cleanup. The [lifecycle case](docs/cases/lifecycle-cleanup.md) tests that behavior with real JS callbacks and a file stream; it does not prove arbitrary file operations. Ordinary host callers must meet the kernel's preconditions, and a proof for a closed driver does not establish that correspondence for every host.
+
+The assurance also relies on the specification matching the intended behavior, the pinned Verus/compiler/solver toolchain, and the execution platform. `--no-cheating` rejects proof bypasses such as `assume`, `admit` and `external_body`; it does not extend the proof boundary to external code. The [paper review guide](docs/paper-review-guide.md) makes these assumptions and executable call paths reviewable.
 
 The last recorded local development run includes:
 

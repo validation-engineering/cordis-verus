@@ -7,9 +7,9 @@
 | Guide | What you can check |
 | --- | --- |
 | [Evidence guide](evidence-guide.md) | Formal-methods review, functional alignment and reproducible cases |
-| [Comparison with Cordis](comparison.md) | Lifecycle contracts, supported functionality and known differences |
+| [Comparison with Cordis](comparison.md) · [中文](comparison.zh-CN.md) | Lifecycle contracts, supported functionality and known differences |
 | [Lifecycle cleanup case](cases/lifecycle-cleanup.md) | One fixture across two pinned upstreams and two native profiles |
-| [Paper review guide](paper-review-guide.md) | Five exact paper → contract → executable path → regression chains |
+| [Paper review guide](paper-review-guide.md) · [中文](paper-review-guide.zh-CN.md) | Five exact paper → contract → executable path → regression chains |
 
 ## 运行与使用
 
@@ -36,7 +36,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [Architecture](architecture.md) | Rust/Node 分层、证明层次、源码导航与信任边界 |
+| [Architecture](architecture.md) | 纯 Rust 路径、可选 Node 宿主、构建／运行依赖、证明层次与信任边界 |
 | [Node compatibility architecture](node-compatibility-architecture.md) | 原版插件运行于 Rust 内核的长期架构、实施状态、兼容合同和交付门槛 |
 | [Semantics](semantics.md) | 实现规则、依赖与所有权、retire/remove 等关键区别 |
 | [Refinement](refinement.md) | 已建立的桥接、真实恢复与轨迹变换及其前提 |

@@ -1,5 +1,7 @@
 # Comparing cordis-verus with Cordis
 
+English · [简体中文](comparison.zh-CN.md)
+
 cordis-verus connects formal methods to executable lifecycle code while aligning
 with Cordis functionality. The same Rust kernel is verified by Verus and compiled
 into the runtime. Original plugin interfaces, upstream tests and official Harness
@@ -38,9 +40,11 @@ connections current is part of maintaining the implementation.
 | Cleanup dependencies | Behavior depends on the selected upstream implementation and plugin interactions | Committed provider identities survive consumer cleanup; provider teardown waits for those consumers under the kernel contract |
 | Cleanup failure | Pinned Cordis tests expect disposal to fulfill after an inverse throws | Reject disposal, retain the failed inverse and provider resources, and expose explicit retry |
 | Configuration and HMR | Official configuration and module APIs | Supported official configuration transactions and in-place JS HMR; Worker/process replacement and independent Rust `cdylib` instance replacement have explicit recovery contracts |
-| Native code updates | No equivalent Rust plugin ABI in this comparison | Rebuild a compatible dynamic library, then replace its instance in-process; logical state transfer requires an opt-in checkpoint contract |
-| Installation | JS dependencies and supported upstream tooling | Adds a platform-specific native addon, pinned Rust/Verus build inputs and artifact validation |
+| Native code updates | No equivalent Rust plugin ABI in this comparison | Rebuild a compatible dynamic library, then replace its instance in the Node host; logical state transfer requires an opt-in checkpoint contract |
+| Installation | JS dependencies and supported upstream tooling | Rust applications use Cargo with pinned Rust/Verus build inputs; optional Node compatibility adds a platform-specific native addon and artifact validation |
 | Assurance | Upstream behavior and tests serve as compatibility evidence | Kernel contracts, counterexamples, host regressions and application acceptance are reported separately |
+
+Node and npm are optional for Rust applications; see the [architecture overview](../README.md#architecture) for runtime and development requirements.
 
 See [feature parity](upstream-parity.md) for the detailed Rust API mapping and
 [Node compatibility](node-compatibility.md) for profile limits. A Rust `cdylib`
@@ -73,7 +77,7 @@ suite, strict profile traces, the smaller API fixture and real Harness service
 scenarios. The full upstream core comparison retains native failures; matching
 selected fixtures does not erase differences in that broader suite.
 
-The current run passes **87/87 upstream tests** and **83/87 native tests**.
+The archived run records **87/87 upstream tests** and **83/87 native tests**.
 The `inertia lock 2` scenario and disposal after an inverse throws differ under
 our committed-publication and cleanup-failure contracts. Two additional failures
 are reproducible compatibility gaps: serialized provider/consumer updates cause
