@@ -16,8 +16,10 @@ export function summarize(samplesMs,unitsPerSample) {
     unitsPerSecond:values.length*unitsPerSample*1000/totalMs};
 }
 export function validateCheckpoints(result,method) {
-  const required=['facade.residentRestart','facade.residentReplace'].includes(result.name);
+  const required=['facade.residentRestart','facade.residentReplace','rust.checkpointReplace'].includes(result.name);
   if(!required&&result.checkpoints===undefined)return;
+  if(result.name==='rust.checkpointReplace'&&(!Number.isSafeInteger(method.scale)||method.scale<1
+    ||result.iterationsPerSample!==10*method.scale||result.unitsPerSample!==result.iterationsPerSample))throw new Error('Native checkpoint replacement units do not match its batch size');
   const points=result.checkpoints,total=method.warmup+method.samples;
   if(!Array.isArray(points)||points.length!==total+2||!Number.isSafeInteger(result.iterationsPerSample)||result.iterationsPerSample<=0)throw new Error('Incomplete resident checkpoints');
   const counters=['registeredPlugins','identitySlots','declarationRecords','bindingRecords','liveBindings','publicationRecords','leaseRecords','liveLeases','publishedValues','pendingActions'];
@@ -29,7 +31,27 @@ export function validateCheckpoints(result,method) {
       ||['rss','heapTotal','heapUsed','external','arrayBuffers','maxRssBytes'].some(key=>!Number.isFinite(point.memoryBytes?.[key])||point.memoryBytes[key]<0))throw new Error('Invalid resident checkpoint');
     if(index>0&&['identitySlots','publicationRecords','leaseRecords'].some(key=>point.storage[key]<points[index-1].storage[key]))throw new Error('Resident checkpoint lost stable identity history');
     if(closed&&['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'].some(key=>point.storage[key]!==0))throw new Error('Resident cleanup checkpoint has live resources');
+    if(result.name==='rust.checkpointReplace')validateNativeCheckpoint(point,method,closed);
   }
+}
+// Exact live-resource bounds distinguish repeated instance replacement from
+// loading an additional image each cycle or retaining a rollback journal.
+function validateNativeCheckpoint(point,method,closed) {
+  const native=point.native,cycles=point.completedCycles;
+  const keys=['instances','jobs','retainedInstances','retainedJobs','reverseCalls','retainedReverseCalls','streams','objects','retainedStreams','retainedObjects'];
+  if(!native||native.moduleCount!==2||native.retainedImageCount!==2
+    ||!Number.isSafeInteger(native.retainedImageLimit)||native.retainedImageLimit<2
+    ||keys.some(key=>!Number.isSafeInteger(native.resources?.[key])||native.resources[key]!==(!closed&&key==='instances'?1:0)))throw new Error('Native checkpoint has unexpected images or live resources');
+  const journal=native.checkpoints;
+  if(!journal||journal.tokens!==(closed?0:1)||journal.tokenLimit!==64||journal.byteLimit!==16777216
+    ||!Number.isSafeInteger(journal.bytes)||journal.bytes<0||journal.bytes>journal.byteLimit
+    ||closed&&journal.bytes!==0)throw new Error('Native checkpoint has invalid migration receipts');
+  const logical=point.logical;
+  if(!Number.isSafeInteger(method.fanout)||method.fanout<1
+    ||logical?.value!==cycles*(method.fanout+1)
+    ||logical.version!==(cycles%2?'v2':'v1')
+    ||logical.restoredFrom!==(cycles===0?null:cycles%2?1:2))throw new Error('Native checkpoint lost migrated logical state');
+  if(!closed&&['registeredPlugins','liveBindings','liveLeases','publishedValues','pendingActions'].some(key=>point.storage[key]!==({registeredPlugins:method.fanout+3,liveBindings:method.fanout+1,liveLeases:method.fanout+1,publishedValues:3,pendingActions:0})[key]))throw new Error('Native checkpoint has unexpected live graph resources');
 }
 export function validateReport(report) {
   const hash=/^[a-f0-9]{64}$/;
@@ -39,6 +61,11 @@ export function validateReport(report) {
   if(!report.environment||typeof report.environment!=='object'||!report.environment.platform||!report.environment.architecture||!report.environment.node||!report.environment.cpuModel||!report.environment.nodeApi||report.environment.driverAbi!==1)throw new Error('Incomplete benchmark environment');
   if(!Array.isArray(report.results)||!report.results.length||!Array.isArray(report.method?.scenarios)||new Set(report.method.scenarios).size!==report.method.scenarios.length||report.results.length!==report.method.scenarios.length) throw new Error('Incomplete benchmark scenario set');
   if(!Number.isSafeInteger(report.method.samples)||report.method.samples<2||!Number.isSafeInteger(report.method.warmup)||report.method.warmup<0) throw new Error('Invalid benchmark sampling method');
+  const dynamic=report.inputs.dynamicFixtureSha256;
+  if(report.method.scenarios.includes('rust.checkpointReplace')||dynamic!==undefined) {
+    if(!dynamic||Array.isArray(dynamic)||Object.keys(dynamic).sort().join(',')!=='v1,v2'
+      ||!hash.test(dynamic.v1)||!hash.test(dynamic.v2)||dynamic.v1===dynamic.v2)throw new Error('Incomplete benchmark dynamic fixture evidence');
+  }
   const seen=new Set();
   for(const result of report.results) {
     if(!result||result.cleanupConfirmed!==true||typeof result.unit!=='string'||!result.unit||seen.has(result.name)||!report.method.scenarios.includes(result.name)||result.samplesMs?.length!==report.method.samples) throw new Error('Incomplete or duplicate benchmark samples');

@@ -52,16 +52,17 @@ export async function main(args=process.argv.slice(2)) {
     for(const name of ['NODE_OPTIONS','NODE_PATH','CORDIS_NATIVE_BINDING'])if(process.env[name])throw new Error('Unset '+name+' for an attributable benchmark');
     const baselineBytes=options.baseline!==undefined?await readFile(options.baseline):undefined;
     const baseline=options.baseline!==undefined?parseBaseline(baselineBytes):undefined;
-    const before=await collectInputs(root);report={...report,inputs:before.inputs,environment:before.environment};
+    const inputOptions={dynamicFixtures:options.scenarios.some(name=>scenarios[name].dynamicFixtures===true)};
+    const before=await collectInputs(root,inputOptions);report={...report,inputs:before.inputs,environment:before.environment};
     for(const name of options.scenarios) {
-      const result=spawnSync(process.execPath,[...(options.gc==='before-and-after'?['--expose-gc']:[]),join(root,'scripts/benchmark/worker.mjs'),JSON.stringify({name,method,fixturePath:before.fixturePath})],{cwd:root,env:process.env,encoding:'utf8',timeout:options.timeoutMs,killSignal:'SIGKILL',maxBuffer:32*1024*1024});
+      const result=spawnSync(process.execPath,[...(options.gc==='before-and-after'?['--expose-gc']:[]),join(root,'scripts/benchmark/worker.mjs'),JSON.stringify({name,method,fixturePath:before.fixturePath,dynamicFixtures:before.dynamicFixtures})],{cwd:root,env:process.env,encoding:'utf8',timeout:options.timeoutMs,killSignal:'SIGKILL',maxBuffer:32*1024*1024});
       if(result.error||result.status!==0)throw new Error('Scenario '+name+' failed; cleanup unconfirmed if the worker was terminated: '+(result.error?.message??result.stderr));
       const observation=JSON.parse(result.stdout.trim());
       if(observation.name!==name||observation.cleanupConfirmed!==true)throw new Error('Incomplete worker result: '+name);
       report.results.push(observation);
       console.error(name+': p95 '+observation.statistics.nanosecondsPerUnit.p95.toFixed(0)+' ns/'+observation.unit);
     }
-    const after=await collectInputs(root);
+    const after=await collectInputs(root,inputOptions);
     if(digest(before)!==digest(after))throw new Error('Source, build, native artifact or environment changed during measurement');
     report={...report,status:'passed',measurementStatus:'passed',completedAt:new Date().toISOString()};
     validateReport(report);

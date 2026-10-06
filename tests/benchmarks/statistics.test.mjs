@@ -64,3 +64,16 @@ test('an explicitly supplied falsy JSON baseline is rejected instead of ignored'
   for(const value of ['null','false','0','""','[]','{}'])assert.throws(()=>parseBaseline(value),/complete successful measurement/);
   assert.equal(parseBaseline(JSON.stringify(fixture())).status,'passed');
 });
+
+
+test('native checkpoint reports require two distinct versioned fixture hashes',()=>{
+  for(const dynamic of [undefined,null,{}, {v1:digest('v1')}, {v1:digest('same'),v2:digest('same')}, {v1:digest('v1'),v2:'stale'}, {v1:digest('v1'),v2:digest('v2'),fail:digest('fail')}]) {
+    const report=fixture();
+    report.method.scenarios=['rust.checkpointReplace'];report.results[0].name='rust.checkpointReplace';
+    if(dynamic!==undefined)report.inputs.dynamicFixtureSha256=dynamic;
+    assert.throws(()=>validateReport(report),/dynamic fixture evidence/);
+  }
+  // Existing reports remain valid; optional evidence is still checked when present.
+  const report=fixture();report.inputs.dynamicFixtureSha256={v1:digest('v1'),v2:digest('v2')};
+  assert.equal(validateReport(report),report);
+});
