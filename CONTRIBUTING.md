@@ -4,6 +4,8 @@ Chinese and English issues, documentation, and pull requests are welcome. This
 is an experimental 0.1 project; open a short design discussion before a large API
 or semantic change. Small bug fixes can go directly to a pull request.
 
+## Development setup
+
 Install Rustup, Python 3.9 or newer, Git, curl and Node 22.22.0, then run:
 
 ```sh
@@ -23,6 +25,19 @@ all full-crate negative mutations. See [validation](docs/validation.md) for the
 separate gates and the experimental scoped checker.
 The primary CI targets are Linux x86_64 and macOS arm64/x86_64. Other platforms
 are currently unvalidated. CI configuration is not evidence of a completed run.
+
+### Toolchain availability
+
+The installer selects the pinned Rust/Verus versions from
+[toolchain.lock.json](toolchain.lock.json) without changing the default Rustup
+toolchain. Installer targets are macOS ARM64/x86_64 and Linux x86_64.
+
+The pinned rolling-release archive URLs returned HTTP 404 in the
+[recorded CI run](https://github.com/validation-engineering/cordis-verus/actions/runs/37490393141).
+Fresh installations may stop at the download step; existing validated local
+caches remain usable. Restoring durable, checksum-matched downloads is tracked
+in the [roadmap](docs/roadmap.md). Keep the pinned versions and checksum validation
+when preparing a cache or restoring the archive source.
 
 ## Changes and review
 
