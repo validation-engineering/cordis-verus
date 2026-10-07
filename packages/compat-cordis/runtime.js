@@ -8,6 +8,7 @@ import { RustHost } from './rust-plugin.js';
 import { LoggerService } from './logger.js';
 import { DisposableList, getTraceable, isConstructor, symbols, withProps } from './utils.js';
 import { defineProperty } from './support.js';
+import { diagnosticError, hostDiagnostics, ObservedDisposables } from './host-diagnostics.js';
 
 const require = createRequire(import.meta.url);
 const invocation = new AsyncLocalStorage();
@@ -17,7 +18,7 @@ const kRetryCleanup = Symbol('cordis-verus.retry-cleanup');
 export const FiberState = Object.freeze({ PENDING: 0, LOADING: 1, ACTIVE: 2, FAILED: 3, DISPOSED: 4, UNLOADING: 5 });
 const states = { pending: 0, loading: 1, active: 2, failed: 3, disposed: 4, unloading: 5, removed: 4 };
 export class CordisError extends Error {
-  constructor(code, message = code) { super(message); this.code = code; }
+  constructor(code, message = code, details) { super(message); this.code = code; if (details) this.details = Object.freeze({...details}); }
 }
 export class ValidationError extends TypeError {
   constructor(issues) { super(`invalid config:\n${issues.map(issue => `  - ${issue.message}`).join('\n')}`); this.name = 'ValidationError'; }
@@ -59,11 +60,16 @@ function* invocationScopes(token = invocation.getStore()) {
   }
 }
 
-function assertCurrentInvocation(domain) {
+function staleDetails(fiber, generation, operation) {
+  return {owner: fiber?.id ?? null, requestedGeneration: generation ?? null,
+    currentGeneration: fiber?._generation ?? null, removed: fiber?._removedFlag ?? false, operation};
+}
+
+function assertCurrentInvocation(domain, operation = 'context operation') {
   for (const token of invocationScopes()) {
     if (token.fiber._domain !== domain) continue;
     if (token.generation !== token.fiber._generation || token.fiber._removedFlag) {
-      throw new CordisError('STALE_EPISODE', 'managed continuation belongs to an old episode');
+      throw new CordisError('STALE_EPISODE', 'managed continuation belongs to an old episode', staleDetails(token.fiber, token.generation, operation));
     }
   }
 }
@@ -96,7 +102,7 @@ function invocationBlocksWait(token) {
 
 function assertNotWaitingForAncestor(target, operation) {
   target = target.ctx.fiber;
-  assertCurrentInvocation(target._domain);
+  assertCurrentInvocation(target._domain, operation);
   for (const token of invocationScopes()) {
     let invoking=invocationBlocksWait(token) ? token.fiber : undefined;
     while (invoking) {
@@ -175,7 +181,7 @@ class Domain {
       child:(session,callback)=>this.rustChild(session,callback),
       childRetire:(session,callback)=>this.rustChild(session,callback,true),
       assertCurrent:assertCurrentInvocation,
-      stale:()=>new CordisError('STALE_EPISODE','Rust service handle is no longer admitted'),
+      stale:(fiber,generation,operation)=>new CordisError('STALE_EPISODE','Rust service handle is no longer admitted', staleDetails(fiber,generation,operation)),
     });
   }
   // These callbacks are internal Rust child dispatch, never user callbacks.
@@ -188,7 +194,7 @@ class Domain {
     if (this.rust.sessions.get(session?.id) !== session || session.closed
       || !fiber || fiber._domain !== this || this.fibers.get(fiber.id) !== fiber
       || fiber._generation !== session.token.generation || fiber._removedFlag) {
-      throw new CordisError('STALE_EPISODE', 'Rust child request belongs to an old episode');
+      throw new CordisError('STALE_EPISODE', 'Rust child request belongs to an old episode', staleDetails(fiber, session?.token?.generation, 'Rust child request'));
     }
     const coordinator = this.currentMutation;
     const admission = coordinator && {domain:this,
@@ -238,7 +244,7 @@ class Domain {
     if (!group?.open || group.token !== this.currentMutation || !group.token.active
       || group.origin !== invocation.getStore() || this.mutationQueue.length
       || group.members.has(fiber) || !this.defaultUpdate(fiber)) return false;
-    const plugins = this.command({op:'snapshot'}).plugins;
+    const plugins = this.command({op:'snapshot_state'}).plugins;
     const current = target => this.fibers.get(target.id) === target && target.uid !== null
       && !target._removedFlag && plugins.find(node => node.id === target.id);
     const provider = current(group.provider), consumer = current(fiber);
@@ -287,7 +293,7 @@ class Domain {
     if (this.currentMutation || this.mutationQueue.length || invocation.getStore() !== undefined || !this.defaultUpdate(fiber)) {
       return this.enqueueMutation(() => fiber._update(config,noSave));
     }
-    const node = this.command({op:'snapshot'}).plugins.find(node => node.id === fiber.id);
+    const node = this.command({op:'snapshot_state'}).plugins.find(node => node.id === fiber.id);
     if (!node || node.state !== 'Active' || node.pendingAction || node.retired
       || node.cleanupFailed || node.generation !== fiber._generation) {
       return this.enqueueMutation(() => fiber._update(config,noSave));
@@ -393,7 +399,7 @@ class Domain {
     try {
       assertCurrentInvocation(this);
       if (this.closed) throw new CordisError('DOMAIN_CLOSED', 'The domain is closed');
-      if (!options.recovery && this.command({op:'snapshot'}).plugins.some(fiber => fiber.cleanupFailed)) {
+      if (!options.recovery && this.command({op:'snapshot_state'}).plugins.some(fiber => fiber.cleanupFailed)) {
         throw new CordisError('CLEANUP_BLOCKED', 'Unconfirmed cleanup blocks external revisions; retry cleanup first');
       }
       const land = async (value, failure, failed = false) => {
@@ -551,13 +557,13 @@ class Domain {
     // Checks/reclamation can change admission even when their public result looks
     // like a read. Unknown commands are writers by default. Drive is accounted
     // for by pump(), except the explicit constructor/root drive.
-    if (!['snapshot','resolve','validate','validate_check','committed_reaches'].includes(command.op)
+    if (!['snapshot','snapshot_state','resolve','validate','validate_check','committed_reaches'].includes(command.op)
       && !(command.op === 'drive' && this.pumping)) this.driverDirty = true;
     try {
       const result = this.driver.command(JSON.stringify(command));
       const reply = typeof result === 'string' ? JSON.parse(result) : result;
       if (reply?.error) throw new CordisError(reply.code ?? 'NATIVE_DRIVER', typeof reply.error === 'string' ? reply.error : JSON.stringify(reply.error));
-      if (!['snapshot','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches'].includes(command.op)) this.wake();
+      if (!['snapshot','snapshot_state','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches'].includes(command.op)) this.wake();
       return reply;
     } catch (error) {
       // Even a rejected read may report a faulted native domain. Never let a
@@ -692,15 +698,19 @@ class Domain {
         // its join handle before entering the native-admitted transition.
         const transition = Promise.withResolvers();
         fiber.inertia = transition.promise;
+        const observation = hostDiagnostics(fiber);
+        observation.startAction(action.ticket);
         let task;
         try { task = action.kind === 'setup' ? fiber._activate(action.ticket) : fiber._cleanup(action.ticket); }
         catch (error) {
+          observation.endAction(action.ticket);
           if (fiber.inertia === transition.promise) fiber.inertia = undefined;
           transition.resolve();
           throw error;
         }
         fiber._task = task;
         task.finally(() => {
+          observation.endAction(action.ticket);
           if (fiber._task === task) fiber._task = undefined;
           // Native completion may already have admitted the next transition.
           // Never erase its join handle when this earlier callback lands.
@@ -714,7 +724,7 @@ class Domain {
     }
   }
   sync() {
-    const snapshot = this.command({op:'snapshot'});
+    const snapshot = this.command({op:'snapshot_state'});
     for (const item of snapshot.plugins ?? snapshot.nodes ?? snapshot.fibers ?? []) {
       this.rust.sync(item);
       const fiber = this.fibers.get(item.id);
@@ -790,7 +800,7 @@ export class Fiber {
     this.state = FiberState.PENDING;
     this.inertia = undefined;
     this._hooks = Object.create(null);
-    this._disposables = new DisposableList();
+    this._disposables = new ObservedDisposables(this);
     this._ownedTasks = new Set();
     this._generation = undefined;
     this._error = undefined;
@@ -828,7 +838,7 @@ export class Fiber {
     this._domain.assertResourceAdmission();
     if (this.uid === null || this._domain.closed) throw new CordisError('INACTIVE_EFFECT', 'cannot create effect on inactive context');
     const token = invocation.getStore();
-    if (token?.fiber === this && token.generation !== this._generation) throw new CordisError('STALE_EPISODE', 'cannot create effect from an old episode');
+    if (token?.fiber === this && token.generation !== this._generation) throw new CordisError('STALE_EPISODE', 'cannot create effect from an old episode', staleDetails(this, token.generation, 'create effect'));
     if (token?.fiber === this && token.kind === 'cleanup') throw new CordisError('INACTIVE_EFFECT', 'cannot create effect during cleanup');
     if (this._generation === undefined || this._generation === '0') {
       this._generation = this._domain.command({op:'prepare',id:this.id}).generation;
@@ -888,11 +898,13 @@ export class Fiber {
   }
   async _cleanup(ticket) {
     const errors = [];
+    const observation = hostDiagnostics(this);
     try { this._setState(FiberState.UNLOADING); } catch(error) { errors.push(error); }
     const token = {fiber:this, generation:ticket.generation, kind:'cleanup',ticket,active:true};
     try { await invocation.run(token, async () => {
       // Task admission closed with native withdrawal. Every owned task must
       // land before any resource inverse, regardless of registration order.
+      observation.stage('draining-tasks');
       const tasks = [...this._ownedTasks];
       const rustCalls = [...(this._rustCalls ?? [])];
       for (const task of [...tasks,...rustCalls]) task.cancel();
@@ -903,11 +915,17 @@ export class Fiber {
         if (!errors.length) errors.push(new Error('Stream resources are still owned by the retiring episode'));
         return; // Retain dependencies and inverses for close retry.
       }
-      for (const dispose of [...this._disposables].reverse()) {
-        try { await dispose(); this._disposables.delete(dispose); } catch (error) { errors.push(error); }
+      observation.stage('inverses');
+      for (const {sn, value: dispose, record, manual} of this._disposables.entriesForCleanup().reverse()) {
+        if (!manual) observation.begin(record);
+        try { await dispose(); this._disposables.removeRegistration(sn); } catch (error) {
+          if (!manual) observation.fail(record, diagnosticError(error));
+          errors.push(error);
+        }
       }
       // Cleanup may start legitimate committed-service calls without awaiting
       // them. They still land before this consumer releases its native leases.
+      observation.stage('draining-calls');
       while (this._rustCalls?.size) {
         await Promise.allSettled([...this._rustCalls].map(call => call.promise));
       }
@@ -918,10 +936,12 @@ export class Fiber {
       // Ordinary and nested effect inverses may need these handles on retry.
       // Object disposal is a separate late phase, never interleaved ahead of them.
       if (!errors.length) {
+        observation.stage('closing-objects');
         try { await this._domain.rust.closeObjects(this._rustObjects); } catch (error) { errors.push(error); }
         if (this._rustObjects?.size && !errors.length) errors.push(new Error('Object resources remain after cleanup'));
       }
       if (!errors.length) {
+        observation.stage('closing-sessions');
         try { await this._domain.rust.closeSessions(this); } catch (error) { errors.push(error); }
       }
     }); } finally { token.active = false; }
@@ -942,7 +962,7 @@ export class Fiber {
     }
   }
   _cleanupFailure() {
-    const nodes = this._domain.command({op:'snapshot'}).plugins;
+    const nodes = this._domain.command({op:'snapshot_state'}).plugins;
     if (!nodes.some(node => node.cleanupFailed)) return;
     const children = new Map();
     for (const node of nodes) {
@@ -1046,26 +1066,33 @@ export class Fiber {
     const fiber = this.ctx.fiber;
     let active = true, task, cleanup, remove, retry = false;
     const inverses = [];
+    const observation = hostDiagnostics(fiber);
+    let record;
     const dispose = () => {
       if (!active && !retry) return cleanup;
       retry = false;
       active = false;
+      observation.begin(record, task ? 'waiting' : 'running');
       const run = () => {
+        record.state = 'running';
         let chain;
         const errors=[];
-        for (const inverse of [...inverses].reverse()) {
+        for (const item of [...inverses].reverse()) {
+          const {inverse, record: childRecord, manual} = item;
           const execute=()=>{
-            const release=()=>{const index=inverses.indexOf(inverse);if(index>=0)inverses.splice(index,1);};
+            const release=()=>{const index=inverses.indexOf(item);if(index>=0)inverses.splice(index,1);observation.forget(childRecord);};
+            const failed=error=>{if (!manual) observation.fail(childRecord,diagnosticError(error));errors.push(error);};
+            if (!manual) observation.begin(childRecord);
             try {
               const result=inverse();
-              if (result?.then) return Promise.resolve(result).then(release,error=>errors.push(error));
+              if (result?.then) return Promise.resolve(result).then(release,failed);
               release();
-            } catch(error) {errors.push(error);}
+            } catch(error) {failed(error);}
           };
           if (chain) chain=chain.then(execute);
           else { const result=execute(); if(result?.then)chain=result; }
         }
-        const finish=()=>{if(errors.length)throw new AggregateError(errors,'Effect cleanup failed');remove?.();};
+        const finish=()=>{if(errors.length)throw new AggregateError(errors,'Effect cleanup failed');remove?.();observation.forget(record);};
         return chain?chain.then(finish):finish();
       };
       const runOwned = () => runEffectInvocation(fiber,run);
@@ -1073,15 +1100,23 @@ export class Fiber {
         await runOwned();
         if (invocation.getStore()?.kind !== 'cleanup') throw error;
       }) : runOwned(); }
-      catch(error) {cleanup=Promise.reject(error);cleanup.catch(()=>{});throw error;}
+      catch(error) {observation.fail(record,diagnosticError(error));cleanup=Promise.reject(error);cleanup.catch(()=>{});throw error;}
+      if (cleanup?.then) Promise.resolve(cleanup).catch(error => { observation.fail(record,diagnosticError(error)); });
       return cleanup;
     };
     defineProperty(dispose, symbols.effect, {label,children:[]});
-    defineProperty(dispose,kRetryCleanup,()=>{retry=true;});
+    defineProperty(dispose,kRetryCleanup,()=>{
+      retry=true;
+      // Nested managed effects have their own cached cleanup result. Reset the
+      // retained failures too; successfully released inverses are already absent.
+      for (const {inverse} of inverses) inverse[kRetryCleanup]?.();
+    });
     // Install ownership before invoking arbitrary synchronous user code.
-    remove = this._disposables.push(dispose);
+    remove = this._disposables.push(dispose, label, true);
+    record = this._disposables.record(dispose);
     const collect = inverse => {
-      this._disposables.delete(inverse); inverses.push(inverse);
+      const moved = this._disposables.detach(inverse, record);
+      inverses.push({inverse, record: moved?.record ?? observation.register(label, record), manual: moved?.manual ?? false});
       if (inverse[symbols.effect]) dispose[symbols.effect].children.push(inverse[symbols.effect]);
     };
     try { task = runEffectInvocation(fiber,() => collectEffect(execute(), collect, () => active)); }
@@ -1107,7 +1142,7 @@ export class Fiber {
     defineProperty(dispose,symbols.effect,{label,children:[]});
     // A task is owned before its body can execute. Cancellation only requests
     // cooperation; cleanup waits for the actual promise, including rejection.
-    const remove = fiber._disposables.push(dispose);
+    const remove = fiber._disposables.push(dispose, label);
     promise = Promise.resolve().then(() => invocation.run(token,() => execute(controller.signal)));
     const owned = {promise,cancel:reason => controller.abort(reason)};
     fiber._ownedTasks.add(owned);
@@ -1314,7 +1349,7 @@ const contextHandler = {
     // Neither access clears the token: exporters, services and effects retain
     // their ordinary episode admission checks, including on a derived view.
     const diagnostic = prop === 'logger' || prop === 'extend' && Reflect.get(target,prop,ctx) === Context.prototype.extend;
-    if (!diagnostic) assertCurrentInvocation(target[kDomain]);
+    if (!diagnostic) assertCurrentInvocation(target[kDomain], `get:${prop}`);
     if (Reflect.has(target,prop)) return getTraceable(ctx,Reflect.get(target,prop,ctx));
     const error=new Error(`cannot get property "${prop}" without inject`);
     const def=target[kDomain].props[prop];
@@ -1537,7 +1572,24 @@ export class Context {
   intercept(name,config) { return this.extend({[symbols.intercept]:Object.assign(Object.create(this[symbols.intercept]),{[name]:config})}); }
   rustPlugin(name, config) { return this.plugin(this[kDomain].rust.plugin(name),config); }
   async settle() { await this[kDomain].settle(); }
-  snapshot() { return {...this[kDomain].command({op:'snapshot'}),diagnostics:[...this[kDomain].diagnostics]}; }
+  snapshot(options = {}) {
+    const domain = this[kDomain];
+    const snapshot = domain.command({op:'snapshot'});
+    // Names were interned during real registration. Do not resolve services,
+    // inspect effect objects, or call user getters while taking an observation.
+    const services = new Map([...domain.services].filter(([name]) => typeof name === 'string').map(([name,id]) => [id,name]));
+    const realms = new Map([...domain.realms].filter(([realm]) => typeof realm === 'symbol').map(([realm,id]) => [id,realm.description]));
+    const port = value => ({...value, ...(services.has(value.key) ? {service: services.get(value.key)} : {}),
+      ...(realms.get(value.realm) === undefined ? {} : {realmLabel: realms.get(value.realm)})});
+    return {...snapshot, checkErrors: snapshot.checkErrors.map(port), diagnostics: domain.diagnostics.map(item => ({...item})),
+      plugins: snapshot.plugins.map(item => {
+        const fiber = domain.fibers.get(item.id);
+        return {...item, dependencies: item.dependencies?.map(port), committed: item.committed?.map(port),
+          target: item.target?.map(port) ?? null,
+          blockers: item.blockers?.map(blocker => blocker.port ? {...blocker,port:port(blocker.port)} : blocker),
+          ...(fiber ? {host: hostDiagnostics(fiber).snapshot(options.includeTiming === true)} : {})};
+      })};
+  }
   async dispose() {
     assertNotWaitingForAncestor(this.root.fiber,'domain disposal');
     const domain=this[kDomain];

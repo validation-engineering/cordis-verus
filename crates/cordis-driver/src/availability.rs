@@ -47,6 +47,8 @@ struct Record {
     dirty: bool,
     available: bool,
     error: Option<String>,
+    // Diagnostic observation only; never used to admit a lifecycle transition.
+    last_current: Option<bool>,
 }
 #[derive(Default)]
 pub(crate) struct Availability {
@@ -90,11 +92,13 @@ impl Availability {
                 dirty: true,
                 available: false,
                 error: None,
+                last_current: None,
             });
             if record.publication != candidate.publication {
                 record.publication = candidate.publication;
                 record.dirty = true;
                 record.available = false;
+                record.last_current = None;
             }
             if !record.dirty {
                 continue;
@@ -163,6 +167,7 @@ impl Availability {
             if record.publication == ticket.publication
                 && record.notification == ticket.notification
             {
+                record.last_current = Some(current);
                 record.available = current && available;
                 record.error = error.or_else(|| {
                     (!current).then(|| "check snapshot invalidated; notify to reevaluate".into())
@@ -171,6 +176,42 @@ impl Availability {
         }
         Ok(current)
     }
+    /// Explain a currently unavailable check from the cached protocol state.
+    /// This never requests a callback or accepts/invalidates a ticket.
+    pub fn blocker(&self, candidate: Candidate) -> serde_json::Value {
+        use serde_json::json;
+        let Some(record) = self
+            .records
+            .get(&Self::key(candidate.consumer, candidate.port))
+        else {
+            return json!({"code": "CheckNotEvaluated"});
+        };
+        if record.publication != candidate.publication || record.dirty {
+            return json!({"code": "CheckNotEvaluated"});
+        }
+        if let Some(ticket) = self.pending.values().find(|ticket| {
+            ticket.consumer == candidate.consumer
+                && ticket.port == candidate.port
+                && ticket.publication == candidate.publication
+                && ticket.notification == record.notification
+        }) {
+            return json!({
+                "code": if self.current(ticket, Some(candidate)) { "CheckPending" } else { "CheckInvalidated" },
+                "ticket": ticket,
+            });
+        }
+        if record.last_current == Some(false) {
+            return json!({"code": "CheckInvalidated", "error": record.error});
+        }
+        if record.last_current.is_none() {
+            return json!({"code": "CheckNotEvaluated"});
+        }
+        match &record.error {
+            Some(error) => json!({"code": "CheckError", "error": error}),
+            None => json!({"code": "CheckRejected"}),
+        }
+    }
+
     pub fn remove_consumer(&mut self, consumer: usize) {
         self.records.retain(|(id, _, _), _| *id != consumer);
         // Outstanding callbacks still acknowledge their ticket exactly once.

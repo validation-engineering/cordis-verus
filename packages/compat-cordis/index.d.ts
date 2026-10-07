@@ -61,6 +61,63 @@ export interface DriverStorageStats {
   publishedValues: number;
   pendingActions: number;
 }
+/** Decimal strings preserve native identities beyond JavaScript's safe integers. */
+export interface DiagnosticPort { key: string; realm: string; service?: string; realmLabel?: string; }
+export interface EpisodeIdentity { id: string; generation: string | null; }
+export interface DiagnosticBinding extends DiagnosticPort {
+  provider: string;
+  generation: string | null;
+  publication: string | null;
+}
+export type DiagnosticPhase = 'Pending' | 'Failed' | 'Loading' | 'Active' | 'Unloading';
+export interface DriverActionTicket { domain: string; id: string; generation: string; action: string; kind: 'setup' | 'cleanup'; }
+export interface DriverCheckTicket {
+  domain: string; consumer: string; port: DiagnosticPort; publication: string;
+  value_revision: string; notification: string; action: string;
+}
+export interface DiagnosticCheck { port: DiagnosticPort; provider: string; publication: string; }
+export type DriverBlocker =
+  | {code: 'MissingProvider'; port: DiagnosticPort}
+  | {code: 'RealmMismatch'; port: DiagnosticPort; observedRealms: string[]}
+  | {code: 'ProviderUnavailable'; port: DiagnosticPort; providers: (EpisodeIdentity & {state: DiagnosticPhase; retired: boolean})[]}
+  | {code: 'PublicationMissing'; port: DiagnosticPort; provider: string}
+  | (DiagnosticCheck & {code: 'CheckNotEvaluated' | 'CheckRejected'})
+  | (DiagnosticCheck & {code: 'CheckPending'; ticket: DriverCheckTicket})
+  | (DiagnosticCheck & {code: 'CheckError'; error: string})
+  | (DiagnosticCheck & ({code: 'CheckInvalidated'; ticket: DriverCheckTicket} | {code: 'CheckInvalidated'; error: string | null}))
+  | {code: 'CommittedConsumers'; consumers: EpisodeIdentity[]}
+  | {code: 'PendingAction'; ticket: DriverActionTicket}
+  | {code: 'RetiringChildren'; children: EpisodeIdentity[]}
+  | {code: 'CleanupFailed'; error: string | null; retryable: true}
+  | {code: 'Failed'; error: string}
+  | {code: 'TargetChanged' | 'Unsealed'};
+export interface InverseObservation {
+  id: string; owner: string; generation: string | null; registeredGeneration: string | null; parent: string | null;
+  label: string; state: 'registered' | 'waiting' | 'running' | 'failed'; attempts: number;
+  error?: string;
+  /** Observed duration of this running attempt; only with includeTiming. */
+  elapsedMs?: number;
+}
+export interface HostObservation {
+  inverses: InverseObservation[];
+  action?: {ticket: DriverActionTicket; stage: 'setup' | 'cleanup' | 'draining-tasks' | 'inverses' | 'draining-calls' | 'closing-objects' | 'closing-sessions'; elapsedMs?: number};
+}
+export interface DriverPluginSnapshot extends EpisodeIdentity {
+  parent: string | null; state: DiagnosticPhase; retired: boolean; error: string | null;
+  cleanupFailed: boolean; pendingAction: DriverActionTicket | null;
+  dependencies: DiagnosticPort[]; committed: DiagnosticBinding[]; target: DiagnosticBinding[] | null;
+  blockers: DriverBlocker[]; host?: HostObservation;
+}
+export interface DriverSnapshot {
+  abi: 1; diagnosticsSchema: 'cordis.driver/v1'; domain: string; profile: 'cordis' | 'harness';
+  plugins: DriverPluginSnapshot[]; storage: DriverStorageStats;
+  checkErrors: (DiagnosticPort & {consumer: string; error: string})[];
+  diagnostics: {kind: 'service-check' | 'mutation-step'; consumer?: string; error: string}[];
+}
+export interface EpisodeErrorDetails {
+  owner: string | null; requestedGeneration: string | null; currentGeneration: string | null;
+  removed: boolean; operation: string;
+}
 export class Context {
   static readonly effect: unique symbol;
   static readonly filter: unique symbol;
@@ -98,7 +155,8 @@ export class Context {
   waterfall(name: keyof Events, ...args: any[]): any;
   settle(): Promise<void>;
   dispose(): Promise<void>;
-  snapshot(): {domain: string; plugins: object[]; storage: DriverStorageStats};
+  /** Read-only observation. Timing is opt-in and does not diagnose deadlock or progress. */
+  snapshot(options?: {includeTiming?: boolean}): DriverSnapshot;
 }
 export const FiberState: Readonly<{PENDING: 0; LOADING: 1; ACTIVE: 2; FAILED: 3; DISPOSED: 4; UNLOADING: 5}>;
 export class Fiber {
@@ -149,7 +207,11 @@ export class RegistryService {
 }
 export class ReflectService { get(name: string, strict?: boolean): any; set(name: string, value: any): boolean; provide(name: string, value?: any, check?: () => boolean): AsyncDisposable; notify(names: string[]): Fiber[]; trace<T>(value: T): T; bind<T extends Function>(callback: T): T; }
 export class EventsService { }
-export class CordisError extends Error { readonly code: string; }
+export class CordisError extends Error {
+  constructor(code: string, message?: string, details?: EpisodeErrorDetails);
+  readonly code: string;
+  readonly details?: Readonly<EpisodeErrorDetails>;
+}
 export class ValidationError extends TypeError { }
 export function Inject(name: string, config?: unknown): (value: any, decorator: ClassDecoratorContext | ClassMethodDecoratorContext) => void;
 export namespace Inject { function resolve(inject?: Inject): Record<string,unknown>; }

@@ -127,12 +127,32 @@ Cleanup-time registration errors now contain `inactive context`; the
 changes do not prove the JS coordinator or arbitrary callbacks, and do not close
 the paper's host-boundary obligation.
 
-A03 still needs a real plugin migration record with required edits and rollback
-steps. A04's four diagnostic tasks remain next: missing dependency, cleanup wait,
-failed inverse and stale episode. Select one real service for A05's DTO + async
-generator and the associated A07 host slice. The order can change when a recorded
-external task reveals a more important blocker; record the reason and preserve
-the proof dependencies.
+A03 still needs a real plugin migration record, including edits and rollback steps.
+The four A04 diagnostic tasks now have the bounded implementation below. A05's
+DTO + async generator and its related A07 host slice should start from a real
+service. Recorded external blockers can change the order without dropping proof
+dependencies.
+
+## Third iteration: diagnostics and runtime delivery
+
+A04 now exposes shared Driver dependency reasons, actual target/committed bindings,
+consumer/child barriers and pending action tickets. Node adds labeled retained
+inverse identities, attempts, failures and optional elapsed time, together with
+structured old-episode rejection details. Snapshot reads neither execute callbacks
+nor retry or release resources. Regression cases also fix explicit retry through
+nested effects and preserve the failed registration when the same raw callback was
+registered more than once. See [host diagnostics](host-diagnostics.md) for the scope,
+including the different ordinary Rust cleanup contract. An external troubleshooting
+record and host refinement remain separate work.
+
+A01/A02 delivery support now includes platform-specific precompiled npm assets, a
+standalone new-project installer and optional GitHub draft prerelease creation.
+The workflow requires all three platforms to pass the complete quality gate and
+install/reinstall the built assets first. Runtime use needs Node/npm and GitHub
+access, not Rust, Verus or a source checkout. This is the Node compatibility runtime,
+not a prebundled Harness application or a pure Rust application binary. No runtime
+release is available yet; [distribution instructions](native-distribution.md) explain
+how the prepared path will work and how maintainers qualify a release.
 
 ## Independent installation acceptance
 

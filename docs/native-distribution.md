@@ -1,8 +1,67 @@
 # Native artifact distribution
 
+English | [简体中文](native-distribution.zh-CN.md)
+
 The Node facade uses the same manifest selector in a source checkout and an
-extracted npm installation. This is local packaging infrastructure. Packages remain
-private; no registry publication, signing or complete platform acceptance is claimed.
+extracted npm installation. The three npm packages can be delivered as precompiled GitHub Release assets.
+No runtime release has been published yet; the commands below become usable after
+a maintainer publishes a validated runtime draft. Packages remain private; npm
+registry publication and signing are separate work.
+
+## Install a published runtime without compiling
+
+Prerequisites are Node.js 22.22+ with npm, and the [GitHub CLI](https://cli.github.com/manual/gh_release_download).
+A private repository also requires `gh auth login` with read access. Rust, Verus,
+a source checkout, and a C/C++ compiler are not needed. Choose an explicit published
+runtime tag from the repository's Releases page; toolchain archive tags are not
+runtime releases.
+
+```sh
+# Replace the placeholder with a published runtime tag. No runtime tag exists yet.
+CORDIS_RELEASE_TAG='<published-runtime-tag>'
+gh release download "$CORDIS_RELEASE_TAG" \
+  --repo validation-engineering/cordis-verus \
+  --pattern install-cordis.mjs --dir ./cordis-installer
+node ./cordis-installer/install-cordis.mjs \
+  --release "$CORDIS_RELEASE_TAG" --project ./my-cordis-app
+cd my-cordis-app
+npm start
+```
+
+The installer selects the current macOS ARM64/x64 or Linux x64 GNU target,
+downloads three existing npm tarballs plus their evidence, verifies size/SHA-256,
+and installs with `npm --offline --ignore-scripts`. It verifies the installed native
+manifest/provenance and actually loads both Cordis profiles before creating the
+requested directory. An existing project is never overwritten. Download, hash,
+package-installation and native-load failures remove staging directories and leave
+the destination absent. Its parent directory must already exist.
+
+The resulting project contains a working `app.mjs`, a package lock, retained
+`.vendor/cordis/` tarballs for offline `npm ci`, and `cordis-release.json` recording
+the source commit, target and manifest hash. Use normal imports from
+`@cordis-verus/compat-cordis`, or start existing Cordis plugins with
+`node --import @cordis-verus/compat-cordis/register app.mjs`. The loader and Harness
+profile packages are installed alongside the same native lifecycle driver.
+
+This delivers the **Node compatibility runtime**, not the complete Harness
+application or custom Rust plugins. Pure Rust applications still consume Rust
+crates; their application code must be compiled. Node remains an optional adapter
+for existing JavaScript/TypeScript plugins.
+
+For an offline machine, download the selected platform's `cordis-runtime-*.json`,
+its referenced three `.tgz` assets and evidence JSON, plus `install-cordis.mjs`.
+Use the same installer and verification path locally:
+
+```sh
+node ./release-assets/install-cordis.mjs \
+  --from-directory ./release-assets --project ./my-cordis-app
+```
+
+Only install assets from a publisher you trust: package JavaScript and the native
+addon execute during the smoke check. Hashes detect changed bytes, not publisher
+identity. GitHub access and release review remain the trust boundary; signing and
+attestation verification are not implemented. No network fallback or source build
+is attempted when a target, dependency or binary cannot be used.
 
 ## Declared targets and evidence
 
@@ -108,3 +167,24 @@ it does not prove an arbitrary supplied native program safe. Signing/attestation
 minimum OS/libc release qualification and a passed multi-platform release matrix
 remain separate acceptance work. JavaScript and native FFI behavior are not covered
 by the lifecycle kernel's Verus proofs.
+
+## Release asset production
+
+[`package-runtime-release.py`](../scripts/package-runtime-release.py) reuses the
+existing three independently installed tarballs and native provenance. It accepts
+only a fresh full release record, checks the exact ordered negative-control manifest,
+binds all package/build inputs, and requires a clean source commit (the newly generated
+verification report is the only permitted tracked difference). It preserves the
+actual native build profile rather than silently calling a development build optimized.
+
+The [full release workflow](../.github/workflows/release-validation.yml) runs all
+three platforms, installs each staged runtime in a new project, and checks a second
+offline `npm ci` followed by the example. When explicitly dispatched with
+`create_draft=true` and a new `release_tag`, it collects all three matching-commit
+asset sets, adds `SHA256SUMS`, and creates a **draft prerelease**. Any failed platform
+prevents this job from running. It refuses an existing tag and never publishes the
+draft automatically. A development workflow cannot upload runtime releases.
+
+A workflow definition is not execution evidence. The first runtime release still
+requires successful full-quality runs on its exact commit and maintainer review.
+See [the release procedure](releasing.md) for the remaining release checklist.

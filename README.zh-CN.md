@@ -12,7 +12,7 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 
 ## 为什么使用 cordis-verus
 
-- **经过验证的生命周期决策。** 显式合同约束 provider 身份、激活与清理。消费者在清理完成前保留所需服务；清理失败时保留资源供后续恢复。
+- **经过验证的生命周期决策。** 显式合同约束 provider 身份、激活与清理。消费者在清理完成前保留所需服务；Node 宿主保留失败的清理动作，支持显式重试。
 - **从论文到代码的审查路径。** 沿论文定义检查前提、可执行合同与具名回归测试，区分已经证明的结果、条件化模型和反例。
 - **Rust 中的 Cordis 功能。** 组合类型化服务、异步插件与具有明确所有者的资源。原版插件接口、上游测试和官方 Harness 工作流为功能对齐提供具体目标。
 
@@ -72,7 +72,7 @@ Verus 在开发阶段检查内核，已编译应用无需运行验证器。完�
 
 1. **扩大 refinement：** 将更多生命周期行为与宿主执行连接到论文约束。
 2. **完善兼容性：** 修复需要对齐的已知差异，验证更多原版插件。
-3. **准备可复现发布：** 恢复长期可用的工具链下载，完成平台与发布验收。
+3. **准备可复现发布：** 完成全部平台的发布验收，通过 [GitHub Release 安装路径](docs/native-distribution.zh-CN.md)提供预编译运行产物；当前尚无可下载的 runtime release。
 
 具体验收条件见[路线图](docs/roadmap.md)，逐项主张见[论文清单](docs/paper-coverage.md)。完整论文 refinement 与生产就绪仍是后续目标。
 
@@ -82,6 +82,7 @@ Verus 在开发阶段检查内核，已编译应用无需运行验证器。完�
 | --- | --- |
 | 编写 Rust 插件 | [运行时指南](docs/runtime.md) · [示例](crates/cordis/examples) |
 | 使用原版插件或混合 Rust/JS | [Node 兼容](docs/node-compatibility.md) · [Rust 插件适配器](docs/rust-node-plugins.md) |
+| 解释生命周期等待 | [宿主诊断](docs/host-diagnostics.zh-CN.md) |
 | 构建 agent 应用 | [Cordis Harness](https://github.com/validation-engineering/cordis-harness) |
 | 审查证明或复现检查 | [论文审查](docs/paper-review-guide.zh-CN.md) · [验证说明](docs/validation.md) |
 

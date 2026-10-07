@@ -90,7 +90,7 @@ export function rustStream(host, session, id, caller, generation) {
   const resource = {id, session, caller, generation, closing:false, closed:false, pending:undefined, attempt:undefined};
   const validate = () => {
     host.hooks.assertCurrent(host.domain);
-    if (session.closed || session.cleaning || caller._removedFlag || caller.state === 5 || caller._generation !== generation) throw host.hooks.stale();
+    if (session.closed || session.cleaning || caller._removedFlag || caller.state === 5 || caller._generation !== generation) throw host.hooks.stale(caller,generation,'Rust stream:next');
     const token = host.hooks.invocation();
     if (token?.fiber && token.fiber !== caller && (!token.rustAuthority || token.fiber._domain !== host.domain)) throw new Error('StreamOwnerMismatch');
   };
@@ -122,7 +122,7 @@ export function rustStream(host, session, id, caller, generation) {
   const next = async () => {
     validate();
     if (resource.closed) return {done:true,value:undefined};
-    if (resource.closing) throw host.hooks.stale();
+    if (resource.closing) throw host.hooks.stale(caller,generation,'Rust stream:next');
     if (resource.pending) throw new Error('StreamBusy');
     const reply = host.command({op:'stream_next', session:session.id, stream:id, caller:host.caller(caller,generation)});
     const pending = host.wait(reply.job,session,'stream-next',caller,resource);

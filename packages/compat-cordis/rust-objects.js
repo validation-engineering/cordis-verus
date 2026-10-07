@@ -123,7 +123,7 @@ export function rustObject(host,session,id,description,caller,generation) {
   const call = (method,...args) => {
     try {
       host.hooks.assertCurrent(host.domain);
-      if (resource.closed || resource.closing || session.closed || session.cleaning || caller._removedFlag || caller._generation !== generation) throw host.hooks.stale();
+      if (resource.closed || resource.closing || session.closed || session.cleaning || caller._removedFlag || caller._generation !== generation) throw host.hooks.stale(caller,generation,typeof method === 'string' ? `Rust object:${method}` : 'Rust object:call');
       const token = host.hooks.invocation();
       if (token?.fiber && token.fiber !== caller && (!token.rustAuthority || token.fiber._domain !== host.domain)) throw new Error('ObjectOwnerMismatch');
       if (!allowed.has(method)) throw new Error(`UndeclaredObjectMethod: ${method}`);

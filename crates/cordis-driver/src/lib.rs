@@ -882,15 +882,245 @@ impl Driver {
         Ok(HostAction::Cleanup { id, ticket })
     }
 
+    fn phase_name(&self, id: usize) -> &'static str {
+        let node = &self.nodes[&id];
+        match self.kernel.phase(id).unwrap() {
+            _ if node.prepared_cleanup => "Unloading",
+            Phase::Inactive if node.failed.is_some() => "Failed",
+            Phase::Inactive => "Pending",
+            Phase::Loading => "Loading",
+            Phase::Active => "Active",
+            Phase::Unloading => "Unloading",
+        }
+    }
+
+    fn identity_snapshot(&self, id: usize) -> Value {
+        json!({
+            "id": id.to_string(),
+            "generation": self.kernel.episode_generation(id).map(|v| v.to_string()),
+        })
+    }
+
+    fn binding_snapshot(
+        &self,
+        id: usize,
+        binding: cordis_kernel::Binding,
+        committed: bool,
+    ) -> Value {
+        let port = Port {
+            key: binding.key,
+            realm: binding.realm,
+        };
+        let publication = if committed {
+            self.nodes[&id]
+                .resources
+                .iter()
+                .find(|resource| resource.port == port)
+                .map(|resource| resource.publication)
+        } else {
+            self.publications.resolve(port).filter(|publication| {
+                self.publications
+                    .entry(*publication)
+                    .is_some_and(|entry| entry.owner == binding.provider)
+            })
+        };
+        // The old episode retains its own publication even when the current
+        // resolver selects a different identity for the same port.
+        let generation = if committed {
+            publication.and_then(|publication| {
+                self.publications
+                    .entry(publication)
+                    .map(|entry| entry.generation)
+            })
+        } else {
+            self.kernel.episode_generation(binding.provider)
+        };
+        json!({
+            "key": binding.key.to_string(), "realm": binding.realm.to_string(),
+            "provider": binding.provider.to_string(),
+            "generation": generation.map(|value| value.to_string()),
+            "publication": publication.map(|value| value.0.to_string()),
+        })
+    }
+
+    fn dependency_blocker(&self, id: usize, port: ServicePort) -> Option<Value> {
+        let provider = self.kernel.resolve(port.into());
+        let publication = self.publications.resolve(port.into());
+        let entry = publication.and_then(|publication| self.publications.entry(publication));
+        let mut blocker = if let Some(provider) = provider {
+            match entry {
+                None => json!({"code": "PublicationMissing", "provider": provider.to_string()}),
+                Some(entry) if entry.owner != provider || self.kernel.retired(entry.owner) => {
+                    json!({"code": "ProviderUnavailable", "providers": [{
+                        "id": entry.owner.to_string(),
+                        "generation": entry.generation.to_string(),
+                        "state": self.phase_name(entry.owner),
+                        "retired": self.kernel.retired(entry.owner),
+                    }]})
+                }
+                Some(entry) => {
+                    let publication = publication.unwrap();
+                    if !self.checked.contains_key(&publication.0)
+                        || self.availability.available(id, port, publication.0)
+                    {
+                        return None;
+                    }
+                    let candidate = self.check_candidate(id, port)?;
+                    let mut blocker = self.availability.blocker(candidate);
+                    blocker["provider"] = json!(entry.owner.to_string());
+                    blocker["publication"] = json!(publication.0.to_string());
+                    blocker
+                }
+            }
+        } else {
+            // Include declared providers as well as dynamic publications. A
+            // visible publication in another realm is never a matching service.
+            let mut providers = Vec::new();
+            let mut realms = std::collections::BTreeSet::new();
+            for (&provider, node) in &self.nodes {
+                let ports =
+                    node.provisions
+                        .iter()
+                        .copied()
+                        .chain(node.publications.iter().filter_map(|publication| {
+                            self.publications
+                                .entry(*publication)
+                                .filter(|entry| entry.retained)
+                                .map(|entry| entry.port)
+                        }));
+                let mut matches = false;
+                for candidate in ports.filter(|candidate| candidate.key == port.key) {
+                    if candidate.realm == port.realm {
+                        matches = true;
+                    } else {
+                        realms.insert(candidate.realm);
+                    }
+                }
+                if matches {
+                    providers.push(json!({
+                        "id": provider.to_string(),
+                        "generation": self.kernel.episode_generation(provider).map(|v| v.to_string()),
+                        "state": self.phase_name(provider), "retired": self.kernel.retired(provider),
+                    }));
+                }
+            }
+            if !providers.is_empty() {
+                json!({"code": "ProviderUnavailable", "providers": providers})
+            } else if !realms.is_empty() {
+                json!({"code": "RealmMismatch", "observedRealms": realms.iter().map(|realm| realm.to_string()).collect::<Vec<_>>()})
+            } else {
+                json!({"code": "MissingProvider"})
+            }
+        };
+        blocker["port"] = json!(port);
+        Some(blocker)
+    }
+
+    fn plugin_state(&self, id: usize) -> Value {
+        let node = &self.nodes[&id];
+        json!({
+            "id": id.to_string(),
+            "generation": self.kernel.episode_generation(id).unwrap().to_string(),
+            "parent": node.parent.map(|id| id.to_string()),
+            "state": self.phase_name(id), "retired": self.kernel.retired(id),
+            "error": node.failed, "cleanupFailed": node.cleanup_failed,
+            "pendingAction": node.pending,
+        })
+    }
+
+    /// Read only the lifecycle fields needed by executor coordination. Unlike
+    /// `snapshot`, this does not resolve targets, scan dependency histories, or
+    /// construct diagnostics/storage. It carries no new admission authority.
+    pub fn snapshot_state(&self) -> Value {
+        let plugins: Vec<_> = self.nodes.keys().map(|&id| self.plugin_state(id)).collect();
+        json!({"abi": 1, "profile": self.profile, "domain": self.domain.to_string(), "plugins": plugins})
+    }
+
     /// Diagnostic observations, not an independent lifecycle state machine.
     /// `leaseRecords` counts stored live leases; `leaseAllocations` is the
     /// monotonic allocation count, including leases already released.
     pub fn snapshot(&self) -> Value {
-        let plugins: Vec<_> = self.nodes.iter().map(|(&id, node)| {
-            let phase = if node.prepared_cleanup { Phase::Unloading } else { self.kernel.phase(id).unwrap() };
-            let state = match phase { Phase::Inactive if node.failed.is_some() => "Failed", Phase::Inactive => "Pending", Phase::Loading => "Loading", Phase::Active => "Active", Phase::Unloading => "Unloading" };
-            json!({"id":id.to_string(),"generation":self.kernel.episode_generation(id).unwrap().to_string(),"parent":node.parent.map(|id|id.to_string()),"state":state,"retired":self.kernel.retired(id),"error":node.failed,"cleanupFailed":node.cleanup_failed,"pendingAction":node.pending})
-        }).collect();
+        let mut consumers: BTreeMap<usize, Vec<Value>> = BTreeMap::new();
+        for &id in self.nodes.keys() {
+            let mut providers = std::collections::BTreeSet::new();
+            for binding in self.kernel.committed(id) {
+                if providers.insert(binding.provider) {
+                    consumers
+                        .entry(binding.provider)
+                        .or_default()
+                        .push(self.identity_snapshot(id));
+                }
+            }
+        }
+        let plugins: Vec<_> = self
+            .nodes
+            .iter()
+            .map(|(&id, node)| {
+                let phase = self.kernel.phase(id).unwrap();
+                let committed = self.kernel.committed(id);
+                let target = self.kernel.target(id);
+                let mut blockers = Vec::new();
+                if node.cleanup_failed {
+                    blockers.push(
+                        json!({"code": "CleanupFailed", "error": node.failed, "retryable": true}),
+                    );
+                } else if phase != Phase::Unloading && !node.prepared_cleanup {
+                    if let Some(error) = &node.failed {
+                        blockers.push(json!({"code": "Failed", "error": error}));
+                    }
+                }
+                if !self.kernel.retired(id) && phase != Phase::Unloading {
+                    if !node.sealed {
+                        blockers.push(json!({"code": "Unsealed"}));
+                    }
+                    for port in &node.dependencies {
+                        if let Some(blocker) = self.dependency_blocker(id, *port) {
+                            blockers.push(blocker);
+                        }
+                    }
+                }
+                if matches!(phase, Phase::Loading | Phase::Active)
+                    && target.as_ref() != Some(&committed)
+                {
+                    blockers.push(json!({"code": "TargetChanged"}));
+                }
+                if let Some(ticket) = &node.pending {
+                    blockers.push(json!({"code": "PendingAction", "ticket": ticket}));
+                }
+                if phase == Phase::Unloading {
+                    if let Some(consumers) = consumers.get(&id) {
+                        blockers
+                            .push(json!({"code": "CommittedConsumers", "consumers": consumers}));
+                    }
+                }
+                // Ownership only delays removal or the next episode. It is not a
+                // service edge and does not delay this parent's cleanup action.
+                if phase == Phase::Inactive {
+                    let children: Vec<_> = self
+                        .kernel
+                        .children(id)
+                        .into_iter()
+                        .filter(|child| self.kernel.retired(*child))
+                        .map(|child| self.identity_snapshot(child))
+                        .collect();
+                    if !children.is_empty() {
+                        blockers.push(json!({"code": "RetiringChildren", "children": children}));
+                    }
+                }
+                let mut plugin = self.plugin_state(id);
+                plugin["dependencies"] = json!(node.dependencies);
+                plugin["committed"] = json!(committed
+                    .into_iter()
+                    .map(|binding| self.binding_snapshot(id, binding, true))
+                    .collect::<Vec<_>>());
+                plugin["target"] = json!(target.map(|bindings| bindings
+                    .into_iter()
+                    .map(|binding| self.binding_snapshot(id, binding, false))
+                    .collect::<Vec<_>>()));
+                plugin["blockers"] = json!(blockers);
+                plugin
+            })
+            .collect();
         let storage = json!({
             "registeredPlugins": self.nodes.len(),
             "identitySlots": self.kernel.identity_slots(),
@@ -904,7 +1134,7 @@ impl Driver {
             "publishedValues": self.values.len(),
             "pendingActions": self.nodes.values().filter(|node| node.pending.is_some()).count(),
         });
-        json!({"abi":1,"profile":self.profile,"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics(),"storage":storage})
+        json!({"abi":1,"diagnosticsSchema":"cordis.driver/v1","profile":self.profile,"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics(),"storage":storage})
     }
 
     /// Whether a fiber is in an episode's still-committed dependency closure.
@@ -1114,6 +1344,7 @@ impl Driver {
                 )
             }
             Command::Snapshot => Ok(self.snapshot()),
+            Command::SnapshotState => Ok(self.snapshot_state()),
         }
     }
 }

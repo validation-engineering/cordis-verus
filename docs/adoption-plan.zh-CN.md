@@ -109,10 +109,25 @@ Harness profile 仍走原来的 FIFO。详细边界见
 和优先执行的 `STALE_EPISODE` 拒绝。这些改动没有证明整个 JS 协调器或任意 callback，
 没有关闭论文的 host-boundary 义务。
 
-A03 仍需真实插件迁移记录，包括所需改动与回退步骤。下一步继续 A04 的四种诊断任务：
-缺少依赖、清理等待、失败 inverse、旧 episode。为 A05 的 DTO + async 生成器和关联
-的 A07 宿主切片选择一个真实服务。如果已记录的外部任务暴露了更重要的阻塞，可调整
-顺序，但需记录原因并保留证明依赖。
+A03 仍需真实插件迁移记录，包括所需改动与回退步骤。A04 的四种诊断任务已有下述
+受限实现。A05 的 DTO + async 生成器与关联 A07 宿主切片应从一个真实服务开始；
+实际外部阻塞可以调整顺序，但不能删除证明依赖。
+
+## 第三轮：诊断与运行产物交付
+
+A04 已导出 shared Driver 的依赖原因、真实 target/committed binding、consumer/child
+屏障和 pending action ticket。Node 增加带标签的保留 inverse 身份、尝试次数、失败和
+可选经过时间，以及结构化旧 episode 拒绝信息。快照读取不执行 callback，不重试或
+释放资源。回归同时修复嵌套 effect 的显式重试，以及同一原始 callback 多次注册时
+精确保留失败的那一次。范围见[宿主诊断](host-diagnostics.zh-CN.md)，其中明确区分
+普通 Rust 的清理合同。外部真实排障记录与宿主 refinement 仍是独立工作。
+
+A01/A02 的交付支持新增按平台打包的预编译 npm 产物、独立新项目安装器和可选的
+GitHub draft prerelease 创建流程。工作流要求三平台完整质量门槛与产物安装/重装
+全部通过后才创建草稿。使用运行库需要 Node/npm 和 GitHub 访问，不需要 Rust、Verus
+或源码 checkout。这是 Node 兼容运行库，不是完整打包的 Harness 应用或纯 Rust 应用
+可执行文件。当前尚无 runtime release；[分发指南](native-distribution.zh-CN.md)说明
+已准备的安装路径和维护者的发行验收方式。
 
 ## 独立安装验收
 

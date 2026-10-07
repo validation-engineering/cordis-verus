@@ -143,3 +143,21 @@ async function coordinated(ctx: Context, fiber: Fiber): Promise<number> {
   return value;
 }
 void coordinated;
+
+function diagnosticTypes(ctx: Context): void {
+  const snapshot = ctx.snapshot({includeTiming: true});
+  for (const plugin of snapshot.plugins) {
+    for (const blocker of plugin.blockers) {
+      if (blocker.code === 'MissingProvider') { const name: string | undefined = blocker.port.service; void name; }
+      if (blocker.code === 'CommittedConsumers') { const id: string = blocker.consumers[0].id; void id; }
+      if (blocker.code === 'CleanupFailed') { const retryable: true = blocker.retryable; void retryable; }
+      // @ts-expect-error Dependency detail requires narrowing to its reason code.
+      blocker.port;
+    }
+    const duration: number | undefined = plugin.host?.action?.elapsedMs;
+    void duration;
+  }
+  // @ts-expect-error Timing is an explicit boolean option.
+  ctx.snapshot({includeTiming: 'yes'});
+}
+void diagnosticTypes;

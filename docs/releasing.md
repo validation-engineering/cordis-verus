@@ -69,6 +69,52 @@ paper copies, and build outputs must not appear in them.
 
 Cargo's [package rules](https://doc.rust-lang.org/cargo/commands/cargo-package.html)
 and [versioned path dependencies](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#multiple-locations)
-define the packaging behavior. CI pins external actions to immutable commits
-and uses a read-only token, following GitHub's
+define the packaging behavior. CI pins external actions to immutable commits. Validation jobs use a read-only
+token; only the explicitly requested draft-release job has `contents: write`, following GitHub's
 [secure-use guidance](https://docs.github.com/en/actions/reference/security/secure-use).
+
+## Precompiled Node runtime on GitHub Releases
+
+The runtime distribution does not require publishing to npm or crates.io. It
+contains the existing `compat-cordis`, `compat-harness` and `compat-loader` tarballs,
+with the native addon already inside the core package. Consumers need Node/npm;
+private downloads also need an authenticated GitHub CLI. See
+[installation and architecture boundaries](native-distribution.md#install-a-published-runtime-without-compiling).
+No runtime release is available yet.
+
+From a clean, reviewed commit, run the `Full release validation` workflow with
+`create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. Every matrix
+job must pass `record-verification.py`, including every current full-crate negative
+control, before its packages can be staged. The workflow then tests installation,
+native loading and offline reinstallation on that same platform. The collector
+requires all three platform manifests from the same source commit, rechecks the
+full-quality records, and copies their original package bytes into a draft
+prerelease with checksums and an installer. It does not rebuild after verification.
+
+The `create_draft` default is false. A failed gate leaves only diagnostic Actions
+artifacts; an interrupted upload can leave an incomplete draft, which must be
+reviewed before publication. No step converts a development report to a release
+report. Tag reuse and overwriting an existing release are rejected. This is a
+prerelease path for the current documented platform/runtime boundary; it does not
+establish minimum OS/glibc support beyond the environments actually tested, signing,
+registry publication, complete Harness application packaging, or paper completion.
+
+For an equivalent local staging check after a real full gate:
+
+```sh
+python3 scripts/record-verification.py --offline
+python3 scripts/package-runtime-release.py package --output /tmp/cordis-runtime-assets
+node scripts/install-cordis.mjs --from-directory /tmp/cordis-runtime-assets \
+  --project /tmp/cordis-runtime-consumer
+cd /tmp/cordis-runtime-consumer
+npm start
+npm ci --offline --ignore-scripts --no-audit --no-fund
+npm start
+```
+
+Both output directories must be new. The package command stages only the current
+host's accepted assets. The remote collector still requires the other two platforms
+before creating a draft. Inspect the draft's source commit, checksums, platform
+records, limitations and installation instructions before publishing it. Retain the
+published assets: deleting a workflow artifact after its retention period should
+not remove the runtime release or its embedded evidence.

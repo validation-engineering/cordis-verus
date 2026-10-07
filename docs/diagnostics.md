@@ -1,5 +1,8 @@
 # 诊断、维护与可靠关闭
 
+Node/shared Driver 的依赖阻塞、清理动作、失败重试和旧 episode 诊断见
+[英文指南](host-diagnostics.md) · [中文指南](host-diagnostics.zh-CN.md)。
+
 `Runtime::snapshot()` 只读取状态，不驱动用户 callback。它按 plugin ID 返回稳定排列的节点：phase、retired/restoring、parent、固定端口、committed 和当前 target，以及阻碍继续执行的原因。
 
 - `MissingDependencies`：Inactive 节点还缺少哪些 key/realm。

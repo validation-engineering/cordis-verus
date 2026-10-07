@@ -508,9 +508,9 @@ export class RustHost {
   }
   call(session,service,descriptor,method,ctx,fiber,generation,args) {
     this.hooks.assertCurrent(this.domain);
-    if (session.closed || session.cleaning || fiber._removedFlag || fiber._generation !== generation) throw this.hooks.stale();
+    if (session.closed || session.cleaning || fiber._removedFlag || fiber._generation !== generation) throw this.hooks.stale(fiber,generation,`Rust service:${descriptor.name}.${method.name}`);
     const current = ctx[descriptor.name];
-    if ((current?.[symbols.original] ?? current) !== service) throw this.hooks.stale();
+    if ((current?.[symbols.original] ?? current) !== service) throw this.hooks.stale(fiber,generation,`Rust service:${descriptor.name}.${method.name}`);
     if (['stream','object'].includes(method.kind) && (session.cancelled || fiber.state === 5 || this.hooks.invocation()?.kind === 'cleanup')) throw new Error(method.kind === 'stream' ? 'StreamAdmissionClosed' : 'ObjectAdmissionClosed');
     const caller = this.caller(fiber,generation);
     const reply = this.command({op:'call',session:session.id,service:descriptor.name,method:method.name,args:jsonValue(args),caller});

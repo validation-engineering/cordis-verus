@@ -241,6 +241,8 @@ pub enum Command {
         error: Option<String>,
     },
     Snapshot,
+    /// Internal lifecycle observation without graph diagnostics or storage scans.
+    SnapshotState,
 }
 
 fn default_sealed() -> bool {

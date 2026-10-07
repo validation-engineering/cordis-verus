@@ -29,6 +29,11 @@ test('Rust opaque handles expose a fixed interface, keep typed state and reject 
   await handle.close();
   assert.equal(closes(trace).length,1);
   await assert.rejects(handle.call('read'),/STALE|no longer admitted/);
+  let conversions=0;
+  for (const method of [Symbol('method'), {toString(){conversions++;throw new Error('must not convert stale arguments');}}]) {
+    await assert.rejects(handle.call(method),error=>error.code==='STALE_EPISODE' && error.details.operation==='Rust object:call');
+  }
+  assert.equal(conversions,0);
   await ctx.dispose();
 });
 

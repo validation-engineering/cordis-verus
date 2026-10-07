@@ -191,7 +191,7 @@ impl NativeDriver {
             return Err("StaleAction".into());
         }
         let expected = serde_json::to_value(ticket).map_err(|e| e.to_string())?;
-        if driver.snapshot()["plugins"]
+        if driver.snapshot_state()["plugins"]
             .as_array()
             .unwrap()
             .iter()
@@ -342,7 +342,7 @@ impl NativeDriver {
                     .driver
                     .try_borrow()
                     .map_err(|_| "ReentrantCommand")?
-                    .snapshot();
+                    .snapshot_state();
                 if !snapshot["plugins"].as_array().unwrap().iter().any(|node| {
                     node["id"].as_str() == Some(&id.to_string())
                         && node["generation"].as_str() == Some(&generation.to_string())
@@ -454,7 +454,7 @@ impl NativeDriver {
                     .driver
                     .try_borrow()
                     .map_err(|_| "ReentrantCommand")?
-                    .snapshot();
+                    .snapshot_state();
                 let nodes = snapshot["plugins"].as_array().unwrap();
                 let valid_parent = nodes.iter().any(|n| {
                     n["id"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(owner)
@@ -499,7 +499,7 @@ impl NativeDriver {
                     .driver
                     .try_borrow()
                     .map_err(|_| "ReentrantCommand")?
-                    .snapshot();
+                    .snapshot_state();
                 let node = snapshot["plugins"]
                     .as_array()
                     .unwrap()
@@ -534,7 +534,7 @@ impl NativeDriver {
                     .driver
                     .try_borrow()
                     .map_err(|_| "ReentrantCommand")?
-                    .snapshot();
+                    .snapshot_state();
                 let nodes = snapshot["plugins"].as_array().unwrap();
                 let valid_parent = nodes.iter().any(|n| {
                     n["id"].as_str().and_then(|v| v.parse::<usize>().ok()) == Some(owner)
@@ -579,7 +579,7 @@ impl NativeDriver {
                     .driver
                     .try_borrow()
                     .map_err(|_| "ReentrantCommand")?
-                    .snapshot();
+                    .snapshot_state();
                 let node = snapshot["plugins"]
                     .as_array()
                     .unwrap()
@@ -645,7 +645,7 @@ impl NativeDriver {
                     .driver
                     .try_borrow()
                     .map_err(|_| "ReentrantCommand")?
-                    .snapshot()["plugins"]
+                    .snapshot_state()["plugins"]
                     .as_array()
                     .unwrap()
                     .iter()
@@ -840,7 +840,7 @@ impl NativeDriver {
                 let mut blocks = Vec::new();
                 if !sources.is_empty() {
                     let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
-                    let snapshot = driver.snapshot();
+                    let snapshot = driver.snapshot_state();
                     let nodes = snapshot["plugins"].as_array().unwrap();
                     let parents = nodes
                         .iter()

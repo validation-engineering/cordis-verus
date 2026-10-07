@@ -25,8 +25,9 @@
 | [Official configuration transactions](official-config-transactions.md) | 默认 Harness 配置 UI、Include/HMR 队列与失败恢复 |
 | [Module graphs, Worker and process reloads](module-graph-reloads.md) | 观测依赖、候选更新计划与旧制品恢复 |
 | [Node compatibility](node-compatibility.md) | 原版 JS/TS 插件的实验性原生运行路径、构建、加载、差分测试与范围 |
-| [Native distribution](native-distribution.md) | 原生产物 manifest、平台选择、校验和离线合包 |
+| [Native distribution](native-distribution.md) · [中文](native-distribution.zh-CN.md) | GitHub Release 免编译安装、平台选择、校验和离线合包 |
 | [Process plugins](process-plugins.md) | 外部可执行插件、JSON-RPC、代码快照与失败恢复 |
+| [Host diagnostics](host-diagnostics.md) · [中文](host-diagnostics.zh-CN.md) | Node/shared Driver 阻塞、清理动作、失败和旧 episode 身份 |
 | [Diagnostics](diagnostics.md) | JSON/DOT 诊断、回收与 shutdown |
 | [Upstream parity](upstream-parity.md) | Cordis／Harness 功能对应、差异及非目标 |
 | [Verified programs](verified-programs.md) | ProgramDriver、MixedDriver、FreshDriver 的可运行接口及证明边界 |

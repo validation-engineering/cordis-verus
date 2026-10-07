@@ -12,7 +12,7 @@ Build native Rust plugin systems, or use the optional Node host to run supported
 
 ## Why cordis-verus
 
-- **Verified lifecycle decisions.** Explicit contracts govern provider identity, activation and cleanup. A consumer keeps the services it needs until its cleanup completes; failed cleanup preserves resources for recovery.
+- **Verified lifecycle decisions.** Explicit contracts govern provider identity, activation and cleanup. A consumer keeps the services it needs until its cleanup completes; the Node host retains failed cleanup for explicit retry.
 - **Reviewable from paper to code.** Follow paper definitions through assumptions, executable contracts and named regressions. The review paths distinguish proved results, conditional models and counterexamples.
 - **Cordis functionality in Rust.** Compose typed services, asynchronous plugins and owned resources. Original plugin interfaces, upstream tests and official Harness workflows provide concrete targets for functional alignment.
 
@@ -72,7 +72,7 @@ The project has an executable verified kernel, Rust and Node plugin hosts, and a
 
 1. **Broader refinement:** connect more lifecycle behavior and host execution to the paper's constraints.
 2. **Closer compatibility:** resolve known differences where alignment is intended and test more original plugins.
-3. **Reproducible releases:** restore durable toolchain downloads and complete platform and release validation.
+3. **Reproducible releases:** complete full platform validation and publish precompiled runtime assets through the [GitHub Release installation path](docs/native-distribution.md). Runtime releases are not yet available.
 
 See the [roadmap](docs/roadmap.md) for acceptance criteria and the [paper ledger](docs/paper-coverage.md) for individual claims. Complete paper refinement and production readiness are still future work.
 
@@ -82,6 +82,7 @@ See the [roadmap](docs/roadmap.md) for acceptance criteria and the [paper ledger
 | --- | --- |
 | Write Rust plugins | [Runtime guide](docs/runtime.md) · [Examples](crates/cordis/examples) |
 | Use original plugins or mix Rust and JS | [Node compatibility](docs/node-compatibility.md) · [Rust plugin adapters](docs/rust-node-plugins.md) |
+| Diagnose lifecycle waits | [Host diagnostics](docs/host-diagnostics.md) |
 | Build an agent application | [Cordis Harness](https://github.com/validation-engineering/cordis-harness) |
 | Review proofs or reproduce checks | [Paper review](docs/paper-review-guide.md) · [Validation](docs/validation.md) |
 
