@@ -5,8 +5,8 @@ English | [简体中文](native-distribution.zh-CN.md)
 The Node facade uses the same manifest selector in a source checkout and an
 extracted npm installation. The three npm packages can be delivered as precompiled GitHub Release assets.
 No runtime release has been published yet; the commands below become usable after
-a maintainer publishes a validated runtime draft. Packages remain private; npm
-registry publication and signing are separate work.
+a maintainer publishes a validated runtime draft. The source repository is public;
+its npm packages remain unpublished. Registry publication and signing are separate work.
 
 ## Install a published runtime without compiling
 

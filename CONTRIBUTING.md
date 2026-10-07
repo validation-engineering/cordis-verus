@@ -34,10 +34,10 @@ toolchain. Installer targets are macOS ARM64/x86_64 and Linux x86_64.
 
 The pinned rolling-release archive URLs returned HTTP 404 in the
 [recorded CI run](https://github.com/validation-engineering/cordis-verus/actions/runs/37490393141).
-Fresh installations may stop at the download step; existing validated local
-caches remain usable. Restoring durable, checksum-matched downloads is tracked
-in the [roadmap](docs/roadmap.md). Keep the pinned versions and checksum validation
-when preparing a cache or restoring the archive source.
+The project now preserves those exact bytes in public, checksum-locked
+[toolchain archives](docs/toolchains/README.md). The installer tries this archive
+before the original upstream URL. Fresh source installations need no repository
+access grant or GitHub token; cached archives remain usable offline.
 
 ## Changes and review
 
@@ -88,7 +88,7 @@ published, the latest 0.x release receive maintenance; no LTS commitment exists.
 The supported Rust compiler is the pinned Rust 1.98.1, also declared as the
 minimum package version. Raising it requires a documented toolchain update and
 the complete verification gate. The source repository is [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus),
-initially private. No public release or registry namespace is configured; see `docs/releasing.md` before distribution.
+now public. No runtime release or registry namespace is configured; see `docs/releasing.md` before distribution.
 
 By submitting a contribution, you license it under the project's MIT license.
 Preserve upstream attribution and keep the reference paper out of source/crate
@@ -111,5 +111,5 @@ The quality command also runs the Python evidence-gate regression tests.
 
 Release evidence must include every name in `check-negative.py::mutation_manifest`, in the canonical order. A minimum mutation count is insufficient: missing, duplicated, additional or reordered entries invalidate the record, as do incomplete positive or negative whole-crate statistics. The evidence-gate unit tests cover these cases.
 
-For private-mirror authentication and original toolchain provenance, see
+For archive transport, private-fork authentication and original toolchain provenance, see
 [toolchain archives](docs/toolchains/README.md).

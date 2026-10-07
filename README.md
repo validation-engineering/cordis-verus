@@ -18,7 +18,7 @@ Build native Rust plugin systems, or use the optional Node host to run supported
 
 ## Quick start
 
-This Rust example needs no Node, model credentials or external service. Prepare Git, Rustup, Python 3.9+, curl and a native Rust build toolchain. Repository access is currently required; check the [setup notes](CONTRIBUTING.md#toolchain-availability) for the pinned toolchain's download limitation before a fresh installation.
+This Rust example needs no Node, model credentials or external service. Prepare Git, Rustup, Python 3.9+, curl and a native Rust build toolchain. The source and checksum-locked toolchain archives are public; see the [setup notes](CONTRIBUTING.md#toolchain-availability).
 
 ```sh
 git clone https://github.com/validation-engineering/cordis-verus.git

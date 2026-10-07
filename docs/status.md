@@ -1,6 +1,6 @@
-# Current status — 2026-10-06
+# Current status — 2026-10-08
 
-This is an experimental development checkpoint for the initially private
+This is an experimental development checkpoint for the public
 [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus) repository.
 It is not a published crate, a production-readiness claim, or a completed
 refinement of the entire paper.

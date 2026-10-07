@@ -18,7 +18,7 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 
 ## 快速开始
 
-这个 Rust 示例不需要 Node、模型凭据或外部服务。请准备 Git、Rustup、Python 3.9+、curl 和本机 Rust 编译工具链。仓库目前需要访问权限；首次安装前，请查看[环境准备说明](CONTRIBUTING.md#toolchain-availability)中锁定工具链的下载限制。
+这个 Rust 示例不需要 Node、模型凭据或外部服务。请准备 Git、Rustup、Python 3.9+、curl 和本机 Rust 编译工具链。源码仓库与经过校验和锁定的工具链归档均已公开，详见[环境准备说明](CONTRIBUTING.md#toolchain-availability)。
 
 ```sh
 git clone https://github.com/validation-engineering/cordis-verus.git

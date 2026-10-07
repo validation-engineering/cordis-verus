@@ -16,11 +16,10 @@ transport must produce the same locked SHA-256 before the cache is replaced.
 Failed downloads and extraction do not replace the working installation. A
 failed automatic rollback reports the preserved backup directory.
 
-While the repository is private, install GitHub CLI and authenticate with read
-access to this repository (`gh auth login`). CI supplies a step-scoped `GH_TOKEN`
-with `contents: read`; tokens are not passed on the command line or saved in the
-lock. A public mirror can be fetched without authentication through its HTTPS
-URL. Rustup is still required and the installer does not change its default.
+The project archive is public and its HTTPS URL needs no authentication. For a
+private fork or mirror, install GitHub CLI and authenticate with read access
+(`gh auth login`). CI supplies a step-scoped `GH_TOKEN` with `contents: read`;
+tokens are not passed on the command line or saved in the lock. Rustup is still required and the installer does not change its default.
 
 ## Why keep an archive
 
