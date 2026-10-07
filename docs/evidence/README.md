@@ -124,3 +124,11 @@ or rerunning the commands. Paths inside the raw JSON are preserved from the
 machine that produced it. Rerunning on another checkout may produce different
 bundle bytes or diagnostic paths; a new result should be archived as new evidence,
 not used to edit these original observations into a passing result.
+
+
+## Subsequent compatibility iteration
+
+The [2026-10-08 A03 archive](2026-10-08-a03/README.md) records a new run after the
+scoped direct-update and cleanup-message fixes. It keeps its reports and manifest
+in a separate directory. The 2026-10-06 reports, results and hashes above remain
+the historical baseline.

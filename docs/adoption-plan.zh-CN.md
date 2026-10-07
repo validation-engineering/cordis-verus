@@ -47,10 +47,12 @@ P0 是独立评估的前置条件；P1 是产品与研究主线；P2 由实际�
 | **A15 · P0 → P1** | 不依赖单一作者也能贡献 | 区分兼容、普通宿主和证明贡献入口；快速反馈与完整验收分开；记录语义决策、支持范围和迁移说明，扩大独立审查。 | 合同变更同时更新实现、证明前提和回归。 |
 | **A16 · P2** | 在需要时扩展语言或部署边界 | Python、远程 RPC、WASM 等需有真实任务、现有路径不足的证据、维护责任和单独验收；每次扩展一个边界。 | 每个新宿主都有新的环境与失败模型；现有内核证明不自动认证它。 |
 
-兼容起点是[归档的 upstream 87/87、native 83/87 结果](evidence/README.md)，
-不是对全部当前上游版本的声明。两项非故意差异是并列 provider/consumer 更新行为
-与清理期资源注册错误文本。committed publication 和 cleanup failure 保留是有意
-差异。新运行必须继续记录精确版本。
+兼容起点仍是[归档的 upstream 87/87、native 83/87 结果](evidence/README.md)。
+[第二轮](evidence/2026-10-08-a03/README.md)对同一固定版本的原样套件重新运行，
+结果为 upstream 87/87、native 85/87，
+修复了被测 provider/consumer 更新场景与清理期资源注册错误文本；committed
+publication 和 cleanup failure 保留仍是有意差异。历史报告继续保留。这些数量
+不代表兼容全部上游版本，也不代表完成 A03 的真实迁移验收。
 
 ## 与产品并行的形式化工作
 
@@ -92,10 +94,25 @@ F0–F4 是相关工作层次，不是认证等级或正确性分数。下一座
 | 对等清理案例（A13） | 在固定版本研究上补充跨实现的等价 provider/consumer 观察 | adapter 输入、精确版本、有序轨迹和断言；区分内存观察与已有真实文件案例。 |
 | 采用任务入口（A14/A15） | 双语计划与[真实任务表单](../.github/ISSUE_TEMPLATE/adoption.yml) | 表单可用；邀约、独立评估和持续采用实际发生后才能计入结果。 |
 
-下一步修复 A03 的两项非故意差异，完成 A04 的四种诊断任务：缺少依赖、清理等待、
-失败 inverse、旧 episode。为 A05 的 DTO + async 生成器和关联的 A07 宿主切片选择
-一个真实服务。如果已记录的外部任务暴露了更重要的阻塞，可调整顺序，但需记录原因
-并保留证明依赖。
+## 第二轮：基线中的两项兼容缺口
+
+A03 的两项非故意差异已有受限运行时实现。Cordis profile 允许空 mutation 队列下、
+没有托管 invocation 来源的直接外部 provider 更新，与同一同步调用栈内的直接
+committed consumer 更新协调。存在 consumer 到 provider 的中间依赖路径、
+自定义 `Config` 或 `internal/update` hook 时不加入协调。请求共用生命周期屏障，
+等待异步 cleanup/setup，并分别保留自身失败结果。重复 Fiber 更新、事务、
+restart/dispose、已排队或跨 microtask 的更新、多跳依赖、自定义配置/hook 以及
+Harness profile 仍走原来的 FIFO。详细边界见
+[兼容合同](node-compatibility.md#同栈-providerconsumer-更新)。
+
+清理期资源注册错误现在包含 `inactive context`，同时保留 `CLEANUP_BLOCKED` code
+和优先执行的 `STALE_EPISODE` 拒绝。这些改动没有证明整个 JS 协调器或任意 callback，
+没有关闭论文的 host-boundary 义务。
+
+A03 仍需真实插件迁移记录，包括所需改动与回退步骤。下一步继续 A04 的四种诊断任务：
+缺少依赖、清理等待、失败 inverse、旧 episode。为 A05 的 DTO + async 生成器和关联
+的 A07 宿主切片选择一个真实服务。如果已记录的外部任务暴露了更重要的阻塞，可调整
+顺序，但需记录原因并保留证明依赖。
 
 ## 独立安装验收
 

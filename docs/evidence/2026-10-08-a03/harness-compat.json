@@ -1,0 +1,2553 @@
+{
+  "schema": "cordis-verus.real-harness-compat/v1",
+  "node": "v22.22.0",
+  "esbuild": "0.28.2",
+  "upstream": {
+    "revision": "da00f7f5358f2949383b35c14f548bc20187d80c",
+    "tree": "3c6b47ceb23985cdeaa53d169f29362e1412479d"
+  },
+  "selection": "all",
+  "normalization": "none",
+  "conformanceClaim": false,
+  "scope": "Real SessionStore, SystemPrompt, ToolRuntime, SessionProjectionRegistry, tool-todo, scope; minimal agent id/session data only; no LLM/provider/network requests.",
+  "observations": "Ordered API outcomes, schemas, tool results, event type/data/seq, projection snapshots, scoped admission and cleanup. Deliberately excludes wall-clock metadata; no post-run trace transformations.",
+  "installedDependencies": {
+    "sha256": "4e37e9324f83671b993b4d7b66c066d1f449df9f72c02e28624d9eb47fbe5f51",
+    "files": 1896,
+    "excludedGeneratedDirectories": [
+      ".vite",
+      ".vite-temp",
+      ".cache"
+    ]
+  },
+  "inputs": {
+    "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750",
+    "package.json": "746bf79b7699b7870204e77ad8fc81f7916064c6f1798cb3fa00c85a8d2dfa59",
+    "package-lock.json": "6050902d2b9774c16e6787cd464fd28803992050559b87c1d1fc2d7358fce2ae",
+    "scripts/check-harness-compat.mjs": "3b7552ad7d58d370719fb6e826f9318d26d3eb7da5302a12a7894bbd30b76cdf",
+    "tests/compat/harness/fixture.mjs": "228718193cf57afe75f844345aa7d1fe69428ba316b7961078ff055d23d9a949",
+    "tests/upstream-core/evidence.mjs": "e730e7ce2db560ed45490b5d1b8a4f5cd73822a5bb9fb27d08226ee42fe86eff",
+    "tests/compat/profiles/deepseek-harness.json": "b42d84521d75bd711de8ec0aaa6dabd05a998fecd6f40e438161236c61f4cd49",
+    "packages/compat-cordis/bootstrap.js": "7426c8ee90208f6e8b4fb71ba16a4f3e56d585aae34338611598bcd870cef58a",
+    "packages/compat-cordis/context.js": "3a61e26a148c143ab30b8a0d713fb6ed8f128929c5a8dc741a7cd3ead10e1623",
+    "packages/compat-cordis/events.js": "01bedaedbe5da69fb55b04f4be26e3265907dc9d0639da49fea0dc826da54d53",
+    "packages/compat-cordis/fiber.js": "641b2b6de00979d76da09ba36fe4f7fe970d283195d44ff461b1415adc3c12f8",
+    "packages/compat-cordis/index.cjs": "2b45c88302dc0c62819d4008f7c54770f770ac79446e0452ae16052c87ab8149",
+    "packages/compat-cordis/index.js": "b56320ee4db3d5d5cca8390c38f6fd5102b6473be7b315e1c6b8364f001987d0",
+    "packages/compat-cordis/logger.js": "7ce249b305df994dd7cc0bb1add6edeae476dabea2ada558ceca8611cabb3dda",
+    "packages/compat-cordis/native-artifacts.js": "7ff966b24eaff87d218c42c20eb386e27f6051a313cf7b71c81c12bac2a05780",
+    "packages/compat-cordis/package.json": "908a186ab1789ea4826776ef583891d64e88c9b528461e1133102900a4c87846",
+    "packages/compat-cordis/register.js": "b9625922ce2224339433d17e26396395e5a7d359a736a0684e6ef88e1fa9663b",
+    "packages/compat-cordis/runtime.js": "01fe8583bf782e4a8d93755b95dc3a0a2f0386e679ad7db17b276867f4a88ca1",
+    "packages/compat-cordis/rust-objects.js": "27e78ac7d8ed19ae419e3ce9d8e4a588a0466b86438463b006a8effa3f19abc2",
+    "packages/compat-cordis/rust-plugin.js": "3446dacc56326601af2833ea2e8459e95b9e606cd621d713b801146052d063de",
+    "packages/compat-cordis/rust-streams.js": "28a9f4df4b23469f00dfbc14c8b8bd3a9c67e319698c75db2537bcd05bb77692",
+    "packages/compat-cordis/service.js": "3413bdac5920898c59f401afaa1a93e6ed8d61c1cd728b0a313062a8626d10ee",
+    "packages/compat-cordis/support.js": "f6b2007bfc0badbdaa0e122c50f41386e482b82e227f9d6b81eed2a297143634",
+    "packages/compat-cordis/utils.js": "ddf4ee17f1b03b5ca11836b23c73143bdb4fa81622425176b4cea583e05d4493",
+    "packages/compat-harness/index.cjs": "2b45c88302dc0c62819d4008f7c54770f770ac79446e0452ae16052c87ab8149",
+    "packages/compat-harness/index.js": "8bca6430cd19dd357675b2a945eceea7d264980c9ed46e769a380fac2fc52055",
+    "packages/compat-harness/package.json": "2087c6ac89883b8279016647863230480c6c27b862a2011b8afbf9fe091885ea",
+    "packages/compat-harness/register.js": "6ab91c5916c16a1c60537d8cae5781f632287febdefd4c8ec1ea97f1d628b2f3",
+    "packages/compat-cordis/native/cordis.node": "6ab82f13c93ee53a0d52b9a4850e173197469b78c02205c986d9891eb1ee662b",
+    "Cargo.lock": "247d4a06cb349ee660db78f1c5120b742e2c983cde7773eb055707e4fda0e8cc",
+    "Cargo.toml": "9449e122e21d691379418f5775a54a1bb1e21a669a7ae48e402e8bacd9936fc7",
+    "crates/cordis-driver/Cargo.toml": "8ca927dfaee34158e4efe4029b81e4504bdb506e114baa2a388b5d10ba1ececd",
+    "crates/cordis-driver/src/availability.rs": "cb5c256dd1c39a40c49629345f2b7c196500126f55c142ba3ce5b87e26e6b60b",
+    "crates/cordis-driver/src/lib.rs": "922e81d6b79cd394ccf0d3ff38613f3c3a303345ae44a1f0fbd3065c47016e2d",
+    "crates/cordis-driver/src/protocol.rs": "45a63a88371bc19bdb9772e28680e765b8fe72e6de355c80e1afa5d9790bbbf9",
+    "crates/cordis-driver/src/shared.rs": "65dc8a5a6233cefccabf58a4b0f5e55ba4b334668cafb31b018b34dc510e7a3a",
+    "crates/cordis-driver/tests/check_protocol.rs": "ba46d0fb3fc293872044731a2c99b13063b7f2ba12d481cbc1f010b765df455a",
+    "crates/cordis-driver/tests/committed_reachability.rs": "cd0f764c454369ceaa6634b536b080f14453058015bbc71620b599440c1ffe57",
+    "crates/cordis-driver/tests/episode_failure.rs": "a96c95fe891cac62af45acb39f0a0211caaba29482bbf9ca6b1f2dc298a84a8a",
+    "crates/cordis-driver/tests/native_driver.rs": "56b596830e9abecb07e515e3e41d266ae1b923e584766660757e095d6e9efdf8",
+    "crates/cordis-driver/tests/reservation_effects.rs": "a8dadadad0bb34bf62f6484290c02e2d79c58133ddbc8a6396492541b99b7b29",
+    "crates/cordis-driver/tests/shared_lifecycle.rs": "0f3abc8ed5eb183820530b5d2145c294da47f5682d4cbe496144df3c26f8fc4c",
+    "crates/cordis-kernel/Cargo.toml": "abe2c70a90f0de345f122d4b0e1990acd10e71238106afa82ecea6712148622e",
+    "crates/cordis-kernel/src/action_ledger.rs": "3515900b8d86ce890a8e06901710241af0d6054844e1625f52f46e1294cd0820",
+    "crates/cordis-kernel/src/administrative_orchestration.rs": "6793dc4b8d003f29862d7df8696555639467c1fe44339e380534838c0aca2a50",
+    "crates/cordis-kernel/src/admitted_fresh_driver.rs": "de04d282e983c4ea680c4df999c123bba20648ac1538e8bdf65cee693d9047e2",
+    "crates/cordis-kernel/src/admitted_script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
+    "crates/cordis-kernel/src/allocation_inputs.rs": "b3a25966f428ae318b4fd7a42122de6179b901c41757c38146c8f90608ca5b55",
+    "crates/cordis-kernel/src/alpha.rs": "f453c4b6b3ee72e09763193c3be749242bc906f70f2d3921f737a2f7ce3a89dc",
+    "crates/cordis-kernel/src/calculus.rs": "c8873eac61e9883cf4c72922e395b89558ee25a361eb72e9f0a7f609a14ed790",
+    "crates/cordis-kernel/src/canonical.rs": "c1726a10742fb7396cd566b2b913181908fe87e1a77f4f1086c630b311f1483f",
+    "crates/cordis-kernel/src/causal_normalization.rs": "2f21f76a87f7c87b29df69674f2290a2fafaaf98aec686c71ce3b5946b0e3639",
+    "crates/cordis-kernel/src/child_driver.rs": "dbd018c49d1dfc7350bcbb33bc81068ccdd05543eca4df25b00e6f1a03f19348",
+    "crates/cordis-kernel/src/child_history.rs": "4705af8d5c1304c4d7b763ab8124c762045937963599938fddaab6fcf67598a4",
+    "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
+    "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
+    "crates/cordis-kernel/src/contexts.rs": "72c32f067433e1a64e7e4196cb12c0ba5f7eed0d4d9f77255e57d58c7032aec8",
+    "crates/cordis-kernel/src/deletion.rs": "1c44e19ce407f69e7411bb7ac2fc29940471c350020e60bb1bce462a0d9cbae3",
+    "crates/cordis-kernel/src/dependent_grammar.rs": "89016e4db79a21cff12b24aa73b1c3d03852cd931c4460e35e98914b0988629d",
+    "crates/cordis-kernel/src/dependent_independence.rs": "bf4fa296cef98066b9e3903b36455598fb7bd47201d5f62b496dc9b139d788bd",
+    "crates/cordis-kernel/src/dependent_independence_example.rs": "e30a431798dd92ac4e64dc3cd8659f3f3cb5a64001bb04b506cef16e39d2f41c",
+    "crates/cordis-kernel/src/dependent_lift.rs": "a7027a087915d476f41fe34a21ab2f148e52c0d1c57b08389dda8a15abe377d9",
+    "crates/cordis-kernel/src/driver.rs": "e9944c7b5d09f2c440d374ec8a0a37c834a5977c763418f4ca781673e8b3b194",
+    "crates/cordis-kernel/src/dynamic_table_deletion.rs": "9692ad12a7a5c546a86806b9f515676117d953eba45d795be634e850a11186d8",
+    "crates/cordis-kernel/src/dynamic_table_deletion_example.rs": "238a5f3daf21a4686ce82a8e03f4dfbf4f09e0cd2d8ab9acdbd6df226d79329c",
+    "crates/cordis-kernel/src/dynamic_table_registry.rs": "d252c00bcd3e60cfe77cfebad2862cf8c0260915db77858a2946e3e9cc36122d",
+    "crates/cordis-kernel/src/dynamic_table_registry_example.rs": "b3f80dfbbb905a958b345d83e9f87aa6ec5f599dc99f670b937b859777b513eb",
+    "crates/cordis-kernel/src/effect_realization.rs": "ae12b213f3cb9827e2213c436b0559f3681ba44937f95489cf218d65ba8cc021",
+    "crates/cordis-kernel/src/effects.rs": "2fb10d958faa7a3e3b4a53050599e96db22328a5b3bc09269bbe492eb9e94672",
+    "crates/cordis-kernel/src/entangled.rs": "ff5e821b638bb9153c34b2357f7614f7a8d4254a674bb74cfdecbcdd1b252080",
+    "crates/cordis-kernel/src/entangled_loading.rs": "9a0585f2be02be2c09b6c4faabced9448ec1ffddde7616d066ca78de20578ed6",
+    "crates/cordis-kernel/src/episode.rs": "252a9cec3ec9a3bb3581e61e21cf9f01a8f606d635e8e826aecb27e8f6f756d9",
+    "crates/cordis-kernel/src/external_inputs.rs": "a7491019af25e1d647220f5f9f0d649d197541d6336cb44072151d2a1425ebfb",
+    "crates/cordis-kernel/src/foreign_child_deletion.rs": "2e2f58d8f2d8ba97c5dd6b1f2426b5fc821605e5b3f8827b0d2ccf550c08b988",
+    "crates/cordis-kernel/src/foreign_child_deletion_example.rs": "d3fc5d4a699ccc049a8722e8b544b1b715a00ef1191590ad2d92ba1233b52701",
+    "crates/cordis-kernel/src/foreign_child_transport.rs": "2946519aa289c6677fa48ea44c05cd710a9bf29dcabec2bb62f8a8a3e388755e",
+    "crates/cordis-kernel/src/foreign_child_transport_example.rs": "dcc5399bf25f778e4d6beb50100ff77715e9f6cbb2a83ce94379cc5f2640266e",
+    "crates/cordis-kernel/src/foreign_provision_transport.rs": "5b837c2c97458a940e52d0717bd7509fa296c3d29083f72773a0b5fbfc5357b4",
+    "crates/cordis-kernel/src/foreign_unload.rs": "c1e07e10f8eabc5fa48750c5249528be377bb68ef25d6a3264cacac5ef7e003f",
+    "crates/cordis-kernel/src/foundations.rs": "0b19e7afb7855da5312dc63a4303e26f6716159e57b41bd62ffa511c7aeb316d",
+    "crates/cordis-kernel/src/fresh_driver.rs": "2295f9218a8dde8c644d86dcd98fdbcf8e088e7f65664ec1de8407458de20941",
+    "crates/cordis-kernel/src/fresh_equivariance.rs": "e9074e2b56d1d130948d2af396bbb50b3e85e81e719c7b866c9456d223315227",
+    "crates/cordis-kernel/src/fresh_grammar.rs": "cce7d43aa00a054a75dca28403c03f8891bee70f9d7a346d79575e103627fce4",
+    "crates/cordis-kernel/src/fresh_semantics.rs": "26826a984ca805e003b6a996fac17d8b8dc4f5f15d7df2a91a14917295dcfe63",
+    "crates/cordis-kernel/src/functional_quotient.rs": "db95c1c293848d7eb280d04f5f2540c9365804d0c819c5957cb23544f6be37f0",
+    "crates/cordis-kernel/src/generalized_table_deletion.rs": "45cf8f559d5fb854fbb5a2ca02cdd08f4236357e4aa8a67569ee9f9217eabf85",
+    "crates/cordis-kernel/src/generalized_table_deletion_example.rs": "159dd24027cb18adeea3d0bcc9026e282f8f87a87aa308349ea23d25635f3f91",
+    "crates/cordis-kernel/src/global.rs": "bc49325a37fb08efae55dc7b1242a8310805ba924e796697c21ff0925aaeae2c",
+    "crates/cordis-kernel/src/grammar_lift.rs": "229713b5eba33d6a7d9685a676f7b29abd8a8cb1ad75685cd082a5f0aa2c9282",
+    "crates/cordis-kernel/src/grammar_ordering.rs": "858f856575fba13cfebd6a66056ab47afb0560db9675ac0130d071ca8504abd5",
+    "crates/cordis-kernel/src/grammar_recovery.rs": "4dacf54db0501a1ddf1af27fda5cd31255eed527bbd17aac587dec3039227f82",
+    "crates/cordis-kernel/src/guarded_child_domains.rs": "40ce966a9d9ffbab8ec11182350767a5c824bf50df0abc3909b1a36332b5983b",
+    "crates/cordis-kernel/src/history.rs": "c20f5087d8634e76fdeeeb222a352cec64d61d948dce8b998645df8768aa462d",
+    "crates/cordis-kernel/src/indexed_ordering.rs": "5a920dc64959e98027faad54c8604404fd93aacaeaed027400f59070d3702dbd",
+    "crates/cordis-kernel/src/interface_observation.rs": "4e97e34839281d27aee6ee463cfbb4bb9aa0474c4faa470eae1bdefe04d21a07",
+    "crates/cordis-kernel/src/interface_observation_example.rs": "e663ec059cbcf0450f4d527ed70194cec2b400ac3252b2b5218caf15b43a3e88",
+    "crates/cordis-kernel/src/internal_old_unload.rs": "7e071cbad6376f5053e2ddbb489d2634a840ac20c5fa5f0021c6ec551844e0ac",
+    "crates/cordis-kernel/src/internal_old_unload_example.rs": "1a422b72714f5e1cbce8afba7cec6f23967fbd00621f9cc323da1d5b82402054",
+    "crates/cordis-kernel/src/internal_table_unload.rs": "c389c7775c1889e9150333414d50ed96a70a6c2ceb3d0467f80ea8a3c30fd1ef",
+    "crates/cordis-kernel/src/internal_table_unload_example.rs": "825233c6ff3f4e10e0a714f955b6e828f4fb602d771398b51f6b96ba91a3e884",
+    "crates/cordis-kernel/src/isolated_deletion.rs": "851afcd76c1303873d8f40d2f5b0e0ac6ef05da047a3211366c4620a8a6b47b7",
+    "crates/cordis-kernel/src/iterator_bridge.rs": "3521e908dcc6a47c54470e8b8b8d967693a151c78061a8b3ffaa5e88c0554ac3",
+    "crates/cordis-kernel/src/iterator_independence.rs": "95c2c384036c43048b29023d26d076a0113c4cfa1cd778b5a63fb04c3d8e57dd",
+    "crates/cordis-kernel/src/iterators.rs": "1c3bc0cee83d69e2140354e51613ce6033d53171fc71b912ad682b234118f92d",
+    "crates/cordis-kernel/src/lib.rs": "08120ccbc034346ecb3248c32e8df60ec3b8575ffd34d535fd0fe3a9d4145262",
+    "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
+    "crates/cordis-kernel/src/mediated.rs": "c63d88166e35070b1f14d99b12f32b39daa4c714ae7ac500227dd0a8aa948f67",
+    "crates/cordis-kernel/src/mixed_age_unload.rs": "1418ae76432a7c171f0a92e646210bc31948f0ef189ada174443716ef766fe1d",
+    "crates/cordis-kernel/src/mixed_age_unload_example.rs": "c04c9fe655c154e8f107e04b6ed76f149685b0e1b10b13d8f7f728fabd1c4e43",
+    "crates/cordis-kernel/src/mixed_driver.rs": "a520f60d1d5aa378d210cf41ae7c90d6f3cdf5ad8c58b6a86c6c72ccb773ed53",
+    "crates/cordis-kernel/src/mixed_examples.rs": "c397fcc35928dfea1ced7717dcf01ef07714d35ad889886ecb7c02cfeb686131",
+    "crates/cordis-kernel/src/mixed_foreign_restore.rs": "baa61e793f0b92d38507215871a25779e1e2652c1169384fce6838742f733749",
+    "crates/cordis-kernel/src/mixed_grammar.rs": "ed9faa272b0f6dc9f1cdf739458ae1902c353ba190bf9d5ed60b622b153aa1ab",
+    "crates/cordis-kernel/src/mixed_iteration_exchange.rs": "94d88f2cd45a81bca3b793ff6425d11f11a5b225aa9101b6b9931c51eb9ee95b",
+    "crates/cordis-kernel/src/mixed_observational_runs.rs": "59b2420ccb4e816d857dc91b61a56dc49e31aab92a7860b08a8c5c85cea95ee2",
+    "crates/cordis-kernel/src/mixed_observational_transport.rs": "1c33c71c173ac67f12dbc711b1af0187dc56a4399cbe79b966b6b3b55cbfa385",
+    "crates/cordis-kernel/src/mixed_orchestration.rs": "4e296ad62b04d8b1b28c222dd642f83502fd978967e2c38a442e96ac1789b190",
+    "crates/cordis-kernel/src/mixed_ordering.rs": "af602a8fce022da5ff2d321e8a3940648ddec65e22253145dae375908a90d67b",
+    "crates/cordis-kernel/src/mixed_recovery.rs": "619c23e25559d01857e571727645f95ba4a484298fd470194224853fff8392e4",
+    "crates/cordis-kernel/src/mixed_syntax.rs": "20e09717be841c5b8b3736e873a199c5ec1166765c051fc1e2ef18159dd7519e",
+    "crates/cordis-kernel/src/mixed_transport.rs": "f0b6fe307377fac26e96f6a738ff09206856e8914c5cce52d84e721342a7eb1a",
+    "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
+    "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
+    "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
+    "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
+    "crates/cordis-kernel/src/observational_examples.rs": "212fba2609c8823aa12c9c1484aa7e877f38654bf879d4d3823d736aa27952db",
+    "crates/cordis-kernel/src/observational_execution.rs": "be89fdd73e9e398d5327ca1351b29f17d9ac395aab9e38e93eb41ad7a639da0b",
+    "crates/cordis-kernel/src/observational_grammar.rs": "c3724c31751c622ed4dd969e48be6c8fb3f72855717d82ebee4302481159ae19",
+    "crates/cordis-kernel/src/observational_lift.rs": "d8721aa7b7bebe32d814783c2b4af1e871d61a8068d169937bc3f022da0d7950",
+    "crates/cordis-kernel/src/observational_permutation.rs": "57abe81c05c5c58275065eb93ca7cddeb55b01791913b665fc856d5bdbe78748",
+    "crates/cordis-kernel/src/observational_recovery.rs": "74130d3d2150b03058c998ea7edd6d7c629ec3d8b5e6e5225c793937a2c9d4b2",
+    "crates/cordis-kernel/src/old_journal_closed_example.rs": "2c9e5cdb133f331eb326dfb39c1ed1ff16e976e96ede35994c6d49ad6cd3c690",
+    "crates/cordis-kernel/src/old_journal_closure.rs": "f56357f039066684c48bb54baa364f08dc6df491e7eb4d3a29a61280ab10fa31",
+    "crates/cordis-kernel/src/old_journal_examples.rs": "32bbc2026b8ae7797145a1c8efc1c77473ad7c240179050ebdc08010bad6f42a",
+    "crates/cordis-kernel/src/old_journal_interleaving.rs": "c9e7b3d9e834e27a6dab893a3ac9783db0cf7ea76142f6c9fdad970cbfaa7c43",
+    "crates/cordis-kernel/src/old_journal_interleaving_example.rs": "5328e56022ab5fc3cf65617a21c3beaa94f4af1ffaafcd2ae817c8736923b4dd",
+    "crates/cordis-kernel/src/old_journal_unload.rs": "706948f6ee80ffc326d8ecefe567e54f826a245c16f348bf5529a6638855db69",
+    "crates/cordis-kernel/src/old_provision_journal.rs": "62096cda7b70c467f7ce7b80bf0e75a6680fb229b35f23480beca08d9076e1f7",
+    "crates/cordis-kernel/src/old_provision_journal_example.rs": "2f8a892bb36ca6528525ed87e19314c65d810a75fb8238c7788e6f68a7aacedb",
+    "crates/cordis-kernel/src/old_provision_support.rs": "e00f9d8beba56a9486c09900d337ef6a27e92688a41e1fbc51aba78ea010863c",
+    "crates/cordis-kernel/src/old_receipt_support.rs": "400dbfce63c0c1c56c7422c2d7b57d7378b50945f584cf4d480443dde535a3e8",
+    "crates/cordis-kernel/src/orchestration_support_cycle.rs": "16406acf722db08876eec71084f45723eae6a8db754dd14c69a3f53d59d58d47",
+    "crates/cordis-kernel/src/ownership.rs": "02bb157bdf63254bbc146d7561762fb3d605a550efa9e3f972dd4bc4f6b4aeda",
+    "crates/cordis-kernel/src/paper_components.rs": "39d2bc1c7419a582aa40348ae278785264dbf27f24d67ed54550df5a54a1b45c",
+    "crates/cordis-kernel/src/paper_confinement.rs": "13fd2a182c446945cac1b756ec08852ae63f3b01426aac1231bca58741513887",
+    "crates/cordis-kernel/src/paper_counterexamples.rs": "064abae9ccd2c02d76314c052162279c6bf095e4fb878540a2b803d39dcc0732",
+    "crates/cordis-kernel/src/paper_instantiation.rs": "eb6cdb87c62ed8349111b6015da7374b6386614fecc3bd4439d191a6941c8f63",
+    "crates/cordis-kernel/src/paper_invariants.rs": "84be535a87dd7808ac90460c20778bd3fd6696882d36576c3953ae5657e21de2",
+    "crates/cordis-kernel/src/paper_observations.rs": "cbb227b44365f700c39e8d97d302832ddfee2f55a910cb5e0c111812f370ab9c",
+    "crates/cordis-kernel/src/paper_trace_independence.rs": "342ffe28831122c2df4ade7da60a3517e9e7396a45da320c09b3f3317b61d1ec",
+    "crates/cordis-kernel/src/paper_typed_context.rs": "0e6f50d6073c7125967559d3d9cc4c562eb1c8b674dfaa71f54677458625444f",
+    "crates/cordis-kernel/src/partial_domains.rs": "0f88ff591367886d93e0cbb3c41ee0ecf98bdf664610bbcba2844d9d8c8bfa8c",
+    "crates/cordis-kernel/src/partial_independence.rs": "62a65b3a4afc82fb09f77f4f132023737bbb994fc8a2d3981e7d4528d609f596",
+    "crates/cordis-kernel/src/permutation.rs": "484a6976b16420a050c69388ef8cffba65e7771f1bf844da5dc377f844b32f19",
+    "crates/cordis-kernel/src/preservation.rs": "e15e6c12384c80ac100bf8812f35f01cd14285e3f561bfe737be2dcbf37e4b4d",
+    "crates/cordis-kernel/src/program.rs": "ee0820a1ddd6ba6d8b172b29e1c1ebf145b9d95691dff6ba9b175e8bdd9bccf7",
+    "crates/cordis-kernel/src/program_normal_form.rs": "d6c5bfbf6ac588080370d76950a563bbf3d60e11fda0ef8ae51b02c69a223cb1",
+    "crates/cordis-kernel/src/program_refinement.rs": "cef2120d184d37ed6412e8a4a18a848a8856d95f1f959e5b635999e1868f9174",
+    "crates/cordis-kernel/src/program_trace.rs": "6295d76bd6b1b7f1f95e6e2c6173cde0b9845e89f8350255f369624a5c2c9a2d",
+    "crates/cordis-kernel/src/progress.rs": "46fdb8931d649daf8870ceb757b2f1bc9581b39c5e9eee1cb9ff4e8be80414ca",
+    "crates/cordis-kernel/src/projection.rs": "2af0c9ed9f8fd7e4a28b327e2e50a795aa3144dc913f2e3e4fa30f7f35234593",
+    "crates/cordis-kernel/src/providing_owner_deletion.rs": "ff6abd0adbf51a0d7577f7b535e7eac2d84607a971843098280349f94e7d2a33",
+    "crates/cordis-kernel/src/providing_owner_examples.rs": "9a834d887a3f471eae7af212da017ace137171e26a23e832da80c1820f789440",
+    "crates/cordis-kernel/src/providing_owner_execution.rs": "4b04784b13630dbaa5267601e44bc5d6268e60d8f4c49a076c9dbb0386063b6e",
+    "crates/cordis-kernel/src/providing_owner_transport.rs": "5854946bcfd3b6204537532a48c7fd37771cf1538d4ae85123b7cb130d3f707a",
+    "crates/cordis-kernel/src/publication.rs": "306318a377609e2048d803cb1b1f305ec1fa276d7504e270144f4397bd466325",
+    "crates/cordis-kernel/src/quotient.rs": "295f0fa31f3ff1c7e18145ae8141c043dfcb5d4d90508073e72444dc6040b3d1",
+    "crates/cordis-kernel/src/recovery_examples.rs": "9414a8b078f0b9e616b363dd6d411d091b55d1915554b058cc30b016ccc0884e",
+    "crates/cordis-kernel/src/recursive_context.rs": "a032537ab661dce5392226e43a3174ad83f660008198084beb7d84f46cf955bc",
+    "crates/cordis-kernel/src/refinement.rs": "73bb8eed7ab88cf9d4556bb6fe308d1d1c436ab42de799046a5799fdc5cf60e6",
+    "crates/cordis-kernel/src/resolution_completion_counterexample.rs": "c7449f9259095cd1b9232e75c849e0e797cd109d0fac95f255fc7550bc8c3281",
+    "crates/cordis-kernel/src/resources.rs": "47b0fe33ab7bab13ea6ffa28e66cfbc73a459ba6ee8c2ab4e263fdaab4010447",
+    "crates/cordis-kernel/src/rewrite_confluence.rs": "def51aea34c8d19d0f2fd8ad5e1c5e147def31899128ce4f2a7e15c74eac0b9a",
+    "crates/cordis-kernel/src/rule_frames.rs": "e34f0f98702955cc99775c106e04c6b0ba12066a1ffe1106d3ffabdf5f7b6055",
+    "crates/cordis-kernel/src/selective_foreign_recovery.rs": "ad3c486c96920e0875bbc7f2a01af7c6a3e5aed7f637b7ba0469034481fca7a5",
+    "crates/cordis-kernel/src/semantics.rs": "5f8435c400d8272af930db537a3ae9d21adb027baf1cb9cf9397cd0ae4cee423",
+    "crates/cordis-kernel/src/shared_execution.rs": "7881a86204f4e172116aa11c7c419c26ee0920a7a84b513c58d1536902ddc70e",
+    "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
+    "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
+    "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
+    "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
+    "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
+    "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs": "21681292c6c7a568b2e40c6bb4d1fd2c7f7c7254bac0aa93f47fa5fbccf030c3",
+    "crates/cordis-kernel/src/strict_partial_quotient_example.rs": "e82014c379ae642a03b0608df261321f609c2b736b69d86fd46e04c7827aa2d2",
+    "crates/cordis-kernel/src/strict_partial_quotient_per.rs": "8f057c24cc527ba518aeb8539a5b68dcfdd8290ecf9e854eb7d6f93eb3c896a8",
+    "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs": "ebe8a3e72554a588d36ece0fa6448e645d8b2828f8568e12458d5b4f4dbbe421",
+    "crates/cordis-kernel/src/termination.rs": "584437e136782e356eb6b4e959e33772e9248e5c3464bb42d1530e1b860f8e5e",
+    "crates/cordis-kernel/src/unload_orchestration.rs": "df1c85da2daaa83e2ef3a6b9c9e01e5fe723ee5f01c553cebce06258b70ff570",
+    "crates/cordis-kernel/src/witnessed.rs": "fceb6532bdcdeeefa3eed198073baedd824fc65b1b598d0dc2d1dd3107e95956",
+    "crates/cordis-kernel/tests/admitted_fresh_driver.rs": "8724f48d0f8cc610a05807f2da438a08ae0f2a871c059455e4395066c427d707",
+    "crates/cordis-kernel/tests/admitted_script.rs": "ef1aad8d98e5cf4cbec4b4788329b79dc5f075c74aea04f06c3ce4df88e31797",
+    "crates/cordis-kernel/tests/child_driver.rs": "9cf7ed234fd268cc5ee2cb362fe547b21912c97ae2c5393e319d43dc5c628a47",
+    "crates/cordis-kernel/tests/compaction_equivalence.rs": "7127fffe4ca9cea73ae50e2bbb8af2f3b089967ae7ff868781907c8b4ac86cb8",
+    "crates/cordis-kernel/tests/driver.rs": "22088bc0a082c88efded80f5871d027aecda4aa6f1899a268dc2ebf5b92298ba",
+    "crates/cordis-kernel/tests/episode_identity.rs": "3d6f6c3022faf0fa6db3e74d2d3db127b2f8c857d916440cabb0022655f7710d",
+    "crates/cordis-kernel/tests/episode_protocol.rs": "fc1987807de8de5183df0f3c29a12d79945ddee563382a6a1fa2015c735002ff",
+    "crates/cordis-kernel/tests/fresh_driver.rs": "ab9f9aff9b7528204526b31ce0381b4b0eefdf678d4aeb98198be691a7bbeb8f",
+    "crates/cordis-kernel/tests/history.rs": "1da6df0ca8359517bba4befd0fc61877e664bfc7aafda5caa1afa4b2b9b625d9",
+    "crates/cordis-kernel/tests/lifecycle.rs": "06448b7ab2443bd7ba39da106a1d2254d06d2a74c5e3fbe482fde7bf701e79eb",
+    "crates/cordis-kernel/tests/mixed_driver.rs": "3ffe364dcebac8e00c7f578e25b72d143cc652937dd56f9ef8c8e30624723837",
+    "crates/cordis-kernel/tests/native_action_ledger.rs": "4579697c48c766f087ec8dc39537cc96d3f13e128eba5b26fbd0588af8d00094",
+    "crates/cordis-kernel/tests/native_publication.rs": "e099052fa203b7ef43b254819194237e24c2eedbec8534984031b7fbdf95e27f",
+    "crates/cordis-kernel/tests/ownership.rs": "9bc750ac65233b6d7abc6977e10ac770e22d47ee4ae58a63554ade68a6524cec",
+    "crates/cordis-kernel/tests/paper_child_support.rs": "85d8f1a76287a2d92079abd3de19cac18b837f75fbd84c3f6ac94162d97d462a",
+    "crates/cordis-kernel/tests/paper_deletion.rs": "dc25b02e735d5adbf14b7f9812bef5ed87d05c5a87dcd8618e76a0be331ea18b",
+    "crates/cordis-kernel/tests/paper_support.rs": "2ae205acc86e7f7c4138f9dd2a59f50a66d03749f3376abb1c0fea4ea88afd0b",
+    "crates/cordis-kernel/tests/paper_transposition.rs": "794186b9b44c4df39315d1bcd3677cfa755c057e6c8b8c348bb9a8bfa4968d47",
+    "crates/cordis-kernel/tests/paper_vestige.rs": "c99b333f8f58b890cbd28c5670a0a2b1de60a077f9104e5383d78e6dd79805fe",
+    "crates/cordis-kernel/tests/program.rs": "2382f03e98f59d2752104c1a96b830dbc627188006a57d3d0af60e7bb0711f8a",
+    "crates/cordis-kernel/tests/program_normal_form.rs": "e8a570680ebaad6799b79726a03a8e1086eae898859fe4345dd02a85845e99e2",
+    "crates/cordis-kernel/tests/program_trace.rs": "a1b716ec5b6a526f28c4a5babec5caac8dc95ef05092ca52ad74c6460460a9e7",
+    "crates/cordis-kernel/tests/progress.rs": "f5938ac7922e0b93ca7073d0be22aff02be3a93068ea726be2799ac775100d32",
+    "crates/cordis-kernel/tests/refinement.rs": "ab4e7fda8b295f8cbe9d7481ddfae12d741f6cff8d895f9b783cc9468adef7ea",
+    "crates/cordis-kernel/tests/witnessed.rs": "708e863b721eaed518c0c61023c137b9a59c91368bea7b6e8154599c42ade337",
+    "crates/cordis-node/Cargo.toml": "45dc6845b3d344c31c92c7c6cd7721c6f74b6ed0542543f68c069e10d9b4320c",
+    "crates/cordis-node/build.rs": "fcbd1ff3f627a7553fa1704dc6f558998daff8bc256015c37aace62cc49ce584",
+    "crates/cordis-node/examples/interop_fixture.rs": "a5a823ff06ecdbf903bfd926fcb080a8c6efaf7a35bbd74cd791b79441a750b7",
+    "crates/cordis-node/examples/typed_fixture/dynamic.rs": "c5fa32b587a2e1c1ed93bac870cfafe740ed0fca7ff88f7f04be2d0a2e7333bf",
+    "crates/cordis-node/examples/typed_fixture/mod.rs": "e2ad6a6431720aa03251b6ac177071cd2bdd7253ef43f2ae3aa6eccf537ef19b",
+    "crates/cordis-node/src/dynamic.rs": "647f6617eee1a619e32ead259eb282da75c40d8ee56a3418a39d70329a6ac133",
+    "crates/cordis-node/src/dynamic_checkpoint.rs": "484d71e0c76c520f5319d52279c07317873c0709ae07028167477d30a9117845",
+    "crates/cordis-node/src/dynamic_checkpoint_tests.rs": "0a45e57c017c2355e96c436d384cff1339242cfa8d8ced389dd7eb14e98c2d1e",
+    "crates/cordis-node/src/dynamic_children.rs": "42b463d82b77ac518e01739c813f5b7c5fb73341f29e80e17d063b0fc1c82e4e",
+    "crates/cordis-node/src/dynamic_children_tests.rs": "a18c7778c78b07999a58518187b3eddfcf6869688c2ad0dffbc3f5f0a759e786",
+    "crates/cordis-node/src/dynamic_ffi.rs": "6d11f760e99e14fb02dc5944795bdf90175b1e6ede564aa40247a24d5121dcba",
+    "crates/cordis-node/src/dynamic_resources.rs": "677cf2d2fb460a77996585786b7d3027c9878497bc7374c4c30f0d89b9db9fae",
+    "crates/cordis-node/src/dynamic_reverse.rs": "df88e5028fe682752efa3ec65e52892d0150e1b54647ae96054569eb4f0555a5",
+    "crates/cordis-node/src/dynamic_reverse_tests.rs": "4a06e25b56a9edeeab2a8886295f92517c421dab91bc76e95bdb34dbeb0be2b9",
+    "crates/cordis-node/src/interop.rs": "dcf8f782a6c8e78ddfd46c602039515c0962abb1efdde0692048e63d1e022038",
+    "crates/cordis-node/src/lib.rs": "5104abb815d47054ed250304c7c3c6d9f75380f5552479ea6d23caba494fa738",
+    "crates/cordis-node/src/objects.rs": "8b483868b80e4fc424fb8511cc979b24d6bf38b4f1fc8b02aa35dcbac9996f6d",
+    "crates/cordis-node/src/plugin.rs": "5d83bf1ea1bd4f6aaf2b02f12cf710baaa0cdacb534344d0568d1203a4d8100a",
+    "crates/cordis-node/src/streams.rs": "383980b09f6567ac38889189c21c2890753f67100d28f7c46ca87414f95b761d",
+    "crates/cordis-node/src/typed.rs": "a46e69925e2fcaade7074874d71751adc5452585c21dfd34b674b0a8a107197b",
+    "crates/cordis-node/src/typed_children.rs": "6d42a5b983642e745547e4b4295d7f953320d66deb4f1c70b0f84d04b06cc2d1",
+    "crates/cordis-node/tests/plugin_runtime.rs": "c6ded6f03eaf5b97dae7ce1b2580eb18b0799e737ec3577f284a506a68bf7abf",
+    "crates/cordis-plugin-api/Cargo.toml": "adb3f8df1774d36b38ba8019962098486acb3bfb65bbfe953583663eb04276a1",
+    "crates/cordis-plugin-api/examples/dynamic_fixture_fail.rs": "70d1ebbdaa56f3654f0ffcd1c740135eaa3df3a549393fda6b2691d7be4ddaf8",
+    "crates/cordis-plugin-api/examples/dynamic_fixture_v1.rs": "16a84beef62d11450897b5caeb1def7587f0f7ce305503d8919f56177a44cd12",
+    "crates/cordis-plugin-api/examples/dynamic_fixture_v2.rs": "c91478ef5d1861c6ff34c72028b64dbb9dd01d1bd4b0e0b633700c358bfb1ce0",
+    "crates/cordis-plugin-api/examples/shared/checkpoint.rs": "1034ae16f1268e43bcc34d49f484f89be71c52ede585d64a7f9d24d529b6c338",
+    "crates/cordis-plugin-api/examples/shared/children.rs": "3f20c05bd0f485e776bdb62e36bd3aac36f495f143d27beb0af7c39033e083f1",
+    "crates/cordis-plugin-api/examples/shared/mod.rs": "61693a8bd00727ca90554e8b43d333ac7c6dda7f6a747f52cf4984d4ef350fed",
+    "crates/cordis-plugin-api/examples/shared/resources.rs": "08e2ab30923a0b0f4b7165561ba5c9ffb654a99d6d59d215bfaedc8df49d3a18",
+    "crates/cordis-plugin-api/examples/shared/reverse_resources.rs": "20759fff62b9526978d0073886c3a8b5bca1bb53ccdcabfed29931fdc412216f",
+    "crates/cordis-plugin-api/src/checkpoint.rs": "a94088dcea694cd703ad620814e12a2c9d241bf8d8f11cc1189d6952132e1a32",
+    "crates/cordis-plugin-api/src/checkpoint_tests.rs": "41bfcdf01b1685b59a6f54a9fa9e661c6e3185cccba1d268e040735c879d1234",
+    "crates/cordis-plugin-api/src/children.rs": "d7bfc5d613644def3c19e0691e165e8f1b606314cb112c935a3b6fbe11e6cc6f",
+    "crates/cordis-plugin-api/src/children_tests.rs": "5eac591736433aa3a827e4acadf2e7bcf8c433b14ac7bf963aae40e23d2636ba",
+    "crates/cordis-plugin-api/src/lib.rs": "983a90801ac053e2f566d7c0170e097756009cea735243c5aca780a17fec8a5d",
+    "crates/cordis-plugin-api/src/resource_tests.rs": "df7d8cfef2b147ebd3d1bc2acb4d4818dda2d10d7571105c85afd6607781afee",
+    "crates/cordis-plugin-api/src/resources.rs": "76b9f6cdf8eab59f26e336ddba2303bb2c0c7c0a2650f456c51eb9bf6a93f060",
+    "crates/cordis-plugin-api/src/reverse.rs": "cfbdafd39d471347598f9cda8a4d02d2f64eca0b2483d4c97946b9fe6763b950",
+    "crates/cordis-plugin-api/src/reverse_resource_tests.rs": "2b20bec126712722b0dfd7da1dba14220243330181f526340bc48302a2b3218c",
+    "crates/cordis-plugin-api/src/reverse_tests.rs": "da5651c73d88125c4e0d1a4375da649cb4e67f9471d9ba9215a5d918de600450",
+    "crates/cordis-plugin-api/src/tests.rs": "3c987a4e224796621edef92a0a006d45d90f61b00137fceed413579d74439b89",
+    "crates/cordis/Cargo.toml": "e73693f2b50723c6ffda5ddb4361e6f4a586f49bb3177873ac4bb8bd744fec87",
+    "crates/cordis/examples/async_lifecycle.rs": "16b5f6253bac68bfed7c6b087a10296db1099417f03ca4a982833e320a4f8371",
+    "crates/cordis/examples/basic.rs": "7b465025a3053fab402b332204deb85cd056dee0128d925caf38ca0388fdf40a",
+    "crates/cordis/examples/config_persistence.rs": "975bbedc661ffc699d04bd6023fd6dbda15d1bbad10a06a77c77e277d5eaa9d2",
+    "crates/cordis/examples/config_reload.rs": "01a224255d0dca41f060cea49879eab0f35c9dbc19a3e5a5dcd506b79170e86f",
+    "crates/cordis/src/config.rs": "e5e958942dfa0162865958379e70037186edfbd681d8a4076725d68da6c3cebb",
+    "crates/cordis/src/diagnostics.rs": "e554dc9d7c5be702c03e98fe41fadad9379cac57e1723fef1e36b42b3ca24bfb",
+    "crates/cordis/src/events.rs": "88a77593c0c9467ea11d43b4fc00b52b1833bc97195049bb5417b2498a550058",
+    "crates/cordis/src/future_support.rs": "160f9ca56163c8c8bb0ec7b264f04539c5412e0d934bef71f2c46594c8fce9d3",
+    "crates/cordis/src/lib.rs": "ff1d9cf39fe20b6f787abeb67b7dad7226c24cba6214dac36ebdc9d7669c678e",
+    "crates/cordis/src/loader.rs": "2e1797ec89cf47e72cd7599cb2bf04d433d425dc2e2b46ae36b9896c54dd3d05",
+    "crates/cordis/src/owned_events.rs": "3f3f1a776daa80fb9d74a8f442985f1c4a95f6bbf06b922317c4dcb3957b828e",
+    "crates/cordis/src/persistence.rs": "4a4226b7f15319c6f58dfd16b419608d6908efe151651ba00fc742b8c8ef722b",
+    "crates/cordis/src/process_plugin.rs": "b73b82fc80ed0f167af72541730e64eba6a942f651d989783d248ea1d6353295",
+    "crates/cordis/src/resources.rs": "8d7189a8ecfabb13bd8b594329a93574c7eafae3969f4781b1891ef5188d38ba",
+    "crates/cordis/src/runtime.rs": "c6028509583967fdf02970d73d6bf7a6569515f529728a2edabbccb089fb9127",
+    "crates/cordis/src/runtime/static_host.rs": "0f4b10ced9eb2c3f28bf144d087ab3f320479c184670197a1a2d7335843fc536",
+    "crates/cordis/src/timer.rs": "3e053bf6e3b50a07e03cffd5cc12330fd76b90bc4747ad039a83964c0b49d16d",
+    "crates/cordis/tests/config.rs": "e9b6ed84488b113c83655d62bf5bd9086c8bea7a43d60c77f40c04b90098803a",
+    "crates/cordis/tests/diagnostics.rs": "fa9e97ac7c44a8c91bd4cbd6e39e0f28f40dc8999ad5dafaafd6dec345f1f25a",
+    "crates/cordis/tests/diagnostics_review.rs": "6386befe662944a678b9e867734038e1f92f6147be07ad0df4abd04fd4f424bb",
+    "crates/cordis/tests/episode_refinement.rs": "b2c628c9dfb18c84cd86fe350d5134a7f004edb420c6b4ac707c5fd3e1e4a8e7",
+    "crates/cordis/tests/events.rs": "220237f64994d60ec5e091af0bd08f8fd0190391f1ff4b978cabd7c7e5500c41",
+    "crates/cordis/tests/harness_composition.rs": "4d1f3418e9ae780c81c9230c005256f2f3ea4ce5635c6ad541dfd9949823650c",
+    "crates/cordis/tests/loader.rs": "281859cf2a9845b86efa6646041688023abfb12ff731f1432220829148ccb0b7",
+    "crates/cordis/tests/loader_update.rs": "11f79adcff55c6bea9536143c279a2ac2bad9c85c9aca2f3445032b1a22f7a50",
+    "crates/cordis/tests/owned_events.rs": "2e3e8a2b674f8bb0ca629152732f1b331d61e0437e42184b87321b40b99422a2",
+    "crates/cordis/tests/persistence.rs": "869fa4f84cfa5d608ba898735af17169896e099dcbf4998ede13e3b68f59542e",
+    "crates/cordis/tests/persistence_paths.rs": "5809f8b3ec788036ac89203739f74ceadca00d1e14a731960c0bcb5de37142e8",
+    "crates/cordis/tests/process_plugin.rs": "b70149d59322dcc67f9421906b4334be36811f37f8017fec0bccd572d157c762",
+    "crates/cordis/tests/resources.rs": "2fcf460e332233af347de012447c5dfb1e455241e7592da810721ef0f26fd747",
+    "crates/cordis/tests/runtime.rs": "3e970cc6bf3b5d8b01faf2373181e916336bb5f99b19895d3c1a25ba82447a6a",
+    "crates/cordis/tests/runtime_waiters.rs": "8851b649be95e05b09508cf650f2c21a2b1a450c6889d8b84dd0723c7da8aff6",
+    "crates/cordis/tests/service_configuration.rs": "abdcfa7e819675551dec0380c750354c80609e8c88a1a12adfa2696314f00170",
+    "crates/cordis/tests/service_parity.rs": "e07fb6ad5f89514f8395a29abd601159502bc5f82ae7a15c6c6d5bff589401de",
+    "crates/cordis/tests/shared_backend_traces.rs": "7b904a3051fbc9fa139e165aa9b08d6cab55d42196c86afcd4e0aa607450b72b",
+    "crates/cordis/tests/shutdown_review.rs": "bd034b0aef15e90b2a09e795eb2c0d6e6394448c4433bfa287f1bea9f007a141",
+    "crates/cordis/tests/static_host.rs": "c3982448fe16578ad1d1c07cd0ea98cc6c7642135f467541a0eceac1ae8d10ef",
+    "crates/cordis/tests/static_host_join.rs": "50501904f8a6b73517caab7c5f292459b84e2d56baa490ea1eef7fac2b813e02",
+    "crates/cordis/tests/timer.rs": "d434d1e7904669288cdf66ee1f249c5b2cbb1270f4d9b568dfa13b5d209346c2",
+    "scripts/build-node.mjs": "0be2f9dd6b6434614119db785fefa94d4fbd69d287987a0fffdb3869a8caf530",
+    "scripts/build-node.sh": "2247863df8b1efc8123b1b6dfbd50e0871f414979700c3c9ee502d8cadc66902",
+    "scripts/toolchain-env.sh": "f9e6689dca3a5658409f110523085600dcb5a233feba2c00720db48c72a0abe9",
+    "scripts/write-native-manifest.mjs": "3e1e64b6f3f363476da302cc6c1718493ff2145db571f7b39c4cae55f3cfb370",
+    "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418",
+    "upstream/deepseek-harness/packages/llm/llm/package.json": "38f6d60272a9ab27682edcbc306d3b591eea282f82897f0d5202f3fcfd8674a8",
+    "target/harness-compat/package.json": "38f6d60272a9ab27682edcbc306d3b591eea282f82897f0d5202f3fcfd8674a8",
+    "upstream/deepseek-harness/vendor/cordis/package.json": "bd5b142ae927e4f954ceaee7cdc0e43fe921dde311edc8ec4f797f85f1981f83",
+    "upstream/deepseek-harness/packages/core/session/package.json": "4ad1c0772238ce947f3287ad94cd467606d856dd8a6cb941b447ebcc9f97dc6b",
+    "upstream/deepseek-harness/packages/core/system-prompt/package.json": "e655a42f5611b367aec46e16a15ffa37ed8ac90d9dc7afb6e3d88a799b81279f",
+    "upstream/deepseek-harness/packages/core/tools/package.json": "312ae0c6090859a29a2bb3daf5bcfb71dbfdcb36160b70003dc971da4e0eeb87",
+    "upstream/deepseek-harness/packages/session/session-projection/package.json": "d4058d73549c9ba64539ae22f7aa240a72195ff60360ce42bc9dba5dd715258d",
+    "upstream/deepseek-harness/packages/core/scope/package.json": "3e0574636480390ebda6ee2b22cb1dc2610fb2bc906014c9d0a90a6a1c230d41",
+    "upstream/deepseek-harness/packages/todo/tool-todo/package.json": "2411b80c9c1d992c51e045d75f2fca67e6d7d8835e9dda5a80aaddf4cfe9f2b1",
+    "upstream/deepseek-harness/vendor/schemastery/package.json": "853b0935cb1d49c477de8600c91ed1829fa46c61d2cd83dbbf406bb405ef7f93",
+    "upstream/deepseek-harness/packages/typert/protocol/package.json": "847d7758d0c2ca9ee3b609eeecc73f179d685e226ed205d1d6bf22f5440a32fb",
+    "upstream/deepseek-harness/packages/util/values/package.json": "9acd71d95237b2cecd70a8d39caf0e0e2f720188ed1cab2d71644039ea7a90d6",
+    "upstream/deepseek-harness/packages/util/brand/package.json": "4d60b2ebf68b05cd362a2682f5d063f696520a7b54d08c251d7525aebdfad2df",
+    "upstream/deepseek-harness/vendor/cosmokit/package.json": "13e5f45b1c2fbb5f5be7f604c8cbb0f30da3529a0b2d28e565e4faf13c728218",
+    "upstream/deepseek-harness/packages/util/timeout/package.json": "8ce88785bc67002b5d3ad430b83828a2a96e3195228b19572c1202768820ec70",
+    "upstream/deepseek-harness/packages/util/crypto/package.json": "3688d9736fb8deda3aabb7657a4588d984677a631333db749ba286dc57a70a1d",
+    "upstream/deepseek-harness/packages/sandbox/sandbox/package.json": "021f29a6ddf8ffc95158888fc3fb579a99b1045b584ab6fb923739f1fbe3749b",
+    "upstream/deepseek-harness/vendor/cosmokit/src/misc.ts": "117617943074ea57c15f216905dacd2f6d1c4c2ff16586f97a7a7a87dbf2141f",
+    "upstream/deepseek-harness/vendor/cosmokit/src/array.ts": "cf4de899ecffd66a90d8cef6f4c7d127d31f77f776d8e173d41c30d2d7632cf7",
+    "upstream/deepseek-harness/vendor/cosmokit/src/volatile.ts": "937433215595f89da249ec7cabb89e331ff4135a40c6686a95666d2095315e55",
+    "upstream/deepseek-harness/vendor/cosmokit/src/types.ts": "cc49c12e4a637f7b0754ff78a8299e9c42fa40ee8c678550af0c538a80146a92",
+    "upstream/deepseek-harness/vendor/cosmokit/src/string.ts": "5564272b3e15e49235cbe3a8b453f27306baf282d23a893982841670f65d3c04",
+    "upstream/deepseek-harness/vendor/cosmokit/src/time.ts": "49957c4608465a1fbd738186a92c47fffcd1fc4ba59dbf89524f8a773fe16fe2",
+    "upstream/deepseek-harness/vendor/cosmokit/src/index.ts": "1087da74b9c461984e547d524ee766eebcf329a78e4720bff5b60a004ccf6e8c",
+    "upstream/deepseek-harness/vendor/cordis/src/utils.ts": "8fe273424583d21267ef13f248840e97454d09d836a0ac08323a9482c2069263",
+    "upstream/deepseek-harness/vendor/cordis/src/events.ts": "9aff93dcfcad98aebb692c19c36d3bf034a96f9085bc66900a997cda3f79e6fe",
+    "upstream/deepseek-harness/vendor/cordis/src/logger.ts": "05cb6be3e4cf8d078185b5d10c87e536c7d2b2b3ad43c270a0dbafaa28f41fef",
+    "upstream/deepseek-harness/vendor/cordis/src/fiber.ts": "b7661d6c19be76cef6b97d88719a8112c0f8b5abe65bd9e7d5947773fd4b96d4",
+    "upstream/deepseek-harness/vendor/cordis/src/reflect.ts": "6847b9781044023d65aebb5896a873b9f0a3d777eaf7fa0dd2a7a408eb6b74a6",
+    "upstream/deepseek-harness/vendor/cordis/src/registry.ts": "34bbd60ae502b4f85201c204afb52a9acabde6878d9278493478c1b2183debd3",
+    "upstream/deepseek-harness/vendor/cordis/src/context.ts": "96b388162d6013c1898de61e35f28917abb93809de24174980f2a1a348d0b115",
+    "upstream/deepseek-harness/vendor/cordis/src/service.ts": "614205c6ce7cf1a057b8b352e96aa4fcd734c967a3d2283a126c9c61f268e3be",
+    "upstream/deepseek-harness/vendor/cordis/src/index.ts": "071fb226e9a21556625e4391b28e6641b9b34b1cd402155246e0437993d8b740",
+    "upstream/deepseek-harness/packages/util/brand/src/index.ts": "f9d6da858d7308117227dcc2306ce7246b7309b2ae22d413d289cbae51e83e98",
+    "upstream/deepseek-harness/packages/util/values/src/partial-json.ts": "d06228f26e0c670dc18615082b5be283f72a1562220c977c3c5d54edc0b5971e",
+    "upstream/deepseek-harness/packages/util/values/src/index.ts": "b550a5db58f714197e49c3a5bfb4c241f33b859c95f772957a50d89c3b917fd8",
+    "upstream/deepseek-harness/packages/core/scope/src/store.ts": "e2f6c98e271cbae483393ccd1e5212a255def165a8a591d308efbd827af67278",
+    "upstream/deepseek-harness/packages/core/scope/src/index.ts": "074b8f0c3fa2e240effd0a7e65c54be7c14debc1e53bb712334ce20d15affe4a",
+    "upstream/deepseek-harness/packages/core/session/src/types.ts": "67ff2491ae8284ab61c2c1a57e346fd4d12effb1e82a42aa654bcc90f067215c",
+    "upstream/deepseek-harness/packages/core/session/src/known-event-types.ts": "f70489f767e4996c482cc7624edbbc93bf71a7d84a1bce94b587016dfa8d073c",
+    "upstream/deepseek-harness/packages/core/session/src/surface.ts": "5b5394dc02584cb3549330b358fbe5919d05f8a6920d90f6819bb7e3b4783154",
+    "upstream/deepseek-harness/packages/typert/protocol/src/remote-error.ts": "bb902ec537e1dfbc74885e77a01192e6532b50a959a5bc4cc55c1fbf52e0a368",
+    "upstream/deepseek-harness/packages/typert/protocol/src/owned-value.ts": "096c583e2093cd814d0cef5bc3f8161f6aabfe8cfe97eff78c3a340c0c95a44d",
+    "upstream/deepseek-harness/packages/typert/protocol/src/json-value.ts": "c5d58b60b7e085004041326055737f7e718e719f5df7b7df5b09d2fb147e57c0",
+    "upstream/deepseek-harness/packages/typert/protocol/src/index.ts": "d44d7bd7811f975dd7937e818f43360a6d683e465e688002dfc0aa25c3f65a33",
+    "upstream/deepseek-harness/packages/util/crypto/src/index.ts": "6d314b677a163808a732c53fc509eebea1f8b8cc34b67031644dcfa4a97e28f0",
+    "upstream/deepseek-harness/packages/llm/llm/src/message.ts": "5826fb32bc3d6e2221a7a39cc8b4fecc57282540a332417bb9f2ac3522b5c7da",
+    "upstream/deepseek-harness/vendor/schemastery/src/index.ts": "a6647b515659cf439b701fa9f9574c9c310ce3872d26a13a81e9fa4d02ba10ad",
+    "upstream/deepseek-harness/packages/util/timeout/src/index.ts": "fdfd67e7d9c0a09668a4101880439f28446a8bf038f060a0bc4d27d941be562c",
+    "upstream/deepseek-harness/packages/llm/llm/src/error.ts": "cd8657420bb84060ee45b1e72fa668df26b090532afd8afd2a96da983a74f792",
+    "upstream/deepseek-harness/packages/llm/llm/src/retry-policy.ts": "eee2423a0152096026446dd651f29678e0c504f0349a91758720f01f74efa871",
+    "upstream/deepseek-harness/packages/llm/llm/src/call-config.ts": "c2ead88240db88af3199235389585d2ddc566312d8976d9648a5f5190d32e6c6",
+    "upstream/deepseek-harness/packages/llm/llm/src/adapter-failure.ts": "533507191d814fc7b3df5ae65076b2ebc4134bbb47a2bbd9bb7309d7e7f9241b",
+    "upstream/deepseek-harness/packages/llm/llm/src/api-key.ts": "16bf926a82b0c0c1d4adbee78e2a1eebe260f100285795edb8330f3fe46141a4",
+    "upstream/deepseek-harness/packages/llm/llm/src/content.ts": "e679f0972cef3f6301c4a9f321ee288ef0a63223ec51c093349c186cdc81ff35",
+    "upstream/deepseek-harness/packages/llm/llm/src/attribution.ts": "44cc79c833cadc78ef0e124da87786bf9d7765f1409d885ec97b5e0e7d8f9ffb",
+    "upstream/deepseek-harness/packages/llm/llm/src/brand.ts": "a3a3f22174353af8aea34a9a439986530bffcc6df6339e55612fd5a1fa4fb14c",
+    "upstream/deepseek-harness/packages/llm/llm/src/types.ts": "f5206fd5daf18d3899202c96ca0edb6e7c1a10ddc535edead062ed28f2261b2d",
+    "upstream/deepseek-harness/packages/llm/llm/src/assembler.ts": "a2d065645058a70195a504b101e9eed23df3eaced3def868d602f3a863b03887",
+    "upstream/deepseek-harness/packages/llm/llm/src/assistant-stream.ts": "9ff074108132ef0ffeefffd8e7967d05db4c6bef1689242807ef7a1d2105dfeb",
+    "upstream/deepseek-harness/packages/llm/llm/src/index.ts": "336cc8be1c05a6cb1881cbec4defdd6586d49c8b6a7bea08e1dceb258fb1a89d",
+    "upstream/deepseek-harness/packages/core/session/src/request-header.ts": "abd8ef57c34ad6ddbc21ba83398092f6aff64ac5c0f38efb353cebb04f654ad4",
+    "upstream/deepseek-harness/packages/core/session/src/tool-history.ts": "53ae6aebe5ebe9b1eb782f008315db33ff637611093e40fa3529ec3019b56683",
+    "upstream/deepseek-harness/packages/core/session/src/repair.ts": "c2835c920aba203c709e44686e55f43bb4d357ea59cfef3561c371b8ff115540",
+    "upstream/deepseek-harness/packages/core/session/src/fork.ts": "de80ecbf0e6a7961c096a2d7f0304bc6f6c83f897268304e28352357da06bfb0",
+    "upstream/deepseek-harness/packages/core/session/src/preparation.ts": "51bcd61f505928fc1d98cc59ecfd5e0a34b3a5cbd3ecb7937caef0da87b7baa5",
+    "upstream/deepseek-harness/packages/core/session/src/seq-ranges.ts": "9f746691995926cb17d3dd19da04871f2355be40c798ed5a8256659e6bf14559",
+    "upstream/deepseek-harness/packages/core/session/src/index.ts": "0ae1db3a5153f9a50e7aaec547c0e0f50af17528ddc5c50aceb8a8bbc34af9f4",
+    "upstream/deepseek-harness/packages/core/system-prompt/src/index.ts": "9e31442544109b3ff9be13458e826e0dcacbe31d9f59ddd96a6498ab20b1574e",
+    "upstream/deepseek-harness/packages/core/tools/src/json-schema.ts": "13deffdfd34539e23706b0fde235991da45b2f07c5c18dbbf3ca734c1da0c788",
+    "upstream/deepseek-harness/packages/sandbox/sandbox/src/escalation.ts": "82b165b60d20ebcd78ab51a4ba503a88b4305fa6a8ba1b420da749759ecc5085",
+    "upstream/deepseek-harness/packages/sandbox/sandbox/src/roots.ts": "8a18e1474012415def8197a4ee493394a91cc739a6ec94eb83c6b4d980b7a23b",
+    "upstream/deepseek-harness/packages/sandbox/sandbox/src/diagnostics.ts": "758d86ef3e565f534a9903ea75b25bab92d31d7c080c8740ff118388966c8659",
+    "upstream/deepseek-harness/packages/sandbox/sandbox/src/index.ts": "46592025ce36d04ff8d1bfa9d6594dd8d1527883649ccf40ff7a169e94e68dc6",
+    "upstream/deepseek-harness/packages/core/tools/src/schema.ts": "d54459d0ad535ff3375138d40f3b37b39c6994703f1ea6a331df9a97c7e3cd23",
+    "upstream/deepseek-harness/packages/core/tools/src/ptc.ts": "227d0d5221432fa9caf5492058ca08f449f732f18a566e708c2aea1a9ee2d96a",
+    "upstream/deepseek-harness/packages/core/tools/src/ts-types.ts": "85205a23ed99597b12579fb2ac4f88ffb3c67ce30a0bd731237a85ba0a8e70b4",
+    "upstream/deepseek-harness/packages/core/tools/src/py-types.ts": "ad83ba1a85d2993c8c15fbf0ea20e4bdc24e128735b82fa1c236d14b61fc59cb",
+    "upstream/deepseek-harness/packages/core/tools/src/testing.ts": "8b7bf72750d885c1acb52e99ccac9e42542cc5efcb581098ad3507e83ca0a651",
+    "upstream/deepseek-harness/packages/core/tools/src/index.ts": "9107a2b6447b10c2ecb90429d7c1b80b956759e96d35230af16f5a88f5d3eccd",
+    "upstream/deepseek-harness/packages/session/session-projection/src/index.ts": "2186b62bfd59c0b5ea1413287f34e3a5be79b2162c5e0e2eb2143d7e42fea39f",
+    "node_modules/zod/v4/core/core.js": "a5e713beaac4647151e03716a83f51ab714e5337cf66850f3b28eaf072a0bbfe",
+    "node_modules/zod/v4/core/util.js": "968e3433e810cf7ba5efb609a1cb6d9a6cfb51215fd1f699938228f7ac25deb3",
+    "node_modules/zod/v4/core/errors.js": "bdd0ed8fd4a6e9d04fe6423b0f9df3a0b403939bc7dcedd8930a4b8df1fb118c",
+    "node_modules/zod/v4/core/parse.js": "2578b8d1341c3882a6c089f9ec57ce1c1a16b8b2b477721d4d89ba3d3ee50c9c",
+    "node_modules/zod/v4/core/regexes.js": "3cb122080c1154321331322ebc0cbe04878fe104c8c7b335891d9f85fc4b3f63",
+    "node_modules/zod/v4/core/checks.js": "5a33a20dcad372b4d18ead8d1e58b1950454f136a2216e62f247e0e5601ac838",
+    "node_modules/zod/v4/core/doc.js": "e084bbcc536746a8942fd33b08afe4db345554b3a0383114f1dca95261c958d9",
+    "node_modules/zod/v4/core/versions.js": "bf082fde98fa7725412d713c7f56da3a5603bdef199d68d5769263f30ce9c756",
+    "node_modules/zod/v4/core/schemas.js": "09da9b0cb9b9d2d795c349bc47c7521d5aaffe241885f0c9728f2aa7de3834c9",
+    "node_modules/zod/v4/locales/ar.js": "220ca3ca8cf67e4ccc05d789eeed2692d970269fe0cd82f05db8fd899b661b9e",
+    "node_modules/zod/v4/locales/az.js": "4725ffef0b2f2df947194f9698c792b69f52a8c3a5a1e1bdfabbf62259a1dd46",
+    "node_modules/zod/v4/locales/be.js": "da4bda7fbc940dd9f50efdd914caa9397243be779a505b82bd4be5395d3b795e",
+    "node_modules/zod/v4/locales/bg.js": "48511ad2f86043f0eea6e7673d5e2b848a3295a26c9c4650e96b3884d640196d",
+    "node_modules/zod/v4/locales/ca.js": "796f9ba7dcd53648171aa0132c50271ef358936765cec0a44a642c41d05b3e8c",
+    "node_modules/zod/v4/locales/cs.js": "670a75fe1db1104db090c95aabb01e4eb6decd451fe77fd830c2e4dafc79b49a",
+    "node_modules/zod/v4/locales/da.js": "cdaad7a1fa370abda1943fe9c2caba961e7896b9808d51275daf33f964af49cc",
+    "node_modules/zod/v4/locales/de.js": "521a4ed29fcaf3f781163875dc282cfb5262047773aa2b70a852996b1d8a51b9",
+    "node_modules/zod/v4/locales/el.js": "9857a9e4909282b2efd86317fc3e67ed86e24287f32329cfa5ab833c05fc0d81",
+    "node_modules/zod/v4/locales/en.js": "232a0828d64df8e410b23ac9825a667bd9d485fd70acdc4b4d0870539faef0a4",
+    "node_modules/zod/v4/locales/eo.js": "ebe08048aa3ee9871ce9fe1271e254cb672b1968ec40ac253066d08d176e8a65",
+    "node_modules/zod/v4/locales/es.js": "4edd9302e9724c408b024220e99092fbd2f90100ac3c6407a94543b79843610c",
+    "node_modules/zod/v4/locales/fa.js": "2dc1bee1e984e8a15191fb3c69aaecaa26c922e12a0d4486ac005a0372b78565",
+    "node_modules/zod/v4/locales/fi.js": "3911184979f01d2ae580ce611710ee40597eff97a410d0fa823ab6ea27cee88c",
+    "node_modules/zod/v4/locales/fr.js": "3ea466ca5737984bb5acc9008822060272f596317004618cfe1e05109f707577",
+    "node_modules/zod/v4/locales/fr-CA.js": "f8716c2baaccdfd1d958743bbc5250c9bdef5152d0801470e9b9a380d618f4ab",
+    "node_modules/zod/v4/locales/he.js": "290512e43d2907700211da09dc3959fd98d120bfb89f8836e6e3f83a472e26fe",
+    "node_modules/zod/v4/locales/hr.js": "1ea65433c32b89bead43113ac69b3acc520bb73ae231dd2e05fedf8e8c5656d6",
+    "node_modules/zod/v4/locales/hu.js": "913ee94a253db79b31463ae23a337060b6fe28be73dfc7657d8a83a4942bd8a8",
+    "node_modules/zod/v4/locales/hy.js": "0d3bbb96c0f8bc74468a2dfc7d066e838bb56fab64fd5ec03ce9c4d89eccbe99",
+    "node_modules/zod/v4/locales/id.js": "cd2c19b5c30dade3ed91ffcff3deb0b068713be24f02248e7e46b87b2b9553ee",
+    "node_modules/zod/v4/locales/is.js": "ead5b14eac892229f915fe38ec94ab3b1e676f8aa2df2a8450848ba9ca9a1612",
+    "node_modules/zod/v4/locales/it.js": "439969d199427d77ebf1e477bf2295b226712804b25437d442f9dfc78aca95e0",
+    "node_modules/zod/v4/locales/ja.js": "43ee10378cac22b0b8aee912a66c3f36a834d5b4c76e9748f88a784044f248fd",
+    "node_modules/zod/v4/locales/ka.js": "0ab5322368f9ac6e6b58f93dac484a4f4f06cdf4c0677f4df88164e9d8b4bf81",
+    "node_modules/zod/v4/locales/km.js": "dbdabda94dd93d4a1827e6c809505c79fa6aa7abefec91dc50fa0871382c99cc",
+    "node_modules/zod/v4/locales/kh.js": "78c3d1991041bb8c8fc0f7c5d745aae422d4c2e4e8f30bae44f3fef4765900a8",
+    "node_modules/zod/v4/locales/ko.js": "d2efe22ac069d9b32b0109fa07713ac0695ac1c1357afc4e4277056466f2e196",
+    "node_modules/zod/v4/locales/lt.js": "dad886e52c56a1329d22e072f8b08dc8730f69c3dc5e5acf8267cac18df1ab28",
+    "node_modules/zod/v4/locales/mk.js": "9eb4af0392fc5b9c438cdc6ceea446acc541b59e221dba918f7b80800d9da3d1",
+    "node_modules/zod/v4/locales/ms.js": "c550a9185d997e8fcd17311951aa1e29793a50b8e825e18310efd5a46c641795",
+    "node_modules/zod/v4/locales/nl.js": "acba414579c5bbd7f83dc6661fa1a12d65f1822f9b0f5035549ac60f46d93763",
+    "node_modules/zod/v4/locales/no.js": "1854483c7cf158b8f97f0faf6fd799eb1f762009018b5fde893ca33f2fb0b313",
+    "node_modules/zod/v4/locales/ota.js": "34ae496104bc17fea7d30c3d45c94cfe3d1d569b5d39a6ca51de6c177690c556",
+    "node_modules/zod/v4/locales/ps.js": "f977b5141fa8fb6a8459372e0b2895d74b381c9f2ff4899141f7ee3e639a4513",
+    "node_modules/zod/v4/locales/pl.js": "18eab58f395e30b906e8e3fddc5f212eb19f2c4362410889a5c5e0141ebe2144",
+    "node_modules/zod/v4/locales/pt.js": "df172afc585544dee7c063c484f5a07b5ed103e2c1072a782c763ad8ceb08e17",
+    "node_modules/zod/v4/locales/ro.js": "ecae409f4299ab91e2aff1095db14e23f3cf2c05b3654e242047655352c7f46b",
+    "node_modules/zod/v4/locales/ru.js": "c397a473e94d7d189a9c09c7890fe379c4f6f46d9556d52a040a90ffa56f7b93",
+    "node_modules/zod/v4/locales/sl.js": "ee2ff3a19b62cd2f89b54b165088773b937de15df7253df220bef07d9adf2d80",
+    "node_modules/zod/v4/locales/sv.js": "97d6718fb643e05d6fe30fa4f9f09b8d9a3eda4a3a350b57dfb2944943d19502",
+    "node_modules/zod/v4/locales/ta.js": "04bbde9766251f9047e786fdd77632f2ecd53aec2eb060eb2fc85bf576ad729d",
+    "node_modules/zod/v4/locales/th.js": "aea70c9ac2b399fe4749e19ba3aa99c3efb4dfb50eadfb62b0b2a6e005748f3d",
+    "node_modules/zod/v4/locales/tr.js": "4449f41d22c6f15ede5066f79d840a52ec45a6b694c859e16f9121062b6fad2f",
+    "node_modules/zod/v4/locales/uk.js": "77136a2a60eef62f7cc803a0f9971aebbc641403af77c1b41fd5ce59abfa5de3",
+    "node_modules/zod/v4/locales/ua.js": "9391169ffbc72f777a83230b6ffcc3f4cf46ab5945ec540de9ef4609dca1f4cc",
+    "node_modules/zod/v4/locales/ur.js": "858f4f38d651073e7a3fbec7ed356692578b3ad1fae1b453cb3d85312a4f39d2",
+    "node_modules/zod/v4/locales/uz.js": "d540bed482d15c47cb45439cff34e053379c53019c7c7c5fbe43f222d0c81f04",
+    "node_modules/zod/v4/locales/vi.js": "2c61bd3f4a733f3cbb1ad85e75a053cb15a8ebeb83ab56dc21f2948b1138e12f",
+    "node_modules/zod/v4/locales/zh-CN.js": "99a4b16af598834a0b11607fcdebd1c6de026386ff1d6a5a306b364c154c5899",
+    "node_modules/zod/v4/locales/zh-TW.js": "37dcae620e1553e9174a4b9434bbcc4e465150a627e80c9c17fd01de8baaf59a",
+    "node_modules/zod/v4/locales/yo.js": "98b9cbf31bf00c8b2c00de62725a9dd7cb718ac72d6e8fd4e0a1a7c49723e0f4",
+    "node_modules/zod/v4/locales/index.js": "d73f41a76614855d43eea493030a1aa05dca30c9a17015a0da5b8b70da61b6b1",
+    "node_modules/zod/v4/core/registries.js": "620ea1a715ccc4e6e605a271343bf47942dccae90885dc71f137b1f08a972e50",
+    "node_modules/zod/v4/core/api.js": "00cb5edcfde8098e5a169e66c1dce50c101484d21436e3d78e137e1fa87c4836",
+    "node_modules/zod/v4/core/to-json-schema.js": "fb3c9ab59947582f7671a53c8e20a3ced5eaa92d1c220ce8b27717a59033ad0d",
+    "node_modules/zod/v4/core/json-schema-processors.js": "ff15f567c9401dd7d3151ce11736283ff747c9a9e205cc08ee96f90eadc1c0c6",
+    "node_modules/zod/v4/core/json-schema-generator.js": "9cc884cdb535a9c87b85b66e61a593ff6b686222f038834f81c5e92552cd6e23",
+    "node_modules/zod/v4/core/json-schema.js": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+    "node_modules/zod/v4/core/index.js": "f9698820ee8371215e8d015cfa060230c62e65428397dce83f78e6538976301c",
+    "node_modules/zod/v4/classic/checks.js": "78a162d29e06001b4d919e1ed08f6e7d0d665bba0ef983201373745410d7b354",
+    "node_modules/zod/v4/classic/iso.js": "3cc5e6b4da086b8ffc7ee3188c69e4d3c945b368092e78d2299b5321182752c5",
+    "node_modules/zod/v4/classic/errors.js": "b155316267f79068ddc2dddc7046e13785804b768ca36e6deff1691d154f7c20",
+    "node_modules/zod/v4/classic/parse.js": "14cbcc416ab9169abc2cde97af77da54ca769684eac1e03a3753c16ea4a7cd95",
+    "node_modules/zod/v4/classic/schemas.js": "eb4af7946a092aff8678b9251728ea58dab40154920cd65ec4a2ca1d4df68393",
+    "node_modules/zod/v4/classic/compat.js": "0e948b101771cc0e7b753e54b3f5b486929d3db9bd4c09d98fe4ce86271bcf7b",
+    "node_modules/zod/v4/classic/from-json-schema.js": "d8866bf5232e55d12cda032bde6a56a05a0a8b276945c2e4eed66432ef5cc9b2",
+    "node_modules/zod/v4/classic/coerce.js": "fb2efe3b6eacc475c77cbb571b5fb8650d92a10f316dc869e49b722973d83c3c",
+    "node_modules/zod/v4/classic/external.js": "179a03ace3d1d77895cc5b3c54a3fcbf2b7f8bad44d6f030092491c10e5d9097",
+    "node_modules/zod/index.js": "c733a1897d6b4b30dad6998597f6896b265b094a65534359ada34b08ecf8932c",
+    "upstream/deepseek-harness/packages/todo/tool-todo/src/index.ts": "74eed074d1b056cc0a029f9b8343bc9337c14f04696c528daaedcbebe9842a17",
+    "target/harness-compat/bundles/upstream.mjs": "2dd2d7bb3e709d599db3dd522d225ba50f8de9118ba07616ff3bbf5e242eeb1a",
+    "target/harness-compat/bundles/native.mjs": "742aba56c3881c363da64718096d92676422e03847154f3d99a6a7d058db0ac4"
+  },
+  "resolvedPackages": {
+    "@deepseek-ai/cordis": "upstream/deepseek-harness/vendor/cordis/src/index.ts",
+    "@deepseek-ai/dsh-session": "upstream/deepseek-harness/packages/core/session/src/index.ts",
+    "@deepseek-ai/dsh-system-prompt": "upstream/deepseek-harness/packages/core/system-prompt/src/index.ts",
+    "@deepseek-ai/dsh-tools": "upstream/deepseek-harness/packages/core/tools/src/index.ts",
+    "@deepseek-ai/dsh-session-projection": "upstream/deepseek-harness/packages/session/session-projection/src/index.ts",
+    "@deepseek-ai/dsh-llm": "upstream/deepseek-harness/packages/llm/llm/src/index.ts",
+    "@deepseek-ai/dsh-scope": "upstream/deepseek-harness/packages/core/scope/src/index.ts",
+    "@deepseek-ai/dsh-tool-todo": "upstream/deepseek-harness/packages/todo/tool-todo/src/index.ts",
+    "@deepseek-ai/schemastery": "upstream/deepseek-harness/vendor/schemastery/src/index.ts",
+    "@deepseek-ai/dsh-typert-protocol": "upstream/deepseek-harness/packages/typert/protocol/src/index.ts",
+    "@deepseek-ai/dsh-util-values": "upstream/deepseek-harness/packages/util/values/src/index.ts",
+    "@deepseek-ai/dsh-brand": "upstream/deepseek-harness/packages/util/brand/src/index.ts",
+    "@deepseek-ai/cosmokit": "upstream/deepseek-harness/vendor/cosmokit/src/index.ts",
+    "@deepseek-ai/dsh-timeout": "upstream/deepseek-harness/packages/util/timeout/src/index.ts",
+    "@deepseek-ai/dsh-util-crypto": "upstream/deepseek-harness/packages/util/crypto/src/index.ts",
+    "@deepseek-ai/dsh-sandbox": "upstream/deepseek-harness/packages/sandbox/sandbox/src/index.ts"
+  },
+  "bundles": {
+    "upstream": {
+      "path": "target/harness-compat/bundles/upstream.mjs",
+      "inputs": [
+        "upstream/deepseek-harness/vendor/cosmokit/src/misc.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/array.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/volatile.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/types.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/string.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/time.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/index.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/utils.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/events.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/logger.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/fiber.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/reflect.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/registry.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/context.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/service.ts",
+        "upstream/deepseek-harness/vendor/cordis/src/index.ts",
+        "upstream/deepseek-harness/packages/util/brand/src/index.ts",
+        "upstream/deepseek-harness/packages/util/values/src/partial-json.ts",
+        "upstream/deepseek-harness/packages/util/values/src/index.ts",
+        "upstream/deepseek-harness/packages/core/scope/src/store.ts",
+        "upstream/deepseek-harness/packages/core/scope/src/index.ts",
+        "upstream/deepseek-harness/packages/core/session/src/types.ts",
+        "upstream/deepseek-harness/packages/core/session/src/known-event-types.ts",
+        "upstream/deepseek-harness/packages/core/session/src/surface.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/remote-error.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/owned-value.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/json-value.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/index.ts",
+        "upstream/deepseek-harness/packages/util/crypto/src/index.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/message.ts",
+        "upstream/deepseek-harness/vendor/schemastery/src/index.ts",
+        "upstream/deepseek-harness/packages/util/timeout/src/index.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/error.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/retry-policy.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/call-config.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/adapter-failure.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/api-key.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/content.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/attribution.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/brand.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/types.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/assembler.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/assistant-stream.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/index.ts",
+        "upstream/deepseek-harness/packages/core/session/src/request-header.ts",
+        "upstream/deepseek-harness/packages/core/session/src/tool-history.ts",
+        "upstream/deepseek-harness/packages/core/session/src/repair.ts",
+        "upstream/deepseek-harness/packages/core/session/src/fork.ts",
+        "upstream/deepseek-harness/packages/core/session/src/preparation.ts",
+        "upstream/deepseek-harness/packages/core/session/src/seq-ranges.ts",
+        "upstream/deepseek-harness/packages/core/session/src/index.ts",
+        "upstream/deepseek-harness/packages/core/system-prompt/src/index.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/json-schema.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/escalation.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/roots.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/diagnostics.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/index.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/schema.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/ptc.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/ts-types.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/py-types.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/testing.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/index.ts",
+        "upstream/deepseek-harness/packages/session/session-projection/src/index.ts",
+        "node_modules/zod/v4/core/core.js",
+        "node_modules/zod/v4/core/util.js",
+        "node_modules/zod/v4/core/errors.js",
+        "node_modules/zod/v4/core/parse.js",
+        "node_modules/zod/v4/core/regexes.js",
+        "node_modules/zod/v4/core/checks.js",
+        "node_modules/zod/v4/core/doc.js",
+        "node_modules/zod/v4/core/versions.js",
+        "node_modules/zod/v4/core/schemas.js",
+        "node_modules/zod/v4/locales/ar.js",
+        "node_modules/zod/v4/locales/az.js",
+        "node_modules/zod/v4/locales/be.js",
+        "node_modules/zod/v4/locales/bg.js",
+        "node_modules/zod/v4/locales/ca.js",
+        "node_modules/zod/v4/locales/cs.js",
+        "node_modules/zod/v4/locales/da.js",
+        "node_modules/zod/v4/locales/de.js",
+        "node_modules/zod/v4/locales/el.js",
+        "node_modules/zod/v4/locales/en.js",
+        "node_modules/zod/v4/locales/eo.js",
+        "node_modules/zod/v4/locales/es.js",
+        "node_modules/zod/v4/locales/fa.js",
+        "node_modules/zod/v4/locales/fi.js",
+        "node_modules/zod/v4/locales/fr.js",
+        "node_modules/zod/v4/locales/fr-CA.js",
+        "node_modules/zod/v4/locales/he.js",
+        "node_modules/zod/v4/locales/hr.js",
+        "node_modules/zod/v4/locales/hu.js",
+        "node_modules/zod/v4/locales/hy.js",
+        "node_modules/zod/v4/locales/id.js",
+        "node_modules/zod/v4/locales/is.js",
+        "node_modules/zod/v4/locales/it.js",
+        "node_modules/zod/v4/locales/ja.js",
+        "node_modules/zod/v4/locales/ka.js",
+        "node_modules/zod/v4/locales/km.js",
+        "node_modules/zod/v4/locales/kh.js",
+        "node_modules/zod/v4/locales/ko.js",
+        "node_modules/zod/v4/locales/lt.js",
+        "node_modules/zod/v4/locales/mk.js",
+        "node_modules/zod/v4/locales/ms.js",
+        "node_modules/zod/v4/locales/nl.js",
+        "node_modules/zod/v4/locales/no.js",
+        "node_modules/zod/v4/locales/ota.js",
+        "node_modules/zod/v4/locales/ps.js",
+        "node_modules/zod/v4/locales/pl.js",
+        "node_modules/zod/v4/locales/pt.js",
+        "node_modules/zod/v4/locales/ro.js",
+        "node_modules/zod/v4/locales/ru.js",
+        "node_modules/zod/v4/locales/sl.js",
+        "node_modules/zod/v4/locales/sv.js",
+        "node_modules/zod/v4/locales/ta.js",
+        "node_modules/zod/v4/locales/th.js",
+        "node_modules/zod/v4/locales/tr.js",
+        "node_modules/zod/v4/locales/uk.js",
+        "node_modules/zod/v4/locales/ua.js",
+        "node_modules/zod/v4/locales/ur.js",
+        "node_modules/zod/v4/locales/uz.js",
+        "node_modules/zod/v4/locales/vi.js",
+        "node_modules/zod/v4/locales/zh-CN.js",
+        "node_modules/zod/v4/locales/zh-TW.js",
+        "node_modules/zod/v4/locales/yo.js",
+        "node_modules/zod/v4/locales/index.js",
+        "node_modules/zod/v4/core/registries.js",
+        "node_modules/zod/v4/core/api.js",
+        "node_modules/zod/v4/core/to-json-schema.js",
+        "node_modules/zod/v4/core/json-schema-processors.js",
+        "node_modules/zod/v4/core/json-schema-generator.js",
+        "node_modules/zod/v4/core/json-schema.js",
+        "node_modules/zod/v4/core/index.js",
+        "node_modules/zod/v4/classic/checks.js",
+        "node_modules/zod/v4/classic/iso.js",
+        "node_modules/zod/v4/classic/errors.js",
+        "node_modules/zod/v4/classic/parse.js",
+        "node_modules/zod/v4/classic/schemas.js",
+        "node_modules/zod/v4/classic/compat.js",
+        "node_modules/zod/v4/classic/from-json-schema.js",
+        "node_modules/zod/v4/classic/coerce.js",
+        "node_modules/zod/v4/classic/external.js",
+        "node_modules/zod/index.js",
+        "upstream/deepseek-harness/packages/todo/tool-todo/src/index.ts",
+        "tests/compat/harness/fixture.mjs"
+      ]
+    },
+    "native": {
+      "path": "target/harness-compat/bundles/native.mjs",
+      "inputs": [
+        "upstream/deepseek-harness/packages/util/brand/src/index.ts",
+        "upstream/deepseek-harness/packages/util/values/src/partial-json.ts",
+        "upstream/deepseek-harness/packages/util/values/src/index.ts",
+        "upstream/deepseek-harness/packages/core/scope/src/store.ts",
+        "upstream/deepseek-harness/packages/core/scope/src/index.ts",
+        "upstream/deepseek-harness/packages/core/session/src/types.ts",
+        "upstream/deepseek-harness/packages/core/session/src/known-event-types.ts",
+        "upstream/deepseek-harness/packages/core/session/src/surface.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/remote-error.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/owned-value.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/json-value.ts",
+        "upstream/deepseek-harness/packages/typert/protocol/src/index.ts",
+        "upstream/deepseek-harness/packages/util/crypto/src/index.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/message.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/misc.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/array.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/volatile.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/types.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/string.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/time.ts",
+        "upstream/deepseek-harness/vendor/cosmokit/src/index.ts",
+        "upstream/deepseek-harness/vendor/schemastery/src/index.ts",
+        "upstream/deepseek-harness/packages/util/timeout/src/index.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/error.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/retry-policy.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/call-config.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/adapter-failure.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/api-key.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/content.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/attribution.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/brand.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/types.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/assembler.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/assistant-stream.ts",
+        "upstream/deepseek-harness/packages/llm/llm/src/index.ts",
+        "upstream/deepseek-harness/packages/core/session/src/request-header.ts",
+        "upstream/deepseek-harness/packages/core/session/src/tool-history.ts",
+        "upstream/deepseek-harness/packages/core/session/src/repair.ts",
+        "upstream/deepseek-harness/packages/core/session/src/fork.ts",
+        "upstream/deepseek-harness/packages/core/session/src/preparation.ts",
+        "upstream/deepseek-harness/packages/core/session/src/seq-ranges.ts",
+        "upstream/deepseek-harness/packages/core/session/src/index.ts",
+        "upstream/deepseek-harness/packages/core/system-prompt/src/index.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/json-schema.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/escalation.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/roots.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/diagnostics.ts",
+        "upstream/deepseek-harness/packages/sandbox/sandbox/src/index.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/schema.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/ptc.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/ts-types.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/py-types.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/testing.ts",
+        "upstream/deepseek-harness/packages/core/tools/src/index.ts",
+        "upstream/deepseek-harness/packages/session/session-projection/src/index.ts",
+        "node_modules/zod/v4/core/core.js",
+        "node_modules/zod/v4/core/util.js",
+        "node_modules/zod/v4/core/errors.js",
+        "node_modules/zod/v4/core/parse.js",
+        "node_modules/zod/v4/core/regexes.js",
+        "node_modules/zod/v4/core/checks.js",
+        "node_modules/zod/v4/core/doc.js",
+        "node_modules/zod/v4/core/versions.js",
+        "node_modules/zod/v4/core/schemas.js",
+        "node_modules/zod/v4/locales/ar.js",
+        "node_modules/zod/v4/locales/az.js",
+        "node_modules/zod/v4/locales/be.js",
+        "node_modules/zod/v4/locales/bg.js",
+        "node_modules/zod/v4/locales/ca.js",
+        "node_modules/zod/v4/locales/cs.js",
+        "node_modules/zod/v4/locales/da.js",
+        "node_modules/zod/v4/locales/de.js",
+        "node_modules/zod/v4/locales/el.js",
+        "node_modules/zod/v4/locales/en.js",
+        "node_modules/zod/v4/locales/eo.js",
+        "node_modules/zod/v4/locales/es.js",
+        "node_modules/zod/v4/locales/fa.js",
+        "node_modules/zod/v4/locales/fi.js",
+        "node_modules/zod/v4/locales/fr.js",
+        "node_modules/zod/v4/locales/fr-CA.js",
+        "node_modules/zod/v4/locales/he.js",
+        "node_modules/zod/v4/locales/hr.js",
+        "node_modules/zod/v4/locales/hu.js",
+        "node_modules/zod/v4/locales/hy.js",
+        "node_modules/zod/v4/locales/id.js",
+        "node_modules/zod/v4/locales/is.js",
+        "node_modules/zod/v4/locales/it.js",
+        "node_modules/zod/v4/locales/ja.js",
+        "node_modules/zod/v4/locales/ka.js",
+        "node_modules/zod/v4/locales/km.js",
+        "node_modules/zod/v4/locales/kh.js",
+        "node_modules/zod/v4/locales/ko.js",
+        "node_modules/zod/v4/locales/lt.js",
+        "node_modules/zod/v4/locales/mk.js",
+        "node_modules/zod/v4/locales/ms.js",
+        "node_modules/zod/v4/locales/nl.js",
+        "node_modules/zod/v4/locales/no.js",
+        "node_modules/zod/v4/locales/ota.js",
+        "node_modules/zod/v4/locales/ps.js",
+        "node_modules/zod/v4/locales/pl.js",
+        "node_modules/zod/v4/locales/pt.js",
+        "node_modules/zod/v4/locales/ro.js",
+        "node_modules/zod/v4/locales/ru.js",
+        "node_modules/zod/v4/locales/sl.js",
+        "node_modules/zod/v4/locales/sv.js",
+        "node_modules/zod/v4/locales/ta.js",
+        "node_modules/zod/v4/locales/th.js",
+        "node_modules/zod/v4/locales/tr.js",
+        "node_modules/zod/v4/locales/uk.js",
+        "node_modules/zod/v4/locales/ua.js",
+        "node_modules/zod/v4/locales/ur.js",
+        "node_modules/zod/v4/locales/uz.js",
+        "node_modules/zod/v4/locales/vi.js",
+        "node_modules/zod/v4/locales/zh-CN.js",
+        "node_modules/zod/v4/locales/zh-TW.js",
+        "node_modules/zod/v4/locales/yo.js",
+        "node_modules/zod/v4/locales/index.js",
+        "node_modules/zod/v4/core/registries.js",
+        "node_modules/zod/v4/core/api.js",
+        "node_modules/zod/v4/core/to-json-schema.js",
+        "node_modules/zod/v4/core/json-schema-processors.js",
+        "node_modules/zod/v4/core/json-schema-generator.js",
+        "node_modules/zod/v4/core/json-schema.js",
+        "node_modules/zod/v4/core/index.js",
+        "node_modules/zod/v4/classic/checks.js",
+        "node_modules/zod/v4/classic/iso.js",
+        "node_modules/zod/v4/classic/errors.js",
+        "node_modules/zod/v4/classic/parse.js",
+        "node_modules/zod/v4/classic/schemas.js",
+        "node_modules/zod/v4/classic/compat.js",
+        "node_modules/zod/v4/classic/from-json-schema.js",
+        "node_modules/zod/v4/classic/coerce.js",
+        "node_modules/zod/v4/classic/external.js",
+        "node_modules/zod/index.js",
+        "upstream/deepseek-harness/packages/todo/tool-todo/src/index.ts",
+        "tests/compat/harness/fixture.mjs"
+      ]
+    }
+  },
+  "scenarios": {
+    "global": {
+      "runs": {
+        "upstream": {
+          "exitCode": 0,
+          "signal": null,
+          "stderr": "",
+          "observation": {
+            "status": "passed",
+            "trace": [
+              [
+                "mounted",
+                "SessionStore"
+              ],
+              [
+                "mounted",
+                "SystemPrompt"
+              ],
+              [
+                "mounted",
+                "ToolRuntime"
+              ],
+              [
+                "mounted",
+                "SessionProjectionRegistry"
+              ],
+              [
+                "schemas",
+                [
+                  {
+                    "name": "todo_write",
+                    "description": "Record and update a task list to plan multi-step work and show progress; skip it for trivial single-step tasks. Add one todo per concrete step before you start. While work remains, keep exactly one todo `in_progress`. Mark each todo `completed` as soon as it is done.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "todos": {
+                          "type": "array",
+                          "description": "The COMPLETE task list, replacing any previous list.",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "content": {
+                                "type": "string",
+                                "description": "What the task is — a short imperative line."
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "pending (not started) | in_progress (now) | completed (done).",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "completed"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "content",
+                              "status"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "todos"
+                      ]
+                    }
+                  }
+                ]
+              ],
+              [
+                "prompt-tools",
+                [
+                  "todo_write"
+                ]
+              ],
+              [
+                "initial-projection",
+                {
+                  "asOfSeq": -1,
+                  "values": {
+                    "todos": null
+                  }
+                }
+              ],
+              [
+                "session-event",
+                {
+                  "seq": 0,
+                  "type": "todo/write",
+                  "data": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "successful",
+                  "result": {
+                    "isError": false,
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                      }
+                    ],
+                    "value": {
+                      "todos": [
+                        {
+                          "content": "read the real code",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "verify",
+                          "status": "pending"
+                        }
+                      ],
+                      "counts": {
+                        "pending": 1,
+                        "inProgress": 1,
+                        "completed": 0
+                      }
+                    }
+                  }
+                }
+              ],
+              [
+                "successful",
+                {
+                  "isError": false,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                    }
+                  ],
+                  "value": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ],
+                    "counts": {
+                      "pending": 1,
+                      "inProgress": 1,
+                      "completed": 0
+                    }
+                  }
+                }
+              ],
+              [
+                "projection",
+                {
+                  "asOfSeq": 0,
+                  "values": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "malformed",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]",
+                      "info": {
+                        "name": "ToolArgsError",
+                        "code": "INVALID_ARGS"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "malformed",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]",
+                    "info": {
+                      "name": "ToolArgsError",
+                      "code": "INVALID_ARGS"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]"
+                    }
+                  ]
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "parallel",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "invalid todos: at most one task may be in_progress (got 2)"
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: invalid todos: at most one task may be in_progress (got 2)"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "parallel-rejected",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "invalid todos: at most one task may be in_progress (got 2)"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: invalid todos: at most one task may be in_progress (got 2)"
+                    }
+                  ]
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "aborted",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "tool call aborted before dispatch",
+                      "info": {
+                        "name": "AbortError",
+                        "code": "ABORTED_BEFORE_DISPATCH"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: tool call aborted before dispatch"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "aborted-before-dispatch",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "tool call aborted before dispatch",
+                    "info": {
+                      "name": "AbortError",
+                      "code": "ABORTED_BEFORE_DISPATCH"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: tool call aborted before dispatch"
+                    }
+                  ]
+                }
+              ],
+              [
+                "policy-entered",
+                "awaited-cancel"
+              ],
+              [
+                "policy-resumed",
+                true
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "awaited-cancel",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "tool call aborted before dispatch",
+                      "info": {
+                        "name": "AbortError",
+                        "code": "ABORTED_BEFORE_DISPATCH"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: tool call aborted before dispatch"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "aborted-during-policy",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "tool call aborted before dispatch",
+                    "info": {
+                      "name": "AbortError",
+                      "code": "ABORTED_BEFORE_DISPATCH"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: tool call aborted before dispatch"
+                    }
+                  ]
+                }
+              ],
+              [
+                "rejections-left-log-unchanged",
+                [
+                  {
+                    "seq": 0,
+                    "type": "todo/write",
+                    "data": {
+                      "todos": [
+                        {
+                          "content": "read the real code",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "verify",
+                          "status": "pending"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              ],
+              [
+                "tool-unmounted",
+                {
+                  "schemas": [],
+                  "projection": {
+                    "asOfSeq": 0,
+                    "values": {}
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "unmounted",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "unknown tool \"todo_write\"",
+                      "info": {
+                        "name": "ToolNotFoundError",
+                        "code": "UNKNOWN_TOOL"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: unknown tool \"todo_write\""
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "call-after-unmount",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "unknown tool \"todo_write\"",
+                    "info": {
+                      "name": "ToolNotFoundError",
+                      "code": "UNKNOWN_TOOL"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: unknown tool \"todo_write\""
+                    }
+                  ]
+                }
+              ],
+              [
+                "session-event",
+                {
+                  "seq": 1,
+                  "type": "todo/write",
+                  "data": {
+                    "todos": [
+                      {
+                        "content": "a",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "b",
+                        "status": "in_progress"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "reloaded",
+                  "result": {
+                    "isError": false,
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Updated todo list: 0 pending, 2 in progress, 0 completed."
+                      }
+                    ],
+                    "value": {
+                      "todos": [
+                        {
+                          "content": "a",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "b",
+                          "status": "in_progress"
+                        }
+                      ],
+                      "counts": {
+                        "pending": 0,
+                        "inProgress": 2,
+                        "completed": 0
+                      }
+                    }
+                  }
+                }
+              ],
+              [
+                "reloaded-parallel",
+                {
+                  "isError": false,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Updated todo list: 0 pending, 2 in progress, 0 completed."
+                    }
+                  ],
+                  "value": {
+                    "todos": [
+                      {
+                        "content": "a",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "b",
+                        "status": "in_progress"
+                      }
+                    ],
+                    "counts": {
+                      "pending": 0,
+                      "inProgress": 2,
+                      "completed": 0
+                    }
+                  }
+                }
+              ],
+              [
+                "reloaded-projection",
+                {
+                  "asOfSeq": 1,
+                  "values": {
+                    "todos": [
+                      {
+                        "content": "a",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "b",
+                        "status": "in_progress"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "root-disposed",
+                [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ]
+              ]
+            ]
+          }
+        },
+        "native": {
+          "exitCode": 0,
+          "signal": null,
+          "stderr": "",
+          "observation": {
+            "status": "passed",
+            "trace": [
+              [
+                "mounted",
+                "SessionStore"
+              ],
+              [
+                "mounted",
+                "SystemPrompt"
+              ],
+              [
+                "mounted",
+                "ToolRuntime"
+              ],
+              [
+                "mounted",
+                "SessionProjectionRegistry"
+              ],
+              [
+                "schemas",
+                [
+                  {
+                    "name": "todo_write",
+                    "description": "Record and update a task list to plan multi-step work and show progress; skip it for trivial single-step tasks. Add one todo per concrete step before you start. While work remains, keep exactly one todo `in_progress`. Mark each todo `completed` as soon as it is done.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "todos": {
+                          "type": "array",
+                          "description": "The COMPLETE task list, replacing any previous list.",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "content": {
+                                "type": "string",
+                                "description": "What the task is — a short imperative line."
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "pending (not started) | in_progress (now) | completed (done).",
+                                "enum": [
+                                  "pending",
+                                  "in_progress",
+                                  "completed"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "content",
+                              "status"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "todos"
+                      ]
+                    }
+                  }
+                ]
+              ],
+              [
+                "prompt-tools",
+                [
+                  "todo_write"
+                ]
+              ],
+              [
+                "initial-projection",
+                {
+                  "asOfSeq": -1,
+                  "values": {
+                    "todos": null
+                  }
+                }
+              ],
+              [
+                "session-event",
+                {
+                  "seq": 0,
+                  "type": "todo/write",
+                  "data": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "successful",
+                  "result": {
+                    "isError": false,
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                      }
+                    ],
+                    "value": {
+                      "todos": [
+                        {
+                          "content": "read the real code",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "verify",
+                          "status": "pending"
+                        }
+                      ],
+                      "counts": {
+                        "pending": 1,
+                        "inProgress": 1,
+                        "completed": 0
+                      }
+                    }
+                  }
+                }
+              ],
+              [
+                "successful",
+                {
+                  "isError": false,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                    }
+                  ],
+                  "value": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ],
+                    "counts": {
+                      "pending": 1,
+                      "inProgress": 1,
+                      "completed": 0
+                    }
+                  }
+                }
+              ],
+              [
+                "projection",
+                {
+                  "asOfSeq": 0,
+                  "values": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "malformed",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]",
+                      "info": {
+                        "name": "ToolArgsError",
+                        "code": "INVALID_ARGS"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "malformed",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]",
+                    "info": {
+                      "name": "ToolArgsError",
+                      "code": "INVALID_ARGS"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: invalid arguments: \"todos[0].status\" must be one of [\"pending\",\"in_progress\",\"completed\"]"
+                    }
+                  ]
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "parallel",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "invalid todos: at most one task may be in_progress (got 2)"
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: invalid todos: at most one task may be in_progress (got 2)"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "parallel-rejected",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "invalid todos: at most one task may be in_progress (got 2)"
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: invalid todos: at most one task may be in_progress (got 2)"
+                    }
+                  ]
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "aborted",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "tool call aborted before dispatch",
+                      "info": {
+                        "name": "AbortError",
+                        "code": "ABORTED_BEFORE_DISPATCH"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: tool call aborted before dispatch"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "aborted-before-dispatch",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "tool call aborted before dispatch",
+                    "info": {
+                      "name": "AbortError",
+                      "code": "ABORTED_BEFORE_DISPATCH"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: tool call aborted before dispatch"
+                    }
+                  ]
+                }
+              ],
+              [
+                "policy-entered",
+                "awaited-cancel"
+              ],
+              [
+                "policy-resumed",
+                true
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "awaited-cancel",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "tool call aborted before dispatch",
+                      "info": {
+                        "name": "AbortError",
+                        "code": "ABORTED_BEFORE_DISPATCH"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: tool call aborted before dispatch"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "aborted-during-policy",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "tool call aborted before dispatch",
+                    "info": {
+                      "name": "AbortError",
+                      "code": "ABORTED_BEFORE_DISPATCH"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: tool call aborted before dispatch"
+                    }
+                  ]
+                }
+              ],
+              [
+                "rejections-left-log-unchanged",
+                [
+                  {
+                    "seq": 0,
+                    "type": "todo/write",
+                    "data": {
+                      "todos": [
+                        {
+                          "content": "read the real code",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "verify",
+                          "status": "pending"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              ],
+              [
+                "tool-unmounted",
+                {
+                  "schemas": [],
+                  "projection": {
+                    "asOfSeq": 0,
+                    "values": {}
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "unmounted",
+                  "result": {
+                    "isError": true,
+                    "error": {
+                      "message": "unknown tool \"todo_write\"",
+                      "info": {
+                        "name": "ToolNotFoundError",
+                        "code": "UNKNOWN_TOOL"
+                      }
+                    },
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Error: unknown tool \"todo_write\""
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "call-after-unmount",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "unknown tool \"todo_write\"",
+                    "info": {
+                      "name": "ToolNotFoundError",
+                      "code": "UNKNOWN_TOOL"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: unknown tool \"todo_write\""
+                    }
+                  ]
+                }
+              ],
+              [
+                "session-event",
+                {
+                  "seq": 1,
+                  "type": "todo/write",
+                  "data": {
+                    "todos": [
+                      {
+                        "content": "a",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "b",
+                        "status": "in_progress"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "result-observer",
+                {
+                  "callId": "reloaded",
+                  "result": {
+                    "isError": false,
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Updated todo list: 0 pending, 2 in progress, 0 completed."
+                      }
+                    ],
+                    "value": {
+                      "todos": [
+                        {
+                          "content": "a",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "b",
+                          "status": "in_progress"
+                        }
+                      ],
+                      "counts": {
+                        "pending": 0,
+                        "inProgress": 2,
+                        "completed": 0
+                      }
+                    }
+                  }
+                }
+              ],
+              [
+                "reloaded-parallel",
+                {
+                  "isError": false,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Updated todo list: 0 pending, 2 in progress, 0 completed."
+                    }
+                  ],
+                  "value": {
+                    "todos": [
+                      {
+                        "content": "a",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "b",
+                        "status": "in_progress"
+                      }
+                    ],
+                    "counts": {
+                      "pending": 0,
+                      "inProgress": 2,
+                      "completed": 0
+                    }
+                  }
+                }
+              ],
+              [
+                "reloaded-projection",
+                {
+                  "asOfSeq": 1,
+                  "values": {
+                    "todos": [
+                      {
+                        "content": "a",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "b",
+                        "status": "in_progress"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "root-disposed",
+                [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ]
+              ]
+            ]
+          }
+        }
+      },
+      "status": "passed"
+    },
+    "scoped": {
+      "runs": {
+        "upstream": {
+          "exitCode": 0,
+          "signal": null,
+          "stderr": "",
+          "observation": {
+            "status": "passed",
+            "trace": [
+              [
+                "mounted",
+                "SessionStore"
+              ],
+              [
+                "mounted",
+                "SystemPrompt"
+              ],
+              [
+                "mounted",
+                "ToolRuntime"
+              ],
+              [
+                "mounted",
+                "SessionProjectionRegistry"
+              ],
+              [
+                "scoped-visibility",
+                {
+                  "inside": [
+                    "todo_write"
+                  ],
+                  "global": [],
+                  "outside": []
+                }
+              ],
+              [
+                "scoped-prompt-tools",
+                [
+                  "todo_write"
+                ]
+              ],
+              [
+                "scoped-result",
+                {
+                  "callId": "inside",
+                  "result": {
+                    "isError": false,
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                      }
+                    ],
+                    "value": {
+                      "todos": [
+                        {
+                          "content": "read the real code",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "verify",
+                          "status": "pending"
+                        }
+                      ],
+                      "counts": {
+                        "pending": 1,
+                        "inProgress": 1,
+                        "completed": 0
+                      }
+                    }
+                  }
+                }
+              ],
+              [
+                "scoped-call",
+                {
+                  "isError": false,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                    }
+                  ],
+                  "value": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ],
+                    "counts": {
+                      "pending": 1,
+                      "inProgress": 1,
+                      "completed": 0
+                    }
+                  }
+                }
+              ],
+              [
+                "outside-call",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "unknown tool \"todo_write\"",
+                    "info": {
+                      "name": "ToolNotFoundError",
+                      "code": "UNKNOWN_TOOL"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: unknown tool \"todo_write\""
+                    }
+                  ]
+                }
+              ],
+              [
+                "scoped-event-admission",
+                [
+                  "inside"
+                ]
+              ],
+              [
+                "scoped-projection",
+                {
+                  "asOfSeq": 0,
+                  "values": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "scope-disposed",
+                {
+                  "fiberRemoved": true,
+                  "schemas": [],
+                  "projection": {
+                    "asOfSeq": 0,
+                    "values": {}
+                  }
+                }
+              ],
+              [
+                "after-scope-call",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "unknown tool \"todo_write\"",
+                    "info": {
+                      "name": "ToolNotFoundError",
+                      "code": "UNKNOWN_TOOL"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: unknown tool \"todo_write\""
+                    }
+                  ]
+                }
+              ],
+              [
+                "root-disposed",
+                [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ]
+              ]
+            ]
+          }
+        },
+        "native": {
+          "exitCode": 0,
+          "signal": null,
+          "stderr": "",
+          "observation": {
+            "status": "passed",
+            "trace": [
+              [
+                "mounted",
+                "SessionStore"
+              ],
+              [
+                "mounted",
+                "SystemPrompt"
+              ],
+              [
+                "mounted",
+                "ToolRuntime"
+              ],
+              [
+                "mounted",
+                "SessionProjectionRegistry"
+              ],
+              [
+                "scoped-visibility",
+                {
+                  "inside": [
+                    "todo_write"
+                  ],
+                  "global": [],
+                  "outside": []
+                }
+              ],
+              [
+                "scoped-prompt-tools",
+                [
+                  "todo_write"
+                ]
+              ],
+              [
+                "scoped-result",
+                {
+                  "callId": "inside",
+                  "result": {
+                    "isError": false,
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                      }
+                    ],
+                    "value": {
+                      "todos": [
+                        {
+                          "content": "read the real code",
+                          "status": "in_progress"
+                        },
+                        {
+                          "content": "verify",
+                          "status": "pending"
+                        }
+                      ],
+                      "counts": {
+                        "pending": 1,
+                        "inProgress": 1,
+                        "completed": 0
+                      }
+                    }
+                  }
+                }
+              ],
+              [
+                "scoped-call",
+                {
+                  "isError": false,
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Updated todo list: 1 pending, 1 in progress, 0 completed."
+                    }
+                  ],
+                  "value": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ],
+                    "counts": {
+                      "pending": 1,
+                      "inProgress": 1,
+                      "completed": 0
+                    }
+                  }
+                }
+              ],
+              [
+                "outside-call",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "unknown tool \"todo_write\"",
+                    "info": {
+                      "name": "ToolNotFoundError",
+                      "code": "UNKNOWN_TOOL"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: unknown tool \"todo_write\""
+                    }
+                  ]
+                }
+              ],
+              [
+                "scoped-event-admission",
+                [
+                  "inside"
+                ]
+              ],
+              [
+                "scoped-projection",
+                {
+                  "asOfSeq": 0,
+                  "values": {
+                    "todos": [
+                      {
+                        "content": "read the real code",
+                        "status": "in_progress"
+                      },
+                      {
+                        "content": "verify",
+                        "status": "pending"
+                      }
+                    ]
+                  }
+                }
+              ],
+              [
+                "scope-disposed",
+                {
+                  "fiberRemoved": true,
+                  "schemas": [],
+                  "projection": {
+                    "asOfSeq": 0,
+                    "values": {}
+                  }
+                }
+              ],
+              [
+                "after-scope-call",
+                {
+                  "isError": true,
+                  "error": {
+                    "message": "unknown tool \"todo_write\"",
+                    "info": {
+                      "name": "ToolNotFoundError",
+                      "code": "UNKNOWN_TOOL"
+                    }
+                  },
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Error: unknown tool \"todo_write\""
+                    }
+                  ]
+                }
+              ],
+              [
+                "root-disposed",
+                [
+                  false,
+                  false,
+                  false,
+                  false,
+                  false
+                ]
+              ]
+            ]
+          }
+        }
+      },
+      "status": "passed"
+    }
+  },
+  "status": "passed",
+  "nativeBuild": {
+    "schema": "cordis-verus.node-build/v1",
+    "sourceHashes": {
+      "Cargo.lock": "247d4a06cb349ee660db78f1c5120b742e2c983cde7773eb055707e4fda0e8cc",
+      "Cargo.toml": "9449e122e21d691379418f5775a54a1bb1e21a669a7ae48e402e8bacd9936fc7",
+      "crates/cordis-driver/Cargo.toml": "8ca927dfaee34158e4efe4029b81e4504bdb506e114baa2a388b5d10ba1ececd",
+      "crates/cordis-driver/src/availability.rs": "cb5c256dd1c39a40c49629345f2b7c196500126f55c142ba3ce5b87e26e6b60b",
+      "crates/cordis-driver/src/lib.rs": "922e81d6b79cd394ccf0d3ff38613f3c3a303345ae44a1f0fbd3065c47016e2d",
+      "crates/cordis-driver/src/protocol.rs": "45a63a88371bc19bdb9772e28680e765b8fe72e6de355c80e1afa5d9790bbbf9",
+      "crates/cordis-driver/src/shared.rs": "65dc8a5a6233cefccabf58a4b0f5e55ba4b334668cafb31b018b34dc510e7a3a",
+      "crates/cordis-driver/tests/check_protocol.rs": "ba46d0fb3fc293872044731a2c99b13063b7f2ba12d481cbc1f010b765df455a",
+      "crates/cordis-driver/tests/committed_reachability.rs": "cd0f764c454369ceaa6634b536b080f14453058015bbc71620b599440c1ffe57",
+      "crates/cordis-driver/tests/episode_failure.rs": "a96c95fe891cac62af45acb39f0a0211caaba29482bbf9ca6b1f2dc298a84a8a",
+      "crates/cordis-driver/tests/native_driver.rs": "56b596830e9abecb07e515e3e41d266ae1b923e584766660757e095d6e9efdf8",
+      "crates/cordis-driver/tests/reservation_effects.rs": "a8dadadad0bb34bf62f6484290c02e2d79c58133ddbc8a6396492541b99b7b29",
+      "crates/cordis-driver/tests/shared_lifecycle.rs": "0f3abc8ed5eb183820530b5d2145c294da47f5682d4cbe496144df3c26f8fc4c",
+      "crates/cordis-kernel/Cargo.toml": "abe2c70a90f0de345f122d4b0e1990acd10e71238106afa82ecea6712148622e",
+      "crates/cordis-kernel/src/action_ledger.rs": "3515900b8d86ce890a8e06901710241af0d6054844e1625f52f46e1294cd0820",
+      "crates/cordis-kernel/src/administrative_orchestration.rs": "6793dc4b8d003f29862d7df8696555639467c1fe44339e380534838c0aca2a50",
+      "crates/cordis-kernel/src/admitted_fresh_driver.rs": "de04d282e983c4ea680c4df999c123bba20648ac1538e8bdf65cee693d9047e2",
+      "crates/cordis-kernel/src/admitted_script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
+      "crates/cordis-kernel/src/allocation_inputs.rs": "b3a25966f428ae318b4fd7a42122de6179b901c41757c38146c8f90608ca5b55",
+      "crates/cordis-kernel/src/alpha.rs": "f453c4b6b3ee72e09763193c3be749242bc906f70f2d3921f737a2f7ce3a89dc",
+      "crates/cordis-kernel/src/calculus.rs": "c8873eac61e9883cf4c72922e395b89558ee25a361eb72e9f0a7f609a14ed790",
+      "crates/cordis-kernel/src/canonical.rs": "c1726a10742fb7396cd566b2b913181908fe87e1a77f4f1086c630b311f1483f",
+      "crates/cordis-kernel/src/causal_normalization.rs": "2f21f76a87f7c87b29df69674f2290a2fafaaf98aec686c71ce3b5946b0e3639",
+      "crates/cordis-kernel/src/child_driver.rs": "dbd018c49d1dfc7350bcbb33bc81068ccdd05543eca4df25b00e6f1a03f19348",
+      "crates/cordis-kernel/src/child_history.rs": "4705af8d5c1304c4d7b763ab8124c762045937963599938fddaab6fcf67598a4",
+      "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
+      "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
+      "crates/cordis-kernel/src/contexts.rs": "72c32f067433e1a64e7e4196cb12c0ba5f7eed0d4d9f77255e57d58c7032aec8",
+      "crates/cordis-kernel/src/deletion.rs": "1c44e19ce407f69e7411bb7ac2fc29940471c350020e60bb1bce462a0d9cbae3",
+      "crates/cordis-kernel/src/dependent_grammar.rs": "89016e4db79a21cff12b24aa73b1c3d03852cd931c4460e35e98914b0988629d",
+      "crates/cordis-kernel/src/dependent_independence.rs": "bf4fa296cef98066b9e3903b36455598fb7bd47201d5f62b496dc9b139d788bd",
+      "crates/cordis-kernel/src/dependent_independence_example.rs": "e30a431798dd92ac4e64dc3cd8659f3f3cb5a64001bb04b506cef16e39d2f41c",
+      "crates/cordis-kernel/src/dependent_lift.rs": "a7027a087915d476f41fe34a21ab2f148e52c0d1c57b08389dda8a15abe377d9",
+      "crates/cordis-kernel/src/driver.rs": "e9944c7b5d09f2c440d374ec8a0a37c834a5977c763418f4ca781673e8b3b194",
+      "crates/cordis-kernel/src/dynamic_table_deletion.rs": "9692ad12a7a5c546a86806b9f515676117d953eba45d795be634e850a11186d8",
+      "crates/cordis-kernel/src/dynamic_table_deletion_example.rs": "238a5f3daf21a4686ce82a8e03f4dfbf4f09e0cd2d8ab9acdbd6df226d79329c",
+      "crates/cordis-kernel/src/dynamic_table_registry.rs": "d252c00bcd3e60cfe77cfebad2862cf8c0260915db77858a2946e3e9cc36122d",
+      "crates/cordis-kernel/src/dynamic_table_registry_example.rs": "b3f80dfbbb905a958b345d83e9f87aa6ec5f599dc99f670b937b859777b513eb",
+      "crates/cordis-kernel/src/effect_realization.rs": "ae12b213f3cb9827e2213c436b0559f3681ba44937f95489cf218d65ba8cc021",
+      "crates/cordis-kernel/src/effects.rs": "2fb10d958faa7a3e3b4a53050599e96db22328a5b3bc09269bbe492eb9e94672",
+      "crates/cordis-kernel/src/entangled.rs": "ff5e821b638bb9153c34b2357f7614f7a8d4254a674bb74cfdecbcdd1b252080",
+      "crates/cordis-kernel/src/entangled_loading.rs": "9a0585f2be02be2c09b6c4faabced9448ec1ffddde7616d066ca78de20578ed6",
+      "crates/cordis-kernel/src/episode.rs": "252a9cec3ec9a3bb3581e61e21cf9f01a8f606d635e8e826aecb27e8f6f756d9",
+      "crates/cordis-kernel/src/external_inputs.rs": "a7491019af25e1d647220f5f9f0d649d197541d6336cb44072151d2a1425ebfb",
+      "crates/cordis-kernel/src/foreign_child_deletion.rs": "2e2f58d8f2d8ba97c5dd6b1f2426b5fc821605e5b3f8827b0d2ccf550c08b988",
+      "crates/cordis-kernel/src/foreign_child_deletion_example.rs": "d3fc5d4a699ccc049a8722e8b544b1b715a00ef1191590ad2d92ba1233b52701",
+      "crates/cordis-kernel/src/foreign_child_transport.rs": "2946519aa289c6677fa48ea44c05cd710a9bf29dcabec2bb62f8a8a3e388755e",
+      "crates/cordis-kernel/src/foreign_child_transport_example.rs": "dcc5399bf25f778e4d6beb50100ff77715e9f6cbb2a83ce94379cc5f2640266e",
+      "crates/cordis-kernel/src/foreign_provision_transport.rs": "5b837c2c97458a940e52d0717bd7509fa296c3d29083f72773a0b5fbfc5357b4",
+      "crates/cordis-kernel/src/foreign_unload.rs": "c1e07e10f8eabc5fa48750c5249528be377bb68ef25d6a3264cacac5ef7e003f",
+      "crates/cordis-kernel/src/foundations.rs": "0b19e7afb7855da5312dc63a4303e26f6716159e57b41bd62ffa511c7aeb316d",
+      "crates/cordis-kernel/src/fresh_driver.rs": "2295f9218a8dde8c644d86dcd98fdbcf8e088e7f65664ec1de8407458de20941",
+      "crates/cordis-kernel/src/fresh_equivariance.rs": "e9074e2b56d1d130948d2af396bbb50b3e85e81e719c7b866c9456d223315227",
+      "crates/cordis-kernel/src/fresh_grammar.rs": "cce7d43aa00a054a75dca28403c03f8891bee70f9d7a346d79575e103627fce4",
+      "crates/cordis-kernel/src/fresh_semantics.rs": "26826a984ca805e003b6a996fac17d8b8dc4f5f15d7df2a91a14917295dcfe63",
+      "crates/cordis-kernel/src/functional_quotient.rs": "db95c1c293848d7eb280d04f5f2540c9365804d0c819c5957cb23544f6be37f0",
+      "crates/cordis-kernel/src/generalized_table_deletion.rs": "45cf8f559d5fb854fbb5a2ca02cdd08f4236357e4aa8a67569ee9f9217eabf85",
+      "crates/cordis-kernel/src/generalized_table_deletion_example.rs": "159dd24027cb18adeea3d0bcc9026e282f8f87a87aa308349ea23d25635f3f91",
+      "crates/cordis-kernel/src/global.rs": "bc49325a37fb08efae55dc7b1242a8310805ba924e796697c21ff0925aaeae2c",
+      "crates/cordis-kernel/src/grammar_lift.rs": "229713b5eba33d6a7d9685a676f7b29abd8a8cb1ad75685cd082a5f0aa2c9282",
+      "crates/cordis-kernel/src/grammar_ordering.rs": "858f856575fba13cfebd6a66056ab47afb0560db9675ac0130d071ca8504abd5",
+      "crates/cordis-kernel/src/grammar_recovery.rs": "4dacf54db0501a1ddf1af27fda5cd31255eed527bbd17aac587dec3039227f82",
+      "crates/cordis-kernel/src/guarded_child_domains.rs": "40ce966a9d9ffbab8ec11182350767a5c824bf50df0abc3909b1a36332b5983b",
+      "crates/cordis-kernel/src/history.rs": "c20f5087d8634e76fdeeeb222a352cec64d61d948dce8b998645df8768aa462d",
+      "crates/cordis-kernel/src/indexed_ordering.rs": "5a920dc64959e98027faad54c8604404fd93aacaeaed027400f59070d3702dbd",
+      "crates/cordis-kernel/src/interface_observation.rs": "4e97e34839281d27aee6ee463cfbb4bb9aa0474c4faa470eae1bdefe04d21a07",
+      "crates/cordis-kernel/src/interface_observation_example.rs": "e663ec059cbcf0450f4d527ed70194cec2b400ac3252b2b5218caf15b43a3e88",
+      "crates/cordis-kernel/src/internal_old_unload.rs": "7e071cbad6376f5053e2ddbb489d2634a840ac20c5fa5f0021c6ec551844e0ac",
+      "crates/cordis-kernel/src/internal_old_unload_example.rs": "1a422b72714f5e1cbce8afba7cec6f23967fbd00621f9cc323da1d5b82402054",
+      "crates/cordis-kernel/src/internal_table_unload.rs": "c389c7775c1889e9150333414d50ed96a70a6c2ceb3d0467f80ea8a3c30fd1ef",
+      "crates/cordis-kernel/src/internal_table_unload_example.rs": "825233c6ff3f4e10e0a714f955b6e828f4fb602d771398b51f6b96ba91a3e884",
+      "crates/cordis-kernel/src/isolated_deletion.rs": "851afcd76c1303873d8f40d2f5b0e0ac6ef05da047a3211366c4620a8a6b47b7",
+      "crates/cordis-kernel/src/iterator_bridge.rs": "3521e908dcc6a47c54470e8b8b8d967693a151c78061a8b3ffaa5e88c0554ac3",
+      "crates/cordis-kernel/src/iterator_independence.rs": "95c2c384036c43048b29023d26d076a0113c4cfa1cd778b5a63fb04c3d8e57dd",
+      "crates/cordis-kernel/src/iterators.rs": "1c3bc0cee83d69e2140354e51613ce6033d53171fc71b912ad682b234118f92d",
+      "crates/cordis-kernel/src/lib.rs": "08120ccbc034346ecb3248c32e8df60ec3b8575ffd34d535fd0fe3a9d4145262",
+      "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
+      "crates/cordis-kernel/src/mediated.rs": "c63d88166e35070b1f14d99b12f32b39daa4c714ae7ac500227dd0a8aa948f67",
+      "crates/cordis-kernel/src/mixed_age_unload.rs": "1418ae76432a7c171f0a92e646210bc31948f0ef189ada174443716ef766fe1d",
+      "crates/cordis-kernel/src/mixed_age_unload_example.rs": "c04c9fe655c154e8f107e04b6ed76f149685b0e1b10b13d8f7f728fabd1c4e43",
+      "crates/cordis-kernel/src/mixed_driver.rs": "a520f60d1d5aa378d210cf41ae7c90d6f3cdf5ad8c58b6a86c6c72ccb773ed53",
+      "crates/cordis-kernel/src/mixed_examples.rs": "c397fcc35928dfea1ced7717dcf01ef07714d35ad889886ecb7c02cfeb686131",
+      "crates/cordis-kernel/src/mixed_foreign_restore.rs": "baa61e793f0b92d38507215871a25779e1e2652c1169384fce6838742f733749",
+      "crates/cordis-kernel/src/mixed_grammar.rs": "ed9faa272b0f6dc9f1cdf739458ae1902c353ba190bf9d5ed60b622b153aa1ab",
+      "crates/cordis-kernel/src/mixed_iteration_exchange.rs": "94d88f2cd45a81bca3b793ff6425d11f11a5b225aa9101b6b9931c51eb9ee95b",
+      "crates/cordis-kernel/src/mixed_observational_runs.rs": "59b2420ccb4e816d857dc91b61a56dc49e31aab92a7860b08a8c5c85cea95ee2",
+      "crates/cordis-kernel/src/mixed_observational_transport.rs": "1c33c71c173ac67f12dbc711b1af0187dc56a4399cbe79b966b6b3b55cbfa385",
+      "crates/cordis-kernel/src/mixed_orchestration.rs": "4e296ad62b04d8b1b28c222dd642f83502fd978967e2c38a442e96ac1789b190",
+      "crates/cordis-kernel/src/mixed_ordering.rs": "af602a8fce022da5ff2d321e8a3940648ddec65e22253145dae375908a90d67b",
+      "crates/cordis-kernel/src/mixed_recovery.rs": "619c23e25559d01857e571727645f95ba4a484298fd470194224853fff8392e4",
+      "crates/cordis-kernel/src/mixed_syntax.rs": "20e09717be841c5b8b3736e873a199c5ec1166765c051fc1e2ef18159dd7519e",
+      "crates/cordis-kernel/src/mixed_transport.rs": "f0b6fe307377fac26e96f6a738ff09206856e8914c5cce52d84e721342a7eb1a",
+      "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
+      "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
+      "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
+      "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
+      "crates/cordis-kernel/src/observational_examples.rs": "212fba2609c8823aa12c9c1484aa7e877f38654bf879d4d3823d736aa27952db",
+      "crates/cordis-kernel/src/observational_execution.rs": "be89fdd73e9e398d5327ca1351b29f17d9ac395aab9e38e93eb41ad7a639da0b",
+      "crates/cordis-kernel/src/observational_grammar.rs": "c3724c31751c622ed4dd969e48be6c8fb3f72855717d82ebee4302481159ae19",
+      "crates/cordis-kernel/src/observational_lift.rs": "d8721aa7b7bebe32d814783c2b4af1e871d61a8068d169937bc3f022da0d7950",
+      "crates/cordis-kernel/src/observational_permutation.rs": "57abe81c05c5c58275065eb93ca7cddeb55b01791913b665fc856d5bdbe78748",
+      "crates/cordis-kernel/src/observational_recovery.rs": "74130d3d2150b03058c998ea7edd6d7c629ec3d8b5e6e5225c793937a2c9d4b2",
+      "crates/cordis-kernel/src/old_journal_closed_example.rs": "2c9e5cdb133f331eb326dfb39c1ed1ff16e976e96ede35994c6d49ad6cd3c690",
+      "crates/cordis-kernel/src/old_journal_closure.rs": "f56357f039066684c48bb54baa364f08dc6df491e7eb4d3a29a61280ab10fa31",
+      "crates/cordis-kernel/src/old_journal_examples.rs": "32bbc2026b8ae7797145a1c8efc1c77473ad7c240179050ebdc08010bad6f42a",
+      "crates/cordis-kernel/src/old_journal_interleaving.rs": "c9e7b3d9e834e27a6dab893a3ac9783db0cf7ea76142f6c9fdad970cbfaa7c43",
+      "crates/cordis-kernel/src/old_journal_interleaving_example.rs": "5328e56022ab5fc3cf65617a21c3beaa94f4af1ffaafcd2ae817c8736923b4dd",
+      "crates/cordis-kernel/src/old_journal_unload.rs": "706948f6ee80ffc326d8ecefe567e54f826a245c16f348bf5529a6638855db69",
+      "crates/cordis-kernel/src/old_provision_journal.rs": "62096cda7b70c467f7ce7b80bf0e75a6680fb229b35f23480beca08d9076e1f7",
+      "crates/cordis-kernel/src/old_provision_journal_example.rs": "2f8a892bb36ca6528525ed87e19314c65d810a75fb8238c7788e6f68a7aacedb",
+      "crates/cordis-kernel/src/old_provision_support.rs": "e00f9d8beba56a9486c09900d337ef6a27e92688a41e1fbc51aba78ea010863c",
+      "crates/cordis-kernel/src/old_receipt_support.rs": "400dbfce63c0c1c56c7422c2d7b57d7378b50945f584cf4d480443dde535a3e8",
+      "crates/cordis-kernel/src/orchestration_support_cycle.rs": "16406acf722db08876eec71084f45723eae6a8db754dd14c69a3f53d59d58d47",
+      "crates/cordis-kernel/src/ownership.rs": "02bb157bdf63254bbc146d7561762fb3d605a550efa9e3f972dd4bc4f6b4aeda",
+      "crates/cordis-kernel/src/paper_components.rs": "39d2bc1c7419a582aa40348ae278785264dbf27f24d67ed54550df5a54a1b45c",
+      "crates/cordis-kernel/src/paper_confinement.rs": "13fd2a182c446945cac1b756ec08852ae63f3b01426aac1231bca58741513887",
+      "crates/cordis-kernel/src/paper_counterexamples.rs": "064abae9ccd2c02d76314c052162279c6bf095e4fb878540a2b803d39dcc0732",
+      "crates/cordis-kernel/src/paper_instantiation.rs": "eb6cdb87c62ed8349111b6015da7374b6386614fecc3bd4439d191a6941c8f63",
+      "crates/cordis-kernel/src/paper_invariants.rs": "84be535a87dd7808ac90460c20778bd3fd6696882d36576c3953ae5657e21de2",
+      "crates/cordis-kernel/src/paper_observations.rs": "cbb227b44365f700c39e8d97d302832ddfee2f55a910cb5e0c111812f370ab9c",
+      "crates/cordis-kernel/src/paper_trace_independence.rs": "342ffe28831122c2df4ade7da60a3517e9e7396a45da320c09b3f3317b61d1ec",
+      "crates/cordis-kernel/src/paper_typed_context.rs": "0e6f50d6073c7125967559d3d9cc4c562eb1c8b674dfaa71f54677458625444f",
+      "crates/cordis-kernel/src/partial_domains.rs": "0f88ff591367886d93e0cbb3c41ee0ecf98bdf664610bbcba2844d9d8c8bfa8c",
+      "crates/cordis-kernel/src/partial_independence.rs": "62a65b3a4afc82fb09f77f4f132023737bbb994fc8a2d3981e7d4528d609f596",
+      "crates/cordis-kernel/src/permutation.rs": "484a6976b16420a050c69388ef8cffba65e7771f1bf844da5dc377f844b32f19",
+      "crates/cordis-kernel/src/preservation.rs": "e15e6c12384c80ac100bf8812f35f01cd14285e3f561bfe737be2dcbf37e4b4d",
+      "crates/cordis-kernel/src/program.rs": "ee0820a1ddd6ba6d8b172b29e1c1ebf145b9d95691dff6ba9b175e8bdd9bccf7",
+      "crates/cordis-kernel/src/program_normal_form.rs": "d6c5bfbf6ac588080370d76950a563bbf3d60e11fda0ef8ae51b02c69a223cb1",
+      "crates/cordis-kernel/src/program_refinement.rs": "cef2120d184d37ed6412e8a4a18a848a8856d95f1f959e5b635999e1868f9174",
+      "crates/cordis-kernel/src/program_trace.rs": "6295d76bd6b1b7f1f95e6e2c6173cde0b9845e89f8350255f369624a5c2c9a2d",
+      "crates/cordis-kernel/src/progress.rs": "46fdb8931d649daf8870ceb757b2f1bc9581b39c5e9eee1cb9ff4e8be80414ca",
+      "crates/cordis-kernel/src/projection.rs": "2af0c9ed9f8fd7e4a28b327e2e50a795aa3144dc913f2e3e4fa30f7f35234593",
+      "crates/cordis-kernel/src/providing_owner_deletion.rs": "ff6abd0adbf51a0d7577f7b535e7eac2d84607a971843098280349f94e7d2a33",
+      "crates/cordis-kernel/src/providing_owner_examples.rs": "9a834d887a3f471eae7af212da017ace137171e26a23e832da80c1820f789440",
+      "crates/cordis-kernel/src/providing_owner_execution.rs": "4b04784b13630dbaa5267601e44bc5d6268e60d8f4c49a076c9dbb0386063b6e",
+      "crates/cordis-kernel/src/providing_owner_transport.rs": "5854946bcfd3b6204537532a48c7fd37771cf1538d4ae85123b7cb130d3f707a",
+      "crates/cordis-kernel/src/publication.rs": "306318a377609e2048d803cb1b1f305ec1fa276d7504e270144f4397bd466325",
+      "crates/cordis-kernel/src/quotient.rs": "295f0fa31f3ff1c7e18145ae8141c043dfcb5d4d90508073e72444dc6040b3d1",
+      "crates/cordis-kernel/src/recovery_examples.rs": "9414a8b078f0b9e616b363dd6d411d091b55d1915554b058cc30b016ccc0884e",
+      "crates/cordis-kernel/src/recursive_context.rs": "a032537ab661dce5392226e43a3174ad83f660008198084beb7d84f46cf955bc",
+      "crates/cordis-kernel/src/refinement.rs": "73bb8eed7ab88cf9d4556bb6fe308d1d1c436ab42de799046a5799fdc5cf60e6",
+      "crates/cordis-kernel/src/resolution_completion_counterexample.rs": "c7449f9259095cd1b9232e75c849e0e797cd109d0fac95f255fc7550bc8c3281",
+      "crates/cordis-kernel/src/resources.rs": "47b0fe33ab7bab13ea6ffa28e66cfbc73a459ba6ee8c2ab4e263fdaab4010447",
+      "crates/cordis-kernel/src/rewrite_confluence.rs": "def51aea34c8d19d0f2fd8ad5e1c5e147def31899128ce4f2a7e15c74eac0b9a",
+      "crates/cordis-kernel/src/rule_frames.rs": "e34f0f98702955cc99775c106e04c6b0ba12066a1ffe1106d3ffabdf5f7b6055",
+      "crates/cordis-kernel/src/selective_foreign_recovery.rs": "ad3c486c96920e0875bbc7f2a01af7c6a3e5aed7f637b7ba0469034481fca7a5",
+      "crates/cordis-kernel/src/semantics.rs": "5f8435c400d8272af930db537a3ae9d21adb027baf1cb9cf9397cd0ae4cee423",
+      "crates/cordis-kernel/src/shared_execution.rs": "7881a86204f4e172116aa11c7c419c26ee0920a7a84b513c58d1536902ddc70e",
+      "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
+      "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
+      "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
+      "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
+      "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
+      "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs": "21681292c6c7a568b2e40c6bb4d1fd2c7f7c7254bac0aa93f47fa5fbccf030c3",
+      "crates/cordis-kernel/src/strict_partial_quotient_example.rs": "e82014c379ae642a03b0608df261321f609c2b736b69d86fd46e04c7827aa2d2",
+      "crates/cordis-kernel/src/strict_partial_quotient_per.rs": "8f057c24cc527ba518aeb8539a5b68dcfdd8290ecf9e854eb7d6f93eb3c896a8",
+      "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs": "ebe8a3e72554a588d36ece0fa6448e645d8b2828f8568e12458d5b4f4dbbe421",
+      "crates/cordis-kernel/src/termination.rs": "584437e136782e356eb6b4e959e33772e9248e5c3464bb42d1530e1b860f8e5e",
+      "crates/cordis-kernel/src/unload_orchestration.rs": "df1c85da2daaa83e2ef3a6b9c9e01e5fe723ee5f01c553cebce06258b70ff570",
+      "crates/cordis-kernel/src/witnessed.rs": "fceb6532bdcdeeefa3eed198073baedd824fc65b1b598d0dc2d1dd3107e95956",
+      "crates/cordis-kernel/tests/admitted_fresh_driver.rs": "8724f48d0f8cc610a05807f2da438a08ae0f2a871c059455e4395066c427d707",
+      "crates/cordis-kernel/tests/admitted_script.rs": "ef1aad8d98e5cf4cbec4b4788329b79dc5f075c74aea04f06c3ce4df88e31797",
+      "crates/cordis-kernel/tests/child_driver.rs": "9cf7ed234fd268cc5ee2cb362fe547b21912c97ae2c5393e319d43dc5c628a47",
+      "crates/cordis-kernel/tests/compaction_equivalence.rs": "7127fffe4ca9cea73ae50e2bbb8af2f3b089967ae7ff868781907c8b4ac86cb8",
+      "crates/cordis-kernel/tests/driver.rs": "22088bc0a082c88efded80f5871d027aecda4aa6f1899a268dc2ebf5b92298ba",
+      "crates/cordis-kernel/tests/episode_identity.rs": "3d6f6c3022faf0fa6db3e74d2d3db127b2f8c857d916440cabb0022655f7710d",
+      "crates/cordis-kernel/tests/episode_protocol.rs": "fc1987807de8de5183df0f3c29a12d79945ddee563382a6a1fa2015c735002ff",
+      "crates/cordis-kernel/tests/fresh_driver.rs": "ab9f9aff9b7528204526b31ce0381b4b0eefdf678d4aeb98198be691a7bbeb8f",
+      "crates/cordis-kernel/tests/history.rs": "1da6df0ca8359517bba4befd0fc61877e664bfc7aafda5caa1afa4b2b9b625d9",
+      "crates/cordis-kernel/tests/lifecycle.rs": "06448b7ab2443bd7ba39da106a1d2254d06d2a74c5e3fbe482fde7bf701e79eb",
+      "crates/cordis-kernel/tests/mixed_driver.rs": "3ffe364dcebac8e00c7f578e25b72d143cc652937dd56f9ef8c8e30624723837",
+      "crates/cordis-kernel/tests/native_action_ledger.rs": "4579697c48c766f087ec8dc39537cc96d3f13e128eba5b26fbd0588af8d00094",
+      "crates/cordis-kernel/tests/native_publication.rs": "e099052fa203b7ef43b254819194237e24c2eedbec8534984031b7fbdf95e27f",
+      "crates/cordis-kernel/tests/ownership.rs": "9bc750ac65233b6d7abc6977e10ac770e22d47ee4ae58a63554ade68a6524cec",
+      "crates/cordis-kernel/tests/paper_child_support.rs": "85d8f1a76287a2d92079abd3de19cac18b837f75fbd84c3f6ac94162d97d462a",
+      "crates/cordis-kernel/tests/paper_deletion.rs": "dc25b02e735d5adbf14b7f9812bef5ed87d05c5a87dcd8618e76a0be331ea18b",
+      "crates/cordis-kernel/tests/paper_support.rs": "2ae205acc86e7f7c4138f9dd2a59f50a66d03749f3376abb1c0fea4ea88afd0b",
+      "crates/cordis-kernel/tests/paper_transposition.rs": "794186b9b44c4df39315d1bcd3677cfa755c057e6c8b8c348bb9a8bfa4968d47",
+      "crates/cordis-kernel/tests/paper_vestige.rs": "c99b333f8f58b890cbd28c5670a0a2b1de60a077f9104e5383d78e6dd79805fe",
+      "crates/cordis-kernel/tests/program.rs": "2382f03e98f59d2752104c1a96b830dbc627188006a57d3d0af60e7bb0711f8a",
+      "crates/cordis-kernel/tests/program_normal_form.rs": "e8a570680ebaad6799b79726a03a8e1086eae898859fe4345dd02a85845e99e2",
+      "crates/cordis-kernel/tests/program_trace.rs": "a1b716ec5b6a526f28c4a5babec5caac8dc95ef05092ca52ad74c6460460a9e7",
+      "crates/cordis-kernel/tests/progress.rs": "f5938ac7922e0b93ca7073d0be22aff02be3a93068ea726be2799ac775100d32",
+      "crates/cordis-kernel/tests/refinement.rs": "ab4e7fda8b295f8cbe9d7481ddfae12d741f6cff8d895f9b783cc9468adef7ea",
+      "crates/cordis-kernel/tests/witnessed.rs": "708e863b721eaed518c0c61023c137b9a59c91368bea7b6e8154599c42ade337",
+      "crates/cordis-node/Cargo.toml": "45dc6845b3d344c31c92c7c6cd7721c6f74b6ed0542543f68c069e10d9b4320c",
+      "crates/cordis-node/build.rs": "fcbd1ff3f627a7553fa1704dc6f558998daff8bc256015c37aace62cc49ce584",
+      "crates/cordis-node/examples/interop_fixture.rs": "a5a823ff06ecdbf903bfd926fcb080a8c6efaf7a35bbd74cd791b79441a750b7",
+      "crates/cordis-node/examples/typed_fixture/dynamic.rs": "c5fa32b587a2e1c1ed93bac870cfafe740ed0fca7ff88f7f04be2d0a2e7333bf",
+      "crates/cordis-node/examples/typed_fixture/mod.rs": "e2ad6a6431720aa03251b6ac177071cd2bdd7253ef43f2ae3aa6eccf537ef19b",
+      "crates/cordis-node/src/dynamic.rs": "647f6617eee1a619e32ead259eb282da75c40d8ee56a3418a39d70329a6ac133",
+      "crates/cordis-node/src/dynamic_checkpoint.rs": "484d71e0c76c520f5319d52279c07317873c0709ae07028167477d30a9117845",
+      "crates/cordis-node/src/dynamic_checkpoint_tests.rs": "0a45e57c017c2355e96c436d384cff1339242cfa8d8ced389dd7eb14e98c2d1e",
+      "crates/cordis-node/src/dynamic_children.rs": "42b463d82b77ac518e01739c813f5b7c5fb73341f29e80e17d063b0fc1c82e4e",
+      "crates/cordis-node/src/dynamic_children_tests.rs": "a18c7778c78b07999a58518187b3eddfcf6869688c2ad0dffbc3f5f0a759e786",
+      "crates/cordis-node/src/dynamic_ffi.rs": "6d11f760e99e14fb02dc5944795bdf90175b1e6ede564aa40247a24d5121dcba",
+      "crates/cordis-node/src/dynamic_resources.rs": "677cf2d2fb460a77996585786b7d3027c9878497bc7374c4c30f0d89b9db9fae",
+      "crates/cordis-node/src/dynamic_reverse.rs": "df88e5028fe682752efa3ec65e52892d0150e1b54647ae96054569eb4f0555a5",
+      "crates/cordis-node/src/dynamic_reverse_tests.rs": "4a06e25b56a9edeeab2a8886295f92517c421dab91bc76e95bdb34dbeb0be2b9",
+      "crates/cordis-node/src/interop.rs": "dcf8f782a6c8e78ddfd46c602039515c0962abb1efdde0692048e63d1e022038",
+      "crates/cordis-node/src/lib.rs": "5104abb815d47054ed250304c7c3c6d9f75380f5552479ea6d23caba494fa738",
+      "crates/cordis-node/src/objects.rs": "8b483868b80e4fc424fb8511cc979b24d6bf38b4f1fc8b02aa35dcbac9996f6d",
+      "crates/cordis-node/src/plugin.rs": "5d83bf1ea1bd4f6aaf2b02f12cf710baaa0cdacb534344d0568d1203a4d8100a",
+      "crates/cordis-node/src/streams.rs": "383980b09f6567ac38889189c21c2890753f67100d28f7c46ca87414f95b761d",
+      "crates/cordis-node/src/typed.rs": "a46e69925e2fcaade7074874d71751adc5452585c21dfd34b674b0a8a107197b",
+      "crates/cordis-node/src/typed_children.rs": "6d42a5b983642e745547e4b4295d7f953320d66deb4f1c70b0f84d04b06cc2d1",
+      "crates/cordis-node/tests/plugin_runtime.rs": "c6ded6f03eaf5b97dae7ce1b2580eb18b0799e737ec3577f284a506a68bf7abf",
+      "crates/cordis-plugin-api/Cargo.toml": "adb3f8df1774d36b38ba8019962098486acb3bfb65bbfe953583663eb04276a1",
+      "crates/cordis-plugin-api/examples/dynamic_fixture_fail.rs": "70d1ebbdaa56f3654f0ffcd1c740135eaa3df3a549393fda6b2691d7be4ddaf8",
+      "crates/cordis-plugin-api/examples/dynamic_fixture_v1.rs": "16a84beef62d11450897b5caeb1def7587f0f7ce305503d8919f56177a44cd12",
+      "crates/cordis-plugin-api/examples/dynamic_fixture_v2.rs": "c91478ef5d1861c6ff34c72028b64dbb9dd01d1bd4b0e0b633700c358bfb1ce0",
+      "crates/cordis-plugin-api/examples/shared/checkpoint.rs": "1034ae16f1268e43bcc34d49f484f89be71c52ede585d64a7f9d24d529b6c338",
+      "crates/cordis-plugin-api/examples/shared/children.rs": "3f20c05bd0f485e776bdb62e36bd3aac36f495f143d27beb0af7c39033e083f1",
+      "crates/cordis-plugin-api/examples/shared/mod.rs": "61693a8bd00727ca90554e8b43d333ac7c6dda7f6a747f52cf4984d4ef350fed",
+      "crates/cordis-plugin-api/examples/shared/resources.rs": "08e2ab30923a0b0f4b7165561ba5c9ffb654a99d6d59d215bfaedc8df49d3a18",
+      "crates/cordis-plugin-api/examples/shared/reverse_resources.rs": "20759fff62b9526978d0073886c3a8b5bca1bb53ccdcabfed29931fdc412216f",
+      "crates/cordis-plugin-api/src/checkpoint.rs": "a94088dcea694cd703ad620814e12a2c9d241bf8d8f11cc1189d6952132e1a32",
+      "crates/cordis-plugin-api/src/checkpoint_tests.rs": "41bfcdf01b1685b59a6f54a9fa9e661c6e3185cccba1d268e040735c879d1234",
+      "crates/cordis-plugin-api/src/children.rs": "d7bfc5d613644def3c19e0691e165e8f1b606314cb112c935a3b6fbe11e6cc6f",
+      "crates/cordis-plugin-api/src/children_tests.rs": "5eac591736433aa3a827e4acadf2e7bcf8c433b14ac7bf963aae40e23d2636ba",
+      "crates/cordis-plugin-api/src/lib.rs": "983a90801ac053e2f566d7c0170e097756009cea735243c5aca780a17fec8a5d",
+      "crates/cordis-plugin-api/src/resource_tests.rs": "df7d8cfef2b147ebd3d1bc2acb4d4818dda2d10d7571105c85afd6607781afee",
+      "crates/cordis-plugin-api/src/resources.rs": "76b9f6cdf8eab59f26e336ddba2303bb2c0c7c0a2650f456c51eb9bf6a93f060",
+      "crates/cordis-plugin-api/src/reverse.rs": "cfbdafd39d471347598f9cda8a4d02d2f64eca0b2483d4c97946b9fe6763b950",
+      "crates/cordis-plugin-api/src/reverse_resource_tests.rs": "2b20bec126712722b0dfd7da1dba14220243330181f526340bc48302a2b3218c",
+      "crates/cordis-plugin-api/src/reverse_tests.rs": "da5651c73d88125c4e0d1a4375da649cb4e67f9471d9ba9215a5d918de600450",
+      "crates/cordis-plugin-api/src/tests.rs": "3c987a4e224796621edef92a0a006d45d90f61b00137fceed413579d74439b89",
+      "crates/cordis/Cargo.toml": "e73693f2b50723c6ffda5ddb4361e6f4a586f49bb3177873ac4bb8bd744fec87",
+      "crates/cordis/examples/async_lifecycle.rs": "16b5f6253bac68bfed7c6b087a10296db1099417f03ca4a982833e320a4f8371",
+      "crates/cordis/examples/basic.rs": "7b465025a3053fab402b332204deb85cd056dee0128d925caf38ca0388fdf40a",
+      "crates/cordis/examples/config_persistence.rs": "975bbedc661ffc699d04bd6023fd6dbda15d1bbad10a06a77c77e277d5eaa9d2",
+      "crates/cordis/examples/config_reload.rs": "01a224255d0dca41f060cea49879eab0f35c9dbc19a3e5a5dcd506b79170e86f",
+      "crates/cordis/src/config.rs": "e5e958942dfa0162865958379e70037186edfbd681d8a4076725d68da6c3cebb",
+      "crates/cordis/src/diagnostics.rs": "e554dc9d7c5be702c03e98fe41fadad9379cac57e1723fef1e36b42b3ca24bfb",
+      "crates/cordis/src/events.rs": "88a77593c0c9467ea11d43b4fc00b52b1833bc97195049bb5417b2498a550058",
+      "crates/cordis/src/future_support.rs": "160f9ca56163c8c8bb0ec7b264f04539c5412e0d934bef71f2c46594c8fce9d3",
+      "crates/cordis/src/lib.rs": "ff1d9cf39fe20b6f787abeb67b7dad7226c24cba6214dac36ebdc9d7669c678e",
+      "crates/cordis/src/loader.rs": "2e1797ec89cf47e72cd7599cb2bf04d433d425dc2e2b46ae36b9896c54dd3d05",
+      "crates/cordis/src/owned_events.rs": "3f3f1a776daa80fb9d74a8f442985f1c4a95f6bbf06b922317c4dcb3957b828e",
+      "crates/cordis/src/persistence.rs": "4a4226b7f15319c6f58dfd16b419608d6908efe151651ba00fc742b8c8ef722b",
+      "crates/cordis/src/process_plugin.rs": "b73b82fc80ed0f167af72541730e64eba6a942f651d989783d248ea1d6353295",
+      "crates/cordis/src/resources.rs": "8d7189a8ecfabb13bd8b594329a93574c7eafae3969f4781b1891ef5188d38ba",
+      "crates/cordis/src/runtime.rs": "c6028509583967fdf02970d73d6bf7a6569515f529728a2edabbccb089fb9127",
+      "crates/cordis/src/runtime/static_host.rs": "0f4b10ced9eb2c3f28bf144d087ab3f320479c184670197a1a2d7335843fc536",
+      "crates/cordis/src/timer.rs": "3e053bf6e3b50a07e03cffd5cc12330fd76b90bc4747ad039a83964c0b49d16d",
+      "crates/cordis/tests/config.rs": "e9b6ed84488b113c83655d62bf5bd9086c8bea7a43d60c77f40c04b90098803a",
+      "crates/cordis/tests/diagnostics.rs": "fa9e97ac7c44a8c91bd4cbd6e39e0f28f40dc8999ad5dafaafd6dec345f1f25a",
+      "crates/cordis/tests/diagnostics_review.rs": "6386befe662944a678b9e867734038e1f92f6147be07ad0df4abd04fd4f424bb",
+      "crates/cordis/tests/episode_refinement.rs": "b2c628c9dfb18c84cd86fe350d5134a7f004edb420c6b4ac707c5fd3e1e4a8e7",
+      "crates/cordis/tests/events.rs": "220237f64994d60ec5e091af0bd08f8fd0190391f1ff4b978cabd7c7e5500c41",
+      "crates/cordis/tests/harness_composition.rs": "4d1f3418e9ae780c81c9230c005256f2f3ea4ce5635c6ad541dfd9949823650c",
+      "crates/cordis/tests/loader.rs": "281859cf2a9845b86efa6646041688023abfb12ff731f1432220829148ccb0b7",
+      "crates/cordis/tests/loader_update.rs": "11f79adcff55c6bea9536143c279a2ac2bad9c85c9aca2f3445032b1a22f7a50",
+      "crates/cordis/tests/owned_events.rs": "2e3e8a2b674f8bb0ca629152732f1b331d61e0437e42184b87321b40b99422a2",
+      "crates/cordis/tests/persistence.rs": "869fa4f84cfa5d608ba898735af17169896e099dcbf4998ede13e3b68f59542e",
+      "crates/cordis/tests/persistence_paths.rs": "5809f8b3ec788036ac89203739f74ceadca00d1e14a731960c0bcb5de37142e8",
+      "crates/cordis/tests/process_plugin.rs": "b70149d59322dcc67f9421906b4334be36811f37f8017fec0bccd572d157c762",
+      "crates/cordis/tests/resources.rs": "2fcf460e332233af347de012447c5dfb1e455241e7592da810721ef0f26fd747",
+      "crates/cordis/tests/runtime.rs": "3e970cc6bf3b5d8b01faf2373181e916336bb5f99b19895d3c1a25ba82447a6a",
+      "crates/cordis/tests/runtime_waiters.rs": "8851b649be95e05b09508cf650f2c21a2b1a450c6889d8b84dd0723c7da8aff6",
+      "crates/cordis/tests/service_configuration.rs": "abdcfa7e819675551dec0380c750354c80609e8c88a1a12adfa2696314f00170",
+      "crates/cordis/tests/service_parity.rs": "e07fb6ad5f89514f8395a29abd601159502bc5f82ae7a15c6c6d5bff589401de",
+      "crates/cordis/tests/shared_backend_traces.rs": "7b904a3051fbc9fa139e165aa9b08d6cab55d42196c86afcd4e0aa607450b72b",
+      "crates/cordis/tests/shutdown_review.rs": "bd034b0aef15e90b2a09e795eb2c0d6e6394448c4433bfa287f1bea9f007a141",
+      "crates/cordis/tests/static_host.rs": "c3982448fe16578ad1d1c07cd0ea98cc6c7642135f467541a0eceac1ae8d10ef",
+      "crates/cordis/tests/static_host_join.rs": "50501904f8a6b73517caab7c5f292459b84e2d56baa490ea1eef7fac2b813e02",
+      "crates/cordis/tests/timer.rs": "d434d1e7904669288cdf66ee1f249c5b2cbb1270f4d9b568dfa13b5d209346c2",
+      "packages/compat-cordis/native-artifacts.js": "7ff966b24eaff87d218c42c20eb386e27f6051a313cf7b71c81c12bac2a05780",
+      "packages/compat-cordis/package.json": "908a186ab1789ea4826776ef583891d64e88c9b528461e1133102900a4c87846",
+      "scripts/build-node.mjs": "0be2f9dd6b6434614119db785fefa94d4fbd69d287987a0fffdb3869a8caf530",
+      "scripts/build-node.sh": "2247863df8b1efc8123b1b6dfbd50e0871f414979700c3c9ee502d8cadc66902",
+      "scripts/toolchain-env.sh": "f9e6689dca3a5658409f110523085600dcb5a233feba2c00720db48c72a0abe9",
+      "scripts/write-native-manifest.mjs": "3e1e64b6f3f363476da302cc6c1718493ff2145db571f7b39c4cae55f3cfb370",
+      "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418"
+    },
+    "dynamicFixtures": {
+      "v1": {
+        "path": "target/node-compat/dynamic-fixture-v1.dylib",
+        "sha256": "f5fe723daf69d1b18aa9412248a96592497a24f33ae815093127369c5e007fee"
+      },
+      "v2": {
+        "path": "target/node-compat/dynamic-fixture-v2.dylib",
+        "sha256": "f796f35eb0d94422bc2d3440d96332f82f82b634e291a7a9944c7cb394efb8e6"
+      },
+      "fail": {
+        "path": "target/node-compat/dynamic-fixture-fail.dylib",
+        "sha256": "6b0a3e4811d52887c36b36e0640203d4331e4b832327278c1d7ffc26c294475a"
+      }
+    },
+    "interopFixture": {
+      "path": "target/node-compat/interop-fixture.node",
+      "sha256": "f7fb108b51471c120618eb28eb185509ada0b0983c630d2d1b8bf3839d8387b3"
+    },
+    "compilerArtifact": "/Users/apple/workspaces/cordis-verus/target/release/libcordis_node.dylib",
+    "compilerProfile": {
+      "opt_level": "3",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v22.22.0",
+    "artifactSha256": "6ab82f13c93ee53a0d52b9a4850e173197469b78c02205c986d9891eb1ee662b",
+    "cargoLockSha256": "247d4a06cb349ee660db78f1c5120b742e2c983cde7773eb055707e4fda0e8cc",
+    "toolchainLockSha256": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418"
+  },
+  "runtimeAssets": {
+    "target/harness-compat/package.json": "upstream/deepseek-harness/packages/llm/llm/package.json"
+  }
+}

@@ -92,6 +92,10 @@ owned child、独立 owner anchor、ready/retire/join 与 cleanup retry；定义
 
 首组[证据入口](evidence-guide.md)已提供四路异步清理复现、英文功能对齐说明，以及五条论文到合同、执行代码和回归的审查链；映射检查接入日常开发门槛。它们是新增审查材料，不提升论文 ledger 状态。
 
-最新[上游差分归档](evidence/README.md)为 upstream 87/87、native 83/87。下一轮兼容工作应先处理两个新增缺口：并列 provider/consumer 更新的合并语义，以及清理期资源注册错误的兼容文本；先写明是否有意改变合同，再增加针对回归、重跑原样上游套件和 Harness 验收。另两项 committed publication 和 cleanup failure 的有意差异继续公开保留。
+[历史上游差分归档](evidence/README.md)保留 upstream 87/87、native 83/87 及原始失败。[本轮归档](evidence/2026-10-08-a03/README.md)对同一固定版本的原样核心套件重新运行，得到 upstream 87/87、native 85/87：Cordis profile 的同栈直接 provider/committed-consumer 更新已有受限协调，清理期注册错误补齐 `inactive context` 文本；另两项 committed publication 和 cleanup failure 的有意差异继续保留。结构化 cleanup/stale-episode 拒绝没有弱化。
+
+自动协调只覆盖空队列、无托管 invocation 来源、默认配置且无自定义 update hook 的外部直接更新，并拒绝经中间节点到 provider 的依赖路径。各请求共享生命周期屏障但保留自身失败；其余情况继续独立 FIFO，详见[兼容合同](node-compatibility.md#同栈-providerconsumer-更新)。这是普通 JS 宿主实现和行为证据，不是协调器的 refinement 证明。
+
+A03 下一步仍需真实插件迁移及回退记录；A04 的缺少依赖、清理等待、失败 inverse、旧 episode 四类诊断验收仍开放。兼容验收继续保留原样上游套件、官方工作流与目标应用的各自结果，不能用局部回归替代整体迁移。
 
 运营验收关注外部独立复现、实际插件接入与一次相关修改后的重新验证；当前没有声称已有外部采用。完整发布负控、跨平台实际运行和公开前安全报告渠道见[证据指南](evidence-guide.md)。

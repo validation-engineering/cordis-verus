@@ -64,17 +64,21 @@ native 合同要求保留已提交的 provider，直到消费者完成清理。
 
 ## 如实记录兼容性差异
 
-[归档比较](evidence/README.md) 包含未经修改的上游核心测试集、严格的 profile 轨迹、
-较小的 API 测试场景和真实 Harness 服务场景。完整的上游核心比较保留了 native 端的
-失败项；通过选定的测试场景，并不能消除更大测试集中的差异。
+[2026-10-08 比较](evidence/2026-10-08-a03/README.md)包含未经修改的上游核心测试集、
+严格的 profile 轨迹、较小的 API 测试场景和真实 Harness 服务场景。当前完整核心运行中，
+**上游测试通过 87/87，native 测试通过 85/87**。其余三组比较通过；选定场景通过，
+并不能消除核心套件中的两项失败。
 
-归档运行记录中，**上游测试通过 87/87，native 测试通过 83/87**。
-`inertia lock 2` 场景，以及逆操作抛错后的释放行为，与我们采用的已提交 publication
-和清理失败合同存在差异。另外两项失败是可复现的兼容性缺口：串行更新 provider 和
-消费者时，会以消费者的旧配置额外激活一次；清理期间注册资源虽然会被拒绝，但错误文本
-与上游不同。我们没有将这两项差异宣称为安全性改进；
-[归档说明](evidence/README.md) 记录了调查过程。
-预期内的失败，仍然是不符合上游行为的失败。
+[2026-10-06 基线](evidence/README.md)仍保留上游 87/87、native 83/87 及原始四项失败。
+两项非故意差异现在通过：受限协调避免了以消费者旧配置额外激活一次，清理期资源注册
+错误也包含了上游要求的文本。协调覆盖 Cordis profile 中满足
+[约定条件](node-compatibility.md#同栈-providerconsumer-更新)的同栈直接 provider/committed-consumer
+更新，其他情况继续使用 FIFO。清理期间仍禁止注册资源，保留结构化失败 code 与旧 episode 检查。
+
+剩余的 `inertia lock 2` 场景，以及逆操作抛错后的释放行为，与我们采用的已提交
+publication 和清理失败合同存在差异。两项断言均保留，完整比较仍以失败退出。
+预期内的失败，仍然是不符合上游行为的失败。这些修复没有证明 JS 协调器，也不代表
+兼容所有应用。
 
 配套的 [Harness 验收](https://github.com/validation-engineering/cordis-harness/blob/main/docs/official-validation-report.json)
 增加了官方 Web/standard 和 headless 执行路径，覆盖原版插件、UI、工具和会话存储。

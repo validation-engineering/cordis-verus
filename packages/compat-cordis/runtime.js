@@ -227,8 +227,91 @@ class Domain {
     check();
     return check;
   }
+  // Default direct updates of a provider and its committed consumers may share
+  // the synchronous revision window. The coordinator remains a queue barrier;
+  // each caller observes only its own update result after that barrier lands.
+  defaultUpdate(fiber) {
+    return this.profile === 'cordis' && fiber.runtime && !fiber.runtime.Config
+      && !this.events.hasUpdateObservers(fiber);
+  }
+  canJoinUpdate(group, fiber) {
+    if (!group?.open || group.token !== this.currentMutation || !group.token.active
+      || group.origin !== invocation.getStore() || this.mutationQueue.length
+      || group.members.has(fiber) || !this.defaultUpdate(fiber)) return false;
+    const plugins = this.command({op:'snapshot'}).plugins;
+    const current = target => this.fibers.get(target.id) === target && target.uid !== null
+      && !target._removedFlag && plugins.find(node => node.id === target.id);
+    const provider = current(group.provider), consumer = current(fiber);
+    if (!(provider && consumer && !provider.retired && !consumer.retired
+      && !provider.cleanupFailed && !consumer.cleanupFailed
+      && provider.generation === group.generation && consumer.generation === fiber._generation
+      && ['Active','Unloading'].includes(consumer.state)
+      && (!consumer.pendingAction || consumer.pendingAction.kind === 'cleanup')
+      && this.command({op:'committed_reaches',from:fiber.id,generation:fiber._generation,target:group.provider.id}).reachable)) return false;
+    // Waiting for the original provider is sufficient only without an
+    // intervening consumer/provider which could still be reactivating. Keep
+    // those multi-hop revisions in FIFO until their readiness protocol is joined.
+    return !plugins.some(node => node.id !== fiber.id && node.id !== provider.id
+      && this.command({op:'committed_reaches',from:fiber.id,generation:fiber._generation,target:node.id}).reachable
+      && this.command({op:'committed_reaches',from:node.id,generation:node.generation,target:provider.id}).reachable);
+  }
+  updateOutcome(group, result) {
+    // Capture rejection immediately, including primitive rejection values. The
+    // group's aggregated error belongs to its internal barrier, not every caller.
+    const outcome = Promise.resolve(result).then(value => ({ok:true,value}), error => ({ok:false,error}));
+    return outcome.then(async result => {
+      await group.barrier;
+      if (!result.ok) throw result.error;
+      return result.value;
+    });
+  }
+  enqueueUpdate(fiber, config, noSave) {
+    this.assertMutationAdmission();
+    const group = this.currentMutation?.updateGroup;
+    if (this.canJoinUpdate(group,fiber)) {
+      group.members.add(fiber);
+      let result;
+      try { result = mutation.run(group.token, () => group.token.performStep('update',fiber,config,noSave)); }
+      catch (error) { group.open = false; result = Promise.reject(error); }
+      // The consumer can temporarily become Pending between its old cleanup and
+      // the provider's new publication. That gap is not completion of this update.
+      const ready = Promise.resolve(result).then(async value => {
+        await group.providerLanded;
+        await fiber._awaitReady();
+        return value;
+      });
+      group.token.trackStep(ready);
+      return this.updateOutcome(group,ready);
+    }
+    if (group) group.open = false;
+    if (this.currentMutation || this.mutationQueue.length || invocation.getStore() !== undefined || !this.defaultUpdate(fiber)) {
+      return this.enqueueMutation(() => fiber._update(config,noSave));
+    }
+    const node = this.command({op:'snapshot'}).plugins.find(node => node.id === fiber.id);
+    if (!node || node.state !== 'Active' || node.pendingAction || node.retired
+      || node.cleanupFailed || node.generation !== fiber._generation) {
+      return this.enqueueMutation(() => fiber._update(config,noSave));
+    }
+    const opened = {provider:fiber,generation:node.generation,origin:invocation.getStore(),members:new Set([fiber]),open:true};
+    // Close before any lifecycle microtask can finish cleanup or admit setup.
+    queueMicrotask(() => { opened.open = false; });
+    let own;
+    try {
+      const barrier = this.enqueueMutation(() => {
+        opened.token = this.currentMutation;
+        opened.token.updateGroup = opened;
+        own = opened.token.performStep('update',fiber,config,noSave);
+        opened.providerLanded = Promise.resolve(own).then(() => {}, () => {});
+        return own;
+      });
+      opened.barrier = Promise.resolve(barrier).then(() => {}, () => {});
+      return this.updateOutcome(opened,own);
+    } catch (error) { opened.open = false; throw error; }
+  }
   enqueueMutation(execute, options = {}) {
     this.assertMutationAdmission(options);
+    // A non-joining operation is a FIFO boundary, even within the same turn.
+    if (this.currentMutation?.updateGroup) this.currentMutation.updateGroup.open = false;
     if (options.closing) this.acceptingMutations = false;
     if (!this.currentMutation && !this.mutationQueue.length) return this.executeMutation(execute, options);
     const pending = Promise.withResolvers();
@@ -241,6 +324,7 @@ class Domain {
     this.currentMutation = token;
     const finish = () => {
       token.active = false;
+      if (token.updateGroup) { token.updateGroup.open = false; token.updateGroup = undefined; }
       this.currentMutation = undefined;
       this.wake();
       if (this.mutationQueue.length) queueMicrotask(() => {
@@ -272,6 +356,9 @@ class Domain {
       let result;
       try { result = fiber[{'dispose':'_dispose','restart':'_restart','retryCleanup':'_retryCleanup','update':'_update'}[operation]](...args); }
       catch (error) { token.failures.add(error); throw error; }
+      return token.trackStep(result);
+    };
+    token.trackStep = result => {
       if (result?.then) {
         const promise = Promise.resolve(result);
         token.steps.add(promise);
@@ -454,7 +541,7 @@ class Domain {
       // coordinator itself retain the no-new-resources rule.
       const setup = invocation.getStore()?.kind === 'setup' && [...invocationScopes()].some(token =>
         token.fiber._domain === this && token.kind === 'setup' && token.ticket && token.active !== false);
-      if (!setup) throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions cannot acquire new resources');
+      if (!setup) throw new CordisError('CLEANUP_BLOCKED', 'Recovery transactions cannot acquire new resources in inactive context');
     }
     if (this.closed || !this.acceptingMutations && !(mutation.getStore()?.domain === this && mutation.getStore().active) && !liveInvocation(this)) {
       throw new CordisError('DOMAIN_CLOSED', 'The domain is closing or closed');
@@ -1090,7 +1177,7 @@ export class Fiber {
     fiber._assertRegistered();
     assertNotWaitingForAncestor(fiber, 'update');
     const delegated = fiber._domain.delegateUpdateMutation(fiber, 'update', config, noSave);
-    const result = fiber._trackMutation(delegated ? delegated.result : fiber._domain.enqueueMutation(() => fiber._update(config,noSave)));
+    const result = fiber._trackMutation(delegated ? delegated.result : fiber._domain.enqueueUpdate(fiber,config,noSave));
     if (fiber._domain.profile === 'harness') {
       result?.catch(error => fiber.ctx.logger.error(error));
       return;

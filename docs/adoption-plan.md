@@ -55,11 +55,14 @@ delivery dates. Each item needs the acceptance record described below.
 | **A15 · P0 → P1** | Contribute without depending on one author | Separate compatibility, ordinary-host and proof contribution paths; keep fast feedback and full acceptance distinct. Record semantic decisions, support scope and migration notes; grow independent review. | Contract changes update implementation, proof premises and regressions together. |
 | **A16 · P2** | Add a language or deployment boundary when useful | Python, remote RPC or WASM work requires a real task, evidence existing paths are insufficient, a maintenance owner and separate acceptance. Extend one boundary at a time. | Each adds an environment and failure model; existing kernel proofs do not certify a new host. |
 
-The compatibility starting point is the [archived 87/87 upstream and 83/87 native
-run](evidence/README.md), not a claim about every current upstream version. Its
-unintentional gaps concern co-updated provider/consumer behavior and cleanup-time
-resource-registration error text. Committed publication and cleanup-failure
-retention remain intentional differences. New runs must retain exact revisions.
+The compatibility starting point remains the [archived 87/87 upstream and 83/87
+native run](evidence/README.md). A new run of the unchanged pinned suite in the
+[second iteration](evidence/2026-10-08-a03/README.md) gives 87/87 upstream and
+85/87 native. It fixes the tested provider/consumer update case and cleanup-time
+registration message; committed
+publication and cleanup-failure retention remain intentional differences. The
+historical report is retained. These counts do not establish compatibility with
+every upstream version or complete A03's real migration acceptance.
 
 ## Formal work alongside the product
 
@@ -107,11 +110,29 @@ This iteration establishes the foundation rather than declaring M0 complete:
 | Comparable cleanup case (A13) | Extend the existing fixed-version research with equivalent provider/consumer observations across implementations | Adapter inputs, exact versions, ordered traces and assertions; distinguish memory-only observations from the existing real-file case. |
 | Adoption intake (A14/A15) | Bilingual plan and a [real-task intake form](../.github/ISSUE_TEMPLATE/adoption.yml) | The form is available; no invitation, independent evaluation or sustained adoption is counted until it occurs. |
 
-Next, resolve A03's two accidental compatibility gaps and complete A04's four
-diagnostic tasks: missing dependency, cleanup wait, failed inverse and stale
-episode. Select one real service for A05's DTO + async generator and the associated
-A07 host slice. The order can change when a recorded external task reveals a more
-important blocker; record the reason and preserve the proof dependencies.
+## Second iteration: the two baseline compatibility gaps
+
+A03 now has a scoped runtime implementation for both accidental gaps. In the
+Cordis profile, an external direct provider update can coordinate with updates of
+its direct committed consumers in the same synchronous stack, starting from an
+idle mutation queue and without a managed invocation origin. A `consumer → intermediate → provider`
+dependency path, custom `Config` or an `internal/update` hook excludes the case. The requests share a lifecycle barrier, await asynchronous
+cleanup/setup and retain their own failure outcomes. Repeated Fiber updates,
+transactions, restart/dispose, queued or later-microtask updates, multi-hop graphs,
+custom configuration/hooks and the Harness profile retain ordinary FIFO behavior.
+See the [compatibility contract](node-compatibility.md#同栈-providerconsumer-更新).
+
+Cleanup-time registration errors now contain `inactive context`; the
+`CLEANUP_BLOCKED` code and prior `STALE_EPISODE` rejection remain intact. These
+changes do not prove the JS coordinator or arbitrary callbacks, and do not close
+the paper's host-boundary obligation.
+
+A03 still needs a real plugin migration record with required edits and rollback
+steps. A04's four diagnostic tasks remain next: missing dependency, cleanup wait,
+failed inverse and stale episode. Select one real service for A05's DTO + async
+generator and the associated A07 host slice. The order can change when a recorded
+external task reveals a more important blocker; record the reason and preserve
+the proof dependencies.
 
 ## Independent installation acceptance
 

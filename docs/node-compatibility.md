@@ -94,12 +94,30 @@ await ctx.dispose()        // 同样会等待所有 owned task，然后清理资
 
 - `Fiber inertia lock 2`：上游可以在 Loading 中撤销后同 owner 重发布时恢复旧 epoch；内核已经执行的 withdrawal 不会被撤销，会先清理再重新激活。旧 lease 不被偷偷替换。
 - `Fiber dispose error`：上游记录并吞掉 inverse 错误；这里保留失败资源并拒绝完成，等待显式 retry。返回成功会错误宣称资源已恢复。
-- `Fiber update config while injected service reloads`：并列请求 provider/consumer update 时，同域队列逐项收敛，会多一次使用旧 consumer 配置的激活；固定上游将这两个更新合并。这是待解决的兼容缺口。
-- `Plugin inactive context`：清理期间的 plugin/effect/listener 注册均被拒绝，但当前错误为 `CLEANUP_BLOCKED`／`Recovery transactions cannot acquire new resources`，与上游要求的 `inactive context` 文本不同。
 - Harness wrapped fiber 的更新作用于实际 fiber，并有本地回归；上游 wrapper receiver 的独立四路缺陷复现仍需另行补充。
 - Service.check 重入旧值失效时不自动重新调用，必须由真实 notify 触发；通知环最多执行 256 次后报告诊断。
 
-本轮未修改上游的完整测试为 upstream 87/87、native 83/87，4 项失败全部保留在[原始对比记录](evidence/README.md)。上述 profile 与扩展合同不等于每项都来自该测试集。这些差异限制“完全替换”的声明；需要逐个目标应用验证。
+[原始对比记录](evidence/README.md)保留 upstream 87/87、native 83/87 及当时的四项失败。[本轮归档](evidence/2026-10-08-a03/README.md)对同一锁定版本的原样核心套件重新运行，结果为 upstream 87/87、native 85/87；仍失败的是上面的 `Fiber inertia lock 2` 和 `Fiber dispose error`，两项有意合同差异没有跳过断言。新增结果不覆盖历史报告，也不说明所有当前上游版本或插件都兼容。
+
+本轮修复了 `Fiber update config while injected service reloads` 的受限直接更新场景，范围见下节；`Plugin inactive context` 的清理期资源注册错误现在包含 `inactive context` 文本。资源仍被拒绝，结构化 `CLEANUP_BLOCKED` code 保留，旧 episode 的 `STALE_EPISODE` 检查仍优先，不会为了错误文本兼容弱化准入检查。这些观察不提升形式化证明范围；实际迁移仍需逐个目标应用验证。
+
+## 同栈 provider/consumer 更新
+
+Cordis profile 的直接外部 `update()` 可以在一个同步调用栈内协调 provider 和它的直接 committed consumers，避免先用旧 consumer 配置重新激活一次：
+
+```js
+const providerUpdate = provider.update({ value: 2 })
+const consumerUpdate = consumer.update({ value: 'new configuration' })
+await Promise.all([providerUpdate, consumerUpdate])
+```
+
+自动协调只在域没有执行中或排队的 mutation、调用者没有托管 invocation 来源时开启。provider 必须处于当前有效的 Active episode；随后同栈更新的 consumer 必须持有该 provider 的 committed 依赖，且不能同时存在 `consumer → intermediate → provider` 路径。参与插件使用默认配置处理，不提供自定义 `Config` 或 `internal/update` hook；未知 update observer 也会关闭协调，不通过执行用户 callback 来判断是否可加入。
+
+这些请求共用一个生命周期屏障，等待相关异步 cleanup 和 setup 落地；provider 尚未落地时，consumer 临时回到 Pending 不代表更新已完成。provider 更新落地后，若 consumer 仍缺少所需依赖，它可以合法地以 Pending 状态结束本次更新：新配置已保存，后续依赖恢复时再激活。这与把更新中的临时 Pending 提前报告为完成不同，也不把 update 成功解释为必然 Active。
+
+每个返回的 Promise 保留自身更新的结果与失败归属，某个 consumer 的 setup 失败不会自动改写为 provider 更新失败。cleanup 失败仍保留原资源和显式 retry 入口；协调不提供外部副作用回滚，也不保证任意 Promise 最终完成。
+
+重复更新同一 Fiber、显式事务、restart/dispose、已有队列、跨 microtask 的更新、多跳依赖、自定义配置或 update hook，以及 Harness profile，都继续使用原来的独立 FIFO revision。托管 callback 及其已完成后的 continuation 也不获得外部协调权限。这是有范围的兼容修复，不是通用批量更新 API；协调器属于尚未形式化证明的 JS 宿主层。
 
 ## 同域外部变更事务
 

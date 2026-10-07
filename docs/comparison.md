@@ -72,20 +72,26 @@ We do not call this JavaScript behavior Rust-style undefined behavior.
 
 ## Compatibility is measured without hiding differences
 
-The [archived comparisons](evidence/README.md) include the unchanged upstream core
-suite, strict profile traces, the smaller API fixture and real Harness service
-scenarios. The full upstream core comparison retains native failures; matching
-selected fixtures does not erase differences in that broader suite.
+The [2026-10-08 comparisons](evidence/2026-10-08-a03/README.md) include the unchanged
+upstream core suite, strict profile traces, the smaller API fixture and real
+Harness service scenarios. The current full core run records **87/87 upstream
+tests** and **85/87 native tests**. The other three comparisons pass; their
+selected scenarios do not erase the two core failures.
 
-The archived run records **87/87 upstream tests** and **83/87 native tests**.
-The `inertia lock 2` scenario and disposal after an inverse throws differ under
-our committed-publication and cleanup-failure contracts. Two additional failures
-are reproducible compatibility gaps: serialized provider/consumer updates cause
-an extra activation with the old consumer configuration, and cleanup-time resource
-registration is rejected with error text different from upstream. These are not
-claimed safety improvements;
-the [archive notes](evidence/README.md) record their investigation.
-An expected failure is still a conformance failure.
+The [2026-10-06 baseline](evidence/README.md) remains archived at 87/87 upstream
+and 83/87 native, including all four original failures. The two accidental gaps
+now pass: scoped coordination avoids an extra activation with the old consumer
+configuration, and cleanup-time registration errors include the expected text.
+Coordination covers same-stack direct provider/committed-consumer updates in the
+Cordis profile under the [documented conditions](node-compatibility.md#同栈-providerconsumer-更新);
+other cases retain FIFO scheduling. Resource registration remains forbidden
+during cleanup, with structured failure codes and stale-episode checks preserved.
+
+The remaining `inertia lock 2` scenario and disposal after an inverse throws differ
+under our committed-publication and cleanup-failure contracts. Both assertions
+remain in the suite, and the full comparison still exits with failure. An expected
+failure is still a conformance failure. These fixes do not prove the JS coordinator
+or establish compatibility for every application.
 
 The companion [Harness acceptance](https://github.com/validation-engineering/cordis-harness/blob/main/docs/official-validation-report.json)
 adds official Web/standard and headless execution with original plugins, UI,

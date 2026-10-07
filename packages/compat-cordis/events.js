@@ -4,6 +4,7 @@ import { defineProperty } from './support.js';
 import { Context } from './context.js';
 import { Fiber, FiberState } from './fiber.js';
 import { DisposableList, symbols } from './utils.js';
+const defaultUpdateDispatchers = new WeakSet();
 export function isBailed(value) {
     return value !== null && value !== false && value !== undefined;
 }
@@ -37,6 +38,13 @@ export class EventsService {
             global: true,
             prepend: true
         });
+        // Record this exact built-in entry, not a listener count. An unknown
+        // listener must disable automatic coordination without invoking filters.
+        defaultUpdateDispatchers.add(this._hooks['internal/update'][0]);
+    }
+    hasUpdateObservers(fiber) {
+        return !!fiber._hooks['internal/update']?.length
+            || (this._hooks['internal/update'] || []).some(hook => !defaultUpdateDispatchers.has(hook));
     }
     _resolve(type, args) {
         const thisArg = typeof args[0] === 'object' || typeof args[0] === 'function' ? args.shift() : null;

@@ -1,0 +1,41 @@
+{
+  "schema": "cordis-verus.compatibility-archive/v1",
+  "archivedAt": "2026-10-07T16:27:29.847214+00:00",
+  "sourceBaseRevision": "d4f3740f24d3b7dcd79a19e0e9e4abb8382419fd",
+  "workingTreeDirtyAtCapture": true,
+  "scope": "Finite fixed-version behavioral comparisons. The full unchanged core suite still fails two intentional contract differences; no release acceptance or JS host refinement is claimed. Raw reports bind the exact runtime and native inputs.",
+  "reports": [
+    {
+      "file": "upstream-core.json",
+      "source": "target/upstream-core/all.json",
+      "command": "node scripts/check-upstream-core.mjs --backend=all",
+      "exitCode": 1,
+      "sha256": "74a74c5da64c356aff580ce0fb594d47145e4f6ffba11d90cb530930e8e7572a",
+      "inputsVerified": 319
+    },
+    {
+      "file": "node-compat.json",
+      "source": "target/node-compat/differential.json",
+      "command": "node scripts/check-node-compat.mjs",
+      "exitCode": 0,
+      "sha256": "0bcc3c98e95e8c88264c530a39b09c600a88ac86c813b26ef7af60b2b4ce0af5",
+      "inputsVerified": 308
+    },
+    {
+      "file": "node-profiles.json",
+      "source": "target/node-compat/profiles.json",
+      "command": "node scripts/check-node-profiles.mjs",
+      "exitCode": 0,
+      "sha256": "5a6fed8fca6f63359ee05f7ad193bee7e6fd0272e325c2b1ec076d494a6f062e",
+      "inputsVerified": 327
+    },
+    {
+      "file": "harness-compat.json",
+      "source": "target/harness-compat/all.json",
+      "command": "node scripts/check-harness-compat.mjs",
+      "exitCode": 0,
+      "sha256": "86355c61551f448db4cc871ad4c7b548366bec4569fc0fea94b3f59c800d4043",
+      "inputsVerified": 464
+    }
+  ]
+}
