@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "kind": "verus-toolchain-recovery",
+  "recovered_at": "2026-10-07T14:36:29.255637+00:00",
+  "repository": "verus-lang/verus",
+  "run_id": 37171084467,
+  "run_url": "https://github.com/verus-lang/verus/actions/runs/37171084467",
+  "commit": "168759867f8c4ba0be848f5a3e438c75cee3e6e3",
+  "verus_version": "0.2026.10.04.1687598",
+  "artifacts": {
+    "arm64-macos": {
+      "id": 11292015626,
+      "name": "verus-arm64-macos",
+      "member": "verus-arm64-macos.zip",
+      "archive": "verus-0.2026.10.04.1687598-arm64-macos.zip",
+      "sha256": "5ac2a44a1c1bf1536f67adc5f16827ca711974b98b749f09bbf9771806edc09a",
+      "bytes": 448945548,
+      "actions_zip_sha256": "f54e33e93d6a5018b81ec5784e7d9cc896328613e6d8ea5f5017e136e29f261d",
+      "created_at": "2026-10-04T02:35:33Z",
+      "expires_at": "2027-01-02T02:27:01Z",
+      "artifact_digest": "sha256:f54e33e93d6a5018b81ec5784e7d9cc896328613e6d8ea5f5017e136e29f261d"
+    },
+    "x86-linux": {
+      "id": 11291293088,
+      "name": "verus-x86-linux",
+      "member": "verus-x86-linux.zip",
+      "archive": "verus-0.2026.10.04.1687598-x86-linux.zip",
+      "sha256": "46e85f93fc77e41723d589e21bc4d36c6ab2f9d98c9f07e721051879496ce580",
+      "bytes": 485265399,
+      "actions_zip_sha256": "e6885b91698b7eb72316e5b3aa3e6c4dd46f5b674d1409c4772ccb1c8f6e2dd7",
+      "created_at": "2026-10-04T02:34:57Z",
+      "expires_at": "2027-01-02T02:27:01Z",
+      "artifact_digest": "sha256:e6885b91698b7eb72316e5b3aa3e6c4dd46f5b674d1409c4772ccb1c8f6e2dd7"
+    },
+    "x86-macos": {
+      "id": 11291916250,
+      "name": "verus-x86-macos",
+      "member": "verus-x86-macos.zip",
+      "archive": "verus-0.2026.10.04.1687598-x86-macos.zip",
+      "sha256": "f55c5f1bc1d667b4dda7f7c8e28a0585ca515c7312570b5ec51bc020dcac7803",
+      "bytes": 460583073,
+      "actions_zip_sha256": "8cd4584764d0a38a97fdbb3260ac3f12b3ba3acb4c65faf91e9c97be0eac7484",
+      "created_at": "2026-10-04T02:39:35Z",
+      "expires_at": "2027-01-02T02:27:01Z",
+      "artifact_digest": "sha256:8cd4584764d0a38a97fdbb3260ac3f12b3ba3acb4c65faf91e9c97be0eac7484"
+    }
+  }
+}

@@ -69,3 +69,13 @@ The recovery script's failure paths have offline tests in
 This archive is a build dependency, not a Cordis runtime release. Restoring a
 download does not establish release readiness; the full gate in
 [releasing](../releasing.md), including canonical negative controls, still applies.
+
+## Recorded recovery
+
+The [2026-10-07 archive job](https://github.com/validation-engineering/cordis-verus/actions/runs/37638045011)
+succeeded for all three original ZIP hashes. The checked-in
+[recovery record](recovered-0.2026.10.04.1687598.json) is also attached to the
+[dependency archive](https://github.com/validation-engineering/cordis-verus/releases/tag/toolchain-verus-0.2026.10.04.1687598).
+Fresh installation and development results belong to the separate
+[Development checks](https://github.com/validation-engineering/cordis-verus/actions/workflows/verify.yml)
+workflow; recovery success alone does not certify either platform behavior or release quality.

@@ -10,19 +10,25 @@
         "url": "https://github.com/verus-lang/verus/releases/download/release/rolling/0.2026.10.04.1687598/verus-0.2026.10.04.1687598-arm64-macos.zip",
         "sha256": "5ac2a44a1c1bf1536f67adc5f16827ca711974b98b749f09bbf9771806edc09a",
         "archive": "verus-0.2026.10.04.1687598-arm64-macos.zip",
-        "directory": "verus-arm64-macos"
+        "directory": "verus-arm64-macos",
+        "mirror_url": "https://github.com/validation-engineering/cordis-verus/releases/download/toolchain-verus-0.2026.10.04.1687598/verus-0.2026.10.04.1687598-arm64-macos.zip",
+        "mirror_api": "repos/validation-engineering/cordis-verus/releases/assets/618958235"
       },
       "x86-linux": {
         "url": "https://github.com/verus-lang/verus/releases/download/release/rolling/0.2026.10.04.1687598/verus-0.2026.10.04.1687598-x86-linux.zip",
         "sha256": "46e85f93fc77e41723d589e21bc4d36c6ab2f9d98c9f07e721051879496ce580",
         "archive": "verus-0.2026.10.04.1687598-x86-linux.zip",
-        "directory": "verus-x86-linux"
+        "directory": "verus-x86-linux",
+        "mirror_url": "https://github.com/validation-engineering/cordis-verus/releases/download/toolchain-verus-0.2026.10.04.1687598/verus-0.2026.10.04.1687598-x86-linux.zip",
+        "mirror_api": "repos/validation-engineering/cordis-verus/releases/assets/618958236"
       },
       "x86-macos": {
         "url": "https://github.com/verus-lang/verus/releases/download/release/rolling/0.2026.10.04.1687598/verus-0.2026.10.04.1687598-x86-macos.zip",
         "sha256": "f55c5f1bc1d667b4dda7f7c8e28a0585ca515c7312570b5ec51bc020dcac7803",
         "archive": "verus-0.2026.10.04.1687598-x86-macos.zip",
-        "directory": "verus-x86-macos"
+        "directory": "verus-x86-macos",
+        "mirror_url": "https://github.com/validation-engineering/cordis-verus/releases/download/toolchain-verus-0.2026.10.04.1687598/verus-0.2026.10.04.1687598-x86-macos.zip",
+        "mirror_api": "repos/validation-engineering/cordis-verus/releases/assets/618958241"
       }
     },
     "channel": "rolling"
