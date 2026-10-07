@@ -35,6 +35,8 @@ jobs:
       - name: Install locked JavaScript dependencies without lifecycle scripts
         run: npm ci --ignore-scripts
       - name: Install checksum-locked Verus and Rust
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/install-verus.sh
       - name: Complete full-crate negative and release-quality gate
         run: python3 scripts/record-verification.py

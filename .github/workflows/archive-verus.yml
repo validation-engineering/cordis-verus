@@ -1,0 +1,63 @@
+name: Preserve pinned Verus toolchain
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-pinned-verus
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUSTUP_TOOLCHAIN: '1.98.1'
+      ARCHIVE_TAG: toolchain-verus-0.2026.10.04.1687598
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Check archive identity against the lock
+        run: |
+          python3 - <<'PYCODE'
+          import json, os
+          lock = json.load(open("toolchain.lock.json"))
+          assert os.environ["ARCHIVE_TAG"] == "toolchain-verus-" + lock["verus"]["version"]
+          assert os.environ["RUSTUP_TOOLCHAIN"] == lock["rust"]["channel"]
+          PYCODE
+      - name: Test recovery without network
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_*verus*.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_toolchain_notices.py'
+      - name: Recover original bytes and validate all locked hashes
+        run: python3 scripts/archive-verus-toolchain.py --output target/toolchain-archive
+      - name: Check out the exact Verus source for attribution
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: verus-lang/verus
+          ref: 168759867f8c4ba0be848f5a3e438c75cee3e6e3
+          path: target/verus-source
+          persist-credentials: false
+      - name: Prepare dependency source and license companion
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update
+          python3 scripts/toolchain-notices.py \
+            --source target/verus-source --output target/toolchain-notices \
+            --z3-license-url https://raw.githubusercontent.com/Z3Prover/z3/ddb49568d3520e99799e364fb22f35fc67d887b1/LICENSE.txt \
+            --z3-license-sha256 e617cad2ab9347e3129c2b171e87909332174e17961c5c3412d0799469111337
+          tar -czf target/toolchain-archive/toolchain-sources.tar.gz -C target toolchain-notices
+      - name: Preserve dependency assets (does not release Cordis)
+        run: |
+          gh release create "$ARCHIVE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title 'Verus 0.2026.10.04.1687598 toolchain archive' \
+            --notes-file docs/toolchains/archive-notes.md \
+            target/toolchain-archive/*

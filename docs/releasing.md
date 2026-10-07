@@ -1,6 +1,7 @@
 # Release procedure
 
-No release has been published. The workspace crate manifests intentionally set `publish = false`:
+No Cordis runtime release has been published. [Toolchain archives](toolchains/README.md)
+preserve development dependencies and do not certify this project for release. The workspace crate manifests intentionally set `publish = false`:
 the repository starts private at
 [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus). Registry names
 and a monitored security reporting route must be confirmed before a public release.

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "repository": "verus-lang/verus",
+  "run_id": 37171084467,
+  "commit": "168759867f8c4ba0be848f5a3e438c75cee3e6e3",
+  "artifacts": {
+    "arm64-macos": {
+      "id": 11292015626,
+      "name": "verus-arm64-macos",
+      "member": "verus-arm64-macos.zip"
+    },
+    "x86-macos": {
+      "id": 11291916250,
+      "name": "verus-x86-macos",
+      "member": "verus-x86-macos.zip"
+    },
+    "x86-linux": {
+      "id": 11291293088,
+      "name": "verus-x86-linux",
+      "member": "verus-x86-linux.zip"
+    }
+  }
+}

@@ -1,0 +1,69 @@
+name: Independent adoption or migration task
+description: Evaluate a real plugin workflow, installation, or maintenance task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Chinese and English reports are welcome. This form tracks a real task and its outcome; submitting it does not imply that migration succeeded.
+        Public issues are visible to others. Remove credentials, private prompts and proprietary source; a minimal reproduction is enough. For vulnerabilities, follow SECURITY.md.
+        The project is experimental. See docs/adoption-plan.md for scope and acceptance criteria.
+  - type: textarea
+    id: task
+    attributes:
+      label: Task and current approach / 任务与当前做法
+      description: What application or plugin task are you trying to complete? Describe the current runtime and why you are evaluating a change. A public project link is optional.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Observable success and failure / 可观察的成功与失败
+      description: What must work, what must be retained after failure, and what would make you stop or continue? Identify relevant dependencies, cleanup, configuration or update behavior.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Current evaluation stage / 当前评估阶段
+      options:
+        - Planning a first source trial
+        - Installing or reproducing a case
+        - Integrating a real plugin or workflow
+        - Maintaining an integration after a change or failure
+        - Stopped or selected another approach
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and installation environment / 版本与安装环境
+      description: Include source revisions or package hashes, OS/architecture, runtime/compiler versions and source build versus artifact install. Note clean or reused caches, sibling checkouts, custom addon paths, and whether Verus was needed. Write unknown where not yet measured.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps and evidence / 步骤与证据
+      description: Provide the baseline steps, attempted commands, actual outputs or a minimal plugin. For comparisons, identify exact upstream versions and use the same observable task. If not run yet, give the proposed reproduction.
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Integration cost and blockers / 接入成本与阻塞
+      description: Record required edits, elapsed time, cold versus warm cache, and maintainer intervention. What remains blocked? Which other approach works better for this task? Unmeasured is a valid answer.
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract or review path / 合同或审查路径
+      description: If relevant, link the runtime API, diagnostic, test or paper-to-code path you rely on. Describe unclear assumptions or boundaries; familiarity with Verus is not required.
+  - type: textarea
+    id: follow_up
+    attributes:
+      label: Result after a real change / 真实修改后的结果
+      description: When available, update this issue after an interface change, upgrade or failure. Record whether you still use the integration, what checks you reran and any reason for leaving. No follow-up commitment is required.
+  - type: markdown
+    attributes:
+      value: |
+        Maintainer acceptance record: identify task/contract, scope and actual implementation/proof boundary, source-bound evidence, unresolved conditions and ownership.
+        Our own examples are not external adoption. A successful first run is not sustained use. Ask separately before using a person or project as a promotional case study.

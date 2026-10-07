@@ -54,6 +54,8 @@
 | [Status](status.md) | 冻结快照结果、尚未通过的检查和当前工作 |
 | [Validation](validation.md) | 重现验证、规范负控、实验性 scoped 检查和证据判定 |
 | [Benchmarks](benchmarks.md) | 性能测量方法、源码/构建绑定、原始批次数据、显式基线与未验收预算 |
+| [Adoption plan](adoption-plan.md) · [中文](adoption-plan.zh-CN.md) | 用户目标、形式化主线、阶段验收与独立接入 |
+| [Toolchain archives](toolchains/README.md) | 固定 Verus 下载来源、恢复与校验 |
 | [Roadmap](roadmap.md) | 后续工作顺序、交付物和验收条件 |
 | [Contributing](../CONTRIBUTING.md) | 开发环境、提交约定与变更检查 |
 | [Releasing](releasing.md) | 完整质量门槛、打包与发布流程 |

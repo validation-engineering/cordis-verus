@@ -110,3 +110,6 @@ partial verification or solver exhaustion alone is always inconclusive.
 The quality command also runs the Python evidence-gate regression tests.
 
 Release evidence must include every name in `check-negative.py::mutation_manifest`, in the canonical order. A minimum mutation count is insufficient: missing, duplicated, additional or reordered entries invalidate the record, as do incomplete positive or negative whole-crate statistics. The evidence-gate unit tests cover these cases.
+
+For private-mirror authentication and original toolchain provenance, see
+[toolchain archives](docs/toolchains/README.md).
