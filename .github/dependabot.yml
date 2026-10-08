@@ -13,4 +13,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Update Actions manually; keep automatic version-update PRs disabled.
+    open-pull-requests-limit: 0
