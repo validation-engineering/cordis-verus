@@ -2,8 +2,8 @@
 
 English · [简体中文](full-negative-validation.zh-CN.md)
 
-Release validation deliberately changes executable kernel code and requires the
-proofs to reject each change. Every one of the 114 canonical mutations must first
+Release validation deliberately changes kernel operations, guards or specifications
+and requires the proofs to reject each change. Every one of the 114 canonical mutations must first
 compile and then produce a concrete contract failure while verifying the entire
 crate. The unchanged kernel must also pass. A timeout, resource limit, frontend
 error or partial result does not satisfy this requirement.
@@ -34,7 +34,8 @@ all 114 already-submitted tasks.
 
 Termination is requested once per process group. The supervisor observes leader
 exit without reaping it until group cleanup finishes, so the process-group identity
-remains reserved. Linux uses `waitid(WNOWAIT)` and macOS uses `kqueue(NOTE_EXIT)`.
+remains reserved. The supervisor uses `waitid(WNOWAIT)` where Python exposes it, with
+`kqueue(NOTE_EXIT)` as the macOS fallback. The actual method is recorded per stage.
 Stage records retain process-group snapshots, signals and any cleanup error. A
 cleanup failure cannot turn a timeout or cancellation into accepted proof evidence.
 CI steps use `exec` so cancellation reaches the supervisor. A forced kill can still
@@ -47,13 +48,22 @@ three platforms. Preflight retains `--trace --time` diagnostics and must pass on
 all platforms before any negative shards start. This prevents one failing baseline
 from being repeated across the entire matrix.
 
-Each platform then runs eighteen shards of six or seven mutations. Every mutation
-still compiles and verifies the **entire mutated crate**, with one worker and two
-Verus threads. Compilation has a 300-second deadline and proof checking has a
-2,400-second deadline. At most seven of these pairs fit within 315 minutes, leaving
-45 minutes of the six-hour job limit for installation, evidence checks and upload.
-The workflow permits at most twelve concurrent negative jobs. These wall-clock
-budgets do not raise solver resource limits or change proof contracts.
+Each mutation still compiles and verifies the **entire mutated crate**, with one
+worker, two Verus threads and a 300-second compilation deadline. A single platform
+plan supplies both the preflight and shard proof deadlines:
+
+| Platform | Proof deadline | Shards | Maximum controls per shard | Compile + proof budget | Job headroom |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Linux x64 | 40 min | 18 | 7 | 315 min | 45 min |
+| macOS ARM64 | 60 min | 24 | 5 | 325 min | 35 min |
+| macOS Intel | 90 min | 38 | 3 | 285 min | 75 min |
+
+The planner checks complete mutation coverage and reserves at least 30 minutes
+within each six-hour shard job for installation, evidence checks,
+cleanup and upload. Preflight jobs reserve another 15 minutes beyond the proof
+deadline. The workflow permits at most twelve concurrent negative jobs. These
+limits are execution budgets, not measured proof durations; they do not raise
+solver resource limits or change proof contracts.
 
 Shards reuse the platform's successful preflight baseline from the **same workflow
 run and attempt**. The raw baseline output, metadata and hashes travel with the
@@ -69,7 +79,7 @@ attempt. Scoped flags, changed sources, missing/duplicate controls, altered
 summaries, cancellation, cleanup failures and resource errors fail collection.
 The final mutation list retains canonical order.
 
-Each platform's quality job collects its eighteen shards within the ordinary gate,
+Each platform's quality job collects its complete planned partition within the ordinary gate,
 alongside positive proof, tests, examples, package builds and installation checks.
 Only the complete collected report can enter `verification/v3`; a green preflight
 or one green shard cannot. Runtime draft creation still requires all three
@@ -104,6 +114,20 @@ The concrete insertion example calls its existing operation lemma explicitly bef
 composition. Public contracts, executable behavior, mutation definitions and solver
 resource limits remain unchanged. Targeted negative checks must still find concrete
 failures in the complete mutated crate, without resource errors.
+
+The concrete foreign-child examples separate restoration and registry values,
+terminal transport, and target execution into proved helper lemmas. Composition
+uses their contracts instead of unfolding all states and quantified theories in
+one query. The existing public postconditions, executable code and mutation list
+remain unchanged. Scoped timing guides this organization; the complete positive
+proof and full-crate negative controls still determine acceptance.
+
+The deletion induction obtains each landing guard through the proved
+`fragment_landing_guard` lemma. A removed dependency exclusion therefore exposes
+a small, explicit contract obligation instead of leaving the solver to search the
+entire induction context. The concrete prefix proof reuses its fragment contract
+without re-proving a stronger condition. These changes preserve the public
+contracts and resource limits; a resource failure still rejects negative evidence.
 
 See [validation gates](validation.md), the [release procedure](releasing.md), and
 the [runner](../scripts/check-negative.py) / [collector](../scripts/negative-shards.py)

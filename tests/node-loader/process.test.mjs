@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, readFile, rm, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inspect } from 'node:util';
+import { waitForMarker, waitForCallMarker, observeOperation, completedValues } from './process-test-support.mjs';
 import { ProcessDomain } from '../../packages/compat-loader/process.js';
 import { WorkerDomain } from '../../packages/compat-loader/worker.js';
 import { releaseLaunch } from '../../packages/compat-loader/artifact.js';
@@ -14,7 +16,7 @@ async function fixture(options = {}) {
   await writeFile(trace, '');
   await writeFile(join(directory, 'plugin.mjs'), `
 import { Service } from 'cordis';
-import { appendFileSync, existsSync, watch, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { label } from './dependency.mjs';
 export default class Probe extends Service {
  constructor(ctx, config) {
@@ -41,10 +43,19 @@ export default class Probe extends Service {
  }
  hang() { return new Promise(() => {}); }
  async wait() {
-  await new Promise(resolve => {
-   const watcher = watch(this.config.external, () => { if (existsSync(this.config.release)) { watcher.close(); resolve(); } });
-   console.log('PROCESS_CALL_WAITING');
-  });
+  writeFileSync(this.config.waiting, 'ready');
+  const deadline = Date.now() + 5000;
+  let previous;
+  for (;;) {
+   try {
+    const value = readFileSync(this.config.release, 'utf8');
+    if (value !== previous) { writeFileSync(this.config.observedRelease, value); previous = value; }
+    if (value === 'go') break;
+   }
+   catch (error) { if (error.code !== 'ENOENT') throw error; }
+   if (Date.now() >= deadline) throw new Error('Process fixture release was not received');
+   await new Promise(resolve => setTimeout(resolve, 10));
+  }
   appendFileSync(this.config.trace, 'call:done\\n');
   return 'done';
  }
@@ -52,7 +63,7 @@ export default class Probe extends Service {
 `);
   const write = async (label, config = {}) => {
     await writeFile(join(directory, 'dependency.mjs'), `export const label = ${JSON.stringify(label)};`);
-    await writeFile(join(directory, 'cordis.json'), JSON.stringify([{ id: 'probe', name: './plugin.mjs', config: { trace, external, release: join(external, 'release'), ...config } }]));
+    await writeFile(join(directory, 'cordis.json'), JSON.stringify([{ id: 'probe', name: './plugin.mjs', config: { trace, external, waiting: join(external, 'waiting'), observedRelease: join(external, 'observed-release'), release: join(external, 'release'), ...config } }]));
   };
   await write('old');
   const domain = new ProcessDomain({ timeout: 5000, stdio: 'ignore', ...options });
@@ -60,6 +71,19 @@ export default class Probe extends Service {
     lines: async () => (await readFile(trace, 'utf8')).trim().split('\n'),
     cleanup: async () => { if (domain.state !== 'closed') await domain.abandon(); await rm(directory, {recursive:true, force:true}); await rm(external, {recursive:true, force:true}); },
   };
+}
+
+async function finishProcessFixture(t, p, operations, failure) {
+  // Observed operations always resolve to result objects, so settling them
+  // cannot replace an earlier assertion. Attempt every remaining cleanup step.
+  const cleanupErrors = [];
+  try { await writeFile(join(p.external, 'release'), 'go'); } catch (error) { cleanupErrors.push(error); }
+  await Promise.all(operations);
+  try { await p.cleanup(); } catch (error) { cleanupErrors.push(error); }
+  if (cleanupErrors.length) {
+    if (failure) t.diagnostic(`Cleanup also failed: ${inspect(cleanupErrors, { depth: 8 })}`);
+    else throw new AggregateError(cleanupErrors, 'Process test cleanup failed', { cause: cleanupErrors[0] });
+  }
 }
 
 test('ProcessDomain replaces real OS processes and refreshes captured transitive modules', async () => {
@@ -113,23 +137,104 @@ test('failed process candidate confirms cleanup and restores captured old bytes 
   } finally { await p.cleanup(); }
 });
 
-test('process shutdown drains already accepted JSON calls before lifecycle cleanup', async () => {
-  const started = Promise.withResolvers();
-  const p = await fixture({ onOutput: chunk => { if (chunk.data.includes('PROCESS_CALL_WAITING')) started.resolve(); } });
+test('process shutdown drains already accepted JSON calls before lifecycle cleanup', async t => {
+  let output = '';
+  const p = await fixture({ onOutput: chunk => { output += `[${chunk.stream}] ${chunk.data}`; } });
+  const operations = [];
+  let failure;
   try {
     await p.domain.load(p.directory);
-    const call = p.domain.call('probe', 'wait');
-    await started.promise;
+    operations.push(observeOperation('accepted call', p.domain.call('probe', 'wait')));
+    await waitForCallMarker(join(p.external, 'waiting'), operations[0]);
     let closed = false;
-    const close = p.domain.dispose().then(() => { closed = true; });
+    operations.push(observeOperation('domain cleanup', p.domain.dispose().then(() => { closed = true; })));
     await assert.rejects(p.domain.call('probe', 'info'), {code:'DOMAIN_NOT_READY'});
     assert.equal(closed, false);
     await writeFile(join(p.external, 'release'), 'go');
-    assert.equal(await call, 'done');
-    await close;
+    const [value] = await completedValues(operations);
+    assert.equal(value, 'done');
     assert.match((await p.lines()).at(-2), /^call:done$/);
     assert.match((await p.lines()).at(-1), /^stop:old:/);
-  } finally { await p.cleanup(); }
+  } catch (error) {
+    failure = error;
+    t.diagnostic(inspect(error, { depth: 8 }));
+    const trace = await readFile(p.trace, 'utf8').catch(error => `Trace unavailable: ${inspect(error)}`);
+    t.diagnostic(`Child output:\n${output}\nTrace:\n${trace}`);
+    throw error;
+  } finally { await finishProcessFixture(t, p, operations, failure); }
+});
+
+test('process release persists when it arrives before the call without a later notification', async t => {
+  const p = await fixture();
+  const operations = [];
+  let failure;
+  try {
+    await p.domain.load(p.directory);
+    await writeFile(join(p.external, 'release'), 'go');
+    // No file writes or output callbacks follow admission. An edge-triggered
+    // watcher would miss this release, whereas the child must observe its state.
+    operations.push(observeOperation('pre-released call', p.domain.call('probe', 'wait')));
+    assert.deepEqual(await completedValues(operations), ['done']);
+    assert.match((await p.lines()).at(-1), /^call:done$/);
+    await p.domain.dispose();
+  } catch (error) { failure = error; throw error; }
+  finally { await finishProcessFixture(t, p, operations, failure); }
+});
+
+test('process release gate observes incomplete contents without releasing the accepted call', async t => {
+  const p = await fixture();
+  const operations = [];
+  let failure;
+  try {
+    await p.domain.load(p.directory);
+    await writeFile(join(p.external, 'release'), 'g');
+    let settled = false;
+    const call = observeOperation('partially released call', p.domain.call('probe', 'wait'));
+    operations.push(call);
+    call.then(() => { settled = true; });
+    await waitForMarker(join(p.external, 'observed-release'), 'g');
+    assert.equal(settled, false);
+    assert.equal((await p.lines()).includes('call:done'), false);
+    await writeFile(join(p.external, 'release'), 'go');
+    assert.deepEqual(await completedValues([call]), ['done']);
+    await p.domain.dispose();
+  } catch (error) { failure = error; throw error; }
+  finally { await finishProcessFixture(t, p, operations, failure); }
+});
+
+test('process readiness polling preserves an early call failure instead of hiding it behind a timeout', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cordis-process-early-error-'));
+  const failure = new Error('injected admission failure', { cause: new Error('original cause') });
+  try {
+    const observed = observeOperation('accepted call', Promise.reject(failure));
+    await assert.rejects(waitForCallMarker(join(directory, 'missing-ready'), observed), error => error === failure);
+  } finally { await rm(directory, {recursive:true, force:true}); }
+});
+
+test('process test operation collection preserves early peer rejections and their causes', async t => {
+  for (const first of ['accepted call', 'domain cleanup']) {
+    await t.test(`${first} rejects before its peer settles`, async () => {
+      const call = Promise.withResolvers(), close = Promise.withResolvers();
+      const underlying = new Error('injected original failure');
+      const failure = Object.assign(new Error('injected peer failure', { cause: underlying }), { code: 'INJECTED_FAILURE' });
+      const observed = [observeOperation('accepted call', call.promise), observeOperation('domain cleanup', close.promise)];
+      const [failed, pending] = first === 'accepted call' ? [call, close] : [close, call];
+      failed.reject(failure);
+      // Cross a whole event-loop turn before awaiting either result: missing
+      // eager rejection handling would be reported by node:test here.
+      await new Promise(resolve => setImmediate(resolve));
+      pending.resolve('done');
+      await assert.rejects(completedValues(observed), error => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors[0], failure);
+        assert.equal(error.cause, failure);
+        assert.equal(error.cause.cause, underlying);
+        assert.match(error.message, new RegExp(first));
+        assert.match(error.message, /injected original failure/);
+        return true;
+      });
+    });
+  }
 });
 
 test('failed candidate cleanup blocks replacement and explicit abandon is not normal cleanup', async () => {

@@ -235,6 +235,17 @@ pub proof fn step_transport<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library
 }
 
 
+/// Expose just one fragment guard before composing the execution induction.
+#[verifier::spinoff_prover]
+proof fn fragment_landing_guard<A,X,U,B,I>(programs:g::Programs<A,X,U,B,I>,source:Seq<g::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize,index:int)
+    requires fragment(programs,source,labels,owner),0<=index<labels.len(),
+    ensures g::landing(source[index],source[index+1],labels[index].1) ==> {
+        let node=programs(labels[index].0)(source[index].current[labels[index].0].unwrap());
+        source_proof::table_node(node) || child::guard(programs,source[index],labels[index].0,owner)
+    },
+{
+}
+
 /// All surviving lifecycle steps are constructed, at their original positions.
 /// This induction uses actual state values; no catalogue replay is assumed.
 #[verifier::spinoff_prover]
@@ -252,6 +263,7 @@ pub proof fn delete_execution<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libra
     },
     decreases labels.len(),
 {
+    hide(og::primitive_theory);
     support::history_from_empty(eq,lib,programs,setup,setup_labels);source_metadata(eq,lib,programs,source,labels,owner);
     reveal(delete);reveal(sh::labels_without);
     let target=delete(lib,programs,source,labels,owner);let kept=sh::labels_without(labels,owner);let offset=source.first().history.len();
@@ -263,6 +275,7 @@ pub proof fn delete_execution<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libra
         assert(pi::context_eq(eq)(x,x));
     } else {
         let states=source.drop_last();let previous=labels.drop_last();let label=labels.last();let a=states.last();let z=source.last();let actor=label.0;let rule=label.1;
+        fragment_landing_guard(programs,source,labels,owner,labels.len() as int-1);
         assert(g::execution(lib,programs,states,previous));assert(fragment(programs,states,previous,owner));
         delete_execution(eq,lib,programs,setup,setup_labels,states,previous,owner);source_metadata(eq,lib,programs,states,previous,owner);
         let before=delete(lib,programs,states,previous,owner);let earlier=sh::labels_without(previous,owner);let input=before.last();

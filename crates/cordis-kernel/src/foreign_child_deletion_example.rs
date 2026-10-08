@@ -106,6 +106,39 @@ pub proof fn actual_landings()
     assert forall|i:int|0<=i<steps.len() implies g::step(lib,programs(),states[i],states[i+1],steps[i].0,steps[i].1) by {if i==0{}else if i==1{}else if i==2{}else if i==3{}else if i==4{}else{assert(i==5);}}
     ol::execution_preservation(eq,lib,programs(),states,steps);assert(states.last().state.accumulators[2usize] =~= seq![1nat,4nat,5nat,6nat]);assert(states.last().state.accumulators[1usize] =~= seq![2nat,3nat]);
 }
+/// Evaluate the concrete restoration and registry guards separately from
+/// composing the execution and its preservation proof.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(45)]
+proof fn cleanup_values()
+    ensures
+        source()[8].state.accumulators[2usize]==seq![1nat,4nat,5nat,6nat],source()[9].state.control.fibers[3usize].retired,!s::registered(source()[10].state,3),
+        source().last().state.tables[0usize][ex::key(0)]==15,source().last().state.tables[1usize][ex::key(1)]==99,source().last().state.tables[2usize].is_empty(),
+        source().last().state.control.fibers[1usize].phase==Phase::Unloading,source().last().state.accumulators[1usize]==seq![2nat,3nat],
+        s::registered(source().last().state,0),s::registered(source().last().state,2),source().last().state.tables[0usize].dom().contains(ex::key(0)),source().last().state.tables[1usize].dom().contains(ex::key(1)),
+        source().last().state.control.fibers[1usize].dependencies==ex::provided(0),source().last().state.control.fibers[1usize].provisions==ex::provided(1),
+
+        g::step(ex::library(),programs(),source()[7],source()[8],2,r::Rule::Leave),
+        g::step(ex::library(),programs(),source()[11],source()[12],1,r::Rule::Leave),
+        g::restore(source()[8].history,source()[8].state.accumulators[2usize],source()[8].state,2).is_some(),
+        g::step(ex::library(),programs(),source()[9],source()[10],3,r::Rule::Remove),
+        deletion::fragment(programs(),source(),labels(),1),
+{
+    actual_landings();reveal(setup);reveal(prefix);reveal(source);
+    let states=source();let steps=labels();let lib=ex::library();
+    reveal_with_fuel(g::restore,5);let tokens=states[8].state.accumulators[2usize];assert(tokens =~= seq![1nat,4nat,5nat,6nat]);
+    let r6=g::undo(states[8].history[6].landed.receipt,states[8].state);assert(r6.is_some());
+    let r5=g::undo(states[8].history[5].landed.receipt,r6.unwrap());assert(r5.is_some());
+    let r4=g::undo(states[8].history[4].landed.receipt,r5.unwrap());assert(r4.is_some());
+    let r1=g::undo(states[8].history[1].landed.receipt,r4.unwrap());assert(r1.is_some());
+    assert(g::restore(states[8].history,tokens,states[8].state,2).is_some());
+    assert forall|n:usize|r::registered(states[9].state.control,n) implies states[9].state.control.fibers[n].parent!=Some(3usize) by {if n==0{}else if n==1{}else if n==2{}else{assert(n==3);}}
+    assert(ch::remove_unreferenced(g::kind(states[9].history),states[9].state,3)) by {assert forall|actor:usize,token:nat|s::registered(states[9].state,actor) && states[9].state.accumulators[actor].contains(token) implies g::kind(states[9].history)(token)!=Some(3usize) by {if actor==0{assert(token==0);}else if actor==1{assert(token==2||token==3);}else if actor==2{}else{assert(actor==3);}}}
+    assert(r::frame(states[9].state.control,states[10].state.control,3));assert(g::step(lib,programs(),states[9],states[10],3,r::Rule::Remove));
+    assert forall|i:int|0<=i<steps.len() && g::landing(states[i],states[i+1],steps[i].1) implies own::table_node(programs()(steps[i].0)(states[i].current[steps[i].0].unwrap())) || child::guard(programs(),states[i],steps[i].0,1) by {if i==1{}else if i==2{}else if i==3{}else if i==4{}else{assert(i==5);}}
+    assert(deletion::fragment(programs(),states,steps,1));assert(states.last().state.accumulators[1usize] =~= seq![2nat,3nat]);
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(45)]
 pub proof fn actual_cleanup()
@@ -117,23 +150,14 @@ pub proof fn actual_cleanup()
         s::registered(source().last().state,0),s::registered(source().last().state,2),source().last().state.tables[0usize].dom().contains(ex::key(0)),source().last().state.tables[1usize].dom().contains(ex::key(1)),
         source().last().state.control.fibers[1usize].dependencies==ex::provided(0),source().last().state.control.fibers[1usize].provisions==ex::provided(1),
 {
-    actual_setup();actual_landings();sh::example_interface();reveal(setup);reveal(prefix);reveal(source);let states=source();let steps=labels();let lib=ex::library();let eq=ex::equality();
+    actual_setup();actual_landings();cleanup_values();sh::example_interface();reveal(source);let states=source();let steps=labels();let lib=ex::library();let eq=ex::equality();
     ch::concrete_child_retirement(states[6].state,2);assert(g::step(lib,programs(),states[6],states[7],2,r::Rule::Retire));ol::configuration_preservation(eq,lib,programs(),states[6],states[7],2,r::Rule::Retire);
     assert(g::step(lib,programs(),states[7],states[8],2,r::Rule::Leave));ol::configuration_preservation(eq,lib,programs(),states[7],states[8],2,r::Rule::Leave);
-    reveal_with_fuel(g::restore,5);let tokens=states[8].state.accumulators[2usize];assert(tokens =~= seq![1nat,4nat,5nat,6nat]);
-    let r6=g::undo(states[8].history[6].landed.receipt,states[8].state);assert(r6.is_some());
-    let r5=g::undo(states[8].history[5].landed.receipt,r6.unwrap());assert(r5.is_some());
-    let r4=g::undo(states[8].history[4].landed.receipt,r5.unwrap());assert(r4.is_some());
-    let r1=g::undo(states[8].history[1].landed.receipt,r4.unwrap());assert(r1.is_some());
-    assert(g::restore(states[8].history,tokens,states[8].state,2).is_some());assert(g::step(lib,programs(),states[8],states[9],2,r::Rule::Unload));ol::configuration_preservation(eq,lib,programs(),states[8],states[9],2,r::Rule::Unload);
-    assert forall|n:usize|r::registered(states[9].state.control,n) implies states[9].state.control.fibers[n].parent!=Some(3usize) by {if n==0{}else if n==1{}else if n==2{}else{assert(n==3);}}
-    assert(ch::remove_unreferenced(g::kind(states[9].history),states[9].state,3)) by {assert forall|actor:usize,token:nat|s::registered(states[9].state,actor) && states[9].state.accumulators[actor].contains(token) implies g::kind(states[9].history)(token)!=Some(3usize) by {if actor==0{assert(token==0);}else if actor==1{assert(token==2||token==3);}else if actor==2{}else{assert(actor==3);}}}
-    assert(r::frame(states[9].state.control,states[10].state.control,3));assert(g::step(lib,programs(),states[9],states[10],3,r::Rule::Remove));
+    assert(g::step(lib,programs(),states[8],states[9],2,r::Rule::Unload));ol::configuration_preservation(eq,lib,programs(),states[8],states[9],2,r::Rule::Unload);
     ch::concrete_child_retirement(states[10].state,1);assert(g::step(lib,programs(),states[10],states[11],1,r::Rule::Retire));assert(g::step(lib,programs(),states[11],states[12],1,r::Rule::Leave));
     assert forall|i:int|0<=i<steps.len() implies g::step(lib,programs(),states[i],states[i+1],steps[i].0,steps[i].1) by {if i<6 {assert(states[i]==prefix()[i]);assert(states[i+1]==prefix()[i+1]);assert(steps[i]==prefix_labels()[i]);}else if i==6{}else if i==7{}else if i==8{}else if i==9{}else if i==10{}else{assert(i==11);}}
     ol::execution_preservation(eq,lib,programs(),states,steps);
-    assert forall|i:int|0<=i<steps.len() && g::landing(states[i],states[i+1],steps[i].1) implies own::table_node(programs()(steps[i].0)(states[i].current[steps[i].0].unwrap())) || child::guard(programs(),states[i],steps[i].0,1) by {if i==1{}else if i==2{}else if i==3{}else if i==4{}else{assert(i==5);}}
-    assert(deletion::fragment(programs(),states,steps,1));assert(states.last().state.accumulators[1usize] =~= seq![2nat,3nat]);
+
 }
 
 /// Concrete returned receipts suffice to evaluate the final two inverses;
@@ -189,17 +213,11 @@ proof fn target_stack_source()
             assert(g::step(ex::library(),programs(),source()[i],source()[i+1],labels()[i].0,labels()[i].1));
         }
     }
-    assert(deletion::fragment(programs(),states,steps,1)) by {
-        assert forall|i:int| 0<=i<steps.len() && g::landing(states[i],states[i+1],steps[i].1) implies {
-            let node=programs()(steps[i].0)(states[i].current[steps[i].0].unwrap());
-            own::table_node(node) || child::guard(programs(),states[i],steps[i].0,1)
-        } by {assert(states[i]==source()[i]);assert(states[i+1]==source()[i+1]);assert(steps[i]==labels()[i]);}
-        assert forall|i:int| #![trigger steps[i]] 0<=i<steps.len() implies {
-            let label=steps[i];
-            &&& ((label.1==r::Rule::Insert || label.1==r::Rule::Remove) ==> crate::dynamic_table_registry::guard(states[i],states[i+1],label.0,label.1,1))
-            &&& (label.1==r::Rule::Unload ==> label.0!=1)
-        } by {assert(states[i]==source()[i]);assert(states[i+1]==source()[i+1]);assert(steps[i]==labels()[i]);}
-    }
+    assert forall|i:int| 0<=i<steps.len() implies {
+        &&& states[i]==source()[i] && states[i+1]==source()[i+1]
+        &&& steps[i]==labels()[i]
+    } by { }
+    assert(deletion::fragment(programs(),states,steps,1));
     assert(labels()[8]==(2usize,r::Rule::Unload));
     assert(g::step(ex::library(),programs(),source()[8],source()[9],2,r::Rule::Unload));
     assert(s::registered(states.last().state,2));

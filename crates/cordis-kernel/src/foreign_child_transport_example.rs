@@ -225,6 +225,47 @@ pub proof fn parent_lifetime()
     assert(g::step(lib,programs(),kept[0],kept[1],2,r::Rule::Begin));
 }
 
+/// Complete the registry and control suffix using the proved parent journal.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(45)]
+proof fn terminal_transport()
+    ensures {
+        let states=source();let kept=target();let eq=ex::equality();let lib=ex::library();
+        let actions=actions_after_parent().push(fu::Action::Identity).push(fu::Action::Identity).push(fu::Action::Identity);
+        &&& g::step(lib,programs(),kept[5],kept[6],3,r::Rule::Remove)
+        &&& g::step(lib,programs(),kept[6],kept[7],1,r::Rule::Retire)
+        &&& g::well_formed(lib,programs(),states.last()) && g::well_formed(lib,programs(),kept.last())
+        &&& transport::related(eq,states.last(),kept.last(),1,1) && own::separated(states.last().state,1)
+        &&& batch_state::synchronized(eq,actions,states.last(),kept.last())
+        &&& own::pinned_tokens(states.last().history,states.last().state.accumulators[1usize],states.last().state,1)
+        &&& sh::receipt_word(states.last().history,states.last().state.accumulators[1usize])==sj::journal(fu::events(actions))
+    },
+{
+    hide(crate::observational_grammar::primitive_theory);
+    actual_source();bridge_shapes();parent_lifetime();sh::example_interface();let lib=ex::library();let eq=ex::equality();let states=source();let kept=target();
+    let a4=actions_after_parent();
+    assert(labels()[9]==(1usize,r::Rule::Retire));assert(g::step(lib,programs(),states[9],states[10],labels()[9].0,labels()[9].1));
+    assert(labels()[10]==(1usize,r::Rule::Leave));assert(g::step(lib,programs(),states[10],states[11],labels()[10].0,labels()[10].1));
+    registry::synchronized_registry(eq,lib,programs(),states[8],states[9],kept[5],a4,1,1,3,r::Rule::Remove);let a5=a4.push(fu::Action::Identity);child::foreign_word(a4,fu::Action::Identity);
+    registry::pinned_journal(eq,lib,programs(),states[8],states[9],3,r::Rule::Remove,1);
+    child::control_transport(eq,lib,programs(),states[9],states[10],kept[6],a5,1,1,1,r::Rule::Retire);let a6=a5.push(fu::Action::Identity);child::foreign_word(a5,fu::Action::Identity);
+    child::control_transport(eq,lib,programs(),states[10],states[11],kept[7],a6,1,1,1,r::Rule::Leave);let a7=a6.push(fu::Action::Identity);child::foreign_word(a6,fu::Action::Identity);
+    assert(sj::journal(fu::events(a7))==sj::journal(fu::events(a4)));
+
+}
+
+/// Assemble the surviving execution without carrying the closure calculation.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(45)]
+proof fn target_execution()
+    ensures g::execution(ex::library(),programs(),target(),sh::labels_without(labels(),1)),
+{
+    parent_lifetime();terminal_transport();bridge_shapes();
+    let lib=ex::library();let kept=target();
+    reveal_with_fuel(sh::labels_without,12);let steps=sh::labels_without(labels(),1);
+    assert forall|i:int|0<=i<steps.len() implies g::step(lib,programs(),kept[i],kept[i+1],steps[i].0,steps[i].1) by {if i==0{}else if i==1{}else if i==2{}else if i==3{}else if i==4{}else if i==5{}else{assert(i==6);}}
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(45)]
 pub proof fn actual_target_and_closure()
@@ -242,18 +283,10 @@ pub proof fn actual_target_and_closure()
         &&& terminal.state.tables[1usize].is_empty() && kept.last().state.tables[1usize].is_empty()
     },
 {
-    actual_source();bridge_shapes();target_values();parent_lifetime();sh::example_interface();let lib=ex::library();let eq=ex::equality();let states=source();let kept=target();
-    let a4=actions_after_parent();
-    assert(labels()[9]==(1usize,r::Rule::Retire));assert(g::step(lib,programs(),states[9],states[10],labels()[9].0,labels()[9].1));
-    assert(labels()[10]==(1usize,r::Rule::Leave));assert(g::step(lib,programs(),states[10],states[11],labels()[10].0,labels()[10].1));
-    registry::synchronized_registry(eq,lib,programs(),states[8],states[9],kept[5],a4,1,1,3,r::Rule::Remove);let a5=a4.push(fu::Action::Identity);child::foreign_word(a4,fu::Action::Identity);
-    registry::pinned_journal(eq,lib,programs(),states[8],states[9],3,r::Rule::Remove,1);
-    child::control_transport(eq,lib,programs(),states[9],states[10],kept[6],a5,1,1,1,r::Rule::Retire);let a6=a5.push(fu::Action::Identity);child::foreign_word(a5,fu::Action::Identity);
-    child::control_transport(eq,lib,programs(),states[10],states[11],kept[7],a6,1,1,1,r::Rule::Leave);let a7=a6.push(fu::Action::Identity);child::foreign_word(a6,fu::Action::Identity);
-    assert(sj::journal(fu::events(a7))==sj::journal(fu::events(a4)));
+    hide(crate::observational_grammar::primitive_theory);
+    actual_source();bridge_shapes();target_values();parent_lifetime();terminal_transport();target_execution();sh::example_interface();
+    let lib=ex::library();let eq=ex::equality();let states=source();let kept=target();
     closure::close_from_strict_word(eq,lib,programs(),states.last(),kept.last(),1);closure::append_execution(lib,programs(),states,labels(),g::unload(states.last(),1),1,r::Rule::Unload);
-    reveal_with_fuel(sh::labels_without,12);let steps=sh::labels_without(labels(),1);
-    assert forall|i:int|0<=i<steps.len() implies g::step(lib,programs(),kept[i],kept[i+1],steps[i].0,steps[i].1) by {if i==0{}else if i==1{}else if i==2{}else if i==3{}else if i==4{}else if i==5{}else{assert(i==6);}}
     let terminal=g::unload(states.last(),1);assert(s::registered(terminal.state,0));assert(terminal.state.tables[0usize].dom()==kept.last().state.tables[0usize].dom());
     assert(ex::equality()(ex::key(0),terminal.state.tables[0usize][ex::key(0)],kept.last().state.tables[0usize][ex::key(0)]));
 }

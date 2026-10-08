@@ -56,6 +56,7 @@ class ShardEvidenceTests(unittest.TestCase):
                          'verified': 40, 'errors': 0, 'is-verifying-entire-crate': True}
         self.negative = {**self.baseline, 'success': False, 'encountered-error': True, 'verified': 39, 'errors': 1}
         self.stack = contextlib.ExitStack()
+        self.stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
         self.addCleanup(self.stack.close)
         self.stack.enter_context(patch.object(SHARDS, 'ROOT', self.repo))
         self.stack.enter_context(patch.object(SHARDS, 'checker', return_value=CHECKS))
@@ -88,10 +89,10 @@ class ShardEvidenceTests(unittest.TestCase):
                 'snapshots': [{'phase': phase, 'members': [{'pid': 42, 'groupId': 42, 'state': 'Z'}]}
                               for phase in ['before-cleanup', 'before-kill', 'after-kill']]}})
 
-    def write_shard(self, index):
+    def write_shard(self, index, count=2):
         directory = self.inputs / str(index)
         directory.mkdir()
-        selected = SHARDS.assigned(self.manifest, index, 2)
+        selected = SHARDS.assigned(self.manifest, index, count)
         self.write_stage(directory, 'baseline', CHECKS.source_fingerprint(self.source), kind='positive')
         rows, filenames = [], SHARDS.stage_files('baseline')
         for name, relative, old, new in selected:
@@ -106,7 +107,7 @@ class ShardEvidenceTests(unittest.TestCase):
             rows.append({'name': name, 'compiles': True, 'verification-results': self.negative})
         SHARDS.save(directory / 'shard.json', {
             'schema': SHARDS.SCHEMA, 'status': 'passed', 'binding': self.bound, 'baselineMode': 'local',
-            'shard': {'index': index, 'count': 2, 'names': [item[0] for item in selected]},
+            'shard': {'index': index, 'count': count, 'names': [item[0] for item in selected]},
             'execution': self.execution, 'baseline': self.baseline, 'verus': self.version,
             'mutations': rows, 'files': {name: SHARDS.digest(directory / name) for name in filenames}})
 
@@ -148,6 +149,18 @@ class ShardEvidenceTests(unittest.TestCase):
         self.assertEqual(summary['execution']['shardCount'], 2)
         self.assertEqual(len(summary['execution']['shards']), 2)
         RECORD.validate_negative_report(summary, ['first', 'second'])
+
+    def test_independent_platform_collections_can_use_different_shard_counts(self):
+        for count in [1, 2]:
+            with self.subTest(count=count):
+                shutil.rmtree(self.inputs)
+                self.inputs.mkdir()
+                self.output = self.root / ('collected-' + str(count))
+                for index in range(count):
+                    self.write_shard(index, count)
+                summary = self.collect()
+                self.assertEqual(summary['execution']['shardCount'], count)
+                self.assertEqual([item['name'] for item in summary['mutations']], ['first', 'second'])
 
     def test_missing_shard_is_not_a_smaller_successful_gate(self):
         (self.inputs / '1/shard.json').unlink()
@@ -472,7 +485,9 @@ class SharedPreflightEvidenceTests(unittest.TestCase):
                         SHARDS.run_preflight(output, threads=2)
                     else:
                         SHARDS.run_shard(0, 2, output, threads=2, preflight=self.preflight)
-                self.assertEqual(SHARDS.read_json(output / (action + '.json'))['status'], 'failed')
+                report = SHARDS.read_json(output / (action + '.json'))
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['failureSummary']['errorType'], 'RunCancelled')
 
     def test_cancellation_during_final_binding_cannot_write_passed_evidence(self):
         for action in ['preflight', 'shard']:
@@ -494,7 +509,33 @@ class SharedPreflightEvidenceTests(unittest.TestCase):
                         SHARDS.run_preflight(output, threads=2)
                     else:
                         SHARDS.run_shard(0, 2, output, threads=2, preflight=self.preflight)
-                self.assertEqual(SHARDS.read_json(output / (action + '.json'))['status'], 'failed')
+                report = SHARDS.read_json(output / (action + '.json'))
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['failureSummary']['errorType'], 'RunCancelled')
+
+    def test_reporting_disk_and_pipe_failures_preserve_original_error_in_both_runners(self):
+        actual_save = SHARDS.save
+        for action in ['preflight', 'shard']:
+            for fault in ['save', 'print']:
+                with self.subTest(action=action, fault=fault):
+                    primary = RuntimeError('original verifier failure')
+                    output = self.root / ('report-fault-' + action + '-' + fault)
+                    def failing_save(path, value):
+                        if fault == 'save' and value.get('status') == 'failed':
+                            raise OSError('disk unavailable')
+                        actual_save(path, value)
+                    def failing_print(message, **_kwargs):
+                        if fault == 'print' and message.startswith(('Negative verification failed:', 'Raw proof evidence')):
+                            raise BrokenPipeError('pipe closed')
+                    with patch.object(SHARDS, 'save', side_effect=failing_save), \
+                         patch.object(SHARDS, 'print', side_effect=failing_print, create=True), \
+                         patch.object(CHECKS, 'run_verus', side_effect=primary), \
+                         self.assertRaises(RuntimeError) as failure:
+                        if action == 'preflight':
+                            SHARDS.run_preflight(output, threads=2)
+                        else:
+                            SHARDS.run_shard(0, 2, output, threads=2)
+                    self.assertIs(failure.exception, primary)
 
     def test_preflight_stage_records_raw_baseline_but_is_not_release_acceptance(self):
         with patch.object(CHECKS, 'run_verus', side_effect=self.fake_positive) as verifier, \
@@ -509,15 +550,150 @@ class SharedPreflightEvidenceTests(unittest.TestCase):
                                   CHECKS.source_fingerprint(self.source), self.execution)
 
 
+class PlatformPlanTests(unittest.TestCase):
+    def test_plan_is_pure_and_covers_each_platform_without_installing_or_running_verus(self):
+        with patch.object(SHARDS, 'checker', return_value=CHECKS), \
+             patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
+             patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
+            plan = SHARDS.release_plan()
+        self.assertEqual(plan['mutationCount'], 114)
+        self.assertEqual(len(plan['negative']['include']), 80)
+        expected = [('ubuntu-24.04', 2400, 18, 55), ('macos-15', 3600, 24, 75),
+                    ('macos-15-intel', 5400, 38, 105)]
+        self.assertEqual([(row['os'], row['timeout'], row['shardCount'], row['preflightMinutes'])
+                          for row in plan['preflight']['include']], expected)
+        manifest = CHECKS.mutation_manifest()
+        for platform in plan['preflight']['include']:
+            rows = [row for row in plan['negative']['include'] if row['os'] == platform['os']]
+            self.assertEqual([row['shard'] for row in rows], list(range(platform['shardCount'])))
+            self.assertTrue(all({key: row[key] for key in platform} == platform for row in rows))
+            covered = [item for row in rows for item in SHARDS.assigned(manifest, row['shard'], row['shardCount'])]
+            self.assertEqual(len(covered), len(manifest))
+            self.assertEqual(set(covered), set(manifest))
+
+    def test_growth_cannot_silently_exceed_job_budget(self):
+        for manifest in [[], [('same',)] * 114, [(f'control-{index}',) for index in range(200)]]:
+            with self.subTest(count=len(manifest)), self.assertRaises(RuntimeError):
+                SHARDS.release_plan(manifest)
+
+    def test_github_outputs_are_json_matrices_from_the_same_plan(self):
+        with tempfile.TemporaryDirectory(prefix='cordis-plan-test-') as temporary:
+            output = Path(temporary) / 'github-output'
+            with contextlib.redirect_stdout(io.StringIO()):
+                plan = SHARDS.write_plan(output)
+            values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+            self.assertEqual(set(values), {'preflight', 'negative'})
+            self.assertEqual(json.loads(values['preflight']), plan['preflight'])
+            self.assertEqual(json.loads(values['negative']), plan['negative'])
+
+
+class FailureSummaryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='cordis-failure-summary-')
+        self.addCleanup(self.temp.cleanup)
+        self.directory = Path(self.temp.name)
+
+    def write_timeout(self, stem='baseline'):
+        # Small synthetic equivalent of the Intel timeout shape; no solver is run.
+        metadata = {'status': 'timed_out', 'returncode': -15, 'durationSeconds': 2401.65,
+                    'timeoutSeconds': 2400, 'startedAtUnix': 100,
+                    'cleanup': {'observationMethod': 'waitid', 'leaderReaped': True,
+                        'snapshots': [{'phase': 'after-kill', 'members': [{'state': 'Z<'}]}]}}
+        SHARDS.save(self.directory / (stem + '.meta.json'), metadata)
+        (self.directory / (stem + '.stdout.json')).write_text('')
+        (self.directory / (stem + '.stderr.txt')).write_text(''.join(f'note: verifying function_{index}\n' for index in range(40)))
+
+    def test_wall_timeout_summary_preserves_empty_json_and_successful_cleanup(self):
+        self.write_timeout()
+        originals = {path.name: path.read_bytes() for path in self.directory.iterdir()}
+        error = CHECKS.subprocess.TimeoutExpired(['verus'], 2400)
+        summary = SHARDS.failure_summary(self.directory, error)
+        self.assertEqual(summary['errorType'], 'TimeoutExpired')
+        stage = summary['stages'][0]
+        self.assertEqual(stage['status'], 'timed_out')
+        self.assertEqual(stage['durationSeconds'], 2401.65)
+        self.assertEqual(stage['returncode'], -15)
+        self.assertTrue(stage['cleanup']['leaderReaped'])
+        self.assertEqual(stage['cleanup']['lastObservedLiveMembers'], 0)
+        self.assertIn('incomplete JSON', stage['verificationOutput'])
+        self.assertEqual(len(stage['lastTrace']), 12)
+        self.assertEqual(stage['lastTrace'][-1], 'note: verifying function_39')
+        self.assertEqual(originals, {path.name: path.read_bytes() for path in self.directory.iterdir()})
+
+    def test_cleanup_failure_and_primary_timeout_are_both_retained(self):
+        self.write_timeout()
+        path = self.directory / 'baseline.meta.json'
+        metadata = SHARDS.read_json(path)
+        metadata.update(cleanupError='PermissionError: cleanup denied', primaryStatus='timed_out')
+        metadata['cleanup'].update(leaderReaped=False, signalError='PermissionError: TERM denied')
+        SHARDS.save(path, metadata)
+        stage = SHARDS.failure_summary(self.directory, PermissionError('cleanup denied'))['stages'][0]
+        self.assertEqual(stage['status'], 'timed_out')
+        self.assertEqual(stage['primaryStatus'], 'timed_out')
+        self.assertEqual(stage['cleanupError'], 'PermissionError: cleanup denied')
+        self.assertFalse(stage['cleanup']['leaderReaped'])
+        self.assertIn('TERM denied', stage['cleanup']['signalError'])
+
+    def test_current_mutant_failure_is_not_hidden_by_reused_baseline(self):
+        self.write_timeout('a-mutant')
+        self.write_timeout('baseline')
+        path = self.directory / 'baseline.meta.json'
+        metadata = SHARDS.read_json(path)
+        metadata.update(status='completed', returncode=0, startedAtUnix=1)
+        SHARDS.save(path, metadata)
+        summary = SHARDS.failure_summary(self.directory, RuntimeError('a-mutant failed'))
+        self.assertEqual([row['stage'] for row in summary['stages']], ['a-mutant'])
+
+    def test_completed_proof_failure_includes_actual_verification_counts(self):
+        self.write_timeout()
+        path = self.directory / 'baseline.meta.json'
+        metadata = SHARDS.read_json(path)
+        metadata.update(status='completed', returncode=1)
+        SHARDS.save(path, metadata)
+        SHARDS.save(self.directory / 'baseline.stdout.json',
+                    {'verification-results': {'success': False, 'verified': 2290, 'errors': 7}})
+        stage = SHARDS.failure_summary(self.directory, RuntimeError('positive baseline failed'))['stages'][0]
+        self.assertEqual(stage['verification'], {'success': False, 'verified': 2290, 'errors': 7})
+
+    def test_diagnostics_are_bounded_safe_log_text_and_cannot_mark_failure_passed(self):
+        self.write_timeout()
+        (self.directory / 'baseline.stderr.txt').write_text('::error::not a workflow command\n' + 'x' * 3000)
+        record = {'status': 'running'}
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            SHARDS.record_failure(self.directory, 'preflight.json', record, RuntimeError('original failure'))
+        self.assertEqual(record['status'], 'failed')
+        self.assertEqual(SHARDS.read_json(self.directory / 'preflight.json')['status'], 'failed')
+        self.assertNotIn('\n::error::', output.getvalue())
+        self.assertLessEqual(max(map(len, record['failureSummary']['stages'][0]['lastTrace'])), 500)
+        self.assertIn('original failure', output.getvalue())
+        self.assertIn('timed_out', output.getvalue())
+
+    def test_missing_malformed_or_unavailable_diagnostics_do_not_replace_the_error(self):
+        (self.directory / 'broken.meta.json').write_text('{broken')
+        summary = SHARDS.failure_summary(self.directory, RuntimeError('keep this failure'))
+        self.assertEqual(summary['message'], 'keep this failure')
+        self.assertEqual(summary['stages'], [])
+        record = {}
+        with patch.object(SHARDS, 'failure_summary', side_effect=OSError('diagnostics unavailable')), \
+             contextlib.redirect_stderr(io.StringIO()):
+            SHARDS.record_failure(self.directory, 'shard.json', record, ValueError('primary error'))
+        self.assertEqual(record['failure'], 'ValueError: primary error')
+        self.assertEqual(record['status'], 'failed')
+        self.assertEqual(record['failureSummary']['message'], 'primary error')
+
+
 class SelectionTests(unittest.TestCase):
     def test_all_114_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
         self.assertEqual(len(manifest), 114)
-        pieces = [SHARDS.assigned(manifest, index, 18) for index in range(18)]
-        flattened = [item for group in pieces for item in group]
-        self.assertEqual(len(flattened), 114)
-        self.assertEqual(set(flattened), set(manifest))
-        self.assertEqual(sorted(map(len, pieces)), [6] * 12 + [7] * 6)
+        for count, maximum in [(18, 7), (24, 5), (38, 3)]:
+            with self.subTest(count=count):
+                pieces = [SHARDS.assigned(manifest, index, count) for index in range(count)]
+                flattened = [item for group in pieces for item in group]
+                self.assertEqual(len(flattened), 114)
+                self.assertEqual(set(flattened), set(manifest))
+                self.assertEqual(max(map(len, pieces)), maximum)
 
     def test_invalid_shards_are_rejected(self):
         for index, count in [(0, 0), (-1, 2), (2, 2), (True, 2), (0, True), (0, 3)]:

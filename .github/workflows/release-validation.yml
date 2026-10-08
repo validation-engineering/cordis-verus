@@ -21,14 +21,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: Plan platform proof budgets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      preflight: ${{ steps.matrix.outputs.preflight }}
+      negative: ${{ steps.matrix.outputs.negative }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Generate matching preflight and negative matrices
+        id: matrix
+        run: python3 scripts/negative-shards.py plan --github-output "$GITHUB_OUTPUT"
+
   preflight:
     name: Negative baseline preflight (${{ matrix.os }})
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-15, macos-15-intel]
+      matrix: ${{ fromJSON(needs.plan.outputs.preflight) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 55
+    timeout-minutes: ${{ matrix.preflightMinutes }}
     env:
       CARGO_TERM_COLOR: never
       RUST_BACKTRACE: "1"
@@ -51,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/install-verus.sh
       - name: Diagnose unchanged full-crate baseline before fan-out
-        run: exec python3 scripts/negative-shards.py preflight --output target/negative-preflight --threads 2 --timeout 2400
+        run: exec python3 scripts/negative-shards.py preflight --output target/negative-preflight --threads ${{ matrix.threads }} --timeout ${{ matrix.timeout }}
       - name: Retain baseline diagnostics, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -63,15 +78,13 @@ jobs:
 
   negative:
     name: Full negatives (${{ matrix.os }}, shard ${{ matrix.shard }})
-    needs: preflight
+    needs: [plan, preflight]
     strategy:
       fail-fast: false
       max-parallel: 12
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-        os: [ubuntu-24.04, macos-15, macos-15-intel]
+      matrix: ${{ fromJSON(needs.plan.outputs.negative) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 360
+    timeout-minutes: ${{ matrix.shardMinutes }}
     env:
       CARGO_TERM_COLOR: never
       RUST_BACKTRACE: "1"
@@ -99,7 +112,7 @@ jobs:
           name: preflight-${{ github.run_attempt }}-${{ matrix.os }}
           path: target/negative-preflight
       - name: Verify this shard as complete crates
-        run: exec python3 scripts/negative-shards.py run --shard-index ${{ matrix.shard }} --shard-count 18 --output target/negative-shard --jobs 1 --threads 2 --timeout 2400 --compile-timeout 300 --preflight target/negative-preflight
+        run: exec python3 scripts/negative-shards.py run --shard-index ${{ matrix.shard }} --shard-count ${{ matrix.shardCount }} --output target/negative-shard --jobs 1 --threads ${{ matrix.threads }} --timeout ${{ matrix.timeout }} --compile-timeout ${{ matrix.compileTimeout }} --preflight target/negative-preflight
       - name: Retain negative evidence, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

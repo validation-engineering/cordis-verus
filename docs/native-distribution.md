@@ -178,8 +178,8 @@ verification report is the only permitted tracked difference). It preserves the
 actual native build profile rather than silently calling a development build optimized.
 
 The [full release workflow](../.github/workflows/release-validation.yml) runs all
-three platforms. Each first completes a baseline preflight and eighteen strictly collected
-[whole-crate negative shards](full-negative-validation.md), then the complete
+three platforms. Each first completes a baseline preflight and its complete partition of
+strictly collected [whole-crate negative shards](full-negative-validation.md), then the complete
 quality/package gate. It installs each staged runtime in a new project and checks a second
 offline `npm ci` followed by the example. When explicitly dispatched with
 `create_draft=true` and a new `release_tag`, it collects all three matching-commit
