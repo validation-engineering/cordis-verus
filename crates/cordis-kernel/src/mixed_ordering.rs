@@ -184,12 +184,24 @@ pub proof fn history_entry_origin<A,X,U,B,I>(lib:mix::Library<A,X,U,B>,programs:
         assert(z.history[token as int]==mix::entry(lib,programs,a,actor));assert(a==states[labels.len()-1]);
     }
 }
-pub proof fn observational_invocation_prior_landing<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mix::Library<A,X,U,B>,programs:mix::Programs<A,X,U,B,I>,
+// Only the retained record metadata is needed to find its prior landing.
+// Keep recursive inverse-call evaluation in the origin proof that establishes it.
+proof fn invocation_record_metadata<U,I>(history:Seq<mix::Entry<U,I>>,tokens:Seq<nat>,input:s::State<U>,actor:usize,
+    provider:usize,key:Port,token:nat,before:s::State<U>,after:s::State<U>)
+    requires changed_invocation(history,tokens,input,actor,provider,key,token,before,after),
+    ensures token<history.len(),mix::owner(history[token as int].landed.receipt)==actor,
+        operation_receipt(history[token as int].landed.receipt,provider,key),
+{
+    hide(invokes);
+}
+
+proof fn retained_invocation_prior_landing<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mix::Library<A,X,U,B>,programs:mix::Programs<A,X,U,B,I>,
     states:Seq<mix::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,t:int,actor:usize,provider:usize,key:Port,
-    token:nat,before:s::State<U>,after:s::State<U>)
+    token:nat)
     requires og::primitive_theory(eq,lib),mix::execution(lib,programs,states,labels),mix::well_formed(lib,programs,states.first()),
         states.first().history.len()==0,0<=t<states.len(),
-        changed_invocation(states[t].history,states[t].state.accumulators[actor],states[t].state,actor,provider,key,token,before,after),
+        token<states[t].history.len(),mix::owner(states[t].history[token as int].landed.receipt)==actor,
+        operation_receipt(states[t].history[token as int].landed.receipt,provider,key),
     ensures exists|i:int| 0<=i<t && labels[i].0==actor && mix::landing(states[i],states[i+1],labels[i].1)
         && states[t].history[token as int]==mix::entry(lib,programs,states[i],actor)
         && operation(lib,programs(actor)(states[i].current[actor].unwrap()),states[i].state,actor,provider,key),
@@ -205,6 +217,21 @@ pub proof fn observational_invocation_prior_landing<A,X,U,B,I>(eq:spec_fn(Port,U
     ol::frame(eq,lib,programs,states[i],states[i+1],labels[i].0,labels[i].1);
     assert(labels[i].0==actor);retained_origin(lib,programs,states[t].history,token,provider,key);
     assert(operation(lib,programs(actor)(states[i].current[actor].unwrap()),states[i].state,actor,provider,key));
+}
+
+pub proof fn observational_invocation_prior_landing<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mix::Library<A,X,U,B>,programs:mix::Programs<A,X,U,B,I>,
+    states:Seq<mix::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,t:int,actor:usize,provider:usize,key:Port,
+    token:nat,before:s::State<U>,after:s::State<U>)
+    requires og::primitive_theory(eq,lib),mix::execution(lib,programs,states,labels),mix::well_formed(lib,programs,states.first()),
+        states.first().history.len()==0,0<=t<states.len(),
+        changed_invocation(states[t].history,states[t].state.accumulators[actor],states[t].state,actor,provider,key,token,before,after),
+    ensures exists|i:int| 0<=i<t && labels[i].0==actor && mix::landing(states[i],states[i+1],labels[i].1)
+        && states[t].history[token as int]==mix::entry(lib,programs,states[i],actor)
+        && operation(lib,programs(actor)(states[i].current[actor].unwrap()),states[i].state,actor,provider,key),
+{
+    hide(changed_invocation);
+    invocation_record_metadata(states[t].history,states[t].state.accumulators[actor],states[t].state,actor,provider,key,token,before,after);
+    retained_invocation_prior_landing(eq,lib,programs,states,labels,t,actor,provider,key,token);
 }
 
 /// Exact-recovery specialization of the observational contract above.

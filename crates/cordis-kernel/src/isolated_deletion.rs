@@ -415,6 +415,7 @@ pub proof fn remove_unreferenced_transport<U,I>(a:g::Configuration<U,I>,target:g
         assert(n!=removed);assert(s::registered(a.state,n));
         let i=choose|i:int| 0<=i<target.state.accumulators[n].len() && target.state.accumulators[n][i]==t;
         let old=a.state.accumulators[n][i];assert(a.state.accumulators[n].contains(old));
+        ch::removal_excludes_retained_token(g::kind(a.history),a.state,actor,n,old);
         assert(old<a.history.len());assert(g::owner(a.history[old as int].landed.receipt)==n);
         assert(t==index(a.history,removed,old));assert(t<target.history.len());
         assert(g::kind(target.history)(t)==g::kind(a.history)(old));

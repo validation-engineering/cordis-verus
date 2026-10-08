@@ -177,6 +177,7 @@ pub proof fn actual_restore_actions<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g:
     },
     decreases tokens.len(),
 {
+    hide(g::undo);
     replay::context_equivalence(eq,lib);
     if tokens.len()==0 {assert(prefix+inverse_actions::<IMap<Port,U>>(tokens,offset) =~= prefix);}
     else {

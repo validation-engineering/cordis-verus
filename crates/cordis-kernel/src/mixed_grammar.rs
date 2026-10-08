@@ -471,7 +471,10 @@ pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,li
                 assert(token<a.history.len());assert(z.history[token as int]==a.history[token as int]);
                 assert(a.state.accumulators[n].contains(token));assert(kind(a.history)(token)==Some(child));
                 assert(s::registered(a.state,child));
-                if rule==r::Rule::Remove {assert(child!=actor);}
+                if rule==r::Rule::Remove {
+                    ch::removal_excludes_retained_token(kind(a.history),a.state,actor,n,token);
+                    assert(child!=actor);
+                }
                 assert(s::registered(z.state,child));
             }
         }

@@ -196,12 +196,21 @@ pub open spec fn coherent_interval<V>(states:Seq<s::State<V>>,labels:Seq<(usize,
     })
 }
 
+// Isolate the Iter/Finish target clause from the rest of a model's effect
+// admissibility. The interval proof only needs this single-step consequence.
+proof fn loading_step_target<V>(model:s::Model<V>,a:s::State<V>,z:s::State<V>,n:usize,rule:r::Rule)
+    requires s::step(model,a,z,n,rule),rule==r::Rule::Iter || rule==r::Rule::Finish,
+    ensures s::target(a,n,a.control.fibers[n].committed),
+{
+}
+
 /// Theorem 71's complete phase/coherence clauses. Eventual closure and the
 /// recovery equation are separate obligations, not consequences of a prefix.
 pub proof fn loading_coherence<V>(states:Seq<s::State<V>>,labels:Seq<(usize,r::Rule)>,n:usize,b:int,u:int)
     requires trace(states,labels),order::episode(states,n,b,u),
     ensures coherent_interval(states,labels,n,b,u),
 {
+    hide(s::step);hide(inv::admissible_step);
     preservation(states,labels);episode_boundaries(states,labels,n,b,u);
     order::loading_end_bounds(states,n,b,u);let end=order::loading_end(states,n,b,u);
     assert forall|t:int| b<=t<=u implies (states[t].control.fibers[n].phase==Phase::Loading)==(t<=end) by {
@@ -210,7 +219,7 @@ pub proof fn loading_coherence<V>(states:Seq<s::State<V>>,labels:Seq<(usize,r::R
     assert forall|t:int| b<=t<=end && t<labels.len() && (labels[t]==(n,r::Rule::Iter) || labels[t]==(n,r::Rule::Finish))
         implies s::target(states[t],n,states[b].control.fibers[n].committed) by {
         committed_interval(states,labels,n,b,t);
-        assert(s::step(at(states,labels,t),states[t],states[t+1],n,labels[t].1));
+        loading_step_target(at(states,labels,t),states[t],states[t+1],n,labels[t].1);
     }
     if end<u {
         order::phase_step(at(states,labels,end),states[end],states[end+1],labels[end].0,labels[end].1,n);

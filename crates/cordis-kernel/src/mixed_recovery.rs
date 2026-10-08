@@ -22,6 +22,13 @@ verus! {
 pub open spec fn receipt_action<U>(receipt:mx::Receipt<U>)->e::Action<U> {
     match receipt {mx::Receipt::Table {receipt}=>gr::receipt_action(receipt),mx::Receipt::Child {..}=>e::Action::Identity}
 }
+/// Isolate the provision receipt projection from the quantified journal proof.
+/// Both exact and observational recovery use this same restriction witness.
+pub(crate) proof fn provision_receipt_action<U>(receipt:mx::Receipt<U>,key:Port)
+    requires match receipt {mx::Receipt::Table {receipt}=>receipt.inverse==(gl::Inverse::Provision {key}),_=>false},
+    ensures receipt_action(receipt)==(e::Action::Restriction {key}),
+{
+}
 pub open spec fn forward_action<A,X,U,B,I>(lib:mx::Library<A,X,U,B>,node:mx::Node<A,X,U,B,I>)->e::Action<U> {
     match node {syntax::Node::Dependent {node}=>gr::forward_action(lib,node),syntax::Node::Child {..}=>e::Action::Identity}
 }
@@ -375,7 +382,7 @@ pub proof fn provided_journals_step<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx
                 let node=programs(actor)(a.current[actor].unwrap());let receipt=mx::entry(lib,programs,a,actor).landed.receipt;
                 if !a.state.tables[n].dom().contains(k) {
                     match node {
-                        syntax::Node::Dependent {node:d::Node::Provision {key,..}}=>{assert(key==k);assert(receipt_action(receipt)==(e::Action::Restriction {key:k}));},
+                        syntax::Node::Dependent {node:d::Node::Provision {key,..}}=>{assert(key==k);provision_receipt_action(receipt,k);},
                         _=>{assert(false);},
                     }
                     assert(own_word(z,n).last()==(e::Action::Restriction {key:k}));

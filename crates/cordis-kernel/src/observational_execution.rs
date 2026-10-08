@@ -11,8 +11,9 @@ use crate::grammar_recovery::{
 #[cfg(verus_keep_ghost)]
 use crate::mixed_recovery::{
     event, events, forward_action, forward_projection, history_typed, node_actions_typed, own_word,
-    provided_journals, receipt_action, receipt_projection, restore_domains, restore_projection,
-    restored_owner_empty, step_word, unchanged_word, word_facts,
+    provided_journals, provision_receipt_action, receipt_action, receipt_projection,
+    restore_domains, restore_projection, restored_owner_empty, step_word, unchanged_word,
+    word_facts,
 };
 #[cfg(verus_keep_ghost)]
 use crate::{
@@ -223,9 +224,11 @@ pub proof fn episode_recovery<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Libr
     obs::entangled_recovery(eq,es,initial);
 }
 
-pub proof fn provided_journals_step<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:mx::Programs<A,X,U,B,I>,a:mx::Configuration<U,I>,z:mx::Configuration<U,I>,actor:usize,rule:r::Rule)
+/// Check one retained provision separately from the quantified journal invariant.
+proof fn provided_journal_entry<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:mx::Programs<A,X,U,B,I>,a:mx::Configuration<U,I>,z:mx::Configuration<U,I>,actor:usize,rule:r::Rule,n:usize,k:Port)
     requires weak::primitive_theory(eq,lib),mx::well_formed(lib,programs,a),provided_journals(a),mx::step(lib,programs,a,z,actor,rule),
-    ensures provided_journals(z),
+        s::registered(z.state,n),z.state.tables[n].dom().contains(k),
+    ensures e::erases(own_word(z,n),k),
 {
     ol::frame(eq,lib,programs,a,z,actor,rule);ol::state_preservation(eq,lib,programs,a,z,actor,rule);
     assert(a.history.len()<=z.history.len());assert forall|i:int| 0<=i<a.history.len() implies #[trigger] a.history[i]==z.history[i] by {}
@@ -234,33 +237,40 @@ pub proof fn provided_journals_step<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx
         episode_step(eq,lib,programs,a,z,actor,rule,actor);
     }
     if rule==r::Rule::Unload {restored_owner_empty(a,actor);restore_domains(a.history,a.state.accumulators[actor],a.state,actor);}
-    assert forall|n:usize,k:Port| s::registered(z.state,n) && z.state.tables[n].dom().contains(k) implies #[trigger] e::erases(own_word(z,n),k) by {
-        if !s::registered(a.state,n) {
-            if mx::landing(a,z,rule) {let out=mx::entry(lib,programs,a,actor).landed;assert(out.spawn.unwrap().0==n);assert(z.state.tables[n].is_empty());}
-            assert(false);
-        }
-        else {
-            assert(s::registered(a.state,n));
-            if n==actor && mx::landing(a,z,rule) {
-                let node=programs(actor)(a.current[actor].unwrap());let receipt=mx::entry(lib,programs,a,actor).landed.receipt;
-                if !a.state.tables[n].dom().contains(k) {
-                    match node {
-                        syntax::Node::Dependent {node:d::Node::Provision {key,..}}=>{assert(key==k);assert(receipt_action(receipt)==(e::Action::Restriction {key:k}));},
-                        _=>{assert(false);},
-                    }
-                    assert(own_word(z,n).last()==(e::Action::Restriction {key:k}));
-                } else {
-                    assert(e::erases(own_word(a,n),k));let i=choose|i:int| 0<=i<own_word(a,n).len() && own_word(a,n)[i]==(e::Action::Restriction {key:k});
-                    assert(own_word(z,n)[i]==(e::Action::Restriction {key:k}));
+    if !s::registered(a.state,n) {
+        if mx::landing(a,z,rule) {let out=mx::entry(lib,programs,a,actor).landed;assert(out.spawn.unwrap().0==n);assert(z.state.tables[n].is_empty());}
+        assert(false);
+    }
+    else {
+        assert(s::registered(a.state,n));
+        if n==actor && mx::landing(a,z,rule) {
+            let node=programs(actor)(a.current[actor].unwrap());let receipt=mx::entry(lib,programs,a,actor).landed.receipt;
+            if !a.state.tables[n].dom().contains(k) {
+                match node {
+                    syntax::Node::Dependent {node:d::Node::Provision {key,..}}=>{assert(key==k);provision_receipt_action(receipt,k);},
+                    _=>{assert(false);},
                 }
-            } else if n==actor && rule==r::Rule::Unload {assert(false);}
-            else if n==actor && rule==r::Rule::Begin {
-                assert(a.state.tables[n].dom().contains(k));assert(e::erases(own_word(a,n),k));assert(a.state.accumulators[n].len()==0);assert(own_word(a,n).len()==0);assert(false);
+                assert(own_word(z,n).last()==(e::Action::Restriction {key:k}));
             } else {
-                assert(a.state.tables[n].dom().contains(k));assert(a.state.accumulators[n]==z.state.accumulators[n]);
-                unchanged_word(a,z,n);
+                assert(e::erases(own_word(a,n),k));let i=choose|i:int| 0<=i<own_word(a,n).len() && own_word(a,n)[i]==(e::Action::Restriction {key:k});
+                assert(own_word(z,n)[i]==(e::Action::Restriction {key:k}));
             }
+        } else if n==actor && rule==r::Rule::Unload {assert(false);}
+        else if n==actor && rule==r::Rule::Begin {
+            assert(a.state.tables[n].dom().contains(k));assert(e::erases(own_word(a,n),k));assert(a.state.accumulators[n].len()==0);assert(own_word(a,n).len()==0);assert(false);
+        } else {
+            assert(a.state.tables[n].dom().contains(k));assert(a.state.accumulators[n]==z.state.accumulators[n]);
+            unchanged_word(a,z,n);
         }
+    }
+}
+
+pub proof fn provided_journals_step<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:mx::Programs<A,X,U,B,I>,a:mx::Configuration<U,I>,z:mx::Configuration<U,I>,actor:usize,rule:r::Rule)
+    requires weak::primitive_theory(eq,lib),mx::well_formed(lib,programs,a),provided_journals(a),mx::step(lib,programs,a,z,actor,rule),
+    ensures provided_journals(z),
+{
+    assert forall|n:usize,k:Port| s::registered(z.state,n) && z.state.tables[n].dom().contains(k) implies #[trigger] e::erases(own_word(z,n),k) by {
+        provided_journal_entry(eq,lib,programs,a,z,actor,rule,n,k);
     }
 }
 

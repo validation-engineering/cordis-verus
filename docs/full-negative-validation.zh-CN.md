@@ -101,6 +101,16 @@ stderr 和调用元数据，包括共享基线。证据绑定完整源码输入�
 具体前缀证明复用 fragment 合同，不重复证明更强的条件。公开合同和资源上限不变，
 资源失败仍会使负控证据被拒绝。
 
+token 排除、provision 逆操作对应的 restriction、单步加载 target 分别由已证明的
+`removal_excludes_retained_token`、`provision_receipt_action`、`loading_step_target`
+小引理给出。搬运、恢复和区间证明使用这些合同，避免重复执行大范围量词搜索。
+observational journal 不变量组合已验证的单项 `provided_journal_entry`，避免在量词中
+重复展开生命周期推理。owner 删除的恢复证明在已有投影合同足够时隐藏 child undo。
+`invocation_record_metadata` 与 `retained_invocation_prior_landing` 分别检查 receipt
+元数据与定位原始 landing 的历史推理。
+这些辅助引理仍由同一次整 crate 验证检查，没有新增假设；守卫或投影变异仍须产生明确
+合同失败，任何资源失败仍会使整项负控结果不可接受。
+
 另见[验证门槛](validation.md)、[发布流程](releasing.md)，以及
 [执行器](../scripts/check-negative.py)／[汇总器](../scripts/negative-shards.py)在
 `scripts/tests/` 中的回归。

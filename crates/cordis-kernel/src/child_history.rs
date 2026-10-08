@@ -642,6 +642,14 @@ pub open spec fn remove_unreferenced<V>(kind:spec_fn(nat)->Option<usize>,a:s::St
         ==> kind(token) != Some(child)
 }
 
+/// Instantiate the removal guard for one actual accumulator entry. Keeping
+/// this local obligation separate avoids unfolding the lifecycle context when
+/// transporting guards or preserving child-reference domains.
+pub proof fn removal_excludes_retained_token<V>(kind:spec_fn(nat)->Option<usize>,a:s::State<V>,child:usize,owner:usize,token:nat)
+    requires remove_unreferenced(kind,a,child),s::registered(a,owner),a.accumulators[owner].contains(token),
+    ensures kind(token) != Some(child),
+{ }
+
 /// Table inverses carry their ordinary local typing obligation. Child inverses
 /// have a concrete interpreter, so their retirement behavior is proved below.
 pub open spec fn primitive_inverses<V>(model:s::Model<V>,kind:spec_fn(nat)->Option<usize>) -> bool {

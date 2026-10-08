@@ -133,6 +133,20 @@ entire induction context. The concrete prefix proof reuses its fragment contract
 without re-proving a stronger condition. These changes preserve the public
 contracts and resource limits; a resource failure still rejects negative evidence.
 
+Token exclusion, provision-inverse restriction and the single-step loading target
+are exposed through the proved `removal_excludes_retained_token`,
+`provision_receipt_action` and `loading_step_target` lemmas. Transport, recovery and
+interval proofs use those contracts without repeating broad quantified searches.
+The observational journal invariant composes a checked single-entry proof,
+`provided_journal_entry`, rather than repeating the lifecycle reasoning inside its
+quantifier. Owner-deletion recovery hides child undo when existing projection
+contracts supply the required facts. `invocation_record_metadata` and
+`retained_invocation_prior_landing` separate receipt metadata from the history
+argument used to locate its original landing. The helpers are checked as part of
+the same whole crate; they add no assumptions.
+A mutated guard or projection must still produce a concrete contract failure, and
+any resource failure still invalidates the complete negative result.
+
 See [validation gates](validation.md), the [release procedure](releasing.md), and
 the [runner](../scripts/check-negative.py) / [collector](../scripts/negative-shards.py)
 regressions in `scripts/tests/`.
