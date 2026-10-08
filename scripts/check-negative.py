@@ -2,16 +2,21 @@
 """Require proof failures for precise, compilable mutations of executable code."""
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+from contextlib import contextmanager
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.dont_write_bytecode = True
@@ -30,7 +35,140 @@ def toolchain():
     return binary, environment
 
 
-def run_verus(binary, environment, source, report_path, compile_only=False, *, threads=9, timeout=600):
+def available_cpus():
+    """Respect process affinity and Linux container quotas, when available."""
+    counts = [os.cpu_count() or 1]
+    if hasattr(os, "process_cpu_count"):
+        counts.append(os.process_cpu_count() or 1)
+    if hasattr(os, "sched_getaffinity"):
+        counts.append(len(os.sched_getaffinity(0)))
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max":
+            counts.append(max(1, int(quota) // int(period)))
+    except (OSError, ValueError, ZeroDivisionError):
+        pass
+    return max(1, min(counts))
+
+
+def execution_budget(jobs=1, threads=None, cpu_budget=None):
+    """Resolve one explicit CPU budget shared by baseline and mutation workers."""
+    available = available_cpus()
+    budget = min(2 if cpu_budget is None else cpu_budget, available)
+    if jobs < 1 or budget < 1 or (threads is not None and threads < 1):
+        raise ValueError("jobs, threads and CPU budget must be positive")
+    if threads is not None and threads > budget:
+        raise ValueError(f"threads per worker ({threads}) exceed the CPU budget ({budget})")
+    workers = min(jobs, budget // threads if threads is not None else budget)
+    per_worker = threads or max(1, budget // workers)
+    return {"availableCpus": available, "cpuBudget": budget, "requestedJobs": jobs,
+            "jobs": workers, "threadsPerWorker": per_worker, "baselineThreads": per_worker}
+
+
+class RunCancelled(RuntimeError):
+    """An interrupted process is never acceptable proof evidence."""
+
+
+class ProcessSupervisor:
+    """Own process groups until their leaders have been reaped, including on cancellation.
+
+    Output goes to files instead of pipes: a solver inheriting an open pipe cannot
+    make the runner hang after its Verus parent has exited. POSIX groups cover the
+    Verus/rustc/Z3 descendants used by all supported release platforms.
+    """
+    def __init__(self, *, terminate_grace=1.0, poll_interval=0.05):
+        self.cancelled = threading.Event()
+        self.lock = threading.RLock()
+        self.processes = set()
+        self.failure = None
+        self.signal_number = None
+        self.terminate_grace = terminate_grace
+        self.poll_interval = poll_interval
+
+    def check(self):
+        if self.cancelled.is_set():
+            raise RunCancelled("Negative verification cancelled; no proof evidence recorded")
+
+    @staticmethod
+    def _signal_group(process, number):
+        try:
+            os.killpg(process.pid, number)
+        except ProcessLookupError:
+            pass
+
+    def start(self, command, **kwargs):
+        if os.name != "posix":
+            raise RuntimeError("Negative verification requires POSIX process-group supervision")
+        with self.lock:
+            self.check()
+            process = subprocess.Popen(command, start_new_session=True, **kwargs)
+            self.processes.add(process)
+            # A signal handler can request cancellation while Popen is starting.
+            if self.cancelled.is_set():
+                self._signal_group(process, signal.SIGTERM)
+            return process
+
+    def cancel(self, failure=None):
+        with self.lock:
+            if self.failure is None and failure is not None:
+                self.failure = failure
+            self.cancelled.set()
+            for process in self.processes:
+                self._signal_group(process, signal.SIGTERM)
+
+    def finish(self, process, *, terminate=False):
+        """Terminate all surviving group members and reap the direct child."""
+        if terminate:
+            self._signal_group(process, signal.SIGTERM)
+            # Give a cooperative parent time to reap its solver children. Even if
+            # the leader exits first, wait out this grace before killing survivors.
+            deadline = time.monotonic() + self.terminate_grace
+            while time.monotonic() < deadline:
+                process.poll()
+                # Do not probe group existence with signal 0: on macOS this can
+                # race with group teardown and return EPERM after the leader is
+                # reaped. Keep the bounded grace, then send the real final kill.
+                time.sleep(min(self.poll_interval, max(0, deadline - time.monotonic())))
+        # Also clean descendants accidentally left behind by a successful leader.
+        self._signal_group(process, signal.SIGKILL)
+        process.wait()
+        with self.lock:
+            self.processes.discard(process)
+
+    @contextmanager
+    def signal_handlers(self):
+        if threading.current_thread() is not threading.main_thread():
+            yield self
+            return
+        previous = {}
+
+        def interrupted(number, _frame):
+            self.signal_number = number
+            self.cancel(RunCancelled(f"Negative verification interrupted by signal {number}"))
+
+        try:
+            for number in (signal.SIGINT, signal.SIGTERM):
+                previous[number] = signal.signal(number, interrupted)
+            yield self
+        finally:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+
+
+def source_fingerprint(directory):
+    digest = hashlib.sha256()
+    for path in sorted(directory.rglob("*.rs")):
+        digest.update(path.relative_to(directory).as_posix().encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def run_verus(binary, environment, source, report_path, compile_only=False, *, threads=None,
+              timeout=600, supervisor=None):
+    threads = threads or execution_budget()["threadsPerWorker"]
+    supervisor = supervisor or ProcessSupervisor()
     command = [
         str(binary), str(source), "--crate-name", "cordis_negative", "--crate-type=lib",
         "--edition=2021", "--no-cheating", "--output-json", "--triggers-mode", "silent",
@@ -38,19 +176,56 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
     ]
     if compile_only:
         command += ["--no-verify", "--compile", "-o", str(source.parent / "compile-check.rlib")]
+    started = time.monotonic()
+    metadata = {"schema": "cordis.negative-stage/v1", "command": command, "threads": threads,
+                "timeoutSeconds": timeout, "compileOnly": compile_only, "startedAtUnix": time.time(),
+                "status": "starting", "returncode": None, "sourceSha256": source_fingerprint(source.parent)}
+    process = None
+    stdout_path = report_path.with_suffix(".stdout.json")
+    stderr_path = report_path.with_suffix(".stderr.txt")
     try:
-        result = subprocess.run(command, env=environment, text=True, capture_output=True, timeout=timeout)
-    except subprocess.TimeoutExpired as error:
-        # subprocess may expose bytes even when text=True. Keep partial output
-        # for diagnosis, but never turn a timed-out process into proof evidence.
-        for suffix, output in ((".stdout.json", error.stdout), (".stderr.txt", error.stderr)):
-            if isinstance(output, bytes):
-                output = output.decode("utf-8", errors="replace")
-            report_path.with_suffix(suffix).write_text(output or "")
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            process = supervisor.start(command, env=environment, stdin=subprocess.DEVNULL,
+                                       stdout=stdout, stderr=stderr)
+            metadata["pid"] = process.pid
+            while True:
+                supervisor.check()
+                remaining = timeout - (time.monotonic() - started)
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                try:
+                    process.wait(timeout=min(supervisor.poll_interval, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            supervisor.check()
+            metadata["status"] = "completed"
+    except subprocess.TimeoutExpired:
+        metadata["status"] = "timed_out"
         raise
-    report_path.with_suffix(".stdout.json").write_text(result.stdout)
-    report_path.with_suffix(".stderr.txt").write_text(result.stderr)
-    return result
+    except RunCancelled as error:
+        metadata["status"] = "cancelled"
+        metadata["cancellationReason"] = str(supervisor.failure or error)
+        metadata["signal"] = supervisor.signal_number
+        raise
+    except BaseException:
+        metadata["status"] = "error"
+        raise
+    finally:
+        try:
+            if process is not None:
+                supervisor.finish(process, terminate=metadata["status"] != "completed")
+        except BaseException as error:
+            metadata["status"] = "error"
+            metadata["cleanupError"] = f"{type(error).__name__}: {error}"
+            raise
+        finally:
+            if process is not None:
+                metadata["returncode"] = process.returncode
+            metadata["durationSeconds"] = time.monotonic() - started
+            report_path.with_suffix(".meta.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    return subprocess.CompletedProcess(command, process.returncode,
+                                       stdout_path.read_text(errors="replace"), stderr_path.read_text(errors="replace"))
 
 
 def rejected_result(name, result):
@@ -87,8 +262,11 @@ def rejected_result(name, result):
     return {"name": name, "compiles": True, "verification-results": stats}
 
 
-def check_mutation(mutation, baseline, temporary, reports, binary, environment, *, threads=9, timeout=600, runner=run_verus):
+def check_mutation(mutation, baseline, temporary, reports, binary, environment, *, threads=None,
+                   timeout=600, runner=run_verus, supervisor=None):
     name, relative, original, replacement = mutation
+    supervisor = supervisor or ProcessSupervisor()
+    supervisor.check()
     mutated = temporary / name
     shutil.copytree(baseline, mutated)
     source = mutated / relative
@@ -96,36 +274,65 @@ def check_mutation(mutation, baseline, temporary, reports, binary, environment, 
     if text.count(original) != 1:
         raise RuntimeError(f"Mutation {name} no longer has exactly one source match; update the negative check")
     source.write_text(text.replace(original, replacement))
+    options = {"threads": threads or execution_budget()["threadsPerWorker"], "timeout": timeout}
+    # Existing injectable runners only need the established threads/timeout API.
+    if runner is run_verus:
+        options["supervisor"] = supervisor
     try:
+        supervisor.check()
         compiled = runner(binary, environment, mutated / "lib.rs", reports / f"{name}-compile", True,
-                          threads=threads, timeout=timeout)
+                          **options)
+        supervisor.check()
         if compiled.returncode != 0:
             raise RuntimeError(f"Mutation {name} did not compile; this is not an accepted proof failure")
-        failed = runner(binary, environment, mutated / "lib.rs", reports / name,
-                        threads=threads, timeout=timeout)
+        failed = runner(binary, environment, mutated / "lib.rs", reports / name, **options)
+        supervisor.check()
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"Mutation {name} timed out; this is not an accepted proof failure") from None
     return rejected_result(name, failed)
 
 
-def check_mutations(mutations, baseline, temporary, reports, binary, environment, *, jobs=1, threads=9, timeout=600, runner=run_verus):
-    """Use isolated source trees and preserve manifest order in the report."""
+def check_mutations(mutations, baseline, temporary, reports, binary, environment, *, jobs=1,
+                    threads=None, timeout=600, runner=run_verus, supervisor=None):
+    """Bound dispatch to active workers, fail fast, and preserve manifest order."""
+    supervisor = supervisor or ProcessSupervisor()
+    if threads is None:
+        budget = execution_budget(jobs)
+        jobs, threads = budget["jobs"], budget["threadsPerWorker"]
     results = [None] * len(mutations)
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        pending = {pool.submit(check_mutation, mutation, baseline, temporary, reports, binary,
-                               environment, threads=threads, timeout=timeout, runner=runner): index
-                   for index, mutation in enumerate(mutations)}
+
+    def checked(mutation):
         try:
-            for future in as_completed(pending):
-                index = pending[future]
-                result = future.result()
-                results[index] = result
-                stats = result["verification-results"]
-                print(f"OK {result['name']}: compiles; proof rejected ({stats['verified']} verified, {stats['errors']} errors)", flush=True)
-        except BaseException:
+            return check_mutation(mutation, baseline, temporary, reports, binary, environment,
+                                  threads=threads, timeout=timeout, runner=runner, supervisor=supervisor)
+        except BaseException as error:
+            supervisor.cancel(error)
+            raise
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        pending = {}
+        next_index = 0
+        try:
+            while pending or next_index < len(mutations):
+                supervisor.check()
+                while len(pending) < jobs and next_index < len(mutations):
+                    supervisor.check()
+                    pending[pool.submit(checked, mutations[next_index])] = next_index
+                    next_index += 1
+                completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+                # Inspect the whole completed batch before dispatching any more.
+                for future in completed:
+                    index = pending.pop(future)
+                    result = future.result()
+                    results[index] = result
+                    stats = result["verification-results"]
+                    print(f"OK {result['name']}: compiles; proof rejected ({stats['verified']} verified, {stats['errors']} errors)", flush=True)
+        except BaseException as error:
+            supervisor.cancel(error)
             for future in pending:
                 future.cancel()
-            raise
+            raise supervisor.failure or error
+    supervisor.check()
     return results
 
 
@@ -773,23 +980,35 @@ def main():
     parser.add_argument("--jobs", type=positive, default=os.environ.get("CORDIS_NEGATIVE_JOBS", "1"),
                         help="independent mutation workers (default: CORDIS_NEGATIVE_JOBS or 1)")
     parser.add_argument("--threads", type=positive,
-                        help="Verus threads per worker (default: share a nine-thread budget)")
+                        default=os.environ.get("CORDIS_NEGATIVE_THREADS"),
+                        help="Verus threads per worker (default: share available CPU budget)")
+    parser.add_argument("--cpu-budget", type=positive, default=os.environ.get("CORDIS_NEGATIVE_CPU_BUDGET"),
+                        help="total CPU budget, capped to available CPUs (default: min(available CPUs, 2))")
     parser.add_argument("--timeout", type=positive, default=os.environ.get("CORDIS_NEGATIVE_TIMEOUT", "600"),
                         help="wall-clock seconds per subprocess (default: CORDIS_NEGATIVE_TIMEOUT or 600); timeout never counts as rejection")
     args = parser.parse_args()
-    threads = args.threads or max(1, 9 // args.jobs)
+    try:
+        budget = execution_budget(args.jobs, args.threads, args.cpu_budget)
+    except ValueError as error:
+        parser.error(str(error))
+    threads = budget["threadsPerWorker"]
+    jobs = budget["jobs"]
+    supervisor = ProcessSupervisor()
     timeout = args.timeout
     binary, environment = toolchain()
     reports = ROOT / "target/proof-negative"
     reports.mkdir(parents=True, exist_ok=True)
     (reports / "report.json").unlink(missing_ok=True)
     mutations = mutation_manifest()
-    with tempfile.TemporaryDirectory(prefix="cordis-negative-") as temporary:
+    with supervisor.signal_handlers(), tempfile.TemporaryDirectory(prefix="cordis-negative-") as temporary:
         temporary = Path(temporary)
         baseline = temporary / "baseline"
         shutil.copytree(ROOT / "crates/cordis-kernel/src", baseline)
         try:
-            result = run_verus(binary, environment, baseline / "lib.rs", reports / "baseline", timeout=timeout)
+            result = run_verus(binary, environment, baseline / "lib.rs", reports / "baseline", threads=budget["baselineThreads"],
+                               timeout=timeout, supervisor=supervisor)
+        except RunCancelled as error:
+            sys.exit(str(error))
         except subprocess.TimeoutExpired:
             sys.exit(f"Unmodified kernel timed out; no proof evidence recorded; see {reports}")
         if result.returncode != 0:
@@ -802,14 +1021,16 @@ def main():
             sys.exit("Unmodified kernel did not produce a successful, nonempty verification report")
         print(f"OK unmodified kernel: {baseline_stats['verified']} verified, 0 errors", flush=True)
         summary = {"verus": baseline_json["verus"], "baseline": baseline_stats,
-                   "execution": {"jobs": args.jobs, "threadsPerWorker": threads, "timeoutSeconds": timeout},
+                   "execution": {**budget, "timeoutSeconds": timeout},
                    "mutations": []}
-        print(f"Checking {len(mutations)} mutations with {args.jobs} worker(s), {threads} Verus threads per worker", flush=True)
+        print(f"Checking {len(mutations)} mutations with {jobs} worker(s), {threads} Verus threads per worker", flush=True)
         try:
             summary["mutations"] = check_mutations(mutations, baseline, temporary, reports, binary,
-                                                  environment, jobs=args.jobs, threads=threads, timeout=timeout)
+                                                  environment, jobs=jobs, threads=threads, timeout=timeout,
+                                                  supervisor=supervisor)
         except RuntimeError as error:
             sys.exit(f"{error}; see {reports}")
+        supervisor.check()
         (reports / "report.json").write_text(json.dumps(summary, indent=2) + "\n")
     return 0
 

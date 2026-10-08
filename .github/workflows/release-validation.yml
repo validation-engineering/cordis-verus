@@ -21,8 +21,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  negative:
+    name: Full negatives (${{ matrix.os }}, shard ${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        os: [ubuntu-24.04, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    env:
+      CARGO_TERM_COLOR: never
+      RUST_BACKTRACE: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Check requested draft tag before running the full gate
+        if: ${{ inputs.create_draft }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          python3 - <<'PYCODE'
+          import os, re
+          if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', os.environ['RELEASE_TAG']):
+              raise SystemExit('A new, simple release tag is required for create_draft=true')
+          PYCODE
+      - name: Install checksum-locked Verus and Rust
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/install-verus.sh
+      - name: Verify this shard as complete crates
+        run: python3 scripts/negative-shards.py run --shard-index ${{ matrix.shard }} --shard-count 12 --output target/negative-shard --jobs 1 --threads 2 --timeout 1200
+      - name: Retain negative evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: negative-${{ github.run_attempt }}-${{ matrix.os }}-shard-${{ matrix.shard }}
+          path: target/negative-shard/
+          if-no-files-found: warn
+          retention-days: 14
+
   quality:
     name: Full quality (${{ matrix.os }})
+    needs: negative
     strategy:
       fail-fast: false
       matrix:
@@ -32,8 +75,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: never
       RUST_BACKTRACE: "1"
-      CORDIS_NEGATIVE_TIMEOUT: "1200"
-      CORDIS_NEGATIVE_JOBS: "2"
+      CORDIS_VERUS_THREADS: "2"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -58,8 +100,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/install-verus.sh
+      - name: Download this platform's complete negative shards from this attempt
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: negative-${{ github.run_attempt }}-${{ matrix.os }}-shard-*
+          path: target/full-negative-shards
       - name: Complete full-crate negative and release-quality gate
-        run: python3 scripts/record-verification.py
+        run: python3 scripts/record-verification.py --negative-shards target/full-negative-shards
       - name: Assemble this host's audited native bundle
         run: node scripts/package-native.mjs --output target/release-artifacts/native packages/compat-cordis/native
       - name: Stage runtime release assets from the full gate
@@ -75,12 +122,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: full-validation-${{ matrix.os }}
+          name: full-validation-${{ github.run_attempt }}-${{ matrix.os }}
           path: |
             docs/verification-report.json
             target/validation/quality.log
             target/proof-negative/*.json
             target/proof-negative/*.txt
+            target/full-negative-shards/
             target/release-artifacts/*.crate
             target/release-artifacts/package-report.json
             target/node-compat/build.json
@@ -104,7 +152,7 @@ jobs:
       - name: Download this run's successful full-quality artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: full-validation-*
+          pattern: full-validation-${{ github.run_attempt }}-*
           path: ${{ runner.temp }}/downloaded
       - name: Validate and collect the exact three platform asset sets
         run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA"

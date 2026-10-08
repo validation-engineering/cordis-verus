@@ -13,8 +13,10 @@ mutation checks and paper coverage answer different questions.
 
 Default push/PR CI runs **development** checks on Linux x86_64 and macOS
 ARM64/Intel. The separate **Full release validation** workflow is manually
-dispatched and runs `quality.sh` on the same matrix. Green development CI does
-not mean full release acceptance. No workflow publishes packages.
+dispatched and runs all complete-crate negative controls in twelve shards per
+platform, then collects them within `quality.sh` on the same platform matrix. Green development CI does
+not mean full release acceptance. The release workflow can create a draft runtime
+prerelease after the complete gate; it does not publish that draft automatically.
 Both retain logs and artifacts; full validation also retains negative reports.
 
 The development/release Node suites and `npm run test:node` use four concurrent
@@ -53,7 +55,9 @@ Full negative runs can take hours. Each mutation must compile, then produce a
 concrete contract rejection during whole-crate verification. Timeouts, solver
 resource limits, frontend errors and crashes fail the gate. The full release
 gate has not passed for this checkpoint; [status](status.md) records this
-without weakening the acceptance criteria.
+without weakening the acceptance criteria. See [complete negative execution and
+collection](full-negative-validation.md) ([简体中文](full-negative-validation.zh-CN.md))
+for process cleanup, CPU budgets and the unchanged whole-crate acceptance rule.
 
 ## Experimental scoped-negative calibration
 

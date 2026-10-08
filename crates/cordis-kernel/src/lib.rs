@@ -1041,6 +1041,8 @@ impl Kernel {
     /// Every committed reference to this owner/port must have finished cleanup
     /// first. Other ports, all commitments and the owner's episode are unchanged.
     /// Publication revocation and value leases remain the host registry's duty.
+    // Keep this quantified filtering proof independent of other root-module queries.
+    #[verifier::spinoff_prover]
     pub fn release_provision(&mut self, owner: usize, port: Port) -> (r: Result<(), Error>)
         requires old(self).wf(),
         ensures final(self).wf(), final(self).generations_preserved(old(self)),

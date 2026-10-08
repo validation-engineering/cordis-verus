@@ -98,11 +98,15 @@ distributions. No CLA or transfer of copyright is required.
 Independent negative controls can run concurrently with
 `CORDIS_NEGATIVE_JOBS=2 python3 scripts/record-verification.py --offline`.
 The default remains one worker. Each worker gets an isolated kernel source tree;
-the default total Verus thread budget is nine, divided across workers. The
+the default total Verus thread budget is at most two available CPUs, divided
+across workers. The unchanged baseline uses the same per-worker thread count. The
 subprocess wall-clock timeout defaults to 600 seconds. Set
 `CORDIS_NEGATIVE_TIMEOUT` (or use `check-negative.py --timeout`) when a slower
 machine needs more time. This wall-clock allowance does not change SMT resource
-limits. Partial timeout output is retained for diagnosis.
+limits. Timeout and cancellation reclaim the complete verifier/solver process
+group; partial output and stage timings are retained for diagnosis.
+See [full negative validation](docs/full-negative-validation.md) for explicit
+CPU budgets, CI shards and complete evidence collection.
 These settings are recorded in the evidence. They do not change proof contracts,
 solver resource limits, or the acceptance rule: every mutation must compile,
 verify the entire crate, and fail a concrete contract. A timeout, frontend error,

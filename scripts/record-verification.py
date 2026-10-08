@@ -18,14 +18,72 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 RECORD = ROOT / "docs/verification-report.json"
+SCHEMA = "cordis-verus.verification/v3"
+SHARDS_ENV = "CORDIS_FULL_NEGATIVE_SHARDS"
 EXCLUDED = {".git", ".tools", "target", "upstream", "reference", "__pycache__", "node_modules"}
 
 
+def helper(filename, name):
+    path = ROOT / "scripts" / filename
+    original = path.read_bytes()
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    exec(compile(original, str(path), "exec"), module.__dict__)
+    if path.read_bytes() != original:
+        raise RuntimeError("Validation helper changed while loading: " + filename)
+    return module
+
+
 def required_negative_names():
-    spec = importlib.util.spec_from_file_location("cordis_negative_evidence", ROOT / "scripts/check-negative.py")
-    checker = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(checker)
-    return [item[0] for item in checker.mutation_manifest()]
+    return [item[0] for item in helper("check-negative.py", "release_negative_checks").mutation_manifest()]
+
+
+def execution_helpers():
+    # This module defines its release-helper imports lazily. Loading only the
+    # process/lease helpers here does not recurse into record-verification.py.
+    return helper("record-development.py", "release_execution_helpers")
+
+
+def run_checks(command, environment, log):
+    checks = helper("check-negative.py", "release_process_supervisor")
+    # The full negative runner owns its own subprocess groups. Give its signal
+    # handler time to stop those groups before forcibly stopping the outer job.
+    with checks.ProcessSupervisor(terminate_grace=3).signal_handlers() as supervisor, log.open("w") as stream:
+        process = supervisor.start(command, cwd=ROOT, env=environment, stdout=stream,
+                                   stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        completed = False
+        try:
+            while True:
+                supervisor.check()
+                try:
+                    process.wait(timeout=0.1)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            supervisor.check()
+            completed = True
+            return process.returncode
+        finally:
+            supervisor.finish(process, terminate=not completed)
+
+
+def environment_for(offline=False, negative_shards=None):
+    environment = os.environ.copy()
+    unsupported = ("VERUS_Z3_PATH", "VERUS_EXTRA_ARGS", "RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER")
+    if any(environment.get(name) for name in unsupported):
+        raise RuntimeError("Custom compiler/verifier overrides are not supported by the release recorder")
+    # Ambient configuration must never turn the default local gate into a
+    # collected-evidence run. Only the explicit recorder option selects it.
+    environment.pop(SHARDS_ENV, None)
+    if negative_shards is not None:
+        directory = Path(negative_shards).resolve(strict=True)
+        if not directory.is_dir():
+            raise RuntimeError("Full negative shards input must be a directory")
+        environment[SHARDS_ENV] = str(directory)
+    environment["CARGO_TERM_COLOR"] = "never"
+    environment["CORDIS_VERUS_THREADS"] = "2"
+    environment["CARGO_NET_OFFLINE"] = "true" if offline else environment.get("CARGO_NET_OFFLINE", "false")
+    return environment
 
 
 def validate_negative_report(proof, expected_names):
@@ -95,47 +153,43 @@ def test_counts(log):
             "doctestTotal": sum(doctests.values()), "deterministicTraces": 8232}
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--offline", action="store_true", help="Use cached package dependencies")
-    parser.add_argument("--upstream", action="store_true", help="Also check local locked research inputs")
-    parser.add_argument("--check", action="store_true", help="Check the existing record for stale sources only")
-    args = parser.parse_args()
+def record_release(offline=False, upstream=False, negative_shards=None):
+    # Invalidate previous success before waiting for the verifier lease or
+    # preparing new evidence. A failed invocation cannot reuse old negatives.
+    RECORD.parent.mkdir(parents=True, exist_ok=True)
+    state = {"schema": SCHEMA, "status": "running", "sha256": {}}
+    RECORD.write_text(json.dumps(state, indent=2) + "\n")
+    try:
+        runtime = execution_helpers()
+        with runtime.termination_signals(), runtime.verifier_lease():
+            return record_locked(offline, upstream, negative_shards)
+    except BaseException as error:
+        RECORD.write_text(json.dumps({"schema": SCHEMA, "status": "failed",
+                                     "failure": f"{type(error).__name__}: {error}", "sha256": {}}, indent=2) + "\n")
+        raise
+
+
+def record_locked(offline, upstream, negative_shards):
+    (ROOT / "target/proof-negative/report.json").unlink(missing_ok=True)
+    (ROOT / "target/release-artifacts/package-report.json").unlink(missing_ok=True)
     before = source_hashes()
-    if args.check:
-        record = json.loads(RECORD.read_text())
-        if record.get("status") != "passed":
-            sys.exit("No successful current-format verification record; run fresh validation")
-        recorded = record["sha256"]
-        changed = sorted(key for key in before.keys() | recorded.keys() if before.get(key) != recorded.get(key))
-        if changed:
-            sys.exit("Verification record is stale: " + ", ".join(changed))
-        print(f"Record matches {len(before)} source files. This is a hash check, not a new verification run.")
-        return
     output = ROOT / "target/validation"
     output.mkdir(parents=True, exist_ok=True)
-    # Invalidate old evidence before attempting new checks; a failed run must
-    # never leave a success report that appears to describe changed sources.
-    RECORD.write_text(json.dumps({"schema": "cordis-verus.verification/v3", "status": "running", "sha256": {}}, indent=2) + "\n")
-    commands = [["./scripts/quality.sh", *(["--offline"] if args.offline else [])]]
-    if args.upstream:
+    commands = [["./scripts/quality.sh", *(["--offline"] if offline else [])]]
+    if upstream:
         commands.append(["python3", "scripts/check-upstream.py"])
-    environment = os.environ.copy()
-    environment["CARGO_TERM_COLOR"] = "never"
-    environment["CARGO_NET_OFFLINE"] = "true" if args.offline else environment.get("CARGO_NET_OFFLINE", "false")
+    environment = environment_for(offline, negative_shards)
     logs = []
     for index, command in enumerate(commands):
         log = output / ("quality.log" if index == 0 else "upstream.log")
         print("Running " + " ".join(command) + "; log: " + str(log), flush=True)
-        with log.open("w") as stream:
-            result = subprocess.run(command, cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT)
-        if result.returncode:
-            RECORD.write_text(json.dumps({"schema": "cordis-verus.verification/v3", "status": "failed", "command": command, "log": str(log.relative_to(ROOT)), "sha256": {}}, indent=2) + "\n")
-            sys.exit(f"Check failed ({result.returncode}); see {log}")
+        returncode = run_checks(command, environment, log)
+        if returncode:
+            raise RuntimeError(f"Check failed ({returncode}); see {log}")
         logs.append(log.relative_to(ROOT).as_posix())
     after = source_hashes()
     if after != before:
-        sys.exit("Sources changed during validation; rerun to obtain consistent evidence")
+        raise RuntimeError("Sources changed during validation; rerun to obtain consistent evidence")
     proof = json.loads((ROOT / "target/proof-negative/report.json").read_text())
     packages = json.loads((ROOT / "target/release-artifacts/package-report.json").read_text())
     validate_negative_report(proof, required_negative_names())
@@ -149,8 +203,10 @@ def main():
         "negativeExecution": proof.get("execution", {"jobs": 1}),
         "examples": sorted(p.stem for p in (ROOT / "crates/cordis/examples").glob("*.rs")),
         "packages": packages,
-        "upstreamCheck": "passed" if args.upstream else "not requested",
-        "ci": "configured; this report describes local execution only",
+        "upstreamCheck": "passed" if upstream else "not requested",
+        "ci": ("GitHub Actions; this report describes the current workflow run"
+               if os.environ.get("GITHUB_ACTIONS") == "true"
+               else "local execution; GitHub Actions was not used for this record"),
         "commands": commands, "logs": logs,
         "paperCoverage": {
             "ledger": "docs/paper-obligations.json",
@@ -163,6 +219,31 @@ def main():
     }
     RECORD.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(f"Recorded {report['proof']['verified']} verified / 0 errors; {report['tests']['total']} tests; {report['tests']['doctestTotal']} doctests; {len(before)} source hashes.")
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--offline", action="store_true", help="Use cached package dependencies")
+    parser.add_argument("--upstream", action="store_true", help="Also check local locked research inputs")
+    parser.add_argument("--check", action="store_true", help="Check the existing record for stale sources only")
+    parser.add_argument("--negative-shards", type=Path,
+                        help="Collect all complete-crate negative shards from this directory; default runs every control locally")
+    args = parser.parse_args()
+    if args.check and args.negative_shards is not None:
+        parser.error("--negative-shards requires a new release validation run, not --check")
+    if args.check:
+        before = source_hashes()
+        record = json.loads(RECORD.read_text())
+        if record.get("schema") != SCHEMA or record.get("status") != "passed":
+            sys.exit("No successful current-format verification record; run fresh validation")
+        recorded = record["sha256"]
+        changed = sorted(key for key in before.keys() | recorded.keys() if before.get(key) != recorded.get(key))
+        if changed:
+            sys.exit("Verification record is stale: " + ", ".join(changed))
+        print(f"Record matches {len(before)} source files. This is a hash check, not a new verification run.")
+        return
+    record_release(args.offline, args.upstream, args.negative_shards)
 
 
 if __name__ == "__main__":

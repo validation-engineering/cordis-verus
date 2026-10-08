@@ -83,9 +83,11 @@ private downloads also need an authenticated GitHub CLI. See
 No runtime release is available yet.
 
 From a clean, reviewed commit, run the `Full release validation` workflow with
-`create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. Every matrix
-job must pass `record-verification.py`, including every current full-crate negative
-control, before its packages can be staged. The workflow then tests installation,
+`create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. Twelve
+[full-crate negative shards](full-negative-validation.md) run per platform; every
+quality job must collect its complete current control set and pass
+`record-verification.py` before its packages can be staged. Evidence binds the
+source, tools, platform and run attempt; rerun the whole workflow after a failure. The workflow then tests installation,
 native loading and offline reinstallation on that same platform. The collector
 requires all three platform manifests from the same source commit, rechecks the
 full-quality records, and copies their original package bytes into a draft

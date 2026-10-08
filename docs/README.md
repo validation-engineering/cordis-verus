@@ -64,3 +64,5 @@
 
 日常开发使用 `./scripts/check-development.sh --offline`；默认 CI 不含全量负控。
 完整 `quality.sh` 的发布门槛仍独立保留，当前尚未通过。scoped-negative 是实验工具，结果不能冒充全库负控或 v3 发布证据。新增或调整论文范围后，编辑 ledger 并运行 `python3 scripts/check-paper-coverage.py --write`；不要直接手改生成表来提升状态。
+
+Complete release-negative execution: [English](full-negative-validation.md) · [简体中文](full-negative-validation.zh-CN.md).
