@@ -22,7 +22,7 @@ jobs:
       RUSTUP_TOOLCHAIN: '1.98.1'
       ARCHIVE_TAG: toolchain-verus-0.2026.10.04.1687598
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check archive identity against the lock
@@ -40,7 +40,7 @@ jobs:
       - name: Recover original bytes and validate all locked hashes
         run: python3 scripts/archive-verus-toolchain.py --output target/toolchain-archive
       - name: Check out the exact Verus source for attribution
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: verus-lang/verus
           ref: 168759867f8c4ba0be848f5a3e438c75cee3e6e3
