@@ -1,6 +1,7 @@
 """Release matrices preserve full coverage, budgets and current-attempt provenance."""
 import fnmatch
 import importlib.util
+import json
 from pathlib import Path
 import re
 import shlex
@@ -15,9 +16,11 @@ exec(compile(SCRIPT.read_bytes(), str(SCRIPT), 'exec'), SHARDS.__dict__)
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
+    include_macos_intel = False
+
     def setUp(self):
         self.text = WORKFLOW.read_text()
-        self.plan = SHARDS.release_plan()
+        self.plan = SHARDS.release_plan(include_macos_intel=self.include_macos_intel)
         self.platforms = self.plan['preflight']['include']
         self.rows = self.plan['negative']['include']
 
@@ -43,8 +46,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertRegex(preflight, r'(?m)^    needs: plan$')
         self.assertRegex(negative, r'(?m)^    needs: \[plan, preflight\]$')
         quality = self.section('quality', 'draft-release')
-        quality_platforms = set(re.search(r'        os: \[(.+)\]', quality)[1].split(', '))
-        self.assertEqual(quality_platforms, {row['os'] for row in self.platforms})
+        self.assertIn('quality: ${{ steps.matrix.outputs.quality }}', plan)
+        self.assertIn('targets: ${{ steps.matrix.outputs.targets }}', plan)
+        self.assertIn('matrix: ${{ fromJSON(needs.plan.outputs.quality) }}', quality)
+        self.assertEqual(set(self.plan['quality']['os']), {row['os'] for row in self.platforms})
+        self.assertIn("${{ inputs.include_macos_intel && '--include-macos-intel' || '' }}", plan)
+        self.assertRegex(self.text, r'include_macos_intel:\n(?:        .+\n)*?        default: false\n        type: boolean')
 
     def test_each_platform_downloads_only_its_own_complete_current_attempt_shards(self):
         upload = re.findall(r'^          name: (negative-.+)$', self.text, re.M)
@@ -68,7 +75,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertEqual(upload, download)
         artifacts = {(attempt, row['os']): self.render(upload, attempt, row)
                      for attempt in (1, 2) for row in self.platforms}
-        self.assertEqual(len(set(artifacts.values())), 6)
+        self.assertEqual(len(set(artifacts.values())), 2 * len(self.platforms))
         for row in self.platforms:
             selected = [key for key, value in artifacts.items() if value == self.render(download, 2, row)]
             self.assertEqual(selected, [(2, row['os'])])
@@ -103,11 +110,33 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertGreaterEqual(row['shardMinutes'] * 60 - budget, 30 * 60)
             self.assertGreaterEqual(row['preflightMinutes'] * 60 - int(p_options['--timeout']), 15 * 60)
         quality = self.section('quality', 'draft-release')
-        self.assertRegex(quality, r'(?m)^    needs: negative$')
+        self.assertRegex(quality, r'(?m)^    needs: \[plan, negative\]$')
         self.assertIn('record-verification.py --negative-shards target/full-negative-shards', quality)
         draft = self.text.split('\n  draft-release:', 1)[1]
-        self.assertRegex(draft, r'(?m)^    needs: quality$')
+        self.assertRegex(draft, r'(?m)^    needs: \[plan, quality\]$')
         self.assertIn('pattern: full-validation-${{ github.run_attempt }}-*', draft)
+        self.assertIn('RELEASE_TARGETS_JSON: ${{ needs.plan.outputs.targets }}', draft)
+        self.assertIn('--targets-json \"$RELEASE_TARGETS_JSON\"', draft)
+        self.assertNotIn('All three platforms passed', draft)
+
+
+class IntelReleaseWorkflowTests(ReleaseWorkflowTests):
+    include_macos_intel = True
+
+
+class DevelopmentWorkflowTests(unittest.TestCase):
+    def test_default_and_manual_matrices_match_release_platform_selection(self):
+        text = (ROOT / '.github/workflows/verify.yml').read_text()
+        self.assertRegex(text, r'include_macos_intel:\n(?:        .+\n)*?        default: false\n        type: boolean')
+        # Push and PR events cannot enable Intel, even if an input-shaped value exists.
+        expression = re.search(r'^        os: (.+)$', text, re.M)[1]
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.include_macos_intel", expression)
+        choices = re.findall(r"'(\[.+?\])'", expression)
+        self.assertEqual(len(choices), 2)
+        manual, default = map(json.loads, choices)
+        self.assertEqual(default, SHARDS.release_plan()['quality']['os'])
+        self.assertEqual(manual, SHARDS.release_plan(include_macos_intel=True)['quality']['os'])
+        self.assertIn('exec python3 scripts/record-development.py', text)
 
 
 if __name__ == '__main__':

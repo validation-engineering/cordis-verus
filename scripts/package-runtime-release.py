@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Stage GitHub Release assets from a fresh full quality gate; never upload.
 
-`collect` requires all declared platforms from the same commit. Development
-records cannot substitute for the full ordered mutation manifest.
+`collect` requires every selected platform from the same commit. Linux x64 and
+macOS ARM64 are required; macOS Intel is optional. Development records cannot
+substitute for the full ordered mutation manifest.
 """
 import argparse
 import hashlib
@@ -16,6 +17,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = {'darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8'}
+DEFAULT_TARGETS = {'darwin-arm64-napi8', 'linux-x64-gnu-napi8'}
 NAMES = {'@cordis-verus/compat-cordis', '@cordis-verus/compat-harness', '@cordis-verus/compat-loader'}
 
 
@@ -144,7 +146,29 @@ def package(output):
     print(f'Staged {target} from full quality evidence at {commit}. No upload performed.')
 
 
-def collect(inputs, output, commit):
+def selected_targets(targets):
+    if targets is None:
+        return DEFAULT_TARGETS.copy()
+    if not isinstance(targets, list) or not all(isinstance(target, str) for target in targets):
+        raise ValueError('Release targets must be a JSON array of platform names')
+    selection = set(targets)
+    if len(selection) != len(targets):
+        raise ValueError('Duplicate release targets')
+    if selection not in (DEFAULT_TARGETS, TARGETS):
+        raise ValueError('Release targets must include Linux x64 and macOS ARM64, with only macOS Intel optional')
+    return selection
+
+
+def parse_targets_json(value):
+    targets = json.loads(value)
+    if not isinstance(targets, list):
+        raise ValueError('Release targets must be a JSON array of platform names')
+    selected_targets(targets)
+    return targets
+
+
+def collect(inputs, output, commit, targets=None):
+    required = selected_targets(targets)
     if not re.fullmatch(r'[a-f0-9]{40}', commit):
         raise ValueError('Expected a full release commit SHA')
     manifests = sorted(inputs.glob('**/cordis-runtime-*.json'))
@@ -155,8 +179,8 @@ def collect(inputs, output, commit):
     for path in manifests:
         record = read(path)
         target = record.get('target')
-        if record.get('schema') != 'cordis-verus.runtime-release/v1' or target not in TARGETS or target in seen or record.get('sourceCommit') != commit:
-            raise ValueError('Duplicate, unsupported or mixed-commit platform evidence')
+        if record.get('schema') != 'cordis-verus.runtime-release/v1' or not isinstance(target, str) or target not in required or target in seen or record.get('sourceCommit') != commit:
+            raise ValueError('Duplicate, unselected, unsupported or mixed-commit platform evidence')
         if record.get('acceptance', {}).get('fullQuality') is not True or record['acceptance'].get('paperCompletion') is not False:
             raise ValueError('A development artifact is not a release artifact')
         if len(record.get('packages', [])) != 3 or {item['name'] for item in record['packages']} != NAMES:
@@ -185,8 +209,8 @@ def collect(inputs, output, commit):
         if current.is_symlink() or not current.is_file() or (installer is not None and digest(current) != digest(installer)):
             raise ValueError('Platform installers differ')
         installer = current
-    if seen != TARGETS:
-        raise ValueError('All three full-quality platform artifacts are required')
+    if seen != required:
+        raise ValueError(f'All selected full-quality platform artifacts are required; missing: {", ".join(sorted(required - seen))}')
     if digest(installer) != digest(ROOT / 'scripts/install-cordis.mjs'):
         raise ValueError('Installer differs from the release checkout')
     assets['install-cordis.mjs'] = installer
@@ -201,7 +225,7 @@ def collect(inputs, output, commit):
             shutil.copyfile(source, stage / name)
         (stage / 'SHA256SUMS').write_text(''.join(f'{digest(stage / name)}  {name}\n' for name in sorted(assets)))
         publish_directory(stage, output)
-    print('Collected all three platforms. No upload performed.')
+    print(f'Collected {len(required)} selected platforms: {", ".join(sorted(required))}. No upload performed.')
 
 
 def main():
@@ -213,11 +237,13 @@ def main():
     collecting.add_argument('--input', type=Path, required=True)
     collecting.add_argument('--output', type=Path, required=True)
     collecting.add_argument('--commit', required=True)
+    collecting.add_argument('--targets-json', type=parse_targets_json,
+                            help='JSON array of release targets; defaults to Linux x64 and macOS ARM64')
     args = parser.parse_args()
     if args.command == 'package':
         package(args.output)
     else:
-        collect(args.input, args.output, args.commit)
+        collect(args.input, args.output, args.commit, args.targets_json)
 
 
 if __name__ == '__main__':

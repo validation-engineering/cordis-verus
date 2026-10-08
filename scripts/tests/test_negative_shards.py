@@ -551,40 +551,54 @@ class SharedPreflightEvidenceTests(unittest.TestCase):
 
 
 class PlatformPlanTests(unittest.TestCase):
-    def test_plan_is_pure_and_covers_each_platform_without_installing_or_running_verus(self):
-        with patch.object(SHARDS, 'checker', return_value=CHECKS), \
-             patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
-             patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
-            plan = SHARDS.release_plan()
-        self.assertEqual(plan['mutationCount'], 114)
-        self.assertEqual(len(plan['negative']['include']), 80)
-        expected = [('ubuntu-24.04', 2400, 18, 55), ('macos-15', 3600, 24, 75),
-                    ('macos-15-intel', 5400, 38, 105)]
-        self.assertEqual([(row['os'], row['timeout'], row['shardCount'], row['preflightMinutes'])
-                          for row in plan['preflight']['include']], expected)
-        manifest = CHECKS.mutation_manifest()
-        for platform in plan['preflight']['include']:
-            rows = [row for row in plan['negative']['include'] if row['os'] == platform['os']]
-            self.assertEqual([row['shard'] for row in rows], list(range(platform['shardCount'])))
-            self.assertTrue(all({key: row[key] for key in platform} == platform for row in rows))
-            covered = [item for row in rows for item in SHARDS.assigned(manifest, row['shard'], row['shardCount'])]
-            self.assertEqual(len(covered), len(manifest))
-            self.assertEqual(set(covered), set(manifest))
+    def test_plan_is_pure_and_covers_each_selected_platform(self):
+        for include_intel in (False, True):
+            with self.subTest(include_intel=include_intel), \
+                 patch.object(SHARDS, 'checker', return_value=CHECKS), \
+                 patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
+                 patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
+                plan = SHARDS.release_plan(include_macos_intel=include_intel)
+                self.assertEqual(plan['mutationCount'], 114)
+                self.assertEqual(len(plan['negative']['include']), 80 if include_intel else 42)
+                expected = [('ubuntu-24.04', 2400, 18, 55), ('macos-15', 3600, 24, 75)]
+                targets = ['linux-x64-gnu-napi8', 'darwin-arm64-napi8']
+                if include_intel:
+                    expected.append(('macos-15-intel', 5400, 38, 105))
+                    targets.append('darwin-x64-napi8')
+                self.assertEqual([(row['os'], row['timeout'], row['shardCount'], row['preflightMinutes'])
+                                  for row in plan['preflight']['include']], expected)
+                self.assertEqual(plan['quality'], {'os': [row[0] for row in expected]})
+                self.assertEqual(plan['targets'], targets)
+                manifest = CHECKS.mutation_manifest()
+                for platform in plan['preflight']['include']:
+                    rows = [row for row in plan['negative']['include'] if row['os'] == platform['os']]
+                    self.assertEqual([row['shard'] for row in rows], list(range(platform['shardCount'])))
+                    self.assertTrue(all({key: row[key] for key in platform} == platform for row in rows))
+                    covered = [item for row in rows for item in SHARDS.assigned(manifest, row['shard'], row['shardCount'])]
+                    self.assertEqual(len(covered), len(manifest))
+                    self.assertEqual(set(covered), set(manifest))
 
     def test_growth_cannot_silently_exceed_job_budget(self):
-        for manifest in [[], [('same',)] * 114, [(f'control-{index}',) for index in range(200)]]:
-            with self.subTest(count=len(manifest)), self.assertRaises(RuntimeError):
-                SHARDS.release_plan(manifest)
+        for include_intel in (False, True):
+            for manifest in [[], [('same',)] * 114, [(f'control-{index}',) for index in range(200)]]:
+                with self.subTest(count=len(manifest), intel=include_intel), self.assertRaises(RuntimeError):
+                    SHARDS.release_plan(manifest, include_macos_intel=include_intel)
 
-    def test_github_outputs_are_json_matrices_from_the_same_plan(self):
+    def test_platform_opt_in_is_boolean(self):
+        for value in ('false', 'true', 1, None):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                SHARDS.release_plan(include_macos_intel=value)
+
+    def test_github_outputs_are_json_from_the_same_plan(self):
         with tempfile.TemporaryDirectory(prefix='cordis-plan-test-') as temporary:
-            output = Path(temporary) / 'github-output'
-            with contextlib.redirect_stdout(io.StringIO()):
-                plan = SHARDS.write_plan(output)
-            values = dict(line.split('=', 1) for line in output.read_text().splitlines())
-            self.assertEqual(set(values), {'preflight', 'negative'})
-            self.assertEqual(json.loads(values['preflight']), plan['preflight'])
-            self.assertEqual(json.loads(values['negative']), plan['negative'])
+            for include_intel in (False, True):
+                output = Path(temporary) / str(include_intel)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    plan = SHARDS.write_plan(output, include_macos_intel=include_intel)
+                values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+                self.assertEqual(set(values), {'preflight', 'negative', 'quality', 'targets'})
+                for key, value in values.items():
+                    self.assertEqual(json.loads(value), plan[key])
 
 
 class FailureSummaryTests(unittest.TestCase):

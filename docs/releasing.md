@@ -49,7 +49,10 @@ paper copies, and build outputs must not appear in them.
    upstream attribution. Configure branch protection for all quality jobs.
 2. Review known limitations, issue backlog, dependency advisories, and proof
    assumptions. Do not describe 0.1 as audited, production-proven, or a complete
-   paper implementation. All three CI platforms must actually pass.
+   paper implementation. Every platform selected for the release must actually
+   pass: Linux x64 and macOS Apple Silicon by default, plus macOS Intel when
+   `include_macos_intel=true`. Claim validation and provide assets only for that
+   selected, accepted set.
 3. Choose matching crate versions and the exact host-to-kernel dependency.
    Update `CHANGELOG.md`, Rust/toolchain policy if changed, and migration notes.
    Refresh the checked verification report from the exact release sources with
@@ -83,15 +86,18 @@ private downloads also need an authenticated GitHub CLI. See
 No runtime release is available yet.
 
 From a clean, reviewed commit, run the `Full release validation` workflow with
-`create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. Twelve
-[full-crate negative shards](full-negative-validation.md) run per platform; every
-quality job must collect its complete current control set and pass
-`record-verification.py` before its packages can be staged. Evidence binds the
-source, tools, platform and run attempt; rerun the whole workflow after a failure. The workflow then tests installation,
-native loading and offline reinstallation on that same platform. The collector
-requires all three platform manifests from the same source commit, rechecks the
-full-quality records, and copies their original package bytes into a draft
-prerelease with checksums and an installer. It does not rebuild after verification.
+`create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. The default
+platforms are Linux x64 and macOS Apple Silicon; set `include_macos_intel=true` to
+include macOS Intel. [Full-crate negative shards](full-negative-validation.md) use a
+platform-specific partition; every selected platform's quality job must collect all
+114 controls and pass `record-verification.py` before its packages can be staged.
+Evidence binds the source, tools, platform and run attempt; rerun the whole workflow
+after a failure. The workflow then tests installation, native loading and offline
+reinstallation on that same platform. The collector requires exactly the selected
+platform manifests from the same source commit, rechecks the full-quality records,
+and copies their original package bytes into a draft prerelease with checksums and
+an installer. It does not rebuild after verification. A default run neither validates
+Intel nor produces Intel assets.
 
 The `create_draft` default is false. A failed gate leaves only diagnostic Actions
 artifacts; an interrupted upload can leave an incomplete draft, which must be
@@ -115,8 +121,9 @@ npm start
 ```
 
 Both output directories must be new. The package command stages only the current
-host's accepted assets. The remote collector still requires the other two platforms
-before creating a draft. Inspect the draft's source commit, checksums, platform
-records, limitations and installation instructions before publishing it. Retain the
+host's accepted assets. The remote collector requires accepted assets for every
+platform selected in that workflow run before creating a draft. Inspect the draft's
+source commit, checksums, platform records, limitations and installation instructions
+before publishing it. Retain the
 published assets: deleting a workflow artifact after its retention period should
 not remove the runtime release or its embedded evidence.

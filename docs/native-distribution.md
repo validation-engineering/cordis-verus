@@ -71,7 +71,11 @@ is attempted when a target, dependency or binary cannot be used.
 | `darwin-x64-napi8` | macOS / x64 | Node-API 8 |
 | `linux-x64-gnu-napi8` | Linux / x64 / GNU libc | Node-API 8 |
 
-These are allowed artifact targets, not a passed test matrix. The package engine
+These are allowed artifact targets, not a passed test matrix. Release validation
+selects Linux x64 and macOS Apple Silicon by default; macOS Intel is opt-in through
+`include_macos_intel=true`. Each release contains only the targets actually selected
+and accepted in its run; an omitted Intel target has no assets or validation claim
+in that release. The package engine
 requires Node 22.22 or newer; Node-API 8 does not certify older Node releases. Node 24,
 Windows, Linux ARM64 and musl have not gained acceptance through this implementation.
 OS deployment versions and minimum glibc compatibility need separate release tests.
@@ -177,15 +181,17 @@ binds all package/build inputs, and requires a clean source commit (the newly ge
 verification report is the only permitted tracked difference). It preserves the
 actual native build profile rather than silently calling a development build optimized.
 
-The [full release workflow](../.github/workflows/release-validation.yml) runs all
-three platforms. Each first completes a baseline preflight and its complete partition of
-strictly collected [whole-crate negative shards](full-negative-validation.md), then the complete
-quality/package gate. It installs each staged runtime in a new project and checks a second
-offline `npm ci` followed by the example. When explicitly dispatched with
-`create_draft=true` and a new `release_tag`, it collects all three matching-commit
-asset sets, adds `SHA256SUMS`, and creates a **draft prerelease**. Any failed platform
-prevents this job from running. It refuses an existing tag and never publishes the
-draft automatically. A development workflow cannot upload runtime releases.
+The [full release workflow](../.github/workflows/release-validation.yml) defaults to
+Linux x64 and macOS Apple Silicon; dispatch it with `include_macos_intel=true` to add
+macOS Intel. Each selected platform first completes a baseline preflight and all
+114 strictly collected [whole-crate negative controls](full-negative-validation.md),
+then the complete quality/package gate. It installs each staged runtime in a new
+project and checks a second offline `npm ci` followed by the example. When explicitly
+dispatched with `create_draft=true` and a new `release_tag`, it collects exactly the
+selected platforms' matching-commit asset sets, adds `SHA256SUMS`, and creates a
+**draft prerelease**. Any failed selected platform prevents this job from running.
+It refuses an existing tag and never publishes the draft automatically. A development
+workflow cannot upload runtime releases.
 
 A workflow definition is not execution evidence. The first runtime release still
 requires successful full-quality runs on its exact commit and maintainer review.

@@ -19,8 +19,8 @@
     ".github/PULL_REQUEST_TEMPLATE.md": "078c5f641b75d3a40a03492f9deaa8fc104bc129fb91c6e20ef7ecb66976708e",
     ".github/dependabot.yml": "f35a0ee33bed90c119461aaceba3d0f431fe50f635969c25c0306ce0ff13b583",
     ".github/workflows/archive-verus.yml": "f6f9631178fef7b601686564cc582bf5dc819dd9233570b5e8bba033fdbbf1e8",
-    ".github/workflows/release-validation.yml": "1c842d205e8b57f4046b310bb740f3ce8387ee986b1c1f6664f5fb6c5c0c5908",
-    ".github/workflows/verify.yml": "f7e18ba00f03af9a37ed85c219967c961b980c6e53fc400be46502112426d99e",
+    ".github/workflows/release-validation.yml": "c0fbf2a516fc7cbb8cce0b26466740cccbc24d7c5b76ad626e3acca2e2a9a7b1",
+    ".github/workflows/verify.yml": "43cbc2cba893073eac6fc17d101979cd13b3c5903e40f193901537e9b9fcf265",
     ".gitignore": "c98ff28d97f469ee7c6ba20b8dae01d7323f4b9b0fe6bb74a344a0dd53121a9b",
     "AGENTS.md": "a91ec3e8c025089e4c0b8398ab2e149bd42ea2c60108b0c0559dc99d2a8a7ac7",
     "CHANGELOG.md": "241216700fe57269a91c73ccd2fbc2a2d79a30ffae62e57d2836460ffa68427a",
@@ -315,8 +315,8 @@
     "crates/cordis/tests/static_host_join.rs": "50501904f8a6b73517caab7c5f292459b84e2d56baa490ea1eef7fac2b813e02",
     "crates/cordis/tests/timer.rs": "d434d1e7904669288cdf66ee1f249c5b2cbb1270f4d9b568dfa13b5d209346c2",
     "docs/README.md": "7540ce91551680d5314a9ed8b74e67ae0f3c127fd86cdb9d9dc17e2984582ef2",
-    "docs/adoption-plan.md": "6a532e2e7c66d1f67748467b0cd3a7964952829e469805046d3c90e33a945a8a",
-    "docs/adoption-plan.zh-CN.md": "c5d7b716692a201d6b957d503224017c8671aecc6240469ec9d9abc9641c70ea",
+    "docs/adoption-plan.md": "ebd3beb1e5c12f7f347c79979061a803742df1ee8804db5d383e0f52279758a7",
+    "docs/adoption-plan.zh-CN.md": "21ac018d6ce4527dca91e39784298d676c2a629fa138bd2b76065c6b8ce42c84",
     "docs/architecture.md": "5e168d34e8095c62f08130cf932700515ecf023f5c2a583710a9d656c13281a1",
     "docs/benchmarks.md": "5861d80e36894b3b72a425e1f1cc39864085088f5549b6014d5cb932c092677b",
     "docs/cases/lifecycle-cleanup.md": "b5738bdfc560b3c47625ad4d4447c9563d8c5356ea66eba226249c69bf366b16",
@@ -338,14 +338,14 @@
     "docs/evidence/node-compat.json": "63d77a19a9dbad8ce637412a08c9b71e87b11857174a7082b55f5f54c9af080c",
     "docs/evidence/node-profiles.json": "30474cd7fd171c6b07e2da40be07cf90c98481cfebff269b237749ab2f9ecf33",
     "docs/evidence/upstream-core.json": "6aa0c29eb0acf9936e6c206c9a482f19684449f6fc483a1b9bb56d8bee9af95d",
-    "docs/full-negative-validation.md": "9ffa2e4ae12ac5ef04dca0daac807ad3bf36f33958532b93bf4a3f02fe0c5883",
-    "docs/full-negative-validation.zh-CN.md": "1eb2993f0d5bbe0fde486a58cae3b6df4942deb45f0402da003fc9ed7be642a0",
+    "docs/full-negative-validation.md": "c7f5e0710efe1c7b966a719b739bf0cefa34e01f1a269b136c0ebd3d83235e95",
+    "docs/full-negative-validation.zh-CN.md": "c66a8d3a6d5a5ac36449a16928e63eb08e40535688d8e61a09b471e947b1c6ed",
     "docs/host-diagnostics.md": "0102516395280caf0fe1d45b426c237fed7e785d94db44ef85282608aac22e71",
     "docs/host-diagnostics.zh-CN.md": "d338fc1d2e26c7c6422a1791d52ebc82744b72f77af2a4033ab31dbaca701d4d",
     "docs/loader.md": "87ef03f36fe6c4650a8d05421514127e2cb02ce1c2dbb70a0621d43ff67d14d1",
     "docs/module-graph-reloads.md": "ad28d2a3b979927f8a4d99e97f177f8debc02f3c21465dc8a21e1350865e5d8e",
-    "docs/native-distribution.md": "fe0b8ff2909bb055382bc18f16a6e8f0fbc3aea87cb2a7be1505d14883be7385",
-    "docs/native-distribution.zh-CN.md": "68b24745bf5c83a5e684b0e02f2a907cf25089910da709d7c0a6eff01fda447a",
+    "docs/native-distribution.md": "40ef26a58ec860744af341ea015b1402532fe10a75f531362d24df3483b68001",
+    "docs/native-distribution.zh-CN.md": "4eebdd026b53fa403f9248d6553e5814b09d5aaeccaf973501679943fe6b0df0",
     "docs/native-rust-modules.md": "1e884154711196d686bcbeeeff47e345230173dafd9cbcf7b8ab2cee4b8a07d2",
     "docs/node-compatibility-architecture.md": "5d02560f635d30a531ca1227559c8844226a355ceb46c5f3d52d07146653b71a",
     "docs/node-compatibility.md": "458cae0d6a32144e933c5400363540649926844bb2df247223fa1318949e810f",
@@ -372,8 +372,8 @@
     "docs/performance/2026-10-06-resident-before.json": "632469f9c349b701d188fac576aca26e292d3274aaf44a495d243455c5f46f6a",
     "docs/process-plugins.md": "356e76cf2e1bf7b9f5f6607b0e13c98c6abf322bb51c05e32921198786e985b1",
     "docs/refinement.md": "390402ebf4fe7be87384a7d9adbef2a57d6ee46b63840f5ad461ce028a2a61f6",
-    "docs/releasing.md": "947584a0e5a75e611b9b89436bc2c3470c3b682345b3a9126a5e9ddb61cc9323",
-    "docs/roadmap.md": "ed8d582816a3abca53510791b747ea740554e80a776fcc1b45d432e46192d732",
+    "docs/releasing.md": "c34693a690cb68076c8165b19216c4dd26b14fbdff547f6150ee28da528a3818",
+    "docs/roadmap.md": "ab78982eba68867181a20f9c1ea8803b11733c3b2b6298ee83c302808b633280",
     "docs/runtime.md": "7639cf8212f657dc127727ae96192cda2d475278cdbd538b7be8de7884b38e54",
     "docs/rust-node-plugins.md": "03a004cf6c6f13e51a3132687db6ed9ec2067a66c254c04322c057a8c35fff2f",
     "docs/semantics.md": "6f38bd1c8837bf4e66ef7a096f7b328517368ee148f3f69a1124a5c4a57223a5",
@@ -384,7 +384,7 @@
     "docs/toolchains/verus-0.2026.10.04.1687598.json": "33a4ae1f6b57eeb9ee0b39d6bd30200b5d3853af29745b9c058dc93cd34cf10b",
     "docs/typed-rust-plugins.md": "e88e2510d31db81410105662b74b4aa4dfd2889a2e469e182e1d6ccc9831edcd",
     "docs/upstream-parity.md": "7ff9a3cc34fcdf87700ebd7da00806ea005510d2495ae8e27d90db718de37bfd",
-    "docs/validation.md": "3e87297ccad7e143408fe7adf1f63ad3aeefb01f5eca27763c4f0f914fef0409",
+    "docs/validation.md": "0b9def8b91156942e945893f679bee487b5692b4f0a9d5ca4252dfb959006743",
     "docs/verified-programs.md": "0a5824e67a38aed99ecc83202ff95198a96a4ffb2e8f5b0ebcfacfb095115fb5",
     "examples/node-loader/README.md": "d0af45dbd0b5ebf4fd9be3958739ae29b338644b796844174232de17c6c64d38",
     "examples/node-loader/cordis.json": "385be58b206b2b41c9277010ccfe69d205841b1b5246f50214a56fffd98abf0f",
@@ -474,10 +474,10 @@
     "scripts/install-verus.py": "e466c05580fe821804f32ce55d85865eca2c700be6ccef05201efa15fcce3fe5",
     "scripts/install-verus.sh": "d9bbc7dad26b46dcab7c4dc93c6ec832c531c436289780dac39770b255aefbe2",
     "scripts/negative-controls.scoped.candidate.json": "7b6b740c8647f0e5f0df0aaec2d6da15da6c27f10a8fa09f319883d25d618827",
-    "scripts/negative-shards.py": "e3bcac83044a1b63f9213a5bf5efd42619e062c080eb35905978119a001e75ec",
+    "scripts/negative-shards.py": "a0c9b4432faeb6acac869a125343072bbbb6362556e608b1538b2a5e1fbf45d3",
     "scripts/package-check.py": "55cb649a58ee81fadb1b8b8055cb7011e75662d4c73a692d2f1c7bc4ff9a9037",
     "scripts/package-native.mjs": "2c56bc4a3deefec71536c1720930fc36503650ef4fbd9a4127e121f1ea469d75",
-    "scripts/package-runtime-release.py": "8dc6305c5f7406d6cb53bcda959e5f7ccc2c69ac5c138dd2069df24d25e72cd6",
+    "scripts/package-runtime-release.py": "5eef67cc86f912fcb03479a901d4d1f59563089fc12668deda98544881c6efe6",
     "scripts/quality.sh": "aee5100d1b83e0d180ca34c1b9fa6ef5d7cf147b935ac0389cf5b25f8dafb18a",
     "scripts/record-development.py": "b106fb61eab516fc5fb74a702b3c89004c02117bd1e7cc9696fa99b839637233",
     "scripts/record-verification.py": "eee91762d9cbc72bbf10ffbfce0b6fc2357975df4a4cf2ac9f55f3046080d19f",
@@ -487,12 +487,12 @@
     "scripts/tests/test_check_negative.py": "ee968374b376e170a57aa879da723bcbe0f365dd14c66c490dabef77ac9587c6",
     "scripts/tests/test_check_negative_scoped.py": "a21b28b816698282a01aa90ab8a8e7cb0782c9e7258ae3b99c44229bbdf49255",
     "scripts/tests/test_install_verus.py": "58c4859d5202d61ae43245cbee596081e6459c53a0fd834086aa15d1fdc6e873",
-    "scripts/tests/test_negative_shards.py": "5b86ec09dce06e9d8fb570d0f77708f6d6af9007e809bb66f5e07865bdd4c6c8",
+    "scripts/tests/test_negative_shards.py": "5bdd6099c302db7a4cf2062d6aecddf729eeb9f30ac61c5a7b2417d6a946a65b",
     "scripts/tests/test_package_check.py": "16bc763f83d3cdce141cc17370be99e5a6f064d2982697d3ba8efbd79f88a922",
-    "scripts/tests/test_package_runtime_release.py": "8bee2ff2184be0286d6564d73e839a7f02249b83ecb58fc14228be52b4db5edd",
+    "scripts/tests/test_package_runtime_release.py": "c561c7b7fc668311d01921d799db3de733d79a436ca6cf781fcc0bdcd3965192",
     "scripts/tests/test_record_development.py": "02a8988bd487aa6fc723ad177c061b908312a15bef088b692c07321f442b1d49",
     "scripts/tests/test_record_verification.py": "6bda426f6cffeb3e294146889889ef6c6c00f6b3b8def1be40f7755d8f493944",
-    "scripts/tests/test_release_workflow.py": "aeba98aeb1309cbd8b60816e1996cfbd4047ca1f94ed8d27fb052413326bca8a",
+    "scripts/tests/test_release_workflow.py": "0febcff76c9da09cd0ca9bf9080c815ff3d664294d2c64800183b6ef56502d1c",
     "scripts/tests/test_toolchain_notices.py": "7dedf7a1874eb931b0a287170fe8b3e93c96dad9eb9606784d43aa531c37638e",
     "scripts/toolchain-env.sh": "f9e6689dca3a5658409f110523085600dcb5a233feba2c00720db48c72a0abe9",
     "scripts/toolchain-notices.py": "c204c04dba967ab40dfaa4170fa3309e3ab12280e1d8aed53f6cfc44b5b595d2",
@@ -600,7 +600,7 @@
     "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418",
     "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750"
   },
-  "checkedAt": "2026-10-08T06:34:33.458058+00:00",
+  "checkedAt": "2026-10-08T07:35:42.789227+00:00",
   "host": {
     "os": "Darwin",
     "architecture": "arm64"
@@ -705,7 +705,7 @@
       {
         "name": "cordis-kernel",
         "version": "0.1.0",
-        "sha256": "586ca470df7c94bbc1e1c6e9a41aa2e485ca663a0269559ceb5887b43317972c",
+        "sha256": "291a17e77e328bfdf8f1d038f90450288c3ae497cbbc92994578a822a0c75b16",
         "files": [
           "cordis-kernel-0.1.0/.cargo_vcs_info.json",
           "cordis-kernel-0.1.0/Cargo.lock",
@@ -893,7 +893,7 @@
       {
         "name": "cordis-driver",
         "version": "0.1.0",
-        "sha256": "437f2c775d0394be0503cd69cc7f64d8f9d23050eca11ec55f2b224c6756b43b",
+        "sha256": "860d4852b75450ceeb03dea1594e6f81609de3b8c057f5967c5eed28be6e6eb2",
         "files": [
           "cordis-driver-0.1.0/.cargo_vcs_info.json",
           "cordis-driver-0.1.0/Cargo.lock",
@@ -921,7 +921,7 @@
       {
         "name": "cordis",
         "version": "0.1.0",
-        "sha256": "e28d3873b6fa953b5099c74f80c595c9954cb894fe410bdc309184591d044426",
+        "sha256": "2d94f300f03e06485fb756b944f1abe2283db5845b9796e85a25e0c4ed812feb",
         "files": [
           "cordis-0.1.0/.cargo_vcs_info.json",
           "cordis-0.1.0/Cargo.lock",
@@ -977,7 +977,7 @@
       {
         "name": "cordis-plugin-api",
         "version": "0.1.0",
-        "sha256": "3c43d37c28893b843299a08a346b86aa3a3d99c551ace4a1b166324b42321eb4",
+        "sha256": "86e38152de4115e04e86b11f8ee72b1d686d678a8b24e63bc6b54766e7819025",
         "files": [
           "cordis-plugin-api-0.1.0/.cargo_vcs_info.json",
           "cordis-plugin-api-0.1.0/Cargo.lock",
@@ -1333,7 +1333,7 @@
   "npmDistribution": {
     "schema": "cordis-verus.npm-package/v1",
     "status": "passed",
-    "checkedAt": "2026-10-08T06:34:33.335Z",
+    "checkedAt": "2026-10-08T07:35:42.671Z",
     "registryPublishChecked": false,
     "uploaded": false,
     "offline": true,
@@ -1346,7 +1346,7 @@
       "driverAbi": 1
     },
     "otherTargets": "not validated",
-    "nativeManifestSha256": "ddba2f9a716e3c8337324ad553beab699a4ede37ac29c1e8dc2ef29e4a4c2555",
+    "nativeManifestSha256": "588d98bbc67e260b7c20cbadf1e4b74439a733bc0571a483fad688ca43d8caf9",
     "nativeTarget": "darwin-arm64-napi8",
     "buildReportSha256": "c4e57511eeb35c8ed9ef838a1c9405aa0f5dc882fc2d4586a2b35290d049c4af",
     "nativeArtifactSha256": "f77b3ead30d34a236b835b543466045262917afd3de8c62e8e3b884e8b0a9971",
@@ -1369,8 +1369,8 @@
       "packages/compat-cordis/native-artifacts.d.ts": "e640dfb044f1752cee13075a88d363c4173061696b2b8d8b930894f6c9f6b9dc",
       "packages/compat-cordis/native-artifacts.js": "7ff966b24eaff87d218c42c20eb386e27f6051a313cf7b71c81c12bac2a05780",
       "packages/compat-cordis/native/cordis.node": "f77b3ead30d34a236b835b543466045262917afd3de8c62e8e3b884e8b0a9971",
-      "packages/compat-cordis/native/manifest.json": "ddba2f9a716e3c8337324ad553beab699a4ede37ac29c1e8dc2ef29e4a4c2555",
-      "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json": "10504d6e533b5af29d7055d7cbfc7a4141bd567e25ec31d801ac87501f792179",
+      "packages/compat-cordis/native/manifest.json": "588d98bbc67e260b7c20cbadf1e4b74439a733bc0571a483fad688ca43d8caf9",
+      "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json": "e6924b6b310d946b44bd3038eceec10d8cafdde88e0868d22022603e2be20bfd",
       "packages/compat-cordis/package.json": "908a186ab1789ea4826776ef583891d64e88c9b528461e1133102900a4c87846",
       "packages/compat-cordis/register.js": "b9625922ce2224339433d17e26396395e5a7d359a736a0684e6ef88e1fa9663b",
       "packages/compat-cordis/runtime.js": "6dc05a409e34f1120680d0e0fbbdd710253020dd7447484ce720eaefb11dc325",
@@ -1693,7 +1693,7 @@
         "name": "@cordis-verus/compat-cordis",
         "version": "0.1.0",
         "filename": "cordis-verus-compat-cordis-0.1.0.tgz",
-        "sha256": "06d50fab88bb58ee5aebfd16badd327e7904985686be5b52cda00531f3b7bbcb",
+        "sha256": "7b5d40242db58376dc4924ba48f30e554f9d2c0ee0f86bdd02d7a0b7dc37509d",
         "files": [
           "LICENSE",
           "LICENSE.upstream",
@@ -1786,7 +1786,7 @@
         ],
         "values": "javascript-object-table"
       },
-      "nativeManifestSha256": "ddba2f9a716e3c8337324ad553beab699a4ede37ac29c1e8dc2ef29e4a4c2555",
+      "nativeManifestSha256": "588d98bbc67e260b7c20cbadf1e4b74439a733bc0571a483fad688ca43d8caf9",
       "nativeTarget": "darwin-arm64-napi8",
       "tests": [
         "native-manifest-selection",
@@ -1816,14 +1816,14 @@
       ]
     }
   },
-  "npmDistributionReportSha256": "4aeab0489df17a11e3d3342406bc2c518ef33e1aefba1242230578fcf5072375",
+  "npmDistributionReportSha256": "4ade24cdffe4d5348fa8d8864746776ecd18ae5dd75026f3086d0152a415e26b",
   "examples": [
     "async_lifecycle",
     "basic",
     "config_persistence",
     "config_reload"
   ],
-  "logSha256": "e1a08471dd341c653b44efe3f1ea132a59fa82e42bd96e3d3f5afb91837535a8",
+  "logSha256": "56e4a76eebf876d5f71a675a9755ed305f2127713589f55cad6d77d52e5264bc",
   "workflowSha256": {
     "scripts/record-development.py": "b106fb61eab516fc5fb74a702b3c89004c02117bd1e7cc9696fa99b839637233",
     "scripts/check-development.sh": "1f5767f7c78d6a21283c8d8b491f7e23f4d2749d682fbf046709b3cb2f12cff4",

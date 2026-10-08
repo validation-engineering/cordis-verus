@@ -102,18 +102,21 @@ def assigned(manifest, index, count):
     return [item for position, item in enumerate(manifest) if position % count == index]
 
 
-def release_plan(manifest=None):
+def release_plan(manifest=None, *, include_macos_intel=False):
     """Plan bounded platform jobs without installing or invoking the verifier."""
+    require(type(include_macos_intel) is bool, 'Intel platform selection must be boolean')
     manifest = checker().mutation_manifest() if manifest is None else manifest
     require(manifest and len({item[0] for item in manifest}) == len(manifest),
             'Negative-control manifest is empty or has duplicate names')
     # Wall-clock budgets, not SMT resource limits. Intel's 90-minute allowance is
     # engineering headroom after a 40-minute timeout, not a measured proof time.
-    configuration = [('ubuntu-24.04', 2400, 18), ('macos-15', 3600, 24),
-                     ('macos-15-intel', 5400, 38)]
+    configuration = [('ubuntu-24.04', 2400, 18, 'linux-x64-gnu-napi8'),
+                     ('macos-15', 3600, 24, 'darwin-arm64-napi8')]
+    if include_macos_intel:
+        configuration.append(('macos-15-intel', 5400, 38, 'darwin-x64-napi8'))
     platforms, shards = [], []
-    for os_name, timeout, count in configuration:
-        row = {'os': os_name, 'timeout': timeout, 'compileTimeout': 300, 'threads': 2,
+    for os_name, timeout, count, target in configuration:
+        row = {'os': os_name, 'target': target, 'timeout': timeout, 'compileTimeout': 300, 'threads': 2,
                'shardCount': count, 'preflightMinutes': timeout // 60 + 15, 'shardMinutes': 360}
         pieces = [assigned(manifest, index, count) for index in range(count)]
         maximum = max(map(len, pieces))
@@ -123,16 +126,17 @@ def release_plan(manifest=None):
         platforms.append(row)
         shards.extend({**row, 'shard': index} for index in range(count))
     return {'mutationCount': len(manifest), 'preflight': {'include': platforms},
-            'negative': {'include': shards}}
+            'negative': {'include': shards}, 'quality': {'os': [row['os'] for row in platforms]},
+            'targets': [row['target'] for row in platforms]}
 
 
-def write_plan(output=None):
-    plan = release_plan()
+def write_plan(output=None, *, include_macos_intel=False):
+    plan = release_plan(include_macos_intel=include_macos_intel)
     if output is None:
         print(json.dumps(plan, indent=2))
     else:
         with output.open('a') as stream:
-            for key in ['preflight', 'negative']:
+            for key in ['preflight', 'negative', 'quality', 'targets']:
                 stream.write(key + '=' + json.dumps(plan[key], separators=(',', ':')) + '\n')
         print(f"Planned {len(plan['negative']['include'])} shards across "
               f"{len(plan['preflight']['include'])} platforms; {plan['mutationCount']} controls per platform.")
@@ -573,6 +577,7 @@ def main():
     commands = parser.add_subparsers(dest='action', required=True)
     plan = commands.add_parser('plan')
     plan.add_argument('--github-output', type=Path, help='Append matrix JSON to a GitHub job output file')
+    plan.add_argument('--include-macos-intel', action='store_true', help='Also validate and package Intel macOS')
     preflight = commands.add_parser('preflight')
     preflight.add_argument('--output', type=Path, required=True)
     preflight.add_argument('--threads', type=int)
@@ -593,7 +598,7 @@ def main():
     gather.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if args.action == 'plan':
-        write_plan(args.github_output)
+        write_plan(args.github_output, include_macos_intel=args.include_macos_intel)
     elif args.action == 'preflight':
         run_preflight(args.output, threads=args.threads, cpu_budget=args.cpu_budget, timeout=args.timeout)
     elif args.action == 'run':

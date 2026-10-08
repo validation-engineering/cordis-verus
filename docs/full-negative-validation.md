@@ -43,10 +43,12 @@ leave incomplete stage files; collection rejects them.
 
 ## Parallel CI without reducing proof scope
 
-The release workflow first verifies the unchanged whole crate once on each of the
-three platforms. Preflight retains `--trace --time` diagnostics and must pass on
-all platforms before any negative shards start. This prevents one failing baseline
-from being repeated across the entire matrix.
+The release workflow defaults to Linux x64 and macOS Apple Silicon (ARM64).
+Set `include_macos_intel=true` when dispatching it to include macOS Intel. It first
+verifies the unchanged whole crate once on each selected platform. Preflight retains
+`--trace --time` diagnostics and must pass on all selected platforms before any
+negative shards start. This prevents one failing baseline from being repeated across
+the entire matrix.
 
 Each mutation still compiles and verifies the **entire mutated crate**, with one
 worker, two Verus threads and a 300-second compilation deadline. A single platform
@@ -56,7 +58,7 @@ plan supplies both the preflight and shard proof deadlines:
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Linux x64 | 40 min | 18 | 7 | 315 min | 45 min |
 | macOS ARM64 | 60 min | 24 | 5 | 325 min | 35 min |
-| macOS Intel | 90 min | 38 | 3 | 285 min | 75 min |
+| macOS Intel (opt-in) | 90 min | 38 | 3 | 285 min | 75 min |
 
 The planner checks complete mutation coverage and reserves at least 30 minutes
 within each six-hour shard job for installation, evidence checks,
@@ -82,8 +84,10 @@ The final mutation list retains canonical order.
 Each platform's quality job collects its complete planned partition within the ordinary gate,
 alongside positive proof, tests, examples, package builds and installation checks.
 Only the complete collected report can enter `verification/v3`; a green preflight
-or one green shard cannot. Runtime draft creation still requires all three
-platforms to pass the entire quality gate.
+or one green shard cannot. Every selected platform must pass all 114 full-crate
+negative controls and the entire quality gate before runtime draft creation.
+The draft contains exactly the selected platforms' assets and evidence. Excluding
+Intel makes no claim about Intel validation or artifact availability.
 
 Artifacts have platform, attempt and shard identifiers in their names. Rerun the
 **whole workflow** after a failure: rerunning only failed jobs would mix attempts

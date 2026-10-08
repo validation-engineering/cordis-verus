@@ -147,8 +147,10 @@ record and host refinement remain separate work.
 
 A01/A02 delivery support now includes platform-specific precompiled npm assets, a
 standalone new-project installer and optional GitHub draft prerelease creation.
-The workflow requires all three platforms to pass the complete quality gate and
-install/reinstall the built assets first. Runtime use needs Node/npm and GitHub
+The workflow requires every selected platform to pass the complete quality gate
+and install/reinstall the built assets first. Linux x64 and macOS Apple Silicon are
+the defaults; macOS Intel is opt-in with `include_macos_intel=true`. Assets and
+validation claims cover only the selected platforms. Runtime use needs Node/npm and GitHub
 access, not Rust, Verus or a source checkout. This is the Node compatibility runtime,
 not a prebundled Harness application or a pure Rust application binary. No runtime
 release is available yet; [distribution instructions](native-distribution.md) explain

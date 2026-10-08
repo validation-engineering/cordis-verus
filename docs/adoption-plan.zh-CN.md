@@ -123,8 +123,9 @@ A04 已导出 shared Driver 的依赖原因、真实 target/committed binding、
 普通 Rust 的清理合同。外部真实排障记录与宿主 refinement 仍是独立工作。
 
 A01/A02 的交付支持新增按平台打包的预编译 npm 产物、独立新项目安装器和可选的
-GitHub draft prerelease 创建流程。工作流要求三平台完整质量门槛与产物安装/重装
-全部通过后才创建草稿。使用运行库需要 Node/npm 和 GitHub 访问，不需要 Rust、Verus
+GitHub draft prerelease 创建流程。工作流默认选择 Linux x64 和 macOS Apple Silicon，
+设置 `include_macos_intel=true` 可加入 macOS Intel；所有选定平台的完整质量门槛与
+产物安装/重装全部通过后才创建草稿，产物和验证声明仅覆盖这些平台。使用运行库需要 Node/npm 和 GitHub 访问，不需要 Rust、Verus
 或源码 checkout。这是 Node 兼容运行库，不是完整打包的 Harness 应用或纯 Rust 应用
 可执行文件。当前尚无 runtime release；[分发指南](native-distribution.zh-CN.md)说明
 已准备的安装路径和维护者的发行验收方式。

@@ -63,7 +63,10 @@ node ./release-assets/install-cordis.mjs \
 | `darwin-x64-napi8` | macOS / x64 | Node-API 8 |
 | `linux-x64-gnu-napi8` | Linux / x64 / GNU libc | Node-API 8 |
 
-这些是允许的产物目标，不代表整个测试矩阵已经通过。
+这些是允许的产物目标，不代表整个测试矩阵已经通过。发布验证默认选择 Linux x64
+和 macOS Apple Silicon；设置 `include_macos_intel=true` 可加入 macOS Intel。
+每次 Release 只包含本次实际选择并验收通过的目标；未选择 Intel 时，该 Release
+不包含 Intel 产物，也不宣称完成 Intel 验证。
 软件包要求 Node 22.22 或更高版本；Node-API 8 不构成对更早 Node 版本的验证。
 Node 24、Windows、Linux ARM64 和 musl 尚未通过本实现的验收。
 操作系统部署版本和最低 glibc 兼容性需要单独的发布测试。
@@ -160,14 +163,15 @@ SHA-256 提供字节完整性与源码绑定，不提供发布者身份认证。
 并要求源码提交保持干净；唯一允许的已跟踪文件差异是新生成的验证报告。
 它保留真实的原生构建 profile，不会将开发构建悄悄称为优化构建。
 
-[完整发布工作流](../.github/workflows/release-validation.yml)在三个平台上运行。
-每个平台先完成基线预检和本平台计划中的全部[整 crate 负控分片](full-negative-validation.zh-CN.md)，并严格汇总证据，
-再完成全部质量与软件包检查，然后将暂存的运行时安装到新项目中，
+[完整发布工作流](../.github/workflows/release-validation.yml)默认选择 Linux x64 和
+macOS Apple Silicon；手动触发时设置 `include_macos_intel=true` 可加入 macOS Intel。
+每个选定平台先完成基线预检及全部 114 项[整 crate 负控](full-negative-validation.zh-CN.md)，
+严格汇总证据，再完成全部质量与软件包检查，然后将暂存的运行时安装到新项目中，
 执行一次离线 `npm ci` 并运行示例。
 当显式使用 `create_draft=true` 和新的 `release_tag` 触发时，
-工作流会收集三个平台上源码提交一致的产物，添加 `SHA256SUMS`，并创建**预发布草稿**。
-任何平台失败都会阻止该任务运行。它拒绝使用已有标签，也不会自动发布草稿。
-开发工作流不能上传运行时 Release。
+工作流只收集与本次选定平台准确对应、源码提交一致的产物，添加 `SHA256SUMS`，
+并创建**预发布草稿**。任一选定平台失败都会阻止该任务运行。
+它拒绝使用已有标签，也不会自动发布草稿。开发工作流不能上传运行时 Release。
 
 工作流定义不等于执行证据。第一个运行时 Release 仍需要在其准确提交上通过完整质量验证，
 并经过维护者审查。其余发布检查项见[发布流程](releasing.md)。

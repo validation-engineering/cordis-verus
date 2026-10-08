@@ -12,14 +12,22 @@ mutation checks and paper coverage answer different questions.
 | Whole paper | `python3 scripts/check-paper-coverage.py --require-complete` | Whole-paper ledger conditions; currently fails because obligations remain open and original claims are refuted |
 
 Default push/PR CI runs **development** checks on Linux x86_64 and macOS
-ARM64/Intel. The separate **Full release validation** workflow is manually
-dispatched. It first runs one baseline preflight per platform, then all complete-crate
-negative controls in a platform-specific partition using strictly bound shared baseline
-evidence. The [execution plan](full-negative-validation.md) keeps preflight and shard
-deadlines consistent and reserves time for cleanup within each job. It collects them within `quality.sh` on the same platform matrix. Green development CI does
-not mean full release acceptance. The release workflow can create a draft runtime
-prerelease after the complete gate; it does not publish that draft automatically.
-Both retain logs and artifacts; full validation also retains negative reports.
+Apple Silicon (ARM64). A manual development run can add macOS Intel with
+`include_macos_intel=true`.
+
+The separate **Full release validation** workflow is manually dispatched and uses
+the same two default platforms; `include_macos_intel=true` adds Intel to that run.
+It first runs one baseline preflight per selected platform, then all 114 complete-crate
+negative controls on each platform in a platform-specific partition using strictly
+bound shared baseline evidence. The [execution plan](full-negative-validation.md)
+keeps preflight and shard deadlines consistent and reserves time for cleanup within
+each job. Each selected platform collects its results within `quality.sh`.
+Green development CI does not mean full release acceptance. The release workflow
+can create a draft runtime prerelease after every selected platform passes the
+complete gate; its assets and evidence must match that selection exactly. A default
+run neither validates Intel nor produces Intel assets. It does not publish the draft
+automatically. Both workflows retain logs and artifacts; full validation also retains
+negative reports.
 
 The development/release Node suites and `npm run test:node` use four concurrent
 test files, with the same 30-second timeout and complete test set. This bounds

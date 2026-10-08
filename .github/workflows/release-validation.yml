@@ -3,6 +3,11 @@ name: Full release validation
 on:
   workflow_dispatch:
     inputs:
+      include_macos_intel:
+        description: Also require full validation and runtime assets for Intel macOS
+        required: true
+        default: false
+        type: boolean
       create_draft:
         description: Create a private/draft runtime prerelease only after all full quality jobs pass
         required: true
@@ -28,13 +33,15 @@ jobs:
     outputs:
       preflight: ${{ steps.matrix.outputs.preflight }}
       negative: ${{ steps.matrix.outputs.negative }}
+      quality: ${{ steps.matrix.outputs.quality }}
+      targets: ${{ steps.matrix.outputs.targets }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
       - name: Generate matching preflight and negative matrices
         id: matrix
-        run: python3 scripts/negative-shards.py plan --github-output "$GITHUB_OUTPUT"
+        run: python3 scripts/negative-shards.py plan --github-output "$GITHUB_OUTPUT" ${{ inputs.include_macos_intel && '--include-macos-intel' || '' }}
 
   preflight:
     name: Negative baseline preflight (${{ matrix.os }})
@@ -124,11 +131,10 @@ jobs:
 
   quality:
     name: Full quality (${{ matrix.os }})
-    needs: negative
+    needs: [plan, negative]
     strategy:
       fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-15, macos-15-intel]
+      matrix: ${{ fromJSON(needs.plan.outputs.quality) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
     env:
@@ -199,9 +205,11 @@ jobs:
 
   draft-release:
     name: Collect and upload a draft runtime prerelease
-    needs: quality
+    needs: [plan, quality]
     if: ${{ inputs.create_draft }}
     runs-on: ubuntu-24.04
+    env:
+      RELEASE_TARGETS_JSON: ${{ needs.plan.outputs.targets }}
     permissions:
       contents: write
     steps:
@@ -213,15 +221,15 @@ jobs:
         with:
           pattern: full-validation-${{ github.run_attempt }}-*
           path: ${{ runner.temp }}/downloaded
-      - name: Validate and collect the exact three platform asset sets
-        run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA"
+      - name: Validate and collect the exact selected platform asset sets
+        run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA" --targets-json "$RELEASE_TARGETS_JSON"
       - name: Create draft prerelease with tested runtime packages
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           python3 - <<'PY'
-          import os, re, subprocess
+          import json, os, re, subprocess
           from pathlib import Path
           tag = os.environ['RELEASE_TAG']
           repository = os.environ['GITHUB_REPOSITORY']
@@ -233,8 +241,10 @@ jobs:
           if 'HTTP 404' not in existing.stderr:
               raise SystemExit('Could not establish that the release tag is unused: ' + existing.stderr)
           notes = Path('runtime-release-notes.md')
-          notes.write_text('Precompiled Node compatibility runtime for macOS ARM64/x64 and Linux x64 GNU.\n\n'
-                           'All three platforms passed the full release quality gate, including every required full-crate negative control, package installation and native smoke checks.\n\n'
+          labels = {'linux-x64-gnu-napi8': 'Linux x64 GNU', 'darwin-arm64-napi8': 'macOS Apple Silicon', 'darwin-x64-napi8': 'macOS Intel'}
+          platforms = ', '.join(labels[target] for target in json.loads(os.environ['RELEASE_TARGETS_JSON']))
+          notes.write_text('Precompiled Node compatibility runtime for ' + platforms + '.\n\n'
+                           'All selected platforms passed the full release quality gate, including every required full-crate negative control, package installation and native smoke checks.\n\n'
                            'This is an experimental runtime prerelease, not the complete Harness application. The kernel proof scope has not expanded; paper-wide completion is not claimed. Node.js 22.22+ is required; the exact accepted runtime is recorded in each asset manifest. See docs/native-distribution.md for installation and platform limits.\n\n'
                            'Assets bind to commit ' + os.environ['GITHUB_SHA'] + '. Review this draft before publishing.\n')
           assets = [str(path) for path in sorted((Path(os.environ['RUNNER_TEMP']) / 'release-assets').iterdir())]

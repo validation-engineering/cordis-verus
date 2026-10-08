@@ -98,6 +98,6 @@ owned child、独立 owner anchor、ready/retire/join 与 cleanup retry；定义
 
 A03 下一步仍需真实插件迁移及回退记录；A04 的四类诊断已有 shared Driver + Node 实现和定向回归，详见[宿主诊断](host-diagnostics.zh-CN.md)。普通 Rust 清理合同、外部真实排障与宿主 refinement 仍单独跟踪。兼容验收继续保留原样上游套件、官方工作流与目标应用的各自结果，不能用局部回归替代整体迁移。
 
-A01/A02 已加入 GitHub Release 预编译运行库的打包、校验和独立安装路径；三平台全量质量检查通过后才能创建发行草稿，当前尚未发布 runtime release。完整 Harness 应用打包仍是后续交付，见[分发指南](native-distribution.zh-CN.md)。
+A01/A02 已加入 GitHub Release 预编译运行库的打包、校验和独立安装路径；默认选择 Linux x64 和 macOS Apple Silicon，设置 `include_macos_intel=true` 可加入 macOS Intel。所有选定平台的全量质量检查通过后才能创建发行草稿，产物与验证声明仅覆盖这些平台。当前尚未发布 runtime release。完整 Harness 应用打包仍是后续交付，见[分发指南](native-distribution.zh-CN.md)。
 
 运营验收关注外部独立复现、实际插件接入与一次相关修改后的重新验证；当前没有声称已有外部采用。完整发布负控、跨平台实际运行和公开前安全报告渠道见[证据指南](evidence-guide.md)。
