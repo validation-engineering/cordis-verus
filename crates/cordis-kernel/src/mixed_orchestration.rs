@@ -177,6 +177,8 @@ pub proof fn actual_operation_insert()
             inverse:lift::Inverse::Operation {provider:0usize,key:crate::recovery_examples::key(0),undo:|v:int|Some(v-5)}}})
     },
 {
+    // Reuse the concrete inverse guarantee before composing the insertion.
+    crate::recovery_examples::actual_operation(5,7);
     crate::recovery_examples::actual_execution();crate::recovery_examples::primitive_theory();
     og::exact_theory(crate::recovery_examples::equality(),crate::recovery_examples::library());
     let lib=crate::recovery_examples::library();let programs=crate::recovery_examples::programs();

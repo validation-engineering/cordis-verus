@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Distribute complete-crate negative checks; accept only their complete union.
 
-Each shard verifies an unchanged full crate and compiles/verifies every assigned
-mutant as a full crate. Collection revalidates the original output and command
+Each shard compiles/verifies every assigned mutant as a full crate. Its positive
+baseline is run locally or reused from the exact same CI run/attempt and platform. Collection revalidates the original output and command
 metadata, rather than trusting a shard's summarized success flag.
 """
 import argparse
@@ -20,7 +20,8 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA = 'cordis-verus.full-negative-shard/v1'
+SCHEMA = 'cordis-verus.full-negative-shard/v2'
+PREFLIGHT_SCHEMA = 'cordis-verus.negative-preflight/v2'
 SCRIPT_SHA = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
@@ -123,12 +124,95 @@ def positive(result):
             and type(stats.get('verified')) is int and stats['verified'] > 0
             and type(stats.get('errors')) is int and stats['errors'] == 0
             and stats.get('encountered-vir-error') is False
+            and stats.get('encountered-error') is False
             and stats.get('is-verifying-entire-crate') is True,
             'Incomplete full-crate positive baseline')
     return data
 
 
-def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, timeout=1200):
+def run_preflight(output, *, threads=None, cpu_budget=None, timeout=2400):
+    """Verify one full positive baseline; reusable only in this CI run/attempt."""
+    require(type(timeout) is int and timeout > 0, 'Timeout must be positive')
+    checks = checker()
+    budget = checks.execution_budget(1, threads, cpu_budget)
+    binary, environment = checks.toolchain()
+    before = binding(checks, binary)
+    output.mkdir(parents=True, exist_ok=False)
+    record = {'schema': PREFLIGHT_SCHEMA, 'status': 'running',
+              'releaseAcceptance': False, 'binding': before,
+              'execution': {**budget, 'timeoutSeconds': timeout, 'diagnostics': True}}
+    save(output / 'preflight.json', record)
+    try:
+        with tempfile.TemporaryDirectory(prefix='cordis-negative-preflight-') as temporary:
+            source = Path(temporary) / 'baseline'
+            shutil.copytree(ROOT / 'crates/cordis-kernel/src', source)
+            print(f"Preflight: unchanged whole crate, {budget['threadsPerWorker']} threads, "
+                  f"{timeout}s deadline; trace and timings retained in {output}", flush=True)
+            with checks.ProcessSupervisor().signal_handlers() as supervisor:
+                result = checks.run_verus(binary, environment, source / 'lib.rs', output / 'baseline',
+                                          threads=budget['threadsPerWorker'], timeout=timeout,
+                                          supervisor=supervisor, diagnostics=True)
+                whole = positive(result)
+                supervisor.check()
+            supervisor.check()
+        require(binding(checks, binary) == before, 'Sources/toolchain changed during preflight')
+        record.update(status='passed', checkedAt=datetime.now(timezone.utc).isoformat(),
+                      baseline=whole['verification-results'], verus=whole['verus'],
+                      files={name: digest(safe_file(output, name)) for name in stage_files('baseline')})
+        supervisor.check()
+        save(output / 'preflight.json', record)
+        print(f"Preflight passed: {whole['verification-results']['verified']} verified, 0 errors. "
+              'Same-attempt shards may reuse these raw baseline files; every mutant still runs as a full crate.', flush=True)
+    except BaseException as error:
+        record.update(status='failed', failure=f'{type(error).__name__}: {error}')
+        save(output / 'preflight.json', record)
+        raise
+    return record
+
+
+def validate_execution(execution, *, compile_timeout=False):
+    keys = ['jobs', 'threadsPerWorker', 'timeoutSeconds', 'availableCpus', 'cpuBudget',
+            'requestedJobs', 'baselineThreads']
+    if compile_timeout:
+        keys.append('compileTimeoutSeconds')
+    require(isinstance(execution, dict)
+            and all(type(execution.get(key)) is int and execution[key] > 0 for key in keys)
+            and execution['jobs'] * execution['threadsPerWorker'] <= execution['cpuBudget']
+            <= execution['availableCpus'] and execution['requestedJobs'] >= execution['jobs']
+            and execution['baselineThreads'] == execution['threadsPerWorker']
+            and execution.get('diagnostics') is True,
+            'Invalid shard or preflight execution budget')
+
+
+def validate_preflight(directory, expected_binding, expected_source, execution):
+    """Recheck raw evidence, never use the producer's status as proof by itself."""
+    require(not directory.is_symlink(), 'Symlinked preflight evidence is not accepted')
+    path = safe_file(directory, 'preflight.json')
+    record = read_json(path)
+    origin = expected_binding.get('origin')
+    names = {'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_SHA'}
+    require(isinstance(origin, dict) and set(origin) == names
+            and all(isinstance(value, str) and value for value in origin.values()),
+            'Preflight reuse requires a complete current CI run/attempt identity')
+    require(record.get('schema') == PREFLIGHT_SCHEMA and record.get('status') == 'passed'
+            and record.get('releaseAcceptance') is False and record.get('binding') == expected_binding,
+            'Preflight source/toolchain/platform/run identity differs or preflight failed')
+    validate_execution(record.get('execution'))
+    require(all(record['execution'][key] == execution[key]
+                for key in ['threadsPerWorker', 'baselineThreads', 'timeoutSeconds', 'diagnostics']),
+            'Preflight verifier parameters differ from shard parameters')
+    require(set(record.get('files', {})) == set(stage_files('baseline')),
+            'Incomplete or additional preflight stage evidence')
+    whole = positive(stage(directory, 'baseline', record, expected_source))
+    require(record.get('baseline') == whole['verification-results'] and record.get('verus') == whole['verus'],
+            'Preflight summary differs from raw verifier output')
+    return record, whole, digest(path)
+
+
+def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, timeout=2400,
+              compile_timeout=300, preflight=None):
+    require(type(timeout) is int and timeout > 0 and type(compile_timeout) is int and compile_timeout > 0,
+            'Timeouts must be positive')
     checks = checker()
     manifest = checks.mutation_manifest()
     selected = assigned(manifest, index, count)
@@ -137,31 +221,51 @@ def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, ti
     before = binding(checks, binary)
     output.mkdir(parents=True, exist_ok=False)
     record = {'schema': SCHEMA, 'status': 'running', 'binding': before,
+              'baselineMode': 'preflight' if preflight is not None else 'local',
               'shard': {'index': index, 'count': count, 'names': [item[0] for item in selected]},
-              'execution': {**budget, 'timeoutSeconds': timeout}}
+              'execution': {**budget, 'timeoutSeconds': timeout,
+                            'compileTimeoutSeconds': compile_timeout, 'diagnostics': True}}
     save(output / 'shard.json', record)
     try:
         with tempfile.TemporaryDirectory(prefix='cordis-full-shard-') as temporary:
             temporary = Path(temporary)
             baseline = temporary / 'baseline'
             shutil.copytree(ROOT / 'crates/cordis-kernel/src', baseline)
+            baseline_source = checks.source_fingerprint(baseline)
             with checks.ProcessSupervisor().signal_handlers() as supervisor:
-                result = checks.run_verus(binary, environment, baseline / 'lib.rs', output / 'baseline',
-                                          threads=budget['threadsPerWorker'], timeout=timeout,
-                                          supervisor=supervisor)
-                whole = positive(result)
-                print(f"OK unmodified kernel: {whole['verification-results']['verified']} verified, 0 errors", flush=True)
+                if preflight is None:
+                    result = checks.run_verus(binary, environment, baseline / 'lib.rs', output / 'baseline',
+                                              threads=budget['threadsPerWorker'], timeout=timeout,
+                                              supervisor=supervisor, diagnostics=True)
+                    whole = positive(result)
+                else:
+                    _, whole, preflight_hash = validate_preflight(preflight, before, baseline_source,
+                                                                 record['execution'])
+                    for name in ['preflight.json'] + stage_files('baseline'):
+                        shutil.copyfile(safe_file(preflight, name), output / name)
+                    _, _, copied_hash = validate_preflight(output, before, baseline_source, record['execution'])
+                    require(copied_hash == preflight_hash, 'Preflight changed while copying evidence')
+                    record['preflightSha256'] = preflight_hash
+                print(f"OK unmodified kernel ({record['baselineMode']}): "
+                      f"{whole['verification-results']['verified']} verified, 0 errors", flush=True)
                 controls = checks.check_mutations(selected, baseline, temporary, output, binary, environment,
                                                  jobs=budget['jobs'], threads=budget['threadsPerWorker'],
-                                                 timeout=timeout, supervisor=supervisor)
+                                                 timeout=timeout, compile_timeout=compile_timeout,
+                                                 supervisor=supervisor, diagnostics=True)
                 supervisor.check()
+            supervisor.check()
         require(binding(checks, binary) == before, 'Sources/toolchain changed during shard execution')
         names = stage_files('baseline')
+        if preflight is not None:
+            _, _, final_hash = validate_preflight(output, before, baseline_source, record['execution'])
+            require(final_hash == record['preflightSha256'], 'Preflight changed during shard execution')
+            names.append('preflight.json')
         for item in selected:
             names += stage_files(item[0] + '-compile') + stage_files(item[0])
         record.update(status='passed', checkedAt=datetime.now(timezone.utc).isoformat(),
                       baseline=whole['verification-results'], verus=whole['verus'], mutations=controls,
                       files={name: digest(safe_file(output, name)) for name in names})
+        supervisor.check()
         save(output / 'shard.json', record)
         print(f'Full-crate shard {index + 1}/{count} passed: {len(selected)} controls. Not complete release evidence.')
     except BaseException as error:
@@ -171,7 +275,35 @@ def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, ti
     return record
 
 
+def validate_cleanup(metadata, stem):
+    cleanup = metadata.get('cleanup', {})
+    pid = metadata.get('pid')
+    require(type(pid) is int and pid > 0 and isinstance(cleanup, dict)
+            and cleanup.get('leaderReaped') is True
+            and cleanup.get('observationMethod') in {'waitid', 'kqueue'}
+            and not any(key.endswith('Error') for key in cleanup),
+            'Incomplete process cleanup evidence: ' + stem)
+    snapshots = cleanup.get('snapshots')
+    require(isinstance(snapshots, list) and len(snapshots) >= 3
+            and all(isinstance(item, dict) for item in snapshots)
+            and [item.get('phase') for item in snapshots[:2]] == ['before-cleanup', 'before-kill']
+            and all(item.get('phase') == 'after-kill' for item in snapshots[2:]),
+            'Incomplete process cleanup snapshots: ' + stem)
+    for snapshot in snapshots:
+        members = snapshot.get('members')
+        require(isinstance(members, list) and all(isinstance(member, dict)
+                and type(member.get('pid')) is int and member['pid'] > 0
+                and type(member.get('groupId')) is int and member['groupId'] == pid
+                and isinstance(member.get('state'), str) and member['state'] for member in members),
+                'Invalid process cleanup members: ' + stem)
+        require(any(member['pid'] == pid for member in members),
+                'Cleanup snapshot lacks retained group leader: ' + stem)
+    require(all(member['state'].startswith('Z') for member in snapshots[-1]['members']),
+            'Live process-group members remain after cleanup: ' + stem)
+
+
 def stage(directory, stem, record, expected_source, *, compile_only=False):
+    validate_execution(record.get('execution'), compile_timeout=compile_only)
     for name in stage_files(stem):
         require(digest(safe_file(directory, name)) == record['files'].get(name),
                 'Changed stage bytes: ' + name)
@@ -183,11 +315,15 @@ def stage(directory, stem, record, expected_source, *, compile_only=False):
             and type(metadata.get('threads')) is int
             and metadata['threads'] == record['execution']['threadsPerWorker']
             and type(metadata.get('timeoutSeconds')) is int
-            and metadata['timeoutSeconds'] == record['execution']['timeoutSeconds']
+            and metadata['timeoutSeconds'] == record['execution'][
+                'compileTimeoutSeconds' if compile_only else 'timeoutSeconds']
+            and metadata.get('diagnostics') is True
             and type(metadata.get('durationSeconds')) in {int, float}
             and math.isfinite(metadata['durationSeconds']) and metadata['durationSeconds'] >= 0
-            and metadata.get('signal') is None and 'cancellationReason' not in metadata,
+            and metadata.get('signal') is None and 'cancellationReason' not in metadata
+            and 'cleanupError' not in metadata and 'primaryStatus' not in metadata and 'error' not in metadata,
             'Incomplete or mismatched stage metadata: ' + stem)
+    validate_cleanup(metadata, stem)
     command = metadata.get('command')
     require(isinstance(command, list) and len(command) >= 2
             and all(isinstance(value, str) for value in command)
@@ -195,7 +331,7 @@ def stage(directory, stem, record, expected_source, *, compile_only=False):
             'Invalid verifier command: ' + stem)
     flags = ['--crate-name', 'cordis_negative', '--crate-type=lib', '--edition=2021',
              '--no-cheating', '--output-json', '--triggers-mode', 'silent',
-             '--num-threads', str(record['execution']['threadsPerWorker'])]
+             '--num-threads', str(record['execution']['threadsPerWorker']), '--trace', '--time']
     if compile_only:
         flags += ['--no-verify', '--compile', '-o', str(Path(command[1]).parent / 'compile-check.rlib')]
     require(command[2:] == flags, 'Unexpected or scoped verifier flags: ' + stem)
@@ -233,6 +369,10 @@ def collect(input_directory, output):
     indices = [record.get('shard', {}).get('index') for record in reports]
     require(all(type(index) is int for index in indices) and sorted(indices) == list(range(count)),
             'Duplicate or missing shard indices')
+    modes = {record.get('baselineMode') for record in reports}
+    require(len(modes) == 1 and modes.issubset({'local', 'preflight'}), 'Mixed or invalid baseline modes')
+    baseline_mode = modes.pop()
+    preflight_hash = None
     rows, baseline, version, inputs = {}, None, None, []
     with tempfile.TemporaryDirectory(prefix='cordis-collect-sources-') as temporary:
         original = Path(temporary) / 'source'
@@ -246,18 +386,26 @@ def collect(input_directory, output):
                     and record['shard'].get('names') == names,
                     'Shard source/toolchain/run identity or selection differs')
             execution = record.get('execution', {})
-            require(all(type(execution.get(key)) is int and execution[key] > 0
-                        for key in ['jobs', 'threadsPerWorker', 'timeoutSeconds', 'availableCpus', 'cpuBudget',
-                                    'requestedJobs', 'baselineThreads'])
-                    and execution['jobs'] * execution['threadsPerWorker'] <= execution['cpuBudget']
-                    <= execution['availableCpus'] and execution['requestedJobs'] >= execution['jobs']
-                    and execution['baselineThreads'] == execution['threadsPerWorker'],
-                    'Invalid shard execution budget')
+            validate_execution(execution, compile_timeout=True)
             expected_files = set(stage_files('baseline'))
+            if baseline_mode == 'preflight':
+                expected_files.add('preflight.json')
             for name in names:
                 expected_files.update(stage_files(name + '-compile') + stage_files(name))
             require(set(record.get('files', {})) == expected_files, 'Incomplete or additional stage evidence')
-            whole = positive(stage(path.parent, 'baseline', record, baseline_source))
+            if baseline_mode == 'preflight':
+                _, whole, identity = validate_preflight(path.parent, expected_binding, baseline_source, execution)
+                require(record.get('preflightSha256') == identity
+                        and record['files'].get('preflight.json') == identity,
+                        'Changed preflight manifest bytes or identity')
+                require(all(record['files'][name] == digest(safe_file(path.parent, name))
+                            for name in stage_files('baseline')), 'Changed stage bytes: reused baseline')
+                if preflight_hash is None:
+                    preflight_hash = identity
+                require(identity == preflight_hash, 'Shards used different preflight evidence')
+            else:
+                require('preflightSha256' not in record, 'Local baseline cannot claim preflight evidence')
+                whole = positive(stage(path.parent, 'baseline', record, baseline_source))
             require(record.get('baseline') == whole['verification-results'] and record.get('verus') == whole['verus'],
                     'Baseline summary differs from raw verifier output')
             if baseline is None:
@@ -285,7 +433,8 @@ def collect(input_directory, output):
     require(binding(checks, binary) == expected_binding, 'Sources/toolchain changed during collection')
     summary = {'verus': version, 'baseline': baseline,
                'execution': {'mode': 'full-crate-shards', 'shardCount': count,
-                             'binding': expected_binding, 'shards': inputs},
+                             'binding': expected_binding, 'baselineMode': baseline_mode,
+                             'preflightSha256': preflight_hash, 'shards': inputs},
                'mutations': [rows[item[0]] for item in manifest]}
     recorder().validate_negative_report(summary, [item[0] for item in manifest])
     # The recorder removes an earlier report before invoking the quality gate.
@@ -300,6 +449,11 @@ def collect(input_directory, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='action', required=True)
+    preflight = commands.add_parser('preflight')
+    preflight.add_argument('--output', type=Path, required=True)
+    preflight.add_argument('--threads', type=int)
+    preflight.add_argument('--cpu-budget', type=int)
+    preflight.add_argument('--timeout', type=int, default=2400)
     run = commands.add_parser('run')
     run.add_argument('--shard-index', type=int, required=True)
     run.add_argument('--shard-count', type=int, required=True)
@@ -307,15 +461,20 @@ def main():
     run.add_argument('--jobs', type=int, default=1)
     run.add_argument('--threads', type=int)
     run.add_argument('--cpu-budget', type=int)
-    run.add_argument('--timeout', type=int, default=1200)
+    run.add_argument('--timeout', type=int, default=2400)
+    run.add_argument('--compile-timeout', type=int, default=300)
+    run.add_argument('--preflight', type=Path, help='Reuse raw baseline evidence from this CI run/attempt only')
     gather = commands.add_parser('collect')
     gather.add_argument('--input', type=Path, required=True)
     gather.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    if args.action == 'run':
+    if args.action == 'preflight':
+        run_preflight(args.output, threads=args.threads, cpu_budget=args.cpu_budget, timeout=args.timeout)
+    elif args.action == 'run':
         require(args.timeout > 0, 'Timeout must be positive')
         run_shard(args.shard_index, args.shard_count, args.output, jobs=args.jobs,
-                  threads=args.threads, cpu_budget=args.cpu_budget, timeout=args.timeout)
+                  threads=args.threads, cpu_budget=args.cpu_budget, timeout=args.timeout,
+                  compile_timeout=args.compile_timeout, preflight=args.preflight)
     else:
         collect(args.input, args.output)
 

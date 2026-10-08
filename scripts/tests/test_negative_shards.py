@@ -8,6 +8,7 @@ import copy
 import importlib.util
 import io
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -46,9 +47,10 @@ class ShardEvidenceTests(unittest.TestCase):
         self.bound = {'sourceHashes': {'lib.rs': SHARDS.digest(self.source / 'lib.rs')},
                       'toolHashes': {'verus': 'synthetic'}, 'manifestSha256': SHARDS.fingerprint(self.manifest),
                       'host': {'os': 'fixture', 'architecture': 'fixture'},
-                      'origin': {'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_SHA': 'fixture'}}
+                      'origin': {'GITHUB_REPOSITORY': 'fixture/repository', 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_SHA': 'fixture'}}
         self.execution = {'availableCpus': 2, 'cpuBudget': 2, 'requestedJobs': 1, 'jobs': 1,
-                          'threadsPerWorker': 2, 'baselineThreads': 2, 'timeoutSeconds': 1200}
+                          'threadsPerWorker': 2, 'baselineThreads': 2, 'timeoutSeconds': 2400,
+                          'compileTimeoutSeconds': 300, 'diagnostics': True}
         self.version = {'version': 'synthetic-unit-fixture'}
         self.baseline = {'success': True, 'encountered-vir-error': False, 'encountered-error': False,
                          'verified': 40, 'errors': 0, 'is-verifying-entire-crate': True}
@@ -72,15 +74,19 @@ class ShardEvidenceTests(unittest.TestCase):
         code = 1 if kind == 'negative' else 0
         command = ['/pinned/verus', '/temporary/source/lib.rs', '--crate-name', 'cordis_negative',
                    '--crate-type=lib', '--edition=2021', '--no-cheating', '--output-json',
-                   '--triggers-mode', 'silent', '--num-threads', '2']
+                   '--triggers-mode', 'silent', '--num-threads', '2', '--trace', '--time']
         if compile_only:
             command += ['--no-verify', '--compile', '-o', '/temporary/source/compile-check.rlib']
         SHARDS.save(directory / (stem + '.stdout.json'), {'verification-results': stats, 'verus': self.version})
         (directory / (stem + '.stderr.txt')).write_text('error: assertion failed\n' if code else '')
         SHARDS.save(directory / (stem + '.meta.json'), {
             'schema': 'cordis.negative-stage/v1', 'command': command, 'status': 'completed',
-            'returncode': code, 'sourceSha256': source_hash, 'threads': 2, 'timeoutSeconds': 1200,
-            'compileOnly': compile_only, 'durationSeconds': 0.1})
+            'returncode': code, 'sourceSha256': source_hash, 'threads': 2,
+            'timeoutSeconds': self.execution['compileTimeoutSeconds' if compile_only else 'timeoutSeconds'],
+            'compileOnly': compile_only, 'durationSeconds': 0.1, 'diagnostics': True,
+            'pid': 42, 'cleanup': {'observationMethod': 'waitid', 'leaderReaped': True,
+                'snapshots': [{'phase': phase, 'members': [{'pid': 42, 'groupId': 42, 'state': 'Z'}]}
+                              for phase in ['before-cleanup', 'before-kill', 'after-kill']]}})
 
     def write_shard(self, index):
         directory = self.inputs / str(index)
@@ -99,7 +105,7 @@ class ShardEvidenceTests(unittest.TestCase):
             filenames += SHARDS.stage_files(name + '-compile') + SHARDS.stage_files(name)
             rows.append({'name': name, 'compiles': True, 'verification-results': self.negative})
         SHARDS.save(directory / 'shard.json', {
-            'schema': SHARDS.SCHEMA, 'status': 'passed', 'binding': self.bound,
+            'schema': SHARDS.SCHEMA, 'status': 'passed', 'binding': self.bound, 'baselineMode': 'local',
             'shard': {'index': index, 'count': 2, 'names': [item[0] for item in selected]},
             'execution': self.execution, 'baseline': self.baseline, 'verus': self.version,
             'mutations': rows, 'files': {name: SHARDS.digest(directory / name) for name in filenames}})
@@ -200,7 +206,8 @@ class ShardEvidenceTests(unittest.TestCase):
         for change in [{'status': 'timed_out'}, {'status': 'cancelled'}, {'signal': 15},
                        {'cancellationReason': 'interrupted'}, {'threads': True},
                        {'timeoutSeconds': True}, {'durationSeconds': float('nan')},
-                       {'durationSeconds': -1}, {'returncode': True}, {'compileOnly': 0}]:
+                       {'durationSeconds': -1}, {'returncode': True}, {'compileOnly': 0},
+                       {'diagnostics': False}, {'cleanupError': 'failed'}, {'primaryStatus': 'timed_out'}]:
             with self.subTest(change=change):
                 paths = [self.inputs / '0/first.meta.json', self.inputs / '0/shard.json']
                 original = [path.read_bytes() for path in paths]
@@ -243,15 +250,274 @@ class ShardEvidenceTests(unittest.TestCase):
             self.rejected('changed during collection')
 
 
+class SharedPreflightEvidenceTests(unittest.TestCase):
+    # All outputs remain synthetic fixtures; no verifier or CI environment is run.
+    write_stage = ShardEvidenceTests.write_stage
+    write_shard = ShardEvidenceTests.write_shard
+    edit = ShardEvidenceTests.edit
+    collect = ShardEvidenceTests.collect
+    rejected = ShardEvidenceTests.rejected
+
+    def setUp(self):
+        ShardEvidenceTests.setUp(self)
+        self.preflight = self.root / 'preflight'
+        self.preflight.mkdir()
+        self.write_stage(self.preflight, 'baseline', CHECKS.source_fingerprint(self.source), kind='positive')
+        self.preflight_execution = {key: value for key, value in self.execution.items()
+                                    if key != 'compileTimeoutSeconds'}
+        SHARDS.save(self.preflight / 'preflight.json', {
+            'schema': SHARDS.PREFLIGHT_SCHEMA, 'status': 'passed', 'releaseAcceptance': False,
+            'binding': self.bound, 'execution': self.preflight_execution,
+            'baseline': self.baseline, 'verus': self.version,
+            'files': {name: SHARDS.digest(self.preflight / name) for name in SHARDS.stage_files('baseline')}})
+        for index in range(2):
+            directory = self.inputs / str(index)
+            for name in ['preflight.json'] + SHARDS.stage_files('baseline'):
+                shutil.copyfile(self.preflight / name, directory / name)
+            self.edit(f'{index}/shard.json', lambda value: value.update(
+                baselineMode='preflight', preflightSha256=SHARDS.digest(directory / 'preflight.json')))
+            self.edit(f'{index}/shard.json', lambda value: value['files'].update(
+                {name: SHARDS.digest(directory / name) for name in ['preflight.json'] + SHARDS.stage_files('baseline')}))
+
+    @contextlib.contextmanager
+    def restore_inputs(self):
+        original = {path: path.read_bytes() for path in self.inputs.rglob('*') if path.is_file()}
+        try:
+            yield
+        finally:
+            for path, raw in original.items():
+                path.write_bytes(raw)
+
+    def tamper(self, index, name, change):
+        """Rehash all enclosing manifests: rejection must inspect the actual content."""
+        directory = self.inputs / str(index)
+        path = directory / name
+        value = SHARDS.read_json(path)
+        change(value)
+        SHARDS.save(path, value)
+        preflight = SHARDS.read_json(directory / 'preflight.json')
+        if name != 'preflight.json':
+            preflight['files'][name] = SHARDS.digest(path)
+            SHARDS.save(directory / 'preflight.json', preflight)
+        self.edit(f'{index}/shard.json', lambda value: value.update(
+            preflightSha256=SHARDS.digest(directory / 'preflight.json')))
+        self.edit(f'{index}/shard.json', lambda value: value['files'].update(
+            {name: SHARDS.digest(directory / name) for name in ['preflight.json'] + SHARDS.stage_files('baseline')}))
+
+    def test_shared_baseline_union_records_one_exact_preflight_identity(self):
+        summary = self.collect()
+        self.assertEqual(summary['execution']['baselineMode'], 'preflight')
+        self.assertEqual(summary['execution']['preflightSha256'], SHARDS.digest(self.preflight / 'preflight.json'))
+        self.assertEqual([item['name'] for item in summary['mutations']], ['first', 'second'])
+
+    def test_unhashed_raw_preflight_tampering_is_rejected(self):
+        (self.inputs / '0/baseline.stderr.txt').write_text('changed')
+        self.rejected('Changed stage bytes')
+
+    def test_rehashed_positive_flags_and_output_are_still_checked(self):
+        for changes in [{'verified': 0}, {'errors': 1}, {'success': False},
+                        {'encountered-error': True}, {'is-verifying-entire-crate': False}]:
+            with self.subTest(changes=changes), self.restore_inputs():
+                self.tamper(0, 'baseline.stdout.json', lambda value: value['verification-results'].update(changes))
+                self.rejected('positive baseline')
+
+    def test_preflight_requires_complete_current_ci_origin(self):
+        for origin in [None, {}, {'GITHUB_RUN_ID': '123'}]:
+            with self.subTest(origin=origin), self.assertRaisesRegex(RuntimeError, 'current CI run/attempt'):
+                SHARDS.validate_preflight(self.preflight, {**self.bound, 'origin': origin},
+                                          CHECKS.source_fingerprint(self.source), self.execution)
+
+    def test_preflight_cannot_be_reused_across_repo_run_attempt_or_commit(self):
+        for key in ['GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_SHA']:
+            with self.subTest(key=key), self.restore_inputs():
+                self.tamper(0, 'preflight.json', lambda value: value['binding']['origin'].update({key: 'different'}))
+                self.rejected('Preflight source/toolchain/platform/run identity')
+
+    def test_preflight_requires_same_sources_tools_platform_and_manifest(self):
+        for key in ['sourceHashes', 'toolHashes', 'host', 'manifestSha256']:
+            with self.subTest(key=key), self.restore_inputs():
+                self.tamper(0, 'preflight.json', lambda value: value['binding'].update({key: 'different'}))
+                self.rejected('Preflight source/toolchain/platform/run identity')
+
+    def test_preflight_status_alone_cannot_hide_timeout_cancellation_or_cleanup_failure(self):
+        for changes in [{'status': 'timed_out'}, {'status': 'cancelled'}, {'signal': 15},
+                        {'cancellationReason': 'cancelled'}, {'cleanupError': 'failed'},
+                        {'primaryStatus': 'completed'}, {'diagnostics': False}, {'timeoutSeconds': 1}]:
+            with self.subTest(changes=changes), self.restore_inputs():
+                self.tamper(0, 'baseline.meta.json', lambda value: value.update(changes))
+                self.rejected('stage metadata')
+
+    def test_preflight_parameter_mismatch_and_extra_or_missing_flags_are_rejected(self):
+        for key, changed in [('threadsPerWorker', 1), ('timeoutSeconds', 1200)]:
+            with self.subTest(key=key), self.restore_inputs():
+                self.edit('0/shard.json', lambda value: value['execution'].update(
+                    {key: changed, **({'baselineThreads': changed} if key == 'threadsPerWorker' else {})}))
+                self.rejected('Preflight verifier parameters differ')
+        for change in [lambda command: command.extend(['--verify-only-module', 'effects']),
+                       lambda command: command.remove('--trace'), lambda command: command.remove('--time')]:
+            with self.subTest(change=change), self.restore_inputs():
+                self.tamper(0, 'baseline.meta.json', lambda value: change(value['command']))
+                self.rejected('Unexpected or scoped')
+
+    def test_rehashed_cleanup_failures_and_live_descendants_are_rejected(self):
+        cases = [{'leaderReaped': False}, {'observationMethod': 'unknown'}, {'snapshots': []},
+                   {'snapshotError': 'failed'}, {'reapError': 'failed'},
+                   {'signalError': 'failed'}, {'additionalError': 'failed'}]
+        for changes in cases:
+            with self.subTest(changes=changes), self.restore_inputs():
+                self.tamper(0, 'baseline.meta.json', lambda value: value['cleanup'].update(changes))
+                self.rejected('process cleanup')
+        with self.restore_inputs():
+            self.tamper(0, 'baseline.meta.json',
+                        lambda value: value['cleanup']['snapshots'][-1]['members'][0].update(state='R'))
+            self.rejected('Live process-group members')
+
+    def test_repeated_after_kill_observations_are_valid_when_final_members_are_zombies(self):
+        for index in range(2):
+            def repeat(value):
+                snapshots = value['cleanup']['snapshots']
+                earlier = copy.deepcopy(snapshots[-1])
+                earlier['members'].append({'pid': 43, 'groupId': 42, 'state': 'R'})
+                snapshots.insert(-1, earlier)
+            self.tamper(index, 'baseline.meta.json', repeat)
+        self.collect()
+
+    def test_two_individually_valid_preflights_cannot_be_combined(self):
+        self.tamper(1, 'preflight.json', lambda value: value.update(checkedAt='another run of this stage'))
+        self.rejected('different preflight evidence')
+
+    def test_mixed_local_and_reused_baselines_and_incomplete_union_are_rejected(self):
+        with self.restore_inputs():
+            self.edit('0/shard.json', lambda value: value.update(baselineMode='local'))
+            self.rejected('Mixed or invalid baseline modes')
+        (self.inputs / '1/shard.json').unlink()
+        self.rejected('Missing or additional')
+
+    def test_preflight_manifest_digest_and_source_tree_are_bound(self):
+        with self.restore_inputs():
+            self.edit('0/shard.json', lambda value: value.update(preflightSha256='different'))
+            self.rejected('preflight manifest bytes or identity')
+        with self.restore_inputs():
+            self.tamper(0, 'baseline.meta.json', lambda value: value.update(sourceSha256='other tree'))
+            self.rejected('stage metadata')
+
+    def test_preflight_success_summary_and_file_inventory_cannot_replace_raw_evidence(self):
+        with self.restore_inputs():
+            self.tamper(0, 'preflight.json', lambda value: value['baseline'].update(verified=999))
+            self.rejected('Preflight summary differs')
+        with self.restore_inputs():
+            self.tamper(0, 'preflight.json', lambda value: value['files'].pop('baseline.meta.json'))
+            self.rejected('Incomplete or additional preflight')
+        with self.restore_inputs():
+            self.tamper(0, 'preflight.json', lambda value: value.update(status='failed'))
+            self.rejected('preflight failed')
+
+    def copied_mutations(self, selected, _baseline, _temporary, output, *_args, **_kwargs):
+        for name, *_ in selected:
+            for filename in SHARDS.stage_files(name + '-compile') + SHARDS.stage_files(name):
+                shutil.copyfile(self.inputs / '0' / filename, output / filename)
+        return SHARDS.read_json(self.inputs / '0/shard.json')['mutations']
+
+    def fake_positive(self, _binary, _environment, source, output, **_kwargs):
+        self.write_stage(output.parent, output.name, CHECKS.source_fingerprint(source.parent), kind='positive')
+        return CHECKS.subprocess.CompletedProcess([], 0,
+            output.with_suffix('.stdout.json').read_text(), output.with_suffix('.stderr.txt').read_text())
+
+    def test_reused_preflight_skips_only_baseline_and_runs_assigned_mutations(self):
+        with patch.object(CHECKS, 'run_verus', side_effect=AssertionError('baseline must not rerun')), \
+             patch.object(CHECKS, 'check_mutations', side_effect=self.copied_mutations) as mutations, \
+             contextlib.redirect_stdout(io.StringIO()):
+            report = SHARDS.run_shard(0, 2, self.root / 'run-shard', threads=2, preflight=self.preflight)
+        self.assertEqual(report['status'], 'passed')
+        self.assertEqual(report['baselineMode'], 'preflight')
+        self.assertEqual(mutations.call_args.kwargs['compile_timeout'], 300)
+        self.assertEqual(mutations.call_args.kwargs['timeout'], 2400)
+        self.assertIs(mutations.call_args.kwargs['diagnostics'], True)
+        self.assertEqual(mutations.call_args.args[0], [self.manifest[0]])
+
+    def test_invalid_preflight_stops_before_any_mutants(self):
+        path = self.preflight / 'baseline.stdout.json'
+        path.write_text('changed')
+        with patch.object(CHECKS, 'run_verus') as verifier, patch.object(CHECKS, 'check_mutations') as mutations, \
+             self.assertRaisesRegex(RuntimeError, 'Changed stage bytes'):
+            SHARDS.run_shard(0, 2, self.root / 'run-shard', threads=2, preflight=self.preflight)
+        verifier.assert_not_called()
+        mutations.assert_not_called()
+        self.assertEqual(SHARDS.read_json(self.root / 'run-shard/shard.json')['status'], 'failed')
+
+    def test_local_run_preserves_a_complete_fresh_baseline(self):
+        with patch.object(CHECKS, 'run_verus', side_effect=self.fake_positive) as verifier, \
+             patch.object(CHECKS, 'check_mutations', side_effect=self.copied_mutations), \
+             contextlib.redirect_stdout(io.StringIO()):
+            report = SHARDS.run_shard(0, 2, self.root / 'local-shard', threads=2)
+        verifier.assert_called_once()
+        self.assertEqual(report['baselineMode'], 'local')
+        self.assertNotIn('preflightSha256', report)
+        self.assertNotIn('preflight.json', report['files'])
+
+    def test_cancellation_while_restoring_handlers_cannot_write_passed_evidence(self):
+        @contextlib.contextmanager
+        def cancel_on_exit(supervisor):
+            yield supervisor
+            supervisor.cancel(CHECKS.RunCancelled('cancelled during handler restoration'))
+
+        for action in ['preflight', 'shard']:
+            with self.subTest(action=action):
+                output = self.root / ('cancelled-' + action)
+                with patch.object(CHECKS.ProcessSupervisor, 'signal_handlers', cancel_on_exit), \
+                     patch.object(CHECKS, 'run_verus', side_effect=self.fake_positive), \
+                     patch.object(CHECKS, 'check_mutations', side_effect=self.copied_mutations), \
+                     contextlib.redirect_stdout(io.StringIO()), self.assertRaises(CHECKS.RunCancelled):
+                    if action == 'preflight':
+                        SHARDS.run_preflight(output, threads=2)
+                    else:
+                        SHARDS.run_shard(0, 2, output, threads=2, preflight=self.preflight)
+                self.assertEqual(SHARDS.read_json(output / (action + '.json'))['status'], 'failed')
+
+    def test_cancellation_during_final_binding_cannot_write_passed_evidence(self):
+        for action in ['preflight', 'shard']:
+            with self.subTest(action=action):
+                supervisor = CHECKS.ProcessSupervisor()
+                calls = []
+                def observe_binding(*_args):
+                    calls.append(None)
+                    if len(calls) > 1:
+                        supervisor.cancel(CHECKS.RunCancelled('cancelled before saving evidence'))
+                    return copy.deepcopy(self.bound)
+                output = self.root / ('late-cancelled-' + action)
+                with patch.object(CHECKS, 'ProcessSupervisor', return_value=supervisor), \
+                     patch.object(SHARDS, 'binding', side_effect=observe_binding), \
+                     patch.object(CHECKS, 'run_verus', side_effect=self.fake_positive), \
+                     patch.object(CHECKS, 'check_mutations', side_effect=self.copied_mutations), \
+                     contextlib.redirect_stdout(io.StringIO()), self.assertRaises(CHECKS.RunCancelled):
+                    if action == 'preflight':
+                        SHARDS.run_preflight(output, threads=2)
+                    else:
+                        SHARDS.run_shard(0, 2, output, threads=2, preflight=self.preflight)
+                self.assertEqual(SHARDS.read_json(output / (action + '.json'))['status'], 'failed')
+
+    def test_preflight_stage_records_raw_baseline_but_is_not_release_acceptance(self):
+        with patch.object(CHECKS, 'run_verus', side_effect=self.fake_positive) as verifier, \
+             contextlib.redirect_stdout(io.StringIO()):
+            report = SHARDS.run_preflight(self.root / 'new-preflight', threads=2)
+        verifier.assert_called_once()
+        self.assertIs(verifier.call_args.kwargs['diagnostics'], True)
+        self.assertEqual(report['schema'], SHARDS.PREFLIGHT_SCHEMA)
+        self.assertEqual(report['status'], 'passed')
+        self.assertIs(report['releaseAcceptance'], False)
+        SHARDS.validate_preflight(self.root / 'new-preflight', self.bound,
+                                  CHECKS.source_fingerprint(self.source), self.execution)
+
+
 class SelectionTests(unittest.TestCase):
     def test_all_114_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
         self.assertEqual(len(manifest), 114)
-        pieces = [SHARDS.assigned(manifest, index, 12) for index in range(12)]
+        pieces = [SHARDS.assigned(manifest, index, 18) for index in range(18)]
         flattened = [item for group in pieces for item in group]
         self.assertEqual(len(flattened), 114)
         self.assertEqual(set(flattened), set(manifest))
-        self.assertEqual(sorted(map(len, pieces)), [9] * 6 + [10] * 6)
+        self.assertEqual(sorted(map(len, pieces)), [6] * 12 + [7] * 6)
 
     def test_invalid_shards_are_rejected(self):
         for index, count in [(0, 0), (-1, 2), (2, 2), (True, 2), (0, True), (0, 3)]:

@@ -112,6 +112,8 @@ pub proof fn swap_frame<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X
         &&& c::inputs(z,zl)==c::inputs(a,labels)
     },
 {
+    // Compose the verified step lemmas without unfolding their primitive laws.
+    hide(og::primitive_theory);
     ol::execution_preservation(eq,lib,programs,a,labels);
     c::adjacent_swap(eq,lib,programs,a,labels,i);
     let z=c::swap_states(lib,programs,a,labels,i);let source=a.subrange(i+2,a.len() as int);let tail=labels.subrange(i+2,labels.len() as int);

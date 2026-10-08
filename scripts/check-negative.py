@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import signal
 import subprocess
@@ -102,10 +103,59 @@ class ProcessSupervisor:
         # while the syscall is in progress. A repeated TERM can interrupt a
         # descendant that is already reaping children and race group teardown.
         with self.lock:
-            if process in self.term_sent:
+            if process in self.term_sent or process._cordis_signals_closed:
                 return
             self.term_sent.add(process)
-            self._signal_group(process, signal.SIGTERM)
+            process._cordis_cleanup["signals"].append({"signal": int(signal.SIGTERM), "atUnix": time.time()})
+            try:
+                self._signal_group(process, signal.SIGTERM)
+            except OSError as error:
+                # Signal handlers must still let finish attempt the final cleanup.
+                # Keep the actual error; even successful later cleanup cannot turn
+                # this interruption into accepted proof evidence.
+                process._cordis_signal_error = error
+                process._cordis_cleanup["signalError"] = f"{type(error).__name__}: {error}"
+
+    @staticmethod
+    def _observe_exit(process):
+        """Observe exit without releasing the PID that identifies our process group."""
+        if process.returncode is not None:
+            raise RuntimeError("Supervised child was reaped before process-group cleanup")
+        if process._cordis_observer == "waitid":
+            return os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+        return bool(process._cordis_kqueue.control([], 1, 0))
+
+    def wait(self, process, *, timeout):
+        """Popen.wait-compatible timeout, but leave final reaping to finish()."""
+        deadline = time.monotonic() + timeout
+        while True:
+            if process._cordis_exited or self._observe_exit(process):
+                process._cordis_exited = True
+                return
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(process.args, timeout)
+            time.sleep(min(self.poll_interval, remaining))
+
+    @staticmethod
+    def _group_snapshot(process, phase):
+        # ps observes zombies too. Retaining the direct child until the last
+        # signal prevents PID/PGID reuse while these snapshots are inspected.
+        listing = subprocess.run(["ps", "-axo", "pid=,ppid=,pgid=,uid=,stat=,comm="],
+                                 capture_output=True, text=True, check=True, timeout=5)
+        members = []
+        for line in listing.stdout.splitlines():
+            fields = line.split(None, 5)
+            if len(fields) < 5:
+                raise RuntimeError(f"Cannot parse process snapshot: {line!r}")
+            pid, parent, group, uid = map(int, fields[:4])
+            if group == process.pid:
+                members.append({"pid": pid, "parentPid": parent, "groupId": group,
+                                "userId": uid, "state": fields[4],
+                                "command": fields[5] if len(fields) == 6 else ""})
+        snapshot = {"phase": phase, "observedAtUnix": time.time(), "members": members}
+        process._cordis_cleanup["snapshots"].append(snapshot)
+        return snapshot
 
     def start(self, command, **kwargs):
         if os.name != "posix":
@@ -113,6 +163,31 @@ class ProcessSupervisor:
         with self.lock:
             self.check()
             process = subprocess.Popen(command, start_new_session=True, **kwargs)
+            process._cordis_exited = False
+            process._cordis_signals_closed = False
+            process._cordis_signal_error = None
+            process._cordis_kqueue = None
+            if all(hasattr(os, name) for name in ("waitid", "WNOWAIT", "WEXITED", "P_PID")):
+                process._cordis_observer = "waitid"
+            elif hasattr(select, "kqueue"):
+                process._cordis_observer = "kqueue"
+                process._cordis_kqueue = select.kqueue()
+                try:
+                    process._cordis_kqueue.control([
+                        select.kevent(process.pid, filter=select.KQ_FILTER_PROC,
+                                      flags=select.KQ_EV_ADD | select.KQ_EV_ENABLE,
+                                      fflags=select.KQ_NOTE_EXIT)], 0, 0)
+                except BaseException:
+                    process._cordis_kqueue.close()
+                    self._signal_group(process, signal.SIGKILL)
+                    process.wait()
+                    raise
+            else:
+                self._signal_group(process, signal.SIGKILL)
+                process.wait()
+                raise RuntimeError("Process supervision requires waitid(WNOWAIT) or kqueue")
+            process._cordis_cleanup = {"observationMethod": process._cordis_observer,
+                                       "snapshots": [], "signals": [], "leaderReaped": False}
             self.processes.add(process)
             # A signal handler can request cancellation while Popen is starting.
             if self.cancelled.is_set():
@@ -128,24 +203,89 @@ class ProcessSupervisor:
                 self.terminate_once(process)
 
     def finish(self, process, *, terminate=False):
-        """Terminate all surviving group members and reap the direct child."""
-        if terminate:
-            self.terminate_once(process)
-            # Give a cooperative parent time to reap its solver children. Even if
-            # the leader exits first, wait out this grace before killing survivors.
-            deadline = time.monotonic() + self.terminate_grace
-            while time.monotonic() < deadline:
-                process.poll()
-                # Do not probe group existence with signal 0: on macOS this can
-                # race with group teardown and return EPERM after the leader is
-                # reaped. Keep the bounded grace, then send the real final kill.
-                time.sleep(min(self.poll_interval, max(0, deadline - time.monotonic())))
-        # Also clean descendants accidentally left behind by a successful leader.
-        self._signal_group(process, signal.SIGKILL)
-        process.wait()
-        with self.lock:
-            self.processes.discard(process)
-            self.term_sent.discard(process)
+        """Signal only the retained group, then reap; never hide a cleanup failure."""
+        cleanup = process._cordis_cleanup
+        failure = process._cordis_signal_error
+
+        def snapshot(phase):
+            nonlocal failure
+            try:
+                return self._group_snapshot(process, phase)
+            except BaseException as error:
+                cleanup["snapshotError"] = f"{type(error).__name__}: {error}"
+                if failure is None:
+                    failure = error
+                return None
+
+        def has_live_members(observation):
+            return observation is None or any(
+                not member["state"].startswith("Z") for member in observation["members"])
+
+        try:
+            if process.returncode is not None:
+                raise RuntimeError("Supervised child was reaped before process-group cleanup")
+            before = snapshot("before-cleanup")
+            if terminate:
+                if has_live_members(before):
+                    self.terminate_once(process)
+                    failure = failure or process._cordis_signal_error
+                else:
+                    cleanup["termSkipped"] = "no-live-group-members"
+                # Do not poll/wait here: either would release the leader PID and
+                # allow teardown/reuse before the last signal to its group.
+                deadline = time.monotonic() + self.terminate_grace
+                while time.monotonic() < deadline:
+                    time.sleep(min(self.poll_interval, max(0, deadline - time.monotonic())))
+            before_kill = snapshot("before-kill")
+            if before_kill is not None and not any(
+                    member["pid"] == process.pid for member in before_kill["members"]):
+                failure = failure or RuntimeError("Retained process-group leader is missing before cleanup")
+                # The child has not been reaped, so its PID is still reserved.
+                # Incomplete diagnostics must not prevent best-effort termination.
+                before_kill = None
+            if has_live_members(before_kill):
+                cleanup["signals"].append({"signal": int(signal.SIGKILL), "atUnix": time.time()})
+                self._signal_group(process, signal.SIGKILL)
+            else:
+                # A zombie-only group cannot run or fork. Avoid a redundant kill
+                # against a group in teardown; its identity remains pinned here.
+                cleanup["killSkipped"] = "no-live-group-members"
+            self.wait(process, timeout=5)
+            deadline = time.monotonic() + 5
+            while True:
+                after = snapshot("after-kill")
+                if after is None or not has_live_members(after):
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Live process-group members remain after cleanup")
+                time.sleep(self.poll_interval)
+        except BaseException as error:
+            if failure is not None and failure is not error:
+                cleanup["additionalError"] = f"{type(error).__name__}: {error}"
+            failure = failure or error
+            snapshot("cleanup-error")
+        finally:
+            # Reap an exited leader even when group cleanup failed. A live child
+            # must not make error reporting block indefinitely.
+            try:
+                self.wait(process, timeout=0 if failure is not None else 5)
+                # A signal can arrive between wait() and removal from processes.
+                # Close signaling before reap so it cannot target a reused PGID.
+                process._cordis_signals_closed = True
+                process.wait()
+                cleanup["leaderReaped"] = True
+            except BaseException as reap_error:
+                cleanup["reapError"] = f"{type(reap_error).__name__}: {reap_error}"
+                if failure is None:
+                    failure = reap_error
+            if cleanup["leaderReaped"]:
+                if process._cordis_kqueue is not None:
+                    process._cordis_kqueue.close()
+                with self.lock:
+                    self.processes.discard(process)
+                    self.term_sent.discard(process)
+        if failure is not None:
+            raise failure
 
     @contextmanager
     def signal_handlers(self):
@@ -178,7 +318,7 @@ def source_fingerprint(directory):
 
 
 def run_verus(binary, environment, source, report_path, compile_only=False, *, threads=None,
-              timeout=600, supervisor=None):
+              timeout=600, supervisor=None, diagnostics=False):
     threads = threads or execution_budget()["threadsPerWorker"]
     supervisor = supervisor or ProcessSupervisor()
     command = [
@@ -186,11 +326,14 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
         "--edition=2021", "--no-cheating", "--output-json", "--triggers-mode", "silent",
         "--num-threads", str(threads),
     ]
+    if diagnostics:
+        command += ["--trace", "--time"]
     if compile_only:
         command += ["--no-verify", "--compile", "-o", str(source.parent / "compile-check.rlib")]
     started = time.monotonic()
     metadata = {"schema": "cordis.negative-stage/v1", "command": command, "threads": threads,
-                "timeoutSeconds": timeout, "compileOnly": compile_only, "startedAtUnix": time.time(),
+                "timeoutSeconds": timeout, "compileOnly": compile_only, "diagnostics": diagnostics,
+                "startedAtUnix": time.time(),
                 "status": "starting", "returncode": None, "sourceSha256": source_fingerprint(source.parent)}
     process = None
     stdout_path = report_path.with_suffix(".stdout.json")
@@ -206,7 +349,7 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired(command, timeout)
                 try:
-                    process.wait(timeout=min(supervisor.poll_interval, remaining))
+                    supervisor.wait(process, timeout=min(supervisor.poll_interval, remaining))
                     break
                 except subprocess.TimeoutExpired:
                     continue
@@ -229,12 +372,15 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
             if process is not None:
                 supervisor.finish(process, terminate=metadata["status"] != "completed")
         except BaseException as error:
-            metadata["status"] = "error"
+            metadata["primaryStatus"] = metadata["status"]
+            if metadata["status"] not in ("timed_out", "cancelled"):
+                metadata["status"] = "error"
             metadata["cleanupError"] = f"{type(error).__name__}: {error}"
             raise
         finally:
             if process is not None:
                 metadata["returncode"] = process.returncode
+                metadata["cleanup"] = process._cordis_cleanup
             if metadata["status"] == "completed" and supervisor.cancelled.is_set():
                 metadata["status"] = "cancelled"
                 metadata["cancellationReason"] = str(supervisor.failure or "cancelled during cleanup")
@@ -281,7 +427,7 @@ def rejected_result(name, result):
 
 
 def check_mutation(mutation, baseline, temporary, reports, binary, environment, *, threads=None,
-                   timeout=600, runner=run_verus, supervisor=None):
+                   timeout=600, runner=run_verus, supervisor=None, diagnostics=False, compile_timeout=None):
     name, relative, original, replacement = mutation
     supervisor = supervisor or ProcessSupervisor()
     supervisor.check()
@@ -296,10 +442,12 @@ def check_mutation(mutation, baseline, temporary, reports, binary, environment, 
     # Existing injectable runners only need the established threads/timeout API.
     if runner is run_verus:
         options["supervisor"] = supervisor
+    if diagnostics:
+        options["diagnostics"] = True
     try:
         supervisor.check()
         compiled = runner(binary, environment, mutated / "lib.rs", reports / f"{name}-compile", True,
-                          **options)
+                          **{**options, "timeout": timeout if compile_timeout is None else compile_timeout})
         supervisor.check()
         if compiled.returncode != 0:
             raise RuntimeError(f"Mutation {name} did not compile; this is not an accepted proof failure")
@@ -311,7 +459,7 @@ def check_mutation(mutation, baseline, temporary, reports, binary, environment, 
 
 
 def check_mutations(mutations, baseline, temporary, reports, binary, environment, *, jobs=1,
-                    threads=None, timeout=600, runner=run_verus, supervisor=None):
+                    threads=None, timeout=600, runner=run_verus, supervisor=None, diagnostics=False, compile_timeout=None):
     """Bound dispatch to active workers, fail fast, and preserve manifest order."""
     supervisor = supervisor or ProcessSupervisor()
     if threads is None:
@@ -322,7 +470,8 @@ def check_mutations(mutations, baseline, temporary, reports, binary, environment
     def checked(mutation):
         try:
             return check_mutation(mutation, baseline, temporary, reports, binary, environment,
-                                  threads=threads, timeout=timeout, runner=runner, supervisor=supervisor)
+                                  threads=threads, timeout=timeout, runner=runner, supervisor=supervisor,
+                                  diagnostics=diagnostics, compile_timeout=compile_timeout)
         except BaseException as error:
             supervisor.cancel(error)
             raise

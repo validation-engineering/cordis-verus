@@ -149,6 +149,18 @@ class IsolatedRunnerTests(unittest.TestCase):
                                   "unused-verus", {}, runner=runner, supervisor=supervisor)
         self.assertEqual(len(calls), 1)
 
+    def test_compile_timeout_is_independent_of_proof_timeout(self):
+        calls = []
+
+        def runner(binary, environment, source, report_path, compile_only=False, **kwargs):
+            calls.append((compile_only, kwargs["timeout"]))
+            return result(code=0) if compile_only else result()
+
+        CHECKS.check_mutations([self.mutation], self.baseline, self.root, self.reports,
+                               "unused-verus", {}, runner=runner, threads=1,
+                               timeout=2400, compile_timeout=300)
+        self.assertEqual(calls, [(True, 300), (False, 2400)])
+
     def test_changed_mutation_anchor_is_rejected_before_compilation(self):
         def runner(*args, **kwargs):
             self.fail("A stale mutation must not invoke the compiler")
@@ -412,9 +424,14 @@ raise AssertionError('signal must cancel verification')
 
     def test_reentrant_cancellation_marks_term_before_sending_and_never_repeats_it(self):
         supervisor = CHECKS.ProcessSupervisor(terminate_grace=0)
-        process = Mock(pid=12345)
-        supervisor.processes.add(process)
+        ready = self.root / "reentrant-ready"
+        binary = self.executable("import signal, time\nfrom pathlib import Path\n"
+                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                                 f"Path({str(ready)!r}).write_text('ready')\ntime.sleep(30)\n")
+        process = supervisor.start([str(binary)])
+        self.wait_file(ready)
         sent = []
+        killpg = os.killpg
 
         def deliver(pid, number):
             sent.append((pid, number))
@@ -422,15 +439,156 @@ raise AssertionError('signal must cancel verification')
                 # Emulate another signal handler before the original syscall
                 # returns. Marking after killpg would recurse or resend TERM.
                 supervisor.cancel()
+            killpg(pid, number)
 
         with patch.object(CHECKS.os, "killpg", side_effect=deliver):
             supervisor.cancel()
             supervisor.cancel()
             supervisor.finish(process, terminate=True)
         self.assertEqual(sent, [(process.pid, signal.SIGTERM), (process.pid, signal.SIGKILL)])
-        process.wait.assert_called_once()
+        self.assert_reaped(process.pid)
         self.assertFalse(supervisor.processes)
         self.assertFalse(supervisor.term_sent)
+
+    def test_exit_observation_retains_leader_until_group_cleanup(self):
+        supervisor = CHECKS.ProcessSupervisor()
+        process = supervisor.start([str(self.executable("pass\n"))])
+        supervisor.wait(process, timeout=5)
+        self.assertIsNone(process.returncode)
+        snapshot = supervisor._group_snapshot(process, "test-before-finish")
+        leader = [member for member in snapshot["members"] if member["pid"] == process.pid]
+        self.assertEqual(len(leader), 1, snapshot)
+        self.assertTrue(leader[0]["state"].startswith("Z"), snapshot)
+        with patch.object(CHECKS.os, "killpg", side_effect=PermissionError("zombie group")) as kill:
+            supervisor.finish(process)
+        kill.assert_not_called()
+        self.assertEqual(process._cordis_cleanup["killSkipped"], "no-live-group-members")
+        self.assertTrue(process._cordis_cleanup["leaderReaped"])
+        self.assert_reaped(process.pid)
+
+    def test_timeout_cleanup_permission_error_keeps_primary_failure_and_live_process_diagnostics(self):
+        prefix = self.reports / "kill-denied"
+        binary = self.executable("import signal, time\n"
+                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(30)\n")
+        supervisor = CHECKS.ProcessSupervisor(terminate_grace=0.01)
+        killpg = os.killpg
+
+        def deny_kill(pid, number):
+            if number == signal.SIGKILL:
+                raise PermissionError("test live group denied")
+            return killpg(pid, number)
+
+        try:
+            with patch.object(CHECKS.os, "killpg", side_effect=deny_kill), \
+                    self.assertRaisesRegex(PermissionError, "live group denied"):
+                CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs", prefix,
+                                 timeout=0.5, supervisor=supervisor)
+            metadata = json.loads(prefix.with_suffix(".meta.json").read_text())
+            detail = json.dumps(metadata, indent=2)
+            self.assertEqual(metadata["status"], "timed_out", detail)
+            self.assertEqual(metadata["primaryStatus"], "timed_out", detail)
+            self.assertIn("PermissionError", metadata["cleanupError"], detail)
+            self.assertFalse(metadata["cleanup"]["leaderReaped"], detail)
+            self.assertTrue(any(not member["state"].startswith("Z")
+                                for snap in metadata["cleanup"]["snapshots"]
+                                for member in snap["members"]), detail)
+        finally:
+            if prefix.with_suffix(".meta.json").exists():
+                pid = json.loads(prefix.with_suffix(".meta.json").read_text())["pid"]
+                for process in list(supervisor.processes):
+                    supervisor.finish(process, terminate=True)
+        self.assert_reaped(pid)
+
+    def test_term_permission_error_does_not_prevent_final_kill(self):
+        prefix = self.reports / "term-denied"
+        binary = self.executable("import time\ntime.sleep(30)\n")
+        supervisor = CHECKS.ProcessSupervisor(terminate_grace=0.01)
+        killpg = os.killpg
+
+        def deny_term(pid, number):
+            if number == signal.SIGTERM:
+                raise PermissionError("test TERM denied")
+            return killpg(pid, number)
+
+        with patch.object(CHECKS.os, "killpg", side_effect=deny_term), \
+                self.assertRaisesRegex(PermissionError, "TERM denied"):
+            CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs", prefix,
+                             timeout=0.5, supervisor=supervisor)
+        metadata = json.loads(prefix.with_suffix(".meta.json").read_text())
+        detail = json.dumps(metadata, indent=2)
+        self.assertEqual(metadata["status"], "timed_out", detail)
+        self.assertIn("TERM denied", metadata["cleanupError"], detail)
+        self.assertTrue(metadata["cleanup"]["leaderReaped"], detail)
+        self.assertEqual(metadata["returncode"], -signal.SIGKILL, detail)
+        self.assert_reaped(metadata["pid"])
+
+    def test_cancellation_during_reap_cannot_signal_a_released_group(self):
+        supervisor = CHECKS.ProcessSupervisor()
+        process = supervisor.start([str(self.executable("pass\n"))])
+        supervisor.wait(process, timeout=5)
+        reap = process.wait
+
+        def interrupted_reap():
+            result = reap()
+            supervisor.cancel()
+            return result
+
+        with patch.object(process, "wait", side_effect=interrupted_reap), \
+                patch.object(CHECKS.os, "killpg") as kill:
+            supervisor.finish(process)
+        kill.assert_not_called()
+        self.assertTrue(supervisor.cancelled.is_set())
+        self.assert_reaped(process.pid)
+
+    def test_snapshot_failure_still_kills_and_reaps_the_retained_group(self):
+        prefix = self.reports / "snapshot-denied"
+        supervisor = CHECKS.ProcessSupervisor(terminate_grace=0.01)
+        binary = self.executable("import signal, time\n"
+                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(30)\n")
+        with patch.object(supervisor, "_group_snapshot", side_effect=OSError("test ps failed")), \
+                self.assertRaisesRegex(OSError, "test ps failed"):
+            CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs", prefix,
+                             timeout=0.5, supervisor=supervisor)
+        metadata = json.loads(prefix.with_suffix(".meta.json").read_text())
+        detail = json.dumps(metadata, indent=2)
+        self.assertEqual(metadata["status"], "timed_out", detail)
+        self.assertIn("test ps failed", metadata["cleanupError"], detail)
+        self.assertIn("test ps failed", metadata["cleanup"]["snapshotError"], detail)
+        self.assertTrue(metadata["cleanup"]["leaderReaped"], detail)
+        self.assertEqual(metadata["returncode"], -signal.SIGKILL, detail)
+        self.assert_reaped(metadata["pid"])
+
+    def test_exited_leader_does_not_hide_a_live_solver_descendant(self):
+        ready = self.root / "orphan-ready"
+        binary = self.executable("import os, signal, time\nfrom pathlib import Path\n"
+                                 "child = os.fork()\nif child == 0:\n"
+                                 "    signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                                 "    time.sleep(30)\nelse:\n"
+                                 f"    Path({str(ready)!r}).write_text(str(child))\n")
+        supervisor = CHECKS.ProcessSupervisor()
+        process = supervisor.start([str(binary)])
+        self.wait_file(ready)
+        supervisor.wait(process, timeout=5)
+        supervisor.finish(process)
+        cleanup = process._cordis_cleanup
+        self.assertEqual([entry["signal"] for entry in cleanup["signals"]], [signal.SIGKILL], cleanup)
+        self.assertTrue(all(member["state"].startswith("Z")
+                            for member in cleanup["snapshots"][-1]["members"]), cleanup)
+        self.assert_reaped(process.pid)
+
+    def test_diagnostics_flags_preserve_json_stdout(self):
+        prefix = self.reports / "diagnostics"
+        binary = self.executable("import json, sys\n"
+                                 "assert '--trace' in sys.argv and '--time' in sys.argv\n"
+                                 "print('verifying example', file=sys.stderr)\n"
+                                 "print(json.dumps({'verification-results': {'success': True}}))\n")
+        outcome = CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs", prefix,
+                                   diagnostics=True)
+        self.assertTrue(json.loads(outcome.stdout)["verification-results"]["success"])
+        metadata = json.loads(prefix.with_suffix(".meta.json").read_text())
+        self.assertTrue(metadata["diagnostics"])
+        self.assertIn("--trace", metadata["command"])
+        self.assertIn("--time", metadata["command"])
 
     def test_cancellation_during_final_cleanup_cannot_return_completed_evidence(self):
         class CancelAfterCleanup(CHECKS.ProcessSupervisor):
@@ -496,6 +654,9 @@ raise AssertionError('signal must cancel verification')
         self.assertEqual(result.returncode, 0)
         meta = json.loads(prefix.with_suffix(".meta.json").read_text())
         self.assertEqual(meta["status"], "completed")
+        self.assertFalse(meta["diagnostics"])
+        self.assertNotIn("--trace", meta["command"])
+        self.assertNotIn("--time", meta["command"])
         self.assertEqual(meta["returncode"], 0)
         self.assertEqual(meta["threads"], 1)
         self.assertEqual(meta["timeoutSeconds"], 5)

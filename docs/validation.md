@@ -13,8 +13,9 @@ mutation checks and paper coverage answer different questions.
 
 Default push/PR CI runs **development** checks on Linux x86_64 and macOS
 ARM64/Intel. The separate **Full release validation** workflow is manually
-dispatched and runs all complete-crate negative controls in twelve shards per
-platform, then collects them within `quality.sh` on the same platform matrix. Green development CI does
+dispatched. It first runs one baseline preflight per platform, then all complete-crate
+negative controls in eighteen shards per platform using strictly bound shared baseline
+evidence. It collects them within `quality.sh` on the same platform matrix. Green development CI does
 not mean full release acceptance. The release workflow can create a draft runtime
 prerelease after the complete gate; it does not publish that draft automatically.
 Both retain logs and artifacts; full validation also retains negative reports.

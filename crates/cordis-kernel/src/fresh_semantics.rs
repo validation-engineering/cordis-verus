@@ -306,6 +306,8 @@ pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,li
     requires og::primitive_theory(eq,lib),well_formed(lib,programs,a),step(lib,programs,a,z,actor,rule,choice),
     ensures well_formed(lib,programs,z),
 {
+    // Compose the verified step lemmas without unfolding their primitive laws.
+    hide(og::primitive_theory);
     frame(eq,lib,programs,a,z,actor,rule,choice);state_preservation(eq,lib,programs,a,z,actor,rule,choice);
     if landing(a,z,rule) {
         let id=a.current[actor].unwrap();let e=entry(lib,programs,a,actor,choice);

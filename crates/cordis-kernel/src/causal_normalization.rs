@@ -200,6 +200,8 @@ pub proof fn adjacent_swap<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<
         &&& forall|j:int| 0<=j<result.len() ==> g::well_formed(lib,programs,result[j])
     },
 {
+    // Compose the verified step lemmas without unfolding their primitive laws.
+    hide(og::primitive_theory);
     ol::execution_preservation(eq,lib,programs,states,labels);
     let suffix=states.subrange(i+2,states.len() as int);let tail=labels.subrange(i+2,labels.len() as int);
     assert(g::execution(lib,programs,suffix,tail)) by {

@@ -16,7 +16,7 @@ uses the same thread count as a mutation worker; it no longer silently starts ni
 threads. Explicit settings are recorded with the actual effective budget:
 
 ```sh
-CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=1200 \
+CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=2400 \
   python3 scripts/record-verification.py --offline
 ```
 
@@ -32,29 +32,48 @@ are retained, including elapsed time, command, exit status, source fingerprint a
 cancellation state. The queue contains only the active worker budget, rather than
 all 114 already-submitted tasks.
 
-Termination is requested once per process group so repeated cancellation cannot
-reenter a child's cleanup handler. The grace period and final group kill remain.
-CI steps use `exec` to deliver runner cancellation directly to the Python supervisor.
-A forced kill can still leave incomplete stage files; collection rejects them.
+Termination is requested once per process group. The supervisor observes leader
+exit without reaping it until group cleanup finishes, so the process-group identity
+remains reserved. Linux uses `waitid(WNOWAIT)` and macOS uses `kqueue(NOTE_EXIT)`.
+Stage records retain process-group snapshots, signals and any cleanup error. A
+cleanup failure cannot turn a timeout or cancellation into accepted proof evidence.
+CI steps use `exec` so cancellation reaches the supervisor. A forced kill can still
+leave incomplete stage files; collection rejects them.
 
 ## Parallel CI without reducing proof scope
 
-The release workflow runs twelve independent shards per platform. Each shard has
-nine or ten mutations, one unchanged whole-crate baseline, one worker and two Verus
-threads. It compiles and verifies each assigned **entire mutated crate**. This is
-different from the experimental function-scoped checker.
+The release workflow first verifies the unchanged whole crate once on each of the
+three platforms. Preflight retains `--trace --time` diagnostics and must pass on
+all platforms before any negative shards start. This prevents one failing baseline
+from being repeated across the entire matrix.
+
+Each platform then runs eighteen shards of six or seven mutations. Every mutation
+still compiles and verifies the **entire mutated crate**, with one worker and two
+Verus threads. Compilation has a 300-second deadline and proof checking has a
+2,400-second deadline. At most seven of these pairs fit within 315 minutes, leaving
+45 minutes of the six-hour job limit for installation, evidence checks and upload.
+The workflow permits at most twelve concurrent negative jobs. These wall-clock
+budgets do not raise solver resource limits or change proof contracts.
+
+Shards reuse the platform's successful preflight baseline from the **same workflow
+run and attempt**. The raw baseline output, metadata and hashes travel with the
+shard evidence. This is not a cache across commits or workflow runs. Standalone
+local shards execute a fresh baseline; shared preflight reuse requires the complete
+CI run and attempt identity.
 
 `scripts/negative-shards.py collect` accepts only the exact complete partition and
-rechecks original stdout, stderr and invocation metadata. It binds the evidence to
-the complete source input hashes, canonical mutation contents, verifier/solver/proof
-library bytes, platform, and GitHub run and attempt. Scoped flags, changed mutant
-sources, missing/duplicate controls, mismatched summaries, cancellation and resource
-errors fail collection. The final mutation list retains canonical order.
+rechecks original stdout, stderr and invocation metadata, including the shared
+baseline. It binds evidence to complete source input hashes, canonical mutations,
+verifier/solver/proof-library bytes, platform, thread settings, and GitHub run and
+attempt. Scoped flags, changed sources, missing/duplicate controls, altered
+summaries, cancellation, cleanup failures and resource errors fail collection.
+The final mutation list retains canonical order.
 
-Each platform's quality job collects its twelve shards within the ordinary gate,
-alongside the positive proof, tests, examples, package builds and installation checks. Only the
-complete collected report can enter `verification/v3`; one green shard cannot.
-Runtime draft creation still requires all three platforms to pass.
+Each platform's quality job collects its eighteen shards within the ordinary gate,
+alongside positive proof, tests, examples, package builds and installation checks.
+Only the complete collected report can enter `verification/v3`; a green preflight
+or one green shard cannot. Runtime draft creation still requires all three
+platforms to pass the entire quality gate.
 
 Artifacts have platform, attempt and shard identifiers in their names. Rerun the
 **whole workflow** after a failure: rerunning only failed jobs would mix attempts
@@ -76,6 +95,15 @@ in a mutated crate. Its executable body, preconditions, postconditions and resou
 limits are unchanged. The complete positive and negative checks remain responsible
 for validating this proof organization; an isolated diagnostic check alone is not
 release evidence.
+
+The composition proofs `causal_normalization::adjacent_swap`,
+`fresh_semantics::configuration_preservation`, and `rewrite_confluence::swap_frame`
+hide the body of `primitive_theory` inside their proofs and use the contracts of
+proved component lemmas. This avoids unnecessary expansion of a quantified theory.
+The concrete insertion example calls its existing operation lemma explicitly before
+composition. Public contracts, executable behavior, mutation definitions and solver
+resource limits remain unchanged. Targeted negative checks must still find concrete
+failures in the complete mutated crate, without resource errors.
 
 See [validation gates](validation.md), the [release procedure](releasing.md), and
 the [runner](../scripts/check-negative.py) / [collector](../scripts/negative-shards.py)

@@ -56,7 +56,7 @@ def run_checks(command, environment, log):
             while True:
                 supervisor.check()
                 try:
-                    process.wait(timeout=0.1)
+                    supervisor.wait(process, timeout=0.1)
                     break
                 except subprocess.TimeoutExpired:
                     continue

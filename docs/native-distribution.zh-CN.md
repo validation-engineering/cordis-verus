@@ -161,7 +161,7 @@ SHA-256 提供字节完整性与源码绑定，不提供发布者身份认证。
 它保留真实的原生构建 profile，不会将开发构建悄悄称为优化构建。
 
 [完整发布工作流](../.github/workflows/release-validation.yml)在三个平台上运行。
-每个平台先完成十二个严格汇总的[整 crate 负控分片](full-negative-validation.zh-CN.md)，
+每个平台先完成基线预检和十八个严格汇总的[整 crate 负控分片](full-negative-validation.zh-CN.md)，
 再完成全部质量与软件包检查，然后将暂存的运行时安装到新项目中，
 执行一次离线 `npm ci` 并运行示例。
 当显式使用 `create_draft=true` 和新的 `release_tag` 触发时，
