@@ -56,7 +56,7 @@ jobs:
         run: exec python3 scripts/negative-shards.py run --shard-index ${{ matrix.shard }} --shard-count 12 --output target/negative-shard --jobs 1 --threads 2 --timeout 1200
       - name: Retain negative evidence, including failures
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: negative-${{ github.run_attempt }}-${{ matrix.os }}-shard-${{ matrix.shard }}
           path: target/negative-shard/
@@ -120,7 +120,7 @@ jobs:
           npm start
       - name: Retain full validation evidence, including failures
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: full-validation-${{ github.run_attempt }}-${{ matrix.os }}
           path: |
