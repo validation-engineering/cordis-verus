@@ -32,6 +32,11 @@ are retained, including elapsed time, command, exit status, source fingerprint a
 cancellation state. The queue contains only the active worker budget, rather than
 all 114 already-submitted tasks.
 
+Termination is requested once per process group so repeated cancellation cannot
+reenter a child's cleanup handler. The grace period and final group kill remain.
+CI steps use `exec` to deliver runner cancellation directly to the Python supervisor.
+A forced kill can still leave incomplete stage files; collection rejects them.
+
 ## Parallel CI without reducing proof scope
 
 The release workflow runs twelve independent shards per platform. Each shard has

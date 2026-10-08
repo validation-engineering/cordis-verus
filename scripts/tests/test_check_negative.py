@@ -12,7 +12,7 @@ import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "check-negative.py"
 SPEC = importlib.util.spec_from_file_location("negative_checks", SCRIPT)
@@ -409,6 +409,58 @@ raise AssertionError('signal must cancel verification')
             if process.poll() is None:
                 process.kill()
                 process.wait()
+
+    def test_reentrant_cancellation_marks_term_before_sending_and_never_repeats_it(self):
+        supervisor = CHECKS.ProcessSupervisor(terminate_grace=0)
+        process = Mock(pid=12345)
+        supervisor.processes.add(process)
+        sent = []
+
+        def deliver(pid, number):
+            sent.append((pid, number))
+            if number == signal.SIGTERM:
+                # Emulate another signal handler before the original syscall
+                # returns. Marking after killpg would recurse or resend TERM.
+                supervisor.cancel()
+
+        with patch.object(CHECKS.os, "killpg", side_effect=deliver):
+            supervisor.cancel()
+            supervisor.cancel()
+            supervisor.finish(process, terminate=True)
+        self.assertEqual(sent, [(process.pid, signal.SIGTERM), (process.pid, signal.SIGKILL)])
+        process.wait.assert_called_once()
+        self.assertFalse(supervisor.processes)
+        self.assertFalse(supervisor.term_sent)
+
+    def test_cancellation_during_final_cleanup_cannot_return_completed_evidence(self):
+        class CancelAfterCleanup(CHECKS.ProcessSupervisor):
+            def finish(self, process, *, terminate=False):
+                super().finish(process, terminate=terminate)
+                self.cancel()
+
+        prefix = self.reports / "cancel-at-finish"
+        with self.assertRaises(CHECKS.RunCancelled):
+            CHECKS.run_verus(self.executable("print('done')\n"), os.environ.copy(), self.source / "lib.rs",
+                             prefix, supervisor=CancelAfterCleanup())
+        metadata = json.loads(prefix.with_suffix(".meta.json").read_text())
+        self.assertEqual(metadata["status"], "cancelled", json.dumps(metadata, indent=2))
+        self.assert_reaped(metadata["pid"])
+
+    def test_actual_cleanup_failure_is_preserved_and_never_relabelled_as_cancellation(self):
+        class FailedCleanup(CHECKS.ProcessSupervisor):
+            def finish(self, process, *, terminate=False):
+                super().finish(process, terminate=terminate)
+                self.cancel()
+                raise PermissionError("test cleanup denied")
+
+        prefix = self.reports / "cleanup-failure"
+        with self.assertRaisesRegex(PermissionError, "cleanup denied"):
+            CHECKS.run_verus(self.executable("print('done')\n"), os.environ.copy(), self.source / "lib.rs",
+                             prefix, supervisor=FailedCleanup())
+        metadata = json.loads(prefix.with_suffix(".meta.json").read_text())
+        self.assertEqual(metadata["status"], "error", json.dumps(metadata, indent=2))
+        self.assertEqual(metadata["cleanupError"], "PermissionError: test cleanup denied")
+        self.assert_reaped(metadata["pid"])
 
     def test_ignored_sigterm_escalates_to_sigkill_and_reaps_leader(self):
         prefix = self.reports / "stubborn"

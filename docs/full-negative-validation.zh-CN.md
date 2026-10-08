@@ -27,6 +27,10 @@ CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=1200 \
 `.meta.json` 阶段记录保留，包括耗时、命令、退出状态、源码指纹和取消状态。任务队列只
 保留当前 worker 预算允许的工作，不再预先提交全部 114 个任务。
 
+每个进程组只发送一次终止请求，避免重复取消重入子进程的清理 handler；宽限时间和最终
+进程组强制终止仍保留。CI 步骤用 `exec` 让 runner 的取消信号直接到达 Python 监督器。
+强制杀死进程仍可能留下不完整阶段文件，汇总器会拒绝这些文件。
+
 ## CI 并行执行与证明范围
 
 发布工作流在每个平台运行十二个独立分片。每片包含九或十项 mutation、一次未修改内核

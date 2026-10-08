@@ -62,9 +62,12 @@ def run_checks(command, environment, log):
                     continue
             supervisor.check()
             completed = True
-            return process.returncode
         finally:
             supervisor.finish(process, terminate=not completed)
+    # Restore the enclosing signal handler before the last cancellation check:
+    # a signal received during finish must not turn into a successful exit.
+    supervisor.check()
+    return process.returncode
 
 
 def environment_for(offline=False, negative_shards=None):

@@ -308,6 +308,18 @@ class CheckScriptRoutingTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "posix", "supported Verus platforms are POSIX")
 class ReleaseProcessTests(unittest.TestCase):
+    def test_cancellation_during_finish_cannot_return_success_from_release_command(self):
+        checks = RECORD.helper("check-negative.py", "release_finish_race_test")
+        class CancelAfterCleanup(checks.ProcessSupervisor):
+            def finish(self, process, *, terminate=False):
+                super().finish(process, terminate=terminate)
+                self.cancel()
+
+        with tempfile.TemporaryDirectory(prefix="cordis-release-finish-") as temporary:
+            with patch.object(RECORD, "helper", return_value=SimpleNamespace(ProcessSupervisor=CancelAfterCleanup)), \
+                    self.assertRaises(checks.RunCancelled):
+                RECORD.run_checks([sys.executable, "-c", "pass"], os.environ.copy(), Path(temporary) / "checks.log")
+
     def test_cancellation_allows_nested_negative_supervisor_to_reap_its_process_group(self):
         with tempfile.TemporaryDirectory(prefix="cordis-release-process-") as temporary:
             root = Path(temporary)
@@ -360,13 +372,16 @@ raise AssertionError('signal did not cancel the release recorder')
                 self.assertTrue(ready.exists(), "nested process did not start")
                 leader, child = map(int, ready.read_text().split())
                 process.send_signal(signal.SIGTERM)
+                time.sleep(0.05)
+                process.send_signal(signal.SIGTERM)
                 stdout, stderr = process.communicate(timeout=8)
                 self.assertEqual(process.returncode, 7, stdout + stderr)
                 for pid in (leader, child):
                     with self.assertRaises(ProcessLookupError):
                         os.kill(pid, 0)
                 metadata = json.loads((root / "stage.meta.json").read_text())
-                self.assertEqual(metadata["status"], "cancelled")
+                self.assertEqual(metadata["status"], "cancelled",
+                                 json.dumps(metadata, indent=2) + "\n" + (root / "checks.log").read_text())
             finally:
                 if process.poll() is None:
                     process.kill()

@@ -80,6 +80,7 @@ class ProcessSupervisor:
         self.cancelled = threading.Event()
         self.lock = threading.RLock()
         self.processes = set()
+        self.term_sent = set()
         self.failure = None
         self.signal_number = None
         self.terminate_grace = terminate_grace
@@ -96,6 +97,16 @@ class ProcessSupervisor:
         except ProcessLookupError:
             pass
 
+    def terminate_once(self, process):
+        # Mark before entering killpg: Python signal handlers can reenter cancel
+        # while the syscall is in progress. A repeated TERM can interrupt a
+        # descendant that is already reaping children and race group teardown.
+        with self.lock:
+            if process in self.term_sent:
+                return
+            self.term_sent.add(process)
+            self._signal_group(process, signal.SIGTERM)
+
     def start(self, command, **kwargs):
         if os.name != "posix":
             raise RuntimeError("Negative verification requires POSIX process-group supervision")
@@ -105,7 +116,7 @@ class ProcessSupervisor:
             self.processes.add(process)
             # A signal handler can request cancellation while Popen is starting.
             if self.cancelled.is_set():
-                self._signal_group(process, signal.SIGTERM)
+                self.terminate_once(process)
             return process
 
     def cancel(self, failure=None):
@@ -114,12 +125,12 @@ class ProcessSupervisor:
                 self.failure = failure
             self.cancelled.set()
             for process in self.processes:
-                self._signal_group(process, signal.SIGTERM)
+                self.terminate_once(process)
 
     def finish(self, process, *, terminate=False):
         """Terminate all surviving group members and reap the direct child."""
         if terminate:
-            self._signal_group(process, signal.SIGTERM)
+            self.terminate_once(process)
             # Give a cooperative parent time to reap its solver children. Even if
             # the leader exits first, wait out this grace before killing survivors.
             deadline = time.monotonic() + self.terminate_grace
@@ -134,6 +145,7 @@ class ProcessSupervisor:
         process.wait()
         with self.lock:
             self.processes.discard(process)
+            self.term_sent.discard(process)
 
     @contextmanager
     def signal_handlers(self):
@@ -208,8 +220,9 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
         metadata["cancellationReason"] = str(supervisor.failure or error)
         metadata["signal"] = supervisor.signal_number
         raise
-    except BaseException:
+    except BaseException as error:
         metadata["status"] = "error"
+        metadata["error"] = f"{type(error).__name__}: {error}"
         raise
     finally:
         try:
@@ -222,8 +235,13 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
         finally:
             if process is not None:
                 metadata["returncode"] = process.returncode
+            if metadata["status"] == "completed" and supervisor.cancelled.is_set():
+                metadata["status"] = "cancelled"
+                metadata["cancellationReason"] = str(supervisor.failure or "cancelled during cleanup")
+                metadata["signal"] = supervisor.signal_number
             metadata["durationSeconds"] = time.monotonic() - started
             report_path.with_suffix(".meta.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    supervisor.check()
     return subprocess.CompletedProcess(command, process.returncode,
                                        stdout_path.read_text(errors="replace"), stderr_path.read_text(errors="replace"))
 

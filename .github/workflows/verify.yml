@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/install-verus.sh
       - name: Whole positive proof, tests, docs and package checks
-        run: python3 scripts/record-development.py
+        run: exec python3 scripts/record-development.py
       - name: Assemble this host's audited native bundle
         run: node scripts/package-native.mjs --output target/release-artifacts/native packages/compat-cordis/native
       - name: Retain development evidence

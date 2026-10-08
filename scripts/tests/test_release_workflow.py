@@ -36,10 +36,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertEqual(selected, {(2, platform, shard) for shard in self.shards})
 
     def test_shard_command_covers_the_matrix_and_never_reduces_whole_crate_verification(self):
-        command = re.search(r"^        run: (python3 scripts/negative-shards.py run .+)$", self.text, re.M)[1]
+        command = re.search(r"^        run: (exec python3 scripts/negative-shards.py run .+)$", self.text, re.M)[1]
         arguments = shlex.split(self.render(command, 1, self.platforms[0], 0))
-        self.assertEqual(arguments[:3], ["python3", "scripts/negative-shards.py", "run"])
-        options = dict(zip(arguments[3::2], arguments[4::2]))
+        self.assertEqual(arguments[:4], ["exec", "python3", "scripts/negative-shards.py", "run"])
+        options = dict(zip(arguments[4::2], arguments[5::2]))
         self.assertEqual(set(options), {"--shard-index", "--shard-count", "--output", "--jobs", "--threads", "--timeout"})
         self.assertEqual(int(options["--shard-count"]), len(self.shards))
         self.assertEqual((options["--jobs"], options["--threads"], options["--timeout"]), ("1", "2", "1200"))
@@ -47,8 +47,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
         draft = self.text.split("\n  draft-release:", 1)[1]
         self.assertRegex(quality, r"(?m)^    needs: negative$")
         self.assertRegex(draft, r"(?m)^    needs: quality$")
-        self.assertIn("run: python3 scripts/record-verification.py --negative-shards target/full-negative-shards", quality)
+        self.assertIn("run: exec python3 scripts/record-verification.py --negative-shards target/full-negative-shards", quality)
         self.assertIn("pattern: full-validation-${{ github.run_attempt }}-*", draft)
+        development = WORKFLOW.with_name("verify.yml").read_text()
+        self.assertIn("run: exec python3 scripts/record-development.py", development)
 
 
 if __name__ == "__main__":
