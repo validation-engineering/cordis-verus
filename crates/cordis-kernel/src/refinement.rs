@@ -69,6 +69,15 @@ pub open spec fn phase_change(a: State, z: State, n: usize, phase: Phase) -> boo
     &&& z.fibers[n].phase == phase
 }
 
+/// The registration guard for a fresh fiber in Rule::Insert. A provision
+/// reservation belongs to every registered owner, not only Active providers.
+/// Availability of the new fiber's dependencies is a later Begin condition.
+pub open spec fn insertion_domain(s: State, parent: Option<usize>, provisions: ISet<Port>) -> bool {
+    &&& (parent.is_some() ==> registered(s, parent.unwrap()))
+    &&& forall|n: usize, p: Port| registered(s, n) && s.fibers[n].provisions.contains(p)
+        ==> !provisions.contains(p)
+}
+
 /// Each constructor states an independent relational rule. No implementation
 /// buffers, tombstones, restoring flags, or declaration order occur here.
 pub open spec fn step(a: State, z: State, n: usize, rule: Rule) -> bool {
@@ -113,6 +122,12 @@ pub open spec fn step(a: State, z: State, n: usize, rule: Rule) -> bool {
     }
 }
 
+/// The named domain is exactly the registration part of the existing rule.
+pub proof fn insertion_has_domain(a: State, z: State, n: usize)
+    requires step(a, z, n, Rule::Insert),
+    ensures insertion_domain(a, z.fibers[n].parent, z.fibers[n].provisions),
+{}
+
 /// Structural and committed-view invariants of Definitions 49–50 and the
 /// resource-safety discipline. A finite name bound witnesses a finite registry;
 /// the bound is not an observable fiber identity or an activation order.
@@ -148,6 +163,23 @@ pub open spec fn well_formed(s: State) -> bool {
     &&& forall|n: usize, a: Binding, b: Binding| registered(s, n)
         && s.fibers[n].committed.contains(a) && s.fibers[n].committed.contains(b)
         && a.key == b.key && a.realm == b.realm ==> a.provider == b.provider
+}
+
+/// L-Begin cannot withdraw one of its own providers: the actor was Inactive,
+/// and all other fibers are framed. Its captured target is therefore still
+/// coherent immediately after the real Begin transition.
+pub proof fn begin_preserves_target(a: State, z: State, n: usize)
+    requires step(a, z, n, Rule::Begin),
+    ensures coherent(z, n),
+{
+    assert forall|b: Binding| z.fibers[n].committed.contains(b) implies
+        z.fibers[n].dependencies.contains(Port { key: b.key, realm: b.realm })
+        && publishes(z, Port { key: b.key, realm: b.realm }, b.provider) by {
+        let p = Port { key: b.key, realm: b.realm };
+        assert(publishes(a, p, b.provider));
+        assert(b.provider != n);
+        assert(z.fibers[b.provider] == a.fibers[b.provider]);
+    }
 }
 
 /// Provider identity, rather than equality of service values, determines a view.

@@ -45,6 +45,19 @@ python3 scripts/check-paper-review.py
 如果本地存在被 Git 忽略的论文文本，它还会检查锁定的哈希、页码与标题标记。
 本仓库不重新分发论文全文，参见 [reference/README.md](../reference/README.md)。
 
+第 73 条的对应另见[进展要求与真实代码合同](progress-contracts.zh-CN.md)：
+包括精确成功条件、运行时调用路径、同步 Mixed/Fresh 单步与跨调用已接纳落地域。
+这些实现合同也对应引理 57。真实 Fresh 循环推出单个 actor 在终态或首个错误处有限
+返回，并条件化延伸其输入已表示的源状态。`run_from_empty` 通过真实准备脚本建立
+该输入，证明一条从 empty 出发、同时表示准备后与返回机器的源执行，每态均良构且
+资源安全。`SetupFailed` 在自主循环前停止，并不表示 actor 被阻塞。Insert/Begin/Step
+现由 `preparation_enabled` 给出精确实现接纳域；该范围内的失败命令在真实失败状态不
+满足定义域，即使此前缀含其他命令也成立，不要求全部命令最初就使能。
+Retire/Depart/Unload/Remove 仍受支持，但不在该 dispatcher 等价范围内。直接
+Mixed/Fresh Unload 另有清理守卫加 inverse 的精确域；其余命令与 dispatcher 的域、
+具体错误枚举、整个系统进展、任意 Future 完成及宿主调度仍有独立义务。这些合同修复不需要引入
+时序逻辑依赖。
+
 ## PR-01: episode 保留其已提交的 provider 身份
 
 **论文位置：** §4.2.2，定义 53，第 35 页，式 (48) 和 (49)；定义 54，
@@ -70,8 +83,22 @@ python3 scripts/check-paper-review.py
 - [driver.rs](../crates/cordis-kernel/src/driver.rs)：`Driver::unload` 调用
   `begin_cleanup`，恢复真实的资源日志，然后调用 `finish_cleanup`。其后置条件
   同时包含控制规则，以及将 `resource(id)` 恢复为 `initial(id)`。
+- [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) 和
+  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs)：公共 `unload` 在且仅在
+  `unload_enabled` 时成功，将 Kernel 清理许可与实际 journal 的 `restore_receipts`
+  有定义性合取。`undo_one` 执行对应的 strict inverse，循环保持 restoring 并递减
+  journal 长度。公共错误保持完整机器，内部草稿则可能已经恢复部分前缀。它将守卫
+  接到真实有限清理；`!relied` 本身不保证任意 inverse 有效。对应引理 57、推论 69
+  和定理 73 的范围仍为 partial：执行有定义的恢复，不等于一般 foreign replay
+  观察等价或整个系统进展。
+- [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs)：
+  `LifecycleActions` 将精确动作票据、清理结果和实际的
+  `Kernel::finish_cleanup` 调用连接起来。失败结果保留阻塞凭据；显式重试获得新票据。
+  共享 Driver 与 Node 路径调用这一可执行协议。合同、reservation 扩展以及普通 Rust
+  宿主不同的 `Drained` 策略见[清理协议审查](cleanup-protocol.zh-CN.md)。
+  宿主报告是否真实、外部 inverse 的效果仍在证明之外。
 - [runtime.rs](../crates/cordis/src/runtime.rs)：普通 Rust 中的
-  `Runtime::poll_settle` 在执行宿主回调前后调用 `Kernel::begin` 和清理方法。
+  `Runtime::poll_settle` 在执行宿主回调前后调用共享生命周期 Driver。
   这是实际的集成路径，不是对任意回调或 Future 行为的证明。
 
 **执行检查：**
@@ -80,11 +107,13 @@ python3 scripts/check-paper-review.py
 cargo test --offline -p cordis-kernel --test refinement strict_departure_preserves_committed_views_until_guarded_unload -- --exact
 cargo test --offline -p cordis-kernel --test driver provider_resources_remain_live_until_consumer_recovery -- --exact
 cargo test --offline -p cordis --test runtime provider_waits_for_async_consumer_cleanup -- --exact
+cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds -- --exact
 ```
 
 第一个测试观察到：当前目标不可用时，consumer 原有的已提交绑定仍然保留，
 过早清理 provider 会被拒绝。第二个测试运行真实的资源恢复。第三个测试检查异步宿主，
 属于**测试证据**，不能证明每个宿主 Future 都会终止或保持其外部资源。
+第四个测试通过生产共享 Driver 检查失败后保留依赖，直到新的精确重试票据成功并显式完成卸载。
 类型化载荷存储和已逃逸的 `Arc` 值不在此控制投影之内。
 
 **负控候选：** `provider-lifetime-guard` 移除实际的 provider 守卫。

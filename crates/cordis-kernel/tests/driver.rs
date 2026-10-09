@@ -156,3 +156,93 @@ fn repeated_activation_keeps_the_same_cells_and_commits_the_new_provider() {
     assert_eq!(driver.read(consumer, 0), Some(12));
     driver.unload(replacement).unwrap();
 }
+
+#[test]
+fn admission_requires_loading_and_never_reopens_an_ended_iterator() {
+    let mut driver = Driver::new();
+    let id = driver.insert(None, vec![], vec![]).unwrap();
+    let invalid = Err(DriverError::Kernel(Error::InvalidState));
+    assert_eq!(driver.admit(id), invalid);
+    assert_eq!(driver.admit(usize::MAX), invalid);
+
+    driver.begin(id).unwrap();
+    assert_eq!(driver.admit(id), Ok(true));
+    driver.end(id).unwrap();
+    // Coherent target alone does not reopen an iterator that already ended.
+    assert_eq!(driver.admit(id), Ok(false));
+    assert_eq!(driver.admit(id), Ok(false));
+    driver.finish(id).unwrap();
+    assert_eq!(driver.admit(id), invalid);
+    driver.retire(id).unwrap();
+    driver.depart(id).unwrap();
+    assert_eq!(driver.admit(id), invalid);
+    driver.unload(id).unwrap();
+    driver.remove(id).unwrap();
+    assert_eq!(driver.admit(id), invalid);
+}
+
+#[test]
+fn target_drift_rejects_new_stages_but_lands_and_recovers_an_admitted_stage() {
+    let mut driver = Driver::new();
+    let port = Port { key: 71, realm: 1 };
+    let provider = driver.insert(None, vec![], vec![port]).unwrap();
+    driver.begin(provider).unwrap();
+    finish(&mut driver, provider);
+    let idle = driver.insert(None, vec![port], vec![]).unwrap();
+    let pending = driver
+        .insert_with_resources(None, vec![port], vec![], vec![12])
+        .unwrap();
+    driver.begin(idle).unwrap();
+    driver.begin(pending).unwrap();
+    assert_eq!(driver.admit(pending), Ok(true));
+
+    driver.retire(provider).unwrap();
+    driver.depart(provider).unwrap();
+    assert_eq!(driver.admit(idle), Ok(false));
+    assert_eq!(driver.admit(pending), Ok(true));
+    assert_eq!(driver.depart(pending), Err(DriverError::Pending));
+    driver.land_write(pending, 4, 0, 33).unwrap();
+    assert_eq!(driver.read(pending, 0), Some(33));
+    assert_eq!(driver.admit(pending), Ok(false));
+    assert_eq!(
+        driver.unload(provider),
+        Err(DriverError::Kernel(Error::Relied))
+    );
+
+    driver.depart(idle).unwrap();
+    driver.unload(idle).unwrap();
+    driver.depart(pending).unwrap();
+    driver.unload(pending).unwrap();
+    assert_eq!(driver.read(pending, 0), Some(12));
+    driver.unload(provider).unwrap();
+}
+
+#[test]
+fn begin_and_admit_uses_real_dependency_readiness_without_touching_resources_on_failure() {
+    let mut driver = Driver::new();
+    let port = Port { key: 75, realm: 1 };
+    let consumer = driver
+        .insert_with_resources(None, vec![port], vec![], vec![17])
+        .unwrap();
+    assert_eq!(
+        driver.begin_and_admit(consumer),
+        Err(DriverError::Kernel(Error::MissingDependency))
+    );
+    assert_eq!(driver.phase(consumer), Some(Phase::Inactive));
+    assert_eq!(driver.read(consumer, 0), Some(17));
+
+    let provider = driver.insert(None, vec![], vec![port]).unwrap();
+    driver.begin_and_admit(provider).unwrap();
+    driver.end(provider).unwrap();
+    driver.finish(provider).unwrap();
+    driver.begin_and_admit(consumer).unwrap();
+    assert_eq!(driver.phase(consumer), Some(Phase::Loading));
+    assert_eq!(driver.read(consumer, 0), Some(17));
+    driver.land_write(consumer, 5, 0, 23).unwrap();
+    assert_eq!(driver.read(consumer, 0), Some(23));
+    assert_eq!(
+        driver.begin_and_admit(consumer),
+        Err(DriverError::Kernel(Error::InvalidState))
+    );
+    assert_eq!(driver.read(consumer, 0), Some(23));
+}

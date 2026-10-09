@@ -50,6 +50,25 @@ paper text is available, it also checks its locked hash and page/heading markers
 The full paper is not redistributed with this repository; see
 [reference/README.md](../reference/README.md).
 
+For Theorem 73, see [progress claims and executable contracts](progress-contracts.md):
+exact acceptance conditions, their runtime callers, synchronous Mixed/Fresh
+steps and the cross-call admitted landing domain. These implementation contracts
+also inform Lemma 57. The real Fresh runner derives finite return for one actor
+at a terminal result or its first error, and conditionally extends the source
+represented by its input. `run_from_empty` establishes that input through the
+actual setup script and proves one source execution from empty representing both
+the prepared and returned machines, with well-formed, resource-safe states.
+`SetupFailed` stops before autonomous execution and does not imply a blocked
+actor. Insert/Begin/Step now have exact implementation acceptance domains through
+`preparation_enabled`; a failed command in that profile is disabled at the actual
+failure state, even after a prefix containing other commands. This does not
+require all commands to be enabled initially. Retire/Depart/Unload/Remove remain
+supported but outside that dispatcher equivalence. Direct Mixed/Fresh Unload
+now has its own exact cleanup-guard-plus-inverse domain. The remaining command
+and dispatcher domains, individual error variants, whole-system progress,
+arbitrary Future completion and host scheduling remain
+separate; these repairs do not require a temporal-logic dependency.
+
 ## PR-01: an episode keeps the provider identity it committed to
 
 **Paper:** §4.2.2, Definition 53, p.35, equations (48) and (49); Definition 54,
@@ -79,8 +98,26 @@ consumer may temporarily disagree with its current target.
   `begin_cleanup`, restores the real resource journal, then calls
   `finish_cleanup`. Its postcondition includes both the control rule and
   restoration of `resource(id)` to `initial(id)`.
+- [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) and
+  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs): public `unload`
+  succeeds iff `unload_enabled`, combining Kernel cleanup permission with a
+  defined `restore_receipts` over the actual journal. `undo_one` implements the
+  corresponding strict inverse; the loop preserves restoring and decreases
+  journal length. Public errors keep the complete machine, while an internal
+  draft may already have restored a prefix. This connects the guard to actual
+  finite cleanup; `!relied` alone does not establish arbitrary inverse validity.
+  Its contribution to Lemma 57, Corollary 69 and Theorem 73 remains partial:
+  defined restoration is separate from general foreign-replay equivalence or
+  whole-system progress.
+- [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs):
+  `LifecycleActions` joins exact action tickets with cleanup outcomes and the
+  actual `Kernel::finish_cleanup` call. A failed completion retains a blocking
+  receipt; an explicit retry receives a new ticket. The shared Driver and Node
+  path call this executable protocol. See the [cleanup protocol review](cleanup-protocol.md)
+  for the contracts, reservation extension and the ordinary Rust host's distinct
+  `Drained` policy. Host reports and external inverse effects remain outside the proof.
 - [runtime.rs](../crates/cordis/src/runtime.rs): ordinary Rust
-  `Runtime::poll_settle` calls `Kernel::begin` and the cleanup methods around
+  `Runtime::poll_settle` calls the shared lifecycle Driver around
   host callback execution. This is an actual integration path, not a proof of
   arbitrary callback or Future behavior.
 
@@ -90,13 +127,16 @@ consumer may temporarily disagree with its current target.
 cargo test --offline -p cordis-kernel --test refinement strict_departure_preserves_committed_views_until_guarded_unload -- --exact
 cargo test --offline -p cordis-kernel --test driver provider_resources_remain_live_until_consumer_recovery -- --exact
 cargo test --offline -p cordis --test runtime provider_waits_for_async_consumer_cleanup -- --exact
+cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds -- --exact
 ```
 
 The first test observes an unavailable current target while the consumer's old
 committed bindings remain, and a rejected early provider cleanup. The second
 runs actual resource recovery. The third exercises the asynchronous host and is
 **test evidence**, not a proof that every host future terminates or preserves
-its external resources. Typed payload storage and escaped `Arc` values are
+its external resources. The fourth checks the production shared Driver: failed
+cleanup retains dependencies until an exact fresh retry succeeds and finish is called.
+Typed payload storage and escaped `Arc` values are
 outside this control projection.
 
 **Negative-control candidate:** `provider-lifetime-guard` removes the real

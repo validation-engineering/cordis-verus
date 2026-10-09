@@ -5,8 +5,10 @@ host executes callbacks only after the driver returns an action; it submits the
 opaque domain, episode and action ticket when the callback has completed. The
 driver never owns a JavaScript object or invokes user code.
 
-This crate is ordinary Rust, with behavioral tests. Its scheduling adapter and
-JSON boundary are not covered by the kernel's Verus proofs. Dynamic publication
+This crate is ordinary Rust, with behavioral tests. It calls the verified
+`LifecycleActions` implementation for action admission, cleanup results, retries
+and permission to finish cleanup. Its scheduling adapter and JSON boundary
+are not covered by those Verus proofs. See the [cleanup protocol review](../../docs/cleanup-protocol.md). Dynamic publication
 uses the kernel publication ledger; availability filtering remains in this
 adapter. In particular, a port remains declared by its owner until registry
 removal, so replacing a revoked publication with a different still-registered

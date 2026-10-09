@@ -420,3 +420,74 @@ fn verified_script_entry_runs_shared_payload_child_restore_and_strict_failure_pr
     assert_eq!(report.machine.phase(3), Some(Phase::Active));
     assert!(!report.machine.retired(3));
 }
+
+#[test]
+fn insertion_checks_raw_declarations_and_preserves_validation_priority() {
+    let leaf = Blueprint::new(vec![], vec![], vec![Instruction::Unit]);
+    let duplicate_dependencies =
+        Blueprint::new(vec![key(), key()], vec![], vec![Instruction::Unit]);
+    let duplicate_provisions = Blueprint::new(vec![], vec![key(), key()], vec![Instruction::Unit]);
+    let missing_dependency = Blueprint::new(vec![key()], vec![], vec![Instruction::Unit]);
+    let mut driver = MixedDriver::new(vec![
+        leaf,
+        duplicate_dependencies,
+        duplicate_provisions,
+        missing_dependency,
+    ]);
+
+    // Blueprint checks happen before the kernel's parent/declaration checks.
+    assert_eq!(
+        driver.insert(Some(99), 4),
+        Err(DriverError::InvalidBlueprint)
+    );
+    assert_eq!(
+        driver.insert(Some(99), 2),
+        Err(DriverError::InvalidBlueprint)
+    );
+    assert_eq!(
+        driver.insert(Some(99), 1),
+        Err(DriverError::Kernel(Error::Unknown))
+    );
+    assert_eq!(
+        driver.insert(None, 1),
+        Err(DriverError::Kernel(Error::Conflict))
+    );
+    assert_eq!(driver.phase(0), None);
+    assert_eq!(driver.inverse_count(0), None);
+
+    // Registration checks declarations, not whether dependencies can activate.
+    assert_eq!(driver.insert(None, 3), Ok(0));
+    assert_eq!(driver.phase(0), Some(Phase::Inactive));
+    driver.retire(0).unwrap();
+    assert_eq!(driver.insert(Some(0), 0), Ok(1));
+    assert_eq!(driver.phase(1), Some(Phase::Inactive));
+    assert!(driver.retired(0));
+}
+
+#[test]
+fn insertion_reservations_include_realm_and_survive_retirement_until_removal() {
+    let other_realm = Port { key: 7, realm: 4 };
+    let mut driver = MixedDriver::new(vec![
+        Blueprint::new(vec![], vec![key()], vec![Instruction::Unit]),
+        Blueprint::new(vec![], vec![other_realm], vec![Instruction::Unit]),
+    ]);
+    let owner = driver.insert(None, 0).unwrap();
+    assert_eq!(owner, 0);
+    driver.retire(owner).unwrap();
+    assert_eq!(
+        driver.insert(None, 0),
+        Err(DriverError::Kernel(Error::Conflict))
+    );
+    assert_eq!(driver.phase(owner), Some(Phase::Inactive));
+    assert!(driver.retired(owner));
+    assert_eq!(driver.read(owner, key()), None);
+    assert_eq!(driver.inverse_count(owner), Some(0));
+    assert_eq!(driver.phase(1), None);
+
+    assert_eq!(driver.insert(None, 1), Ok(1));
+    driver.remove(owner).unwrap();
+    assert_eq!(driver.phase(owner), None);
+    assert_eq!(driver.insert(None, 0), Ok(2));
+    assert_eq!(driver.phase(1), Some(Phase::Inactive));
+    assert_eq!(driver.phase(2), Some(Phase::Inactive));
+}

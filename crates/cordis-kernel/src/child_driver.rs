@@ -58,6 +58,12 @@ impl ChildDriver {
     pub closed spec fn generation(&self,id:usize) -> Option<u64> {self.kernel.generation_of(id)}
     pub closed spec fn journal(&self,id:usize) -> Seq<usize> { self.episodes[id as int].children() }
     pub closed spec fn pending(&self,id:usize) -> bool { self.episodes[id as int].pending() }
+    /// Exact domain for a child landing, including the checked handle identity
+    /// and current insertion constraints. Admission alone is insufficient.
+    pub closed spec fn land_enabled(&self,id:usize,dependencies:Seq<Port>,provisions:Seq<Port>) -> bool {
+        paper::registered(self.control(),id) && self.control().fibers[id].phase == Phase::Loading
+            && self.episodes[id as int].land_enabled(&self.kernel,dependencies,provisions)
+    }
     pub open spec fn good(s:paper::State,e:&ChildEpisode,id:usize) -> bool {
         &&& e.wf() && e.owner() == id
         &&& (!paper::registered(s,id) || s.fibers[id].phase == Phase::Inactive
@@ -203,13 +209,50 @@ impl ChildDriver {
         r
     }
 
+    /// Non-destructive preflight against the actual pending episode and live
+    /// registry. Other insertions can invalidate this check before landing.
+    pub fn check_child(&self,id:usize,dependencies:&[Port],provisions:&[Port]) -> (r:Result<(),ChildDriverError>)
+        requires self.wf(),
+        ensures r.is_ok() == self.land_enabled(id,dependencies@,provisions@),
+    {
+        proof { self.kernel.paper_observations(id); }
+        if self.kernel.phase(id) != Some(Phase::Loading) { return Err(ChildDriverError::Kernel(Error::InvalidState)); }
+        match self.episodes[id].check_child(&self.kernel,dependencies,provisions) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(ChildDriverError::Episode(e)),
+        }
+    }
+
+    /// Execute preflight and landing without an intervening registry operation.
+    /// The live check establishes the domain; successful landing is proved from
+    /// that check rather than supplied as a caller assumption.
+    pub fn check_and_land_child(&mut self,id:usize,dependencies:Vec<Port>,provisions:Vec<Port>)
+        -> (r:Result<usize,ChildDriverError>)
+        requires old(self).wf(),
+        ensures final(self).wf(),r.is_ok() == old(self).land_enabled(id,dependencies@,provisions@),
+            r.is_ok() ==> child_landing(old(self).control(),final(self).control(),id,r.unwrap())
+                && final(self).journal(id) == old(self).journal(id).push(r.unwrap()) && !final(self).pending(id),
+            r.is_err() ==> final(self).control() == old(self).control(),
+            r.is_err() && paper::registered(old(self).control(),id) ==> final(self).journal(id) == old(self).journal(id)
+                && final(self).pending(id) == old(self).pending(id),
+    {
+        self.check_child(id,dependencies.as_slice(),provisions.as_slice())?;
+        let result = self.land_child(id,dependencies,provisions);
+        assert(result.is_ok());
+        result
+    }
+
     /// The actual newly allocated child ID is stored in its parent's journal
     /// before this call returns. A target change cannot discard a pending yield.
     #[verifier::spinoff_prover]
     pub fn land_child(&mut self,id:usize,dependencies:Vec<Port>,provisions:Vec<Port>) -> (r:Result<usize,ChildDriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),r.is_ok() ==> child_landing(old(self).control(),final(self).control(),id,r.unwrap())
-            && final(self).journal(id) == old(self).journal(id).push(r.unwrap()) && !final(self).pending(id),
+        ensures final(self).wf(),r.is_ok() == old(self).land_enabled(id,dependencies@,provisions@),
+            r.is_ok() ==> child_landing(old(self).control(),final(self).control(),id,r.unwrap())
+                && final(self).journal(id) == old(self).journal(id).push(r.unwrap()) && !final(self).pending(id),
+            r.is_err() ==> final(self).control() == old(self).control(),
+            r.is_err() && paper::registered(old(self).control(),id) ==> final(self).journal(id) == old(self).journal(id)
+                && final(self).pending(id) == old(self).pending(id),
     {
         let ghost prior = *self;
         proof { self.kernel.paper_observations(id); }
@@ -231,6 +274,8 @@ impl ChildDriver {
             None => {proof {self.kernel.unavailable_not_coherent(id);} false},
         };
         assert(has_target == paper::coherent(prior.control(),id));
+        assert(self.episodes[id as int].land_enabled(&self.kernel,dependencies@,provisions@)
+            == prior.land_enabled(id,dependencies@,provisions@));
         match self.episodes[id].land_child(&mut self.kernel,dependencies,provisions) {
             Err(e) => {
                 proof { self.kernel.unchanged_observations(&prior.kernel); self.rebuild(&prior,id,id,None); }

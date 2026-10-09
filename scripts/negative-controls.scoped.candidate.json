@@ -73,7 +73,7 @@
           "module": "",
           "file": "lib.rs",
           "diagnosticKind": "invariant not satisfied",
-          "uniqueSourceAnchor": "invariant k <= self.declarations.len(), self.wf(),\n                    forall|a: int| 0 <= a < k && self.declarations[a].provides && self.nodes[self.declarations[a].owner as int].present\n                        ==> self.declarations[a].port != p,\n                decreases self.declarations.len() - k,"
+          "uniqueSourceAnchor": "invariant k <= self.declarations.len(), self.wf(),\n                    i < ports.len(), p == ports@[i as int],\n                    forall|a: int| 0 <= a < k && self.declarations[a].provides && self.nodes[self.declarations[a].owner as int].present\n                        ==> self.declarations[a].port != p,\n                decreases self.declarations.len() - k,"
         }
       ],
       "selectionRationale": "The contract in cordis_negative::Kernel::check_provisions detects provision-conflict-guard. The mutation remains the exact canonical change to lib.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
@@ -150,7 +150,7 @@
           "module": "episode",
           "file": "episode.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "final(self).inverse_view() == old(self).inverse_view(),\n            poll == final(self).pending(),\n            poll ==> old(self).pending() || (!old(self).settled()\n                && !old(self).cancellation() && target.is_some()"
+          "uniqueSourceAnchor": "final(self).inverse_view() == old(self).inverse_view(),\n            poll == final(self).pending(),\n            poll == (old(self).pending() || (!old(self).settled()\n                && !old(self).cancellation() && target.is_some()"
         }
       ],
       "selectionRationale": "The contract in cordis_negative::episode::StageProtocol::admit detects stage-loses-pending-admission. The mutation remains the exact canonical change to episode.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
@@ -228,7 +228,7 @@
           "module": "witnessed",
           "file": "witnessed.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "requires old(self).wf(),\n        ensures final(self).wf(), final(self).initial() == old(self).initial(),\n            final(self).committed() == old(self).committed(),\n            (old(self).pending() && old(self).depth() < usize::MAX && index < old(self).view().len()"
+          "uniqueSourceAnchor": "requires old(self).wf(),\n        ensures final(self).wf(), final(self).initial() == old(self).initial(),\n            final(self).committed() == old(self).committed(),\n            final(self).cancellation() == old(self).cancellation(),\n            (old(self).pending() && old(self).depth() < usize::MAX && index < old(self).view().len()"
         }
       ],
       "selectionRationale": "The contract in cordis_negative::witnessed::ResourceEpisode::land_write detects episode-token-names-wrong-inverse. The mutation remains the exact canonical change to witnessed.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
@@ -1666,8 +1666,8 @@
       "name": "mixed-driver-xor-skips-payload",
       "mutation": {
         "file": "mixed_driver.rs",
-        "old": "self.write_slot(provider,index,Some(value^mask));\n                Inverse::Xor {provider,key,mask}",
-        "new": "self.write_slot(provider,index,Some(value));\n                Inverse::Xor {provider,key,mask}"
+        "old": "self.write_slot(provider,index,Some(value^mask));\n",
+        "new": "self.write_slot(provider,index,Some(value));\n"
       },
       "targets": [
         {
@@ -1683,7 +1683,7 @@
           "module": "mixed_driver",
           "file": "mixed_driver.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],\n            out.is_ok() ==> {\n                let y=mx::run(library(),instruction_node(old(self).blueprints@,_blueprint,instruction),old(self).primitive_state(),actor);\n                &&& y.is_some() && final(self).physical(y.unwrap().state) && out.unwrap().model()==y.unwrap().receipt"
+          "uniqueSourceAnchor": "        ensures final(self).wf(),final(self).blueprints@==old(self).blueprints@,\n            out.is_ok()==old(self).primitive_enabled(actor,instruction),\n            final(self).rows.len()>=old(self).rows.len(),\n            forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],\n            out.is_ok() ==> final(self).fully_provided(actor)==old(self).complete_after(actor,instruction),\n            out.is_ok() ==> r::coherent(final(self).control(),actor)==r::coherent(old(self).control(),actor),\n            out.is_ok() ==> {\n                let y=mx::run(library(),instruction_node(old(self).blueprints@,_blueprint,instruction),old(self).primitive_state(),actor);\n                &&& y.is_some() && final(self).physical(y.unwrap().state) && out.unwrap().model()==y.unwrap().receipt\n                &&& out.unwrap().actor==actor\n                &&& match instruction {\n                    Instruction::Child {expected,blueprint,..}=>expected==old(self).rows.len() && final(self).rows.len()==old(self).rows.len()+1\n                        && final(self).rows[old(self).rows.len() as int].blueprint==blueprint\n                        && final(self).rows[old(self).rows.len() as int].current.is_none()\n                        && final(self).rows[old(self).rows.len() as int].journal.len()==0,\n                    _=>final(self).rows.len()==old(self).rows.len(),\n                }\n            },\n"
         }
       ],
       "selectionRationale": "The contract in cordis_negative::mixed_driver::MixedDriver::execute detects mixed-driver-xor-skips-payload. The mutation remains the exact canonical change to mixed_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
@@ -2010,21 +2010,20 @@
       "targets": [
         {
           "kind": "module",
-          "path": "admitted_fresh_driver",
-          "descendants": false,
-          "function": "cordis_negative::admitted_fresh_driver::Admission::land"
+          "path": "mixed_driver::fresh::admitted",
+          "descendants": true
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::admitted_fresh_driver::Admission::land",
-          "module": "admitted_fresh_driver",
+          "function": "cordis_negative::mixed_driver::fresh::admitted::Admission::land",
+          "module": "mixed_driver::fresh::admitted",
           "file": "admitted_fresh_driver.rs",
-          "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_err() ==> final(self).same(old(self)),\n            out.is_ok() ==> final(self).consumed() && !old(self).consumed() && old(self).bound(&old(self).machine())\n                && out.unwrap().actor==old(self).identity().0\n                && old(self).machine().ack(&final(self).machine(),out.unwrap().label().0,out.unwrap().label().1,out.unwrap().label().2)"
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.bound(&self.machine));"
         }
       ],
-      "selectionRationale": "The contract in cordis_negative::admitted_fresh_driver::Admission::land detects admitted-fresh-generation-guard. The mutation remains the exact canonical change to admitted_fresh_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+      "selectionRationale": "Check the actual nested admission subtree, including Admission::land and its script callers; a substring function selector would also match land_enabled. The module selector preserves an explicit partial-verification report on the pinned tool. Removing the unchanged canonical generation guard fails the ticket binding assertion. A positive with this selector and complete mutant compilation are required."
     },
     {
       "name": "admitted-script-event-provenance",
@@ -2036,21 +2035,21 @@
       "targets": [
         {
           "kind": "module",
-          "path": "admitted_script",
+          "path": "mixed_driver::fresh::admitted::script",
           "descendants": false,
-          "function": "cordis_negative::admitted_script::run_script"
+          "function": "cordis_negative::mixed_driver::fresh::admitted::script::run_script"
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::admitted_script::run_script",
-          "module": "admitted_script",
+          "function": "cordis_negative::mixed_driver::fresh::admitted::script::run_script",
+          "module": "mixed_driver::fresh::admitted::script",
           "file": "admitted_script.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert forall|k:int|0<=k<events.len() implies events[k].action_index!=j by {\n                            if k<previous.len() {assert(events[k]==previous[k]);}else{assert(events[k].action_index==i);}\n                        }\n                    }"
         }
       ],
-      "selectionRationale": "The contract in cordis_negative::admitted_script::run_script detects admitted-script-event-provenance. The mutation remains the exact canonical change to admitted_script.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+      "selectionRationale": "Select run_script in its actual nested module. The unchanged canonical event-index mutation must fail its event provenance assertion after a positive with this selector and complete mutant compilation."
     },
     {
       "name": "selective-recovery-forgets-owner-foreign-crossing",

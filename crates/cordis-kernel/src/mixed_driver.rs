@@ -690,8 +690,11 @@ impl MixedDriver {
         requires old(self).wf(),r::registered(old(self).control(),provider),provider<old(self).tables.len(),
             index<old(self).tables[provider as int].view().len(),
             value.is_none() ==> old(self).control().fibers[provider].phase!=Phase::Active,
-        ensures final(self).wf(),final(self).control()==old(self).control(),final(self).rows@==old(self).rows@,
-            final(self).blueprints@==old(self).blueprints@,
+        ensures final(self).wf(),final(self).control()==old(self).control(),
+            final(self).kernel.unchanged(&old(self).kernel),final(self).rows@==old(self).rows@,
+            final(self).blueprints@==old(self).blueprints@,final(self).tables.len()==old(self).tables.len(),
+            final(self).tables[provider as int].view()==old(self).tables[provider as int].view().update(index as int,Slot {key:old(self).tables[provider as int].view()[index as int].key,value}),
+            forall|i:int| 0<=i<old(self).tables.len() && i!=provider ==> final(self).tables[i]==old(self).tables[i],
             final(self).physical(projection::update_slot(old(self).primitive_state(),provider,old(self).tables[provider as int].view()[index as int].key,value)),
     {
         let ghost prior=*self;
@@ -706,6 +709,51 @@ impl MixedDriver {
     }
     pub closed spec fn bank_valid(&self,rank:usize)->bool {
         rank<self.blueprints.len() && forall|i:int| #![trigger self.blueprints[i]] 0<=i<=rank ==> self.blueprints[i].valid(i as usize)
+    }
+    /// Exact domain of the installed blueprint and concrete kernel checks.
+    /// Code validity alone does not remove duplicate declaration entries.
+    pub closed spec fn insertion_enabled(&self,parent:Option<usize>,blueprint:usize)->bool {
+        blueprint<self.blueprints.len() && self.bank_valid(blueprint)
+            && self.kernel.insert_enabled(parent,self.blueprints[blueprint as int].dependencies@,
+                self.blueprints[blueprint as int].provisions@)
+    }
+    proof fn same_insertion_domain(&self,other:&Self,parent:Option<usize>,blueprint:usize)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.insertion_enabled(parent,blueprint)==other.insertion_enabled(parent,blueprint),
+    {
+        self.kernel.unchanged_observations(&other.kernel);
+        if blueprint<self.blueprints.len() {
+            assert forall|i:int| 0<=i<=blueprint implies
+                self.blueprints[i].valid(i as usize)==other.blueprints[i].valid(i as usize) by { }
+            self.kernel.paper_insert_domain(parent,self.blueprints[blueprint as int].dependencies@,
+                self.blueprints[blueprint as int].provisions@);
+            other.kernel.paper_insert_domain(parent,other.blueprints[blueprint as int].dependencies@,
+                other.blueprints[blueprint as int].provisions@);
+        }
+    }
+    /// Exact domain of guarded recovery over the actual retained LIFO journal.
+    /// Cleanup permission alone does not imply that every inverse is defined.
+    pub closed spec fn unload_enabled(&self,actor:usize)->bool {
+        self.kernel.cleanup_enabled(actor)
+            && restore_receipts(self.journal(actor),self.primitive_state()).is_some()
+    }
+    proof fn same_unload_domain(&self,other:&Self,actor:usize)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.unload_enabled(actor)==other.unload_enabled(actor),
+    {
+        self.kernel.unchanged_observations(&other.kernel);
+        reveal(Kernel::cleanup_enabled);reveal(Kernel::unchanged);
+        if r::registered(self.control(),actor) {
+            self.kernel.paper_observations(actor);
+            assert(self.journal(actor)==other.journal(actor));
+            assert(self.tables() =~= other.tables()) by {
+                assert forall|n:usize| r::registered(self.control(),n) implies self.table(n)==other.table(n) by {
+                    self.kernel.paper_observations(n);self.row_bounds(n);other.row_bounds(n);
+                    self.tables[n as int].same_map(&other.tables[n as int]);
+                }
+            }
+            restore_payload(self.journal(actor),self.primitive_state(),other.primitive_state());
+        }
     }
     closed spec fn layout(&self,id:int)->bool {
         let bp=self.blueprints[self.rows[id].blueprint as int];
@@ -821,11 +869,13 @@ impl MixedDriver {
     /// Install a blueprint without exposing its mutable code or declarations.
     pub fn insert(&mut self,parent:Option<usize>,blueprint:usize)->(out:Result<usize,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).observation()==old(self).observation() && final(self).same(old(self)),
+        ensures final(self).wf(),out.is_ok()==old(self).insertion_enabled(parent,blueprint),
+            out.is_err() ==> final(self).observation()==old(self).observation() && final(self).same(old(self)),
             out.is_ok() ==> r::step(old(self).control(),final(self).control(),out.unwrap(),r::Rule::Insert)
                 && old(self).ack(final(self),out.unwrap(),r::Rule::Insert),
     {
         let mut draft=self.duplicate();
+        proof {draft.same_insertion_domain(self,parent,blueprint);}
         let ghost initial=draft;
         match draft.insert_inner(parent,blueprint) {
             Err(e)=>Err(e),Ok(id)=>{proof {draft.administrative_simulation(&initial,id,r::Rule::Insert);reveal(MixedDriver::ack);}*self=draft;Ok(id)},
@@ -835,6 +885,7 @@ impl MixedDriver {
     fn insert_inner(&mut self,parent:Option<usize>,blueprint:usize)->(out:Result<usize,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),final(self).blueprints@==old(self).blueprints@,
+            out.is_ok()==old(self).insertion_enabled(parent,blueprint),
             final(self).rows.len()>=old(self).rows.len(),
             forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i] && final(self).tables[i]==old(self).tables[i],
             out.is_ok() ==> r::step(old(self).control(),final(self).control(),out.unwrap(),r::Rule::Insert)
@@ -849,7 +900,7 @@ impl MixedDriver {
         let provisions=copy_vec(&self.blueprints[blueprint].provisions);
         let mut slots:Vec<Slot>=Vec::new();let mut i=0;
         while i<provisions.len()
-            invariant self.wf(),i<=provisions.len(),slots.len()==i,
+            invariant self.wf(),*self==*old(self),i<=provisions.len(),slots.len()==i,
                 self.bank_valid(blueprint),provisions@==self.blueprints[blueprint as int].provisions@,
                 dependencies@==self.blueprints[blueprint as int].dependencies@,
                 forall|j:int| 0<=j<i ==> slots[j]==(Slot {key:provisions[j],value:None}),
@@ -858,13 +909,22 @@ impl MixedDriver {
         {
             let mut j=0;
             while j<i
-                invariant self.wf(),j<=i,i<provisions.len(),slots.len()==i,
+                invariant self.wf(),*self==*old(self),j<=i,i<provisions.len(),slots.len()==i,
                     self.bank_valid(blueprint),provisions@==self.blueprints[blueprint as int].provisions@,
                     dependencies@==self.blueprints[blueprint as int].dependencies@,
                     forall|k:int| 0<=k<i ==> slots[k].key==provisions[k],
                     forall|k:int| 0<=k<j ==> provisions[k]!=provisions[i as int],
                 decreases i-j,
-            {if provisions[j]==provisions[i] {return Err(DriverError::InvalidBlueprint);}j+=1;}
+            {
+                if provisions[j]==provisions[i] {
+                    proof {
+                        assert(!crate::distinct_ports(provisions@));
+                        self.kernel.paper_insert_domain(parent,dependencies@,provisions@);
+                    }
+                    return Err(DriverError::InvalidBlueprint);
+                }
+                j+=1;
+            }
             slots.push(Slot {key:provisions[i],value:None});i+=1;
         }
         let result=self.kernel.insert(parent,dependencies,provisions);
@@ -941,7 +1001,8 @@ impl MixedDriver {
     /// this lookup to redirect an operation or inverse to a replacement.
     fn provider(&self,actor:usize,key:Port)->(out:Result<usize,DriverError>)
         requires self.wf(),actor<self.rows.len(),r::registered(self.control(),actor),
-        ensures out.is_ok() ==> out.unwrap()<self.tables.len() && r::registered(self.control(),out.unwrap())
+        ensures out.is_ok()==lift::resolve(self.primitive_state(),actor,key).is_some(),
+            out.is_ok() ==> out.unwrap()<self.tables.len() && r::registered(self.control(),out.unwrap())
             && lift::resolve(self.primitive_state(),actor,key)==Some(out.unwrap()),
     {
         proof {self.kernel.refines_paper();self.table_declaration(actor,key);}
@@ -951,10 +1012,12 @@ impl MixedDriver {
             invariant self.wf(),r::well_formed(self.control()),actor<self.rows.len(),r::registered(self.control(),actor),
                 !self.control().fibers[actor].provisions.contains(key),i<=bindings.len(),
                 self.control().fibers[actor].committed==ports_bindings(bindings@),
+                forall|j:int| 0<=j<i ==> !lift::names_key(bindings[j],key),
             decreases bindings.len()-i,
         {
             let b=bindings[i];
             if b.key==key.key && b.realm==key.realm {
+                proof {assert(bindings@.contains(b));assert(self.control().fibers[actor].committed.contains(b));}
                 if !self.registered(b.provider) {return Err(DriverError::MissingBinding);}
                 proof {
                     assert(bindings@.contains(b));assert(self.control().fibers[actor].committed.contains(b));
@@ -969,7 +1032,151 @@ impl MixedDriver {
             }
             i+=1;
         }
+        assert forall|b:crate::Binding| self.control().fibers[actor].committed.contains(b) implies !lift::names_key(b,key) by {
+            let j=choose|j:int| 0<=j<bindings.len() && bindings[j]==b;
+            assert(!lift::names_key(bindings[j],key));
+        }
         Err(DriverError::MissingBinding)
+    }
+
+    /// Value availability after one successful primitive, before publication.
+    pub closed spec fn fully_provided(&self,actor:usize)->bool {
+        forall|i:int| 0<=i<self.tables[actor as int].view().len()
+            ==> self.tables[actor as int].view()[i].value.is_some()
+    }
+    pub closed spec fn complete_after(&self,actor:usize,instruction:Instruction)->bool {
+        forall|i:int| 0<=i<self.tables[actor as int].view().len()
+            ==> self.tables[actor as int].view()[i].value.is_some()
+                || match instruction {Instruction::Provide {key,..}=>self.tables[actor as int].view()[i].key==key,_=>false}
+    }
+    /// Independent input domain of the real primitive interpreter. This does
+    /// not assume that a call, a model run, or a callback has succeeded.
+    pub closed spec fn primitive_enabled(&self,actor:usize,instruction:Instruction)->bool {
+        match instruction {
+            Instruction::Unit=>true,
+            Instruction::Provide {key,..}=>self.tables[actor as int].find(key).is_some()
+                && self.tables[actor as int].view()[self.tables[actor as int].find(key).unwrap() as int].value.is_none(),
+            Instruction::Xor {key,..}=>{
+                let provider=lift::resolve(self.primitive_state(),actor,key);
+                provider.is_some() && self.table(provider.unwrap()).dom().contains(key)
+            },
+            Instruction::Child {expected,blueprint,..}=>expected==self.rows.len() && self.insertion_enabled(Some(actor),blueprint),
+        }
+    }
+    pub closed spec fn instruction_enabled(&self,actor:usize,instruction:Instruction)->bool {
+        self.primitive_enabled(actor,instruction)
+            && (instruction.continuation().is_some() || self.complete_after(actor,instruction))
+    }
+    pub closed spec fn ready(&self,actor:usize)->bool {
+        actor<self.rows.len() && r::registered(self.control(),actor)
+            && self.control().fibers[actor].phase==Phase::Loading && r::coherent(self.control(),actor)
+            && self.rows[actor as int].current.is_some()
+    }
+    pub closed spec fn installed_instruction(&self,actor:usize)->Instruction {
+        let row=self.rows[actor as int];let bp=self.blueprints[row.blueprint as int];
+        if row.current.unwrap()==bp.code.len() {Instruction::Unit} else {bp.code[row.current.unwrap() as int]}
+    }
+    pub closed spec fn step_enabled(&self,actor:usize)->bool {
+        self.ready(actor) && self.instruction_enabled(actor,self.installed_instruction(actor))
+    }
+    proof fn same_primitive_state(&self,other:&Self)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.primitive_state()==other.primitive_state(),
+    {
+        self.kernel.unchanged_observations(&other.kernel);
+        assert(self.tables() =~= other.tables()) by {
+            assert forall|n:usize| r::registered(self.control(),n) implies self.table(n)==other.table(n) by {
+                self.kernel.paper_observations(n);self.row_bounds(n);other.row_bounds(n);
+                self.tables[n as int].same_map(&other.tables[n as int]);
+            }
+        }
+    }
+    #[verifier::spinoff_prover]
+    #[verifier::rlimit(10)]
+    proof fn same_instruction_domain(&self,other:&Self,actor:usize,instruction:Instruction)
+        requires self.wf(),other.wf(),self.same(other),actor<self.rows.len(),r::registered(self.control(),actor),
+        ensures self.primitive_enabled(actor,instruction)==other.primitive_enabled(actor,instruction),
+            self.complete_after(actor,instruction)==other.complete_after(actor,instruction),
+            self.instruction_enabled(actor,instruction)==other.instruction_enabled(actor,instruction),
+    {
+        self.same_primitive_state(other);
+        self.row_bounds(actor);other.row_bounds(actor);
+        assert(self.tables[actor as int].view()==other.tables[actor as int].view());
+        assert(self.complete_after(actor,instruction)==other.complete_after(actor,instruction));
+        match instruction {
+            Instruction::Provide {key,..}=>{
+                let left=self.tables[actor as int].find(key);
+                let right=other.tables[actor as int].find(key);
+                if left.is_some() {
+                    let i=left.unwrap();
+                    assert(other.tables[actor as int].view()[i as int].key==key);
+                    assert(right.is_some());
+                    let j=right.unwrap();
+                    assert(self.tables[actor as int].view()[j as int].key==key);
+                    assert(i==j);
+                } else if right.is_some() {
+                    let j=right.unwrap();
+                    assert(self.tables[actor as int].view()[j as int].key==key);
+                    assert(left.is_some());
+                }
+                assert(left==right);
+                assert(self.primitive_enabled(actor,instruction)==other.primitive_enabled(actor,instruction));
+            },
+            Instruction::Xor {key,..}=>{
+                self.kernel.refines_paper();
+                let provider=lift::resolve(self.primitive_state(),actor,key);
+                if provider.is_some() {
+                    if !self.control().fibers[actor].provisions.contains(key) {
+                        let b=choose|b:crate::Binding| self.control().fibers[actor].committed.contains(b) && lift::names_key(b,key);
+                        assert(r::registered(self.control(),b.provider));
+                    }
+                    assert(r::registered(self.control(),provider.unwrap()));
+                    assert(self.table(provider.unwrap())==other.table(provider.unwrap()));
+                }
+                assert(self.primitive_enabled(actor,instruction)==other.primitive_enabled(actor,instruction));
+            },
+            Instruction::Child {blueprint,..}=>{
+                self.same_insertion_domain(other,Some(actor),blueprint);
+                assert(self.primitive_enabled(actor,instruction)==other.primitive_enabled(actor,instruction));
+            },
+            Instruction::Unit=>{},
+        }
+    }
+    proof fn same_domains(&self,other:&Self,actor:usize,instruction:Instruction)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.ready(actor)==other.ready(actor),
+            self.ready(actor) ==> self.installed_instruction(actor)==other.installed_instruction(actor)
+                && self.instruction_enabled(actor,instruction)==other.instruction_enabled(actor,instruction),
+            self.step_enabled(actor)==other.step_enabled(actor),
+    {
+        self.kernel.unchanged_observations(&other.kernel);
+        assert(self.ready(actor)==other.ready(actor));
+        if self.ready(actor) {
+            self.row_bounds(actor);other.row_bounds(actor);
+            assert(self.installed_instruction(actor)==other.installed_instruction(actor));
+            self.same_instruction_domain(other,actor,instruction);
+            self.same_instruction_domain(other,actor,self.installed_instruction(actor));
+        }
+    }
+    /// Concrete initialized slots are exactly the declared provision domain.
+    proof fn provided_domain(&self,actor:usize)
+        requires self.wf(),r::registered(self.control(),actor),
+        ensures self.fully_provided(actor)==(self.table(actor).dom()==self.control().fibers[actor].provisions),
+    {
+        self.kernel.paper_observations(actor);self.row_bounds(actor);
+        if self.fully_provided(actor) {
+            assert(self.table(actor).dom() =~= self.control().fibers[actor].provisions) by {
+                assert forall|key:Port| self.table(actor).dom().contains(key)==self.control().fibers[actor].provisions.contains(key) by {
+                    self.table_declaration(actor,key);
+                }
+            }
+        } else {
+            let i=choose|i:int| 0<=i<self.tables[actor as int].view().len() && self.tables[actor as int].view()[i].value.is_none();
+            let key=self.tables[actor as int].view()[i].key;
+            self.table_declaration(actor,key);
+            assert(self.tables[actor as int].find(key)==Some(i as usize));
+            assert(!self.table(actor).dom().contains(key));
+        }
     }
 
     fn provided(&self,id:usize)->(yes:bool)
@@ -990,7 +1197,7 @@ impl MixedDriver {
     /// payload, continuation, or inverse after the instruction is installed.
     pub fn step(&mut self,actor:usize)->(out:Result<Outcome,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).observation()==old(self).observation() && final(self).same(old(self)),
+        ensures final(self).wf(),out.is_ok()==old(self).step_enabled(actor),out.is_err() ==> final(self).observation()==old(self).observation() && final(self).same(old(self)),
             out.is_ok() ==> final(self).journal(actor).len()==old(self).journal(actor).len()+1
                 && final(self).journal(actor).last().actor==actor
                 && old(self).step_ack(final(self),actor,out.unwrap())
@@ -998,6 +1205,7 @@ impl MixedDriver {
     {
         let ghost initial=*self;
         let mut draft=self.duplicate();
+        proof {draft.same_domains(&initial,actor,initial.installed_instruction(actor));}
         match draft.step_inner(actor) {Err(e)=>Err(e),Ok(outcome)=>{
             proof {reveal(MixedDriver::step_ack);initial.landing_ack(&draft,actor,outcome);}
             *self=draft;Ok(outcome)
@@ -1010,8 +1218,11 @@ impl MixedDriver {
         requires old(self).wf(),actor<old(self).rows.len(),r::registered(old(self).control(),actor),
             old(self).control().fibers[actor].phase==Phase::Loading,
         ensures final(self).wf(),final(self).blueprints@==old(self).blueprints@,
+            out.is_ok()==old(self).primitive_enabled(actor,instruction),
             final(self).rows.len()>=old(self).rows.len(),
             forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],
+            out.is_ok() ==> final(self).fully_provided(actor)==old(self).complete_after(actor,instruction),
+            out.is_ok() ==> r::coherent(final(self).control(),actor)==r::coherent(old(self).control(),actor),
             out.is_ok() ==> {
                 let y=mx::run(library(),instruction_node(old(self).blueprints@,_blueprint,instruction),old(self).primitive_state(),actor);
                 &&& y.is_some() && final(self).physical(y.unwrap().state) && out.unwrap().model()==y.unwrap().receipt
@@ -1033,6 +1244,12 @@ impl MixedDriver {
                 let index=match self.tables[actor].locate(key) {Some(i)=>i,None=>return Err(DriverError::MissingBinding)};
                 if self.tables[actor].slots[index].value.is_some() {return Err(DriverError::AlreadyProvided);}
                 self.write_slot(actor,index,Some(value));
+                assert forall|i:int| 0<=i<self.tables[actor as int].view().len() implies
+                    self.tables[actor as int].view()[i].value.is_some()
+                        ==(before.tables[actor as int].view()[i].value.is_some() || before.tables[actor as int].view()[i].key==key) by {
+                    if i!=index {assert(before.tables[actor as int].view()[i].key!=key);}
+                }
+                assert(self.fully_provided(actor)==before.complete_after(actor,instruction));
                 Inverse::Provision {key}
             },
             Instruction::Xor {key,mask,..}=>{
@@ -1040,6 +1257,11 @@ impl MixedDriver {
                 let index=match self.tables[provider].locate(key) {Some(i)=>i,None=>return Err(DriverError::MissingValue)};
                 let value=match self.tables[provider].slots[index].value {Some(v)=>v,None=>return Err(DriverError::MissingValue)};
                 self.write_slot(provider,index,Some(value^mask));
+                assert forall|i:int| 0<=i<self.tables[actor as int].view().len() implies
+                    self.tables[actor as int].view()[i].value.is_some()==before.tables[actor as int].view()[i].value.is_some() by {
+                    if provider==actor && i==index {assert(before.tables[actor as int].view()[i].value.is_some());}
+                }
+                assert(self.fully_provided(actor)==before.fully_provided(actor));
                 Inverse::Xor {provider,key,mask}
             },
             Instruction::Child {expected,blueprint,..}=>{
@@ -1069,6 +1291,11 @@ impl MixedDriver {
                         }
                     }
                     assert(self.physical(target));
+                    assert forall|b:crate::Binding| r::publishes(self.control(),Port {key:b.key,realm:b.realm},b.provider)
+                        ==r::publishes(before.control(),Port {key:b.key,realm:b.realm},b.provider) by {
+                        if b.provider!=child {assert(r::registered(self.control(),b.provider)==r::registered(before.control(),b.provider));}
+                    }
+                    assert(r::coherent(self.control(),actor)==r::coherent(before.control(),actor));
                 }
                 Inverse::Child {child}
             },
@@ -1081,6 +1308,7 @@ impl MixedDriver {
             old(self).control().fibers[actor].phase==Phase::Loading,receipt.actor==actor,
             next.is_some() ==> next.unwrap()<=old(self).blueprints[old(self).rows[actor as int].blueprint as int].code.len(),
         ensures final(self).wf(),final(self).rows.len()==old(self).rows.len(),
+            out.is_ok()==(next.is_some() || (old(self).fully_provided(actor) && r::coherent(old(self).control(),actor))),
             final(self).tables@==old(self).tables@,final(self).blueprints@==old(self).blueprints@,
             out.is_ok() ==> {
                 &&& final(self).rows[actor as int].blueprint==old(self).rows[actor as int].blueprint
@@ -1091,6 +1319,7 @@ impl MixedDriver {
                 &&& (next.is_some() ==> old(self).control()==final(self).control())
             },
     {
+        proof {self.kernel.paper_iteration_guard(actor);self.provided_domain(actor);}
         if next.is_none() {
             if !self.provided(actor) {return Err(DriverError::IncompleteProvision);}
             if let Err(e)=self.kernel.finish(actor) {return Err(DriverError::Kernel(e));}
@@ -1104,10 +1333,12 @@ impl MixedDriver {
     #[verifier::rlimit(60)]
     fn step_inner(&mut self,actor:usize)->(out:Result<Outcome,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok() ==> actor<old(self).rows.len() && final(self).journal(actor).len()==old(self).journal(actor).len()+1
+        ensures final(self).wf(),out.is_ok()==old(self).step_enabled(actor),
+            out.is_ok() ==> actor<old(self).rows.len() && final(self).journal(actor).len()==old(self).journal(actor).len()+1
             && final(self).journal(actor).last().actor==actor && old(self).step_ack(final(self),actor,out.unwrap()),
     {
         let ghost initial=*self;
+        proof {self.kernel.paper_iteration_guard(actor);}
         if !self.registered(actor) {return Err(DriverError::Unknown);}
         if let Err(e)=self.kernel.check_iteration(actor) {return Err(DriverError::Kernel(e));}
         proof {self.row_bounds(actor);}
@@ -1233,11 +1464,17 @@ impl MixedDriver {
         requires old(self).wf(),r::registered(old(self).control(),receipt.actor),
             old(self).control().fibers[receipt.actor].phase==Phase::Unloading,
         ensures final(self).wf(),final(self).rows@==old(self).rows@,final(self).blueprints@==old(self).blueprints@,
-            out.is_ok() ==> mx::undo(receipt.model(),old(self).primitive_state()).is_some()
-                && final(self).primitive_state()==mx::undo(receipt.model(),old(self).primitive_state()).unwrap(),
+            out.is_ok()==mx::undo(receipt.model(),old(self).primitive_state()).is_some(),
+            out.is_err() ==> final(self).same(old(self)),
+            forall|n:usize| final(self).kernel.is_restoring(n)==old(self).kernel.is_restoring(n),
+            out.is_ok() ==> final(self).primitive_state()==mx::undo(receipt.model(),old(self).primitive_state()).unwrap(),
     {
         let ghost before=*self;
         let actor=receipt.actor;
+        proof {
+            reveal(Kernel::unchanged);reveal(Kernel::is_restoring);reveal(Kernel::registered);
+            if let Inverse::Child {child}=receipt.inverse {self.kernel.paper_observations(child);}
+        }
         if !self.registered(actor) {return Err(DriverError::Unknown);}
         let result=match receipt.inverse {
             Inverse::Unit=>Ok(()),
@@ -1297,11 +1534,13 @@ impl MixedDriver {
     pub fn unload(&mut self,actor:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).observation()==old(self).observation() && final(self).same(old(self)),
+            out.is_ok()==old(self).unload_enabled(actor),
             out.is_ok() ==> final(self).journal(actor).len()==0
                 && final(self).control().fibers[actor].phase==Phase::Inactive && old(self).ack(final(self),actor,r::Rule::Unload),
     {
         let mut draft=self.duplicate();
         let ghost initial=draft;
+        proof {draft.same_unload_domain(self,actor);}
         match draft.unload_inner(actor) {Err(e)=>Err(e),Ok(())=>{
             proof {draft.unload_simulation(&initial,actor);reveal(MixedDriver::ack);}
             *self=draft;Ok(())
@@ -1355,7 +1594,7 @@ impl MixedDriver {
     #[verifier::spinoff_prover]
     fn unload_inner(&mut self,actor:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok() ==> {
+        ensures final(self).wf(),out.is_ok()==old(self).unload_enabled(actor),out.is_ok() ==> {
             &&& final(self).journal(actor).len()==0 && final(self).rows[actor as int].current.is_none()
             &&& final(self).control().fibers[actor].phase==Phase::Inactive
             &&& r::registered(old(self).control(),actor) && old(self).control().fibers[actor].phase==Phase::Unloading
@@ -1369,6 +1608,7 @@ impl MixedDriver {
         },
     {
         let ghost initial=*self;
+        proof {reveal(Kernel::cleanup_enabled);}
         if !self.registered(actor) {return Err(DriverError::Unknown);}
         if let Err(e)=self.kernel.begin_cleanup(actor) {return Err(DriverError::Kernel(e));}
         proof {
@@ -1385,8 +1625,9 @@ impl MixedDriver {
         }
         proof {self.canonical_equal(&initial);}
         while !self.rows[actor].journal.is_empty()
-            invariant self.wf(),actor<self.rows.len(),r::registered(self.control(),actor),
-                self.control().fibers[actor].phase==Phase::Unloading,
+            invariant initial==*old(self),self.wf(),actor<self.rows.len(),r::registered(self.control(),actor),
+                self.control().fibers[actor].phase==Phase::Unloading,self.kernel.is_restoring(actor),
+                initial.kernel.cleanup_enabled(actor),
                 r::registered(initial.control(),actor),initial.control().fibers[actor].phase==Phase::Unloading,!r::relied(initial.control(),actor),
                 self.rows.len()==initial.rows.len(),self.blueprints@==initial.blueprints@,
                 self.rows[actor as int].blueprint==initial.rows[actor as int].blueprint,
@@ -1397,6 +1638,11 @@ impl MixedDriver {
             let ghost previous=*self;
             let index=self.rows[actor].journal.len()-1;
             let receipt=self.rows[actor].journal[index];
+            proof {
+                assert(receipt==previous.journal(actor).last());
+                assert(restore_receipts(previous.journal(actor),previous.primitive_state()).is_some()
+                    ==> mx::undo(receipt.model(),previous.primitive_state()).is_some());
+            }
             self.undo_one(receipt)?;
             let ghost undone=*self;
             let ghost restored=self.primitive_state();
@@ -1708,3 +1954,7 @@ proof fn append_source(bank:Seq<Blueprint>,states:Seq<mx::Configuration<u64,Inde
 
 #[path = "fresh_driver.rs"]
 pub mod fresh;
+
+#[cfg(all(test, not(verus_keep_ghost)))]
+#[path = "unload_tests.rs"]
+mod unload_tests;

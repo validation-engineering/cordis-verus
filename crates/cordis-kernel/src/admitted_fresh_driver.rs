@@ -61,6 +61,25 @@ impl Admission {
         &&& self.blueprint<driver.blueprints.len() && self.pc<=driver.blueprints[self.blueprint as int].code().len()
         &&& self.template==if self.pc==driver.blueprints[self.blueprint as int].code().len() {core::Instruction::Unit} else {driver.blueprints[self.blueprint as int].code()[self.pc as int]}
     }
+    /// The captured instruction is fixed; only Child's fresh identity is
+    /// selected from the current machine when the stage actually lands.
+    pub closed spec fn selected_instruction(&self)->core::Instruction {
+        match self.template {
+            core::Instruction::Child {blueprint,next,..}=>core::Instruction::Child {
+                expected:self.machine.inner.rows.len(),blueprint,next,
+            },
+            instruction=>instruction,
+        }
+    }
+    /// A ticket retains admission across target loss, but neither reserves
+    /// values/child ports nor authorizes a different generation or instruction.
+    pub closed spec fn land_enabled(&self)->bool {
+        let driver=self.machine.inner;let instruction=self.selected_instruction();
+        !self.consumed && self.bound(&self.machine)
+            && driver.primitive_enabled(self.actor,instruction)
+            && (!r::coherent(driver.control(),self.actor)
+                || instruction.continuation().is_some() || driver.complete_after(self.actor,instruction))
+    }
     pub fn actor(&self)->(out:usize) ensures out==self.identity().0, {self.actor}
     pub fn is_consumed(&self)->(out:bool) ensures out==self.consumed(), {self.consumed}
     pub fn phase(&self,actor:usize)->Option<Phase> {self.machine.phase(actor)}
@@ -83,22 +102,35 @@ impl Admission {
     pub fn land(&mut self)->(out:Result<Landing,AdmissionError>)
         requires old(self).wf(),
         ensures final(self).wf(),final(self).identity()==old(self).identity(),
+            out.is_ok()==old(self).land_enabled(),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> final(self).consumed() && !old(self).consumed() && old(self).bound(&old(self).machine())
                 && out.unwrap().actor==old(self).identity().0
+                && out.unwrap().diverted==!r::coherent(old(self).machine().control(),old(self).identity().0)
+                && (super::choice(out.unwrap().outcome).is_some() ==> super::choice(out.unwrap().outcome).unwrap()==old(self).machine().next_id())
                 && old(self).machine().ack(&final(self).machine(),out.unwrap().label().0,out.unwrap().label().1,out.unwrap().label().2)
                 && final(self).machine().journal(out.unwrap().actor).len()==old(self).machine().journal(out.unwrap().actor).len()+1,
     {
         if self.consumed {return Err(AdmissionError::StaleAdmission);}
         let actor=self.actor;
         let mut draft=self.machine.inner.duplicate();let ghost initial=draft;
+        proof {draft.kernel.unchanged_observations(&self.machine.inner.kernel);}
         if !draft.registered(actor) || draft.kernel.phase(actor)!=Some(Phase::Loading) {return Err(AdmissionError::StaleAdmission);}
         if draft.kernel.episode_generation(actor)!=Some(self.generation) {return Err(AdmissionError::StaleAdmission);}
-        proof {draft.row_bounds(actor);draft.kernel.paper_observations(actor);}
+        proof {
+            draft.row_bounds(actor);draft.kernel.paper_observations(actor);
+            draft.kernel.generation_frame(&self.machine.inner.kernel,actor);
+        }
         if draft.rows[actor].blueprint!=self.blueprint || draft.rows[actor].current!=Some(self.pc) {return Err(AdmissionError::StaleAdmission);}
         let blueprint=self.blueprint;let pc=self.pc;let length=draft.blueprints[blueprint].code.len();
         let template=if pc==length {core::Instruction::Unit} else {draft.blueprints[blueprint].code[pc]};
         if template!=self.template {return Err(AdmissionError::StaleAdmission);}
+        proof {
+            assert(self.bound(&self.machine));
+            draft.same_instruction_domain(&self.machine.inner,actor,self.selected_instruction());
+            assert(template.valid(pc,length,blueprint,initial.blueprints[blueprint as int].dependencies(),
+                initial.blueprints[blueprint as int].provisions()));
+        }
         let has_target=match draft.kernel.target(actor) {
             Some(_target)=>{
                 proof {draft.kernel.refines_paper();draft.kernel.paper_target_vector(actor,_target@);
@@ -111,6 +143,7 @@ impl Admission {
             core::Instruction::Child {blueprint,next,..}=>core::Instruction::Child {expected:draft.rows.len(),blueprint,next},
             _=>template,
         };
+        assert(instruction==self.selected_instruction());
         let next=match instruction {core::Instruction::Unit=>None,core::Instruction::Provide {next,..}=>next,
             core::Instruction::Xor {next,..}=>next,core::Instruction::Child {next,..}=>next};
         if let Some(next)=next {if next<=pc || next>length {return Err(AdmissionError::Driver(DriverError::InvalidInstruction));}}
@@ -136,18 +169,24 @@ impl Admission {
 }
 
 impl FreshDriver {
+    /// New admission checks control and the installed position. It does not
+    /// require an effect value or reserve a future Child insertion.
+    pub closed spec fn admission_enabled(&self,actor:usize)->bool {self.inner.ready(actor)}
     /// Ownership binds this ticket to this machine without a caller-supplied
     /// instance identity. Failed admission returns the original machine intact.
     // Return ownership of the complete machine on failure without an extra allocation.
     #[allow(clippy::result_large_err)]
     pub fn admit(self,actor:usize)->(out:Result<Admission,Rejected>)
         requires self.wf(),
-        ensures match out {
+        ensures out.is_ok()==self.admission_enabled(actor),
+            match out {
             Ok(admitted)=>admitted.wf() && admitted.machine().same(&self) && admitted.bound(&self)
-                && !admitted.consumed() && admitted.identity().0==actor && r::coherent(self.control(),actor),
+                && !admitted.consumed() && admitted.identity().0==actor && r::coherent(self.control(),actor)
+                && admitted.land_enabled()==self.step_enabled(actor),
             Err(rejected)=>rejected.machine.wf() && rejected.machine.same(&self),
         },
     {
+        proof {self.inner.kernel.paper_iteration_guard(actor);}
         if let Err(e)=self.inner.kernel.check_iteration(actor) {
             return Err(Rejected {machine:self,error:AdmissionError::Driver(DriverError::Kernel(e))});
         }
@@ -174,7 +213,7 @@ impl core::MixedDriver {
     fn commit_divert(&mut self,actor:usize,receipt:core::Receipt)->(out:Result<(),DriverError>)
         requires old(self).wf(),actor<old(self).rows.len(),r::registered(old(self).control(),actor),
             old(self).control().fibers[actor].phase==Phase::Loading,!r::coherent(old(self).control(),actor),receipt.actor==actor,
-        ensures final(self).wf(),final(self).rows.len()==old(self).rows.len(),
+        ensures out.is_ok(),final(self).wf(),final(self).rows.len()==old(self).rows.len(),
             final(self).tables@==old(self).tables@,final(self).blueprints@==old(self).blueprints@,
             out.is_ok() ==> {
                 &&& final(self).rows[actor as int].blueprint==old(self).rows[actor as int].blueprint
@@ -184,6 +223,7 @@ impl core::MixedDriver {
                 &&& r::step(old(self).control(),final(self).control(),actor,r::Rule::Divert)
             },
     {
+        proof {self.kernel.paper_observations(actor);}
         if let Err(e)=self.kernel.leave_if_changed(actor) {return Err(DriverError::Kernel(e));}
         self.rows[actor].current=None;self.rows[actor].journal.push(receipt);Ok(())
     }

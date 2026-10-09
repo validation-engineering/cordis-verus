@@ -81,6 +81,26 @@
           "file": "crates/cordis/src/runtime.rs",
           "symbol": "poll_settle",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "symbol": "begin_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "symbol": "complete_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "symbol": "retry_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "symbol": "finish_cleanup",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -98,6 +118,11 @@
           "package": "cordis",
           "target": "runtime",
           "name": "provider_waits_for_async_consumer_cleanup"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "cleanup_outcomes",
+          "name": "failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds"
         }
       ],
       "negativeControl": {

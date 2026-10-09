@@ -1276,7 +1276,7 @@
       "kind": "Definition",
       "title": "Registry and publication",
       "status": "formalized",
-      "scope": "Actual partial tables publish only from Active fibers.",
+      "scope": "Actual partial tables publish only from Active fibers. The executable registration-domain bridge separates the paper parent-registration/provision-reservation premises (insertion_domain) from bounded identity capacity and duplicate-free declaration vectors (Kernel::paper_insert_domain). check_insert and the real insert accept exactly insert_enabled; the preflight is read-only and makes no reservation against intervening registrations. Dependency availability and parent activity are not insertion requirements; retired registered fibers retain provision reservations. This does not establish original Component membership for arbitrary registered bodies.",
       "evidence": [
         {
           "file": "crates/cordis-kernel/src/semantics.rs",
@@ -1285,6 +1285,30 @@
         {
           "file": "crates/cordis-kernel/src/semantics.rs",
           "symbol": "shaped"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "insert_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "check_insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_insert_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "insertion_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "insertion_has_domain"
         }
       ]
     },
@@ -1306,7 +1330,7 @@
       "kind": "Definition",
       "title": "Child creation inverse",
       "status": "formalized",
-      "scope": "Conditional primitive definition over a supplied G, registry interpretation and local image-closed insertion/retirement editors. The input is the original full-carrier, least witnessed Component predicate, with an explicit all-input dependent-value projection gate. Actual fresh O-Insert records parent, complete component, empty table and Inactive phase; its chosen name is delivered to the real body continuation. The inverse captures exactly that name and performs the actual registered-only O-Retire, framing every other registry field and background. No surjectivity onto arbitrary function-valued registries is assumed. A concrete nonempty parent/child representation satisfies the editor laws and full Unit component gate. Immediate table recovery retains the retired empty child, not literal registry equality. Missing-child retirement stays None; future retention, recursive Gamma existence and Lemma57 total-context membership are separate obligations. Existing Child/Mixed/Fresh drivers implement captured retirement with authentic journals and a live-reference removal guard, which remains an explicit correction to unrestricted O-Remove.",
+      "scope": "Conditional primitive definition over a supplied G, registry interpretation and local image-closed insertion/retirement editors. The input is the original full-carrier, least witnessed Component predicate, with an explicit all-input dependent-value projection gate. Actual fresh O-Insert records parent, complete component, empty table and Inactive phase; its chosen name is delivered to the real body continuation. The inverse captures exactly that name and performs the actual registered-only O-Retire, framing every other registry field and background. No surjectivity onto arbitrary function-valued registries is assumed. A concrete nonempty parent/child representation satisfies the editor laws and full Unit component gate. Immediate table recovery retains the retired empty child, not literal registry equality. Missing-child retirement stays None; future retention, recursive Gamma existence and Lemma57 total-context membership are separate obligations. Existing Child/Mixed/Fresh drivers implement captured retirement with authentic journals and a live-reference removal guard, which remains an explicit correction to unrestricted O-Remove. The spec predicates ChildEpisode::current_matches and land_enabled now characterize the actual pending child-registration domain: registered Loading owner, matching captured bindings, an unbound or current generation, pending admission and the current Kernel insertion domain. Both ChildEpisode and ChildDriver expose check_child/land_child success equivalences; successful landing captures the identity returned by the real insert. Preflight does not reserve a port or bind an episode generation. Insert failure preserves registry and inverse-prefix state, but a detached handle may already bind its generation and the owned driver may refresh cancellation. Current target coherence is not required for an already admitted landing. This closes registration-domain acceptance only; arbitrary child-body totality and the strict guarded domain-respect counterexample remain unchanged. ChildDriver::check_and_land_child composes the real read-only preflight and landing with no intervening registry operation. The successful check establishes the domain from which actual landing success follows; no caller-supplied success assumption or lasting reservation is introduced.",
       "evidence": [
         {
           "file": "crates/cordis-kernel/src/child_history.rs",
@@ -1451,6 +1475,34 @@
         {
           "file": "crates/cordis-kernel/src/paper_typed_context.rs",
           "symbol": "heterogeneous_component"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "current_matches"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "land_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "check_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "land_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "land_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "check_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "check_and_land_child"
         }
       ]
     },
@@ -1459,7 +1511,7 @@
       "kind": "Definition",
       "title": "Target and quiescence",
       "status": "formalized",
-      "scope": "Target uses actual table domains and provider identities.",
+      "scope": "Target uses actual table domains and provider identities. The specification projection binding_set observes full (key, realm, provider) identities. The executable same_bindings compares these sets without imposing vector order or multiplicity. Kernel::paper_captured_target connects an actual target observation and a captured committed set to projected coherence for a registered Loading actor under wf; total Active provisions remain the control-profile specialization, not a proof of arbitrary host value availability.",
       "evidence": [
         {
           "file": "crates/cordis-kernel/src/semantics.rs",
@@ -1468,6 +1520,22 @@
         {
           "file": "crates/cordis-kernel/src/semantics.rs",
           "symbol": "quiet"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "target"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "binding_set"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "same_bindings"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_captured_target"
         }
       ]
     },
@@ -1647,7 +1715,7 @@
       "kind": "Lemma",
       "title": "Lifted admissibility",
       "status": "partial",
-      "scope": "The dependent/child least grammar with observational primitive witnesses derives typed successful-prefix safety, authentic original-index receipts and child retention for all nine rules. Per-step models establish admissibility without assumed successor invariants. MixedDriver and FreshDriver implement closed instructions and construct actual histories from empty; FreshDriver admits dynamic allocation and one owning pending admission, including landing Divert after intervening checked calls. Strict failure is an absent transition. These results do not establish the original full recursive-context strong witness: guarded Child success domains can distinguish equal observations. Arbitrary callbacks/Future internals and unrestricted interference remain open.",
+      "scope": "The dependent/child least grammar with observational primitive witnesses derives typed successful-prefix safety, authentic original-index receipts and child retention for all nine rules. Per-step models establish admissibility without assumed successor invariants. MixedDriver and FreshDriver implement closed instructions and construct actual histories from empty; FreshDriver admits dynamic allocation and one owning pending admission, including landing Divert after intervening checked calls. Strict failure is an absent transition. These results do not establish the original full recursive-context strong witness: guarded Child success domains can distinguish equal observations. Arbitrary callbacks/Future internals and unrestricted interference remain open. The actual synchronous interpreter now states exact acceptance under its existing wf invariant: Mixed insertion requires a valid bank index, validity of the required bank prefix and the Kernel insertion domain; provider resolution and primitive execution each have independent success equivalences. Mixed/Fresh step succeeds iff a registered coherent Loading actor has a current instruction whose primitive domain holds and whose terminal effect completes publication. complete_after accounts for a Provide filling the final missing slot in this call. Fresh instantiates Child with the current next_id. Public step errors preserve the complete transactional same relation; internal execute/step_inner failures may have changed the draft. These are checked contracts on the same executable methods, not caller-supplied success premises or whole-run totality. The owning admitted protocol now also has exact local acceptance: FreshDriver::admit succeeds iff admission_enabled (the current ready predicate), without reserving values or child ports. Admission::selected_instruction retains the captured template and instantiates Child with the current allocator; land succeeds iff an unconsumed bound ticket has an enabled primitive and either target incoherence, a continuation, or complete_after for coherent terminal publication. Under its original premises commit_divert succeeds. Successful landing reports diverted exactly for input-state incoherence and any returned child equals the input machine next_id. Errors preserve the complete machine, ticket identity and consumed flag, so an unused ticket can be retried after checked calls make its domain valid; stale and consumed tickets remain rejected. These contracts characterize existing execution branches, not arbitrary Future completion or whole-run dynamic termination. Successful admission additionally establishes admitted.land_enabled() == the input machine's step_enabled(actor): immediate landing without an intervening operation has the synchronous step acceptance domain, while admission_enabled itself checks only the weaker ready condition. This domain equality does not reserve it against later calls. FreshDriver::run_until_blocked now performs an actual loop over transactional step under wf alone, without fuel, future-success assumptions or a supplied source trace. Its rank is the installed forward program's remaining code positions plus a possible terminal Unit, with one for a missing/invalid position. The u128 count records committed calls including the terminal call, excludes the first failed attempt and is bounded by the input run_budget; on error count+1 is bounded and the final actor is not step_enabled. Successful prefixes remain committed and only a failed step rolls back; zero committed steps preserve the complete machine under same. A no-error report establishes a registered Active actor with no current instruction; newly registered children remain Inactive and are not executed. RunReport::refines conditionally extends any well-formed source already represented by the input with exactly the actual successful calls, using an erased ghost source chain. The public proof method RunReport::advance_source extracts this execution under the established refines, input representation and source well-formedness premises for further composition. It does not establish source existence from arbitrary wf or an independent empty-origin execution. This is finite return for one synchronous installed program, not totality of strict primitives, guaranteed unblocking, global quiescence or the full dynamic-registry theorem. The real run_from_empty entry point now constructs a new machine, executes run_script and calls run_until_blocked only after all preparation commands succeed; it takes no input machine, source representation, fuel or future-success assumption. FromEmptyReport::refines establishes one source execution from empty representing both the actual prepared machine and the final machine, with every state well formed and resource_safe. source_execution extracts this witness; concatenate joins the preparation and autonomous executions at their identical boundary without a duplicate state or extra failure event. This establishes the conditional RunReport input premises for this path, not for arbitrary wf machines. SetupFailed preserves the successful preparation prefix and has zero autonomous steps without implying that the selected actor is blocked. Blocked and Finished describe the autonomous result only after successful preparation. The runtime setup vector records preparation transitions, while steps counts only committed autonomous calls including a terminal call; prepared snapshots and autonomous outcomes are erased ghost data. The exact implementation acceptance profile now covers Insert, Begin and Step via mixed_driver::fresh::preparation::preparation_command and FreshDriver::preparation_enabled. Fresh insertion_enabled reuses the Mixed blueprint/bank-prefix/Kernel insertion domain; begin_enabled includes registration, an empty retained journal and Kernel begin_enabled, including target availability and bounded generation capacity; Step retains step_enabled. FreshDriver::apply succeeds iff the current preparation predicate for commands in this profile. On a script error whose failed command is in the profile, run_script proves that command disabled in the returned machine; run_from_empty propagates this to both prepared and returned machines on SetupFailed. The predicate is evaluated at the actual failure state after the successful prefix, not for the whole script in the initial empty state, and the prefix may contain other commands. Retire/Depart/Unload/Remove remain supported: a false preparation_enabled result outside preparation_command is not a rejection claim. Dispatcher equivalences for those commands and individual error enum classifications remain outside this profile; the direct Unload domain is characterized separately below. This characterizes the implementation domain, including blueprint validity, finite capacity and strict value availability, rather than acceptance of every paper-enabled preparation command. Executable branches and error order are unchanged. Newly registered children remain Inactive; strict primitives may block. Multiple-actor/dynamic-child execution, the remaining preparation/recovery domains and the global rank remain open, so this from-empty execution result does not establish whole-system progress or complete this item. Public MixedDriver::unload and FreshDriver::unload now succeed iff unload_enabled: Kernel cleanup_enabled and restore_receipts of the actual retained journal in the current primitive state is Some. The latter recursively applies mixed_grammar::undo from last receipt to first, independently of the return result. Under its registered Unloading receipt-owner premises, actual undo_one succeeds iff its modeled inverse is defined, produces that state on success, preserves its own input on failure and preserves Kernel restoring flags. The real loop maintains restoring and decreases journal length; unload_inner has the same success domain and on success establishes the modeled full restoration followed by commitment release, an empty journal/current instruction and Inactive control. Public errors preserve the complete machine through the existing transaction; an internal draft may already have entered cleanup and restored part of the journal before a later error. same_unload_domain connects complete machine equality to the input domain. This does not derive inverse definedness from arbitrary wf, cleanup permission or !relied, and it does not establish general foreign-replay observation equivalence, arbitrary external-resource restoration or whole-system progress. Child inverses retire captured identities without removing them or running their cleanup. The preparation dispatcher success-equivalence profile remains only Insert/Begin/Step. These are exact execution-domain and finite-call guarantees within the existing strict grammar, not completion of the unrestricted paper theorem.",
       "evidence": [
         {
           "file": "crates/cordis-kernel/src/preservation.rs",
@@ -1736,6 +1804,210 @@
         {
           "file": "crates/cordis-kernel/src/admitted_script.rs",
           "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "insertion_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "provider"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "primitive_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "execute"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "complete_after"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "commit_landing"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "step_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "selected_instruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "step_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admission_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "selected_instruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "land_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "land"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "commit_divert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "RunReport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "run_until_blocked"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "source_chain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_budget"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_finished"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_budget_bounds"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "advance_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "run_from_empty"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "FromEmptyReport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "source_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "concatenate"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_preparation.rs",
+          "symbol": "preparation_command"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_preparation.rs",
+          "symbol": "preparation_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_preparation.rs",
+          "symbol": "same_preparation_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "insertion_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "begin_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "begin"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "apply"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "same_start_domains"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "restore_receipts"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "restore_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "undo_one"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_inner"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "same_unload_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "fresh_unload_simulation"
         }
       ]
     },
@@ -2951,7 +3223,7 @@
       "kind": "Corollary",
       "title": "Terminal recovery",
       "status": "partial",
-      "scope": "Actual terminal owner restoration, including foreign Child cleanup, is derived for the following restricted profile. Constructive terminal recovery starts with a real empty-origin setup and combines all foreign Unit/Operation/Provision/Child landings, arbitrary-age mixed Table/Child journal Unloads at any interior position, and actual foreign Insert/Remove in one source/target induction. The owner remains registered, starts Inactive with an empty table, and uses Table instructions; it may publish private provisions and share dependencies. Initial foreign declarations and the dependencies of each newly inserted or instantiated fiber avoid the owner's private provisions; actual source O-Insert supplies provision freshness. Only new owner entries require Table metadata. Foreign historical entries retain their original inputs after removal or name reuse. Mixed LIFO restoration performs the captured child's real retirement and strict Table inverses. Target restore success, authentic compressed journals, every surviving target step, and prefix separation are derived from the actual source execution. If the source ends with the owner Unloading, its actual final restore is defined, its guarded Unload is legal, and the resulting control equals the constructed target's control; corresponding tables are observationally related and both owner tables are empty. A nonempty example interleaves old foreign +7, owner Q99/+5, and foreign Child/R77/+11; the mixed stack [1,4,5,6] maps to [1,2,3,4], child3 is retired and legally removed, and final cleanup restores K10 with Q/R empty. Owner Child, consumers of the owner's private provisions, and interior owner Unload remain outside this profile. Selective scalar commutation and strict partial-domain laws remain explicit; this is not original full-context membership, global liveness, or arbitrary-schedule confluence. The original unrestricted Corollary69 still depends on the outstanding full-context component and independence bridges.",
+      "scope": "Actual terminal owner restoration, including foreign Child cleanup, is derived for the following restricted profile. Constructive terminal recovery starts with a real empty-origin setup and combines all foreign Unit/Operation/Provision/Child landings, arbitrary-age mixed Table/Child journal Unloads at any interior position, and actual foreign Insert/Remove in one source/target induction. The owner remains registered, starts Inactive with an empty table, and uses Table instructions; it may publish private provisions and share dependencies. Initial foreign declarations and the dependencies of each newly inserted or instantiated fiber avoid the owner's private provisions; actual source O-Insert supplies provision freshness. Only new owner entries require Table metadata. Foreign historical entries retain their original inputs after removal or name reuse. Mixed LIFO restoration performs the captured child's real retirement and strict Table inverses. Target restore success, authentic compressed journals, every surviving target step, and prefix separation are derived from the actual source execution. If the source ends with the owner Unloading, its actual final restore is defined, its guarded Unload is legal, and the resulting control equals the constructed target's control; corresponding tables are observationally related and both owner tables are empty. A nonempty example interleaves old foreign +7, owner Q99/+5, and foreign Child/R77/+11; the mixed stack [1,4,5,6] maps to [1,2,3,4], child3 is retired and legally removed, and final cleanup restores K10 with Q/R empty. Owner Child, consumers of the owner's private provisions, and interior owner Unload remain outside this profile. Selective scalar commutation and strict partial-domain laws remain explicit; this is not original full-context membership, global liveness, or arbitrary-schedule confluence. The original unrestricted Corollary69 still depends on the outstanding full-context component and independence bridges. Separately, ProgramEpisode::execute_and_recover constructs a checked finite program, executes actual instructions to completion, then runs the actual inverse journal and returns every supplied cell to its initial value with no owner or depth. This synchronous fixed-target profile adds no arbitrary-resource or whole-host recovery claim. Its executable target check compares complete binding-identity sets, preserving the captured vector and the order of the inverse journal. Public MixedDriver::unload and FreshDriver::unload now succeed iff unload_enabled: Kernel cleanup_enabled and restore_receipts of the actual retained journal in the current primitive state is Some. The latter recursively applies mixed_grammar::undo from last receipt to first, independently of the return result. Under its registered Unloading receipt-owner premises, actual undo_one succeeds iff its modeled inverse is defined, produces that state on success, preserves its own input on failure and preserves Kernel restoring flags. The real loop maintains restoring and decreases journal length; unload_inner has the same success domain and on success establishes the modeled full restoration followed by commitment release, an empty journal/current instruction and Inactive control. Public errors preserve the complete machine through the existing transaction; an internal draft may already have entered cleanup and restored part of the journal before a later error. same_unload_domain connects complete machine equality to the input domain. This does not derive inverse definedness from arbitrary wf, cleanup permission or !relied, and it does not establish general foreign-replay observation equivalence, arbitrary external-resource restoration or whole-system progress. Child inverses retire captured identities without removing them or running their cleanup. The preparation dispatcher success-equivalence profile remains only Insert/Begin/Step. These are exact execution-domain and finite-call guarantees within the existing strict grammar, not completion of the unrestricted paper theorem.",
       "evidence": [
         {
           "file": "crates/cordis-kernel/src/canonical.rs",
@@ -3256,6 +3528,54 @@
         {
           "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
           "symbol": "actual_closed_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "execute_and_recover"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "restore_receipts"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "restore_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "undo_one"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_inner"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "same_unload_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "fresh_unload_simulation"
         }
       ]
     },
@@ -3399,7 +3719,7 @@
       "kind": "Theorem",
       "title": "Progress and termination",
       "status": "partial",
-      "scope": "Actual fixed-registry traces yield target-change/step bounds. Under local table footprint, terminal total provision and continuation rank, construct a full landing execution to quiet. Dynamic registry changes remain outside this profile. In the strict guarded fresh-child interpretation, a seven-step execution from empty reaches a nonquiet Loading state with no enabled core lifecycle rule. The fixed natural catalogue has empty dependencies, at most three names and one landing per component; every successful Finish publishes all provisions. This pinpoints the missing definedness/total-witness bridge, not an unconditional refutation of original Theorem 73. An added failure exit changes the transition system.",
+      "scope": "Actual fixed-registry traces yield target-change/step bounds. Under local table footprint, terminal total provision and continuation rank, construct a full landing execution to quiet. Dynamic registry changes remain outside this profile. In the strict guarded fresh-child interpretation, a seven-step execution from empty reaches a nonquiet Loading state with no enabled core lifecycle rule. The fixed natural catalogue has empty dependencies, at most three names and one landing per component; every successful Finish publishes all provisions. This pinpoints the missing definedness/total-witness bridge, not an unconditional refutation of original Theorem 73. An added failure exit changes the transition system. Local executable enabledness is also checked: Kernel::begin succeeds exactly under begin_enabled (including bounded generation capacity), begin_cleanup exactly under cleanup_enabled, and StageProtocol::admit exactly under its pending/fresh-matching guard. ResourceEpisode and ProgramEpisode expose the admission contract. A real cancelled-admission client retains admission through cancellation and accepts the caller-supplied terminal result through real land/end. These are local acceptance contracts, not the full dynamic-registry or host scheduling theorem. Kernel::paper_coherence and paper_iteration_guard connect the concrete guard to the paper projection; check_iteration and finish accept exactly Loading/coherent, without a vector-order/multiplicity guard. For the fixed ProgramEpisode language, new checks the exact valid-program domain, run_to_completion checks real admission and derives each step plus a decreasing rank, and execute_and_recover invokes real rollback; the measured interpreter count is writes+1 including the terminal call. The extra vector-order/multiplicity admission guard is removed: same_bindings compares complete binding identities, and Kernel::paper_captured_target connects actual target observations to captured commitments. Driver::admit and ProgramDriver::admit return Ok exactly for a registered Loading actor; within Ok, admission is equivalent to pending or fresh noncancelled coherent state. ChildEpisode::admit_current additionally checks current capture membership and generation, retaining stale-episode rejection. Ordinary LifecycleDriver coherence and host publication gates reuse the comparison, but complete host capture/execution, dynamic children and arbitrary Futures remain outside the verified finite execution profile. These contracts preserve the order of captured vectors, resource inverses and child journals; they do not add a whole-host scheduling or liveness claim. Kernel::begin additionally establishes the next iteration guard via begin_preserves_target. Both verified driver Begin calls establish fresh noncancelled coherent episodes. Driver::begin_and_admit composes the real calls and succeeds exactly under its bounded begin_enabled guard, establishing a pending first stage without a caller-supplied admission-success premise; it does not run the effect or admit an intervening host step. Dynamic child registration now also has exact local enabledness: Kernel::check_insert/insert accept exactly insert_enabled, and paper_insert_domain separates the projected O-Insert parent/provision constraints from bounded capacity and duplicate-free input vectors. ChildEpisode and ChildDriver check_child/land_child accept exactly their pending/current-capture/generation/insertion domain. The read-only preflight reserves nothing and actual landing rechecks after interleaving. This does not make admitted child stages total, change the strict guarded counterexample or failure semantics, or establish whole-run Mixed/Fresh termination or host progress. ChildDriver::check_and_land_child composes the real read-only preflight and landing with no intervening registry operation. The successful check establishes the domain from which actual landing success follows; no caller-supplied success assumption or lasting reservation is introduced. Synchronous MixedDriver::step and FreshDriver::step now also have an exact local step_enabled domain, derived from registered Loading/coherent control, an installed instruction, independent primitive enabledness and complete_after for terminal publication. A final Provide may fill the last missing slot; Fresh uses the current allocator identity when instantiating Child. This closes that synchronous single-step acceptance gap, not the original Component totality premise, whole-run dynamic termination or arbitrary host scheduling. Public transaction rollback is preserved and is not attributed to internal draft mutations. The owning admitted protocol now also has exact local acceptance: FreshDriver::admit succeeds iff admission_enabled (the current ready predicate), without reserving values or child ports. Admission::selected_instruction retains the captured template and instantiates Child with the current allocator; land succeeds iff an unconsumed bound ticket has an enabled primitive and either target incoherence, a continuation, or complete_after for coherent terminal publication. Under its original premises commit_divert succeeds. Successful landing reports diverted exactly for input-state incoherence and any returned child equals the input machine next_id. Errors preserve the complete machine, ticket identity and consumed flag, so an unused ticket can be retried after checked calls make its domain valid; stale and consumed tickets remain rejected. These contracts characterize existing execution branches, not arbitrary Future completion or whole-run dynamic termination. Successful admission additionally establishes admitted.land_enabled() == the input machine's step_enabled(actor): immediate landing without an intervening operation has the synchronous step acceptance domain, while admission_enabled itself checks only the weaker ready condition. This domain equality does not reserve it against later calls. FreshDriver::run_until_blocked now performs an actual loop over transactional step under wf alone, without fuel, future-success assumptions or a supplied source trace. Its rank is the installed forward program's remaining code positions plus a possible terminal Unit, with one for a missing/invalid position. The u128 count records committed calls including the terminal call, excludes the first failed attempt and is bounded by the input run_budget; on error count+1 is bounded and the final actor is not step_enabled. Successful prefixes remain committed and only a failed step rolls back; zero committed steps preserve the complete machine under same. A no-error report establishes a registered Active actor with no current instruction; newly registered children remain Inactive and are not executed. RunReport::refines conditionally extends any well-formed source already represented by the input with exactly the actual successful calls, using an erased ghost source chain. The public proof method RunReport::advance_source extracts this execution under the established refines, input representation and source well-formedness premises for further composition. It does not establish source existence from arbitrary wf or an independent empty-origin execution. This is finite return for one synchronous installed program, not totality of strict primitives, guaranteed unblocking, global quiescence or the full dynamic-registry theorem. The real run_from_empty entry point now constructs a new machine, executes run_script and calls run_until_blocked only after all preparation commands succeed; it takes no input machine, source representation, fuel or future-success assumption. FromEmptyReport::refines establishes one source execution from empty representing both the actual prepared machine and the final machine, with every state well formed and resource_safe. source_execution extracts this witness; concatenate joins the preparation and autonomous executions at their identical boundary without a duplicate state or extra failure event. This establishes the conditional RunReport input premises for this path, not for arbitrary wf machines. SetupFailed preserves the successful preparation prefix and has zero autonomous steps without implying that the selected actor is blocked. Blocked and Finished describe the autonomous result only after successful preparation. The runtime setup vector records preparation transitions, while steps counts only committed autonomous calls including a terminal call; prepared snapshots and autonomous outcomes are erased ghost data. The exact implementation acceptance profile now covers Insert, Begin and Step via mixed_driver::fresh::preparation::preparation_command and FreshDriver::preparation_enabled. Fresh insertion_enabled reuses the Mixed blueprint/bank-prefix/Kernel insertion domain; begin_enabled includes registration, an empty retained journal and Kernel begin_enabled, including target availability and bounded generation capacity; Step retains step_enabled. FreshDriver::apply succeeds iff the current preparation predicate for commands in this profile. On a script error whose failed command is in the profile, run_script proves that command disabled in the returned machine; run_from_empty propagates this to both prepared and returned machines on SetupFailed. The predicate is evaluated at the actual failure state after the successful prefix, not for the whole script in the initial empty state, and the prefix may contain other commands. Retire/Depart/Unload/Remove remain supported: a false preparation_enabled result outside preparation_command is not a rejection claim. Dispatcher equivalences for those commands and individual error enum classifications remain outside this profile; the direct Unload domain is characterized separately below. This characterizes the implementation domain, including blueprint validity, finite capacity and strict value availability, rather than acceptance of every paper-enabled preparation command. Executable branches and error order are unchanged. Newly registered children remain Inactive; strict primitives may block. Multiple-actor/dynamic-child execution, the remaining preparation/recovery domains and the global rank remain open, so this from-empty execution result does not establish whole-system progress or complete this item. Public MixedDriver::unload and FreshDriver::unload now succeed iff unload_enabled: Kernel cleanup_enabled and restore_receipts of the actual retained journal in the current primitive state is Some. The latter recursively applies mixed_grammar::undo from last receipt to first, independently of the return result. Under its registered Unloading receipt-owner premises, actual undo_one succeeds iff its modeled inverse is defined, produces that state on success, preserves its own input on failure and preserves Kernel restoring flags. The real loop maintains restoring and decreases journal length; unload_inner has the same success domain and on success establishes the modeled full restoration followed by commitment release, an empty journal/current instruction and Inactive control. Public errors preserve the complete machine through the existing transaction; an internal draft may already have entered cleanup and restored part of the journal before a later error. same_unload_domain connects complete machine equality to the input domain. This does not derive inverse definedness from arbitrary wf, cleanup permission or !relied, and it does not establish general foreign-replay observation equivalence, arbitrary external-resource restoration or whole-system progress. Child inverses retire captured identities without removing them or running their cleanup. The preparation dispatcher success-equivalence profile remains only Insert/Begin/Step. These are exact execution-domain and finite-call guarantees within the existing strict grammar, not completion of the unrestricted paper theorem.",
       "evidence": [
         {
           "file": "crates/cordis-kernel/src/termination.rs",
@@ -3424,6 +3744,346 @@
         {
           "file": "crates/cordis-kernel/src/guarded_child_domains.rs",
           "symbol": "strict_progress_boundary"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "begin_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "begin"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "draining_can_progress"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "begin_cleanup"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "cancelled_admission_witness"
+        },
+        {
+          "file": "crates/cordis-kernel/src/witnessed.rs",
+          "symbol": "admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_coherence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_iteration_guard"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "check_iteration"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "finish"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "valid_program"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "run_to_completion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "execute_and_recover"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "binding_set"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "same_bindings"
+        },
+        {
+          "file": "crates/cordis-kernel/src/episode.rs",
+          "symbol": "can_finish"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_captured_target"
+        },
+        {
+          "file": "crates/cordis-kernel/src/driver.rs",
+          "symbol": "admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "check_current"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "admit_current"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "begin_preserves_target"
+        },
+        {
+          "file": "crates/cordis-kernel/src/driver.rs",
+          "symbol": "begin_and_admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "insert_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "check_insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "paper_insert_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "insertion_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "insertion_has_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "current_matches"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "land_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "check_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "land_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "land_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "check_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "land_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_driver.rs",
+          "symbol": "check_and_land_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "ready"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "primitive_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "complete_after"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "step_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "selected_instruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "step_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admission_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "admit"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "selected_instruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "land_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "land"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_fresh_driver.rs",
+          "symbol": "commit_divert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "RunReport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "run_until_blocked"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "source_chain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_budget"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_finished"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_budget_bounds"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "advance_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "run_from_empty"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "FromEmptyReport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "refines"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "source_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "concatenate"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_preparation.rs",
+          "symbol": "preparation_command"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_preparation.rs",
+          "symbol": "preparation_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_preparation.rs",
+          "symbol": "same_preparation_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "insertion_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "begin_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "insert"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "begin"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "apply"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "same_start_domains"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "restore_receipts"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "restore_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "undo_one"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_inner"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_simulation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload_enabled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "same_unload_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "fresh_unload_simulation"
         }
       ]
     },
@@ -4111,7 +4771,7 @@
     {
       "id": "host-boundary",
       "status": "open",
-      "description": "Ordinary Rust async runtime, callbacks, events, timers and loader remain tested adapters; no unrestricted host refinement is claimed."
+      "description": "Ordinary Rust async runtime, callbacks, events, timers and loader remain tested adapters; no unrestricted host refinement is claimed. The actual shared Driver now calls verified LifecycleActions to compose exact action ownership, explicit cleanup outcomes, failed-attempt retention, fresh retries and generation-checked Kernel commitment release. Node reports Succeeded/Failed; the ordinary Rust FnOnce runtime explicitly reports Drained after consuming its cleanup attempts, which does not imply successful external restoration. Host report truth, publication lease-release orchestration, JSON/FFI conversion, kernel/protocol instance pairing and arbitrary scheduling remain host obligations; this local safety protocol does not close the unrestricted host boundary."
     }
   ]
 }

@@ -279,3 +279,92 @@ fn complete_child_recovery_checks_missing_prefix_before_retiring_newest_child() 
     assert!(!kernel.retired(newest));
     assert!(!kernel.cleanup_started(parent));
 }
+
+#[test]
+fn detached_child_snapshot_accepts_reordered_repeated_bindings_and_recovers_its_child() {
+    let mut kernel = Kernel::new();
+    let ports = vec![Port { key: 72, realm: 1 }, Port { key: 73, realm: 1 }];
+    let provider = kernel.insert(None, vec![], ports.clone()).unwrap();
+    install(&mut kernel, provider);
+    let parent = kernel.insert(None, ports, vec![]).unwrap();
+    kernel.begin(parent).unwrap();
+    let mut captured = kernel.committed(parent);
+    captured.reverse();
+    captured.push(captured[0]);
+    let mut episode = ChildEpisode::new(parent, captured);
+
+    // Definition 53's binding set is unchanged by vector order or repetition.
+    assert_eq!(episode.admit_current(&kernel), Ok(true));
+    let child = episode.land_child(&mut kernel, vec![], vec![]).unwrap();
+    episode.cancel();
+    kernel.retire(parent).unwrap();
+    kernel.leave_if_changed(parent).unwrap();
+    episode.finish_restore(&mut kernel).unwrap();
+    assert!(kernel.retired(child));
+    assert!(episode.is_empty());
+}
+
+#[test]
+fn checked_child_admission_rejects_a_different_provider_without_settling_the_iterator() {
+    let mut kernel = Kernel::new();
+    let port = Port { key: 74, realm: 1 };
+    let provider = kernel.insert(None, vec![], vec![port]).unwrap();
+    install(&mut kernel, provider);
+    let parent = kernel.insert(None, vec![port], vec![]).unwrap();
+    kernel.begin(parent).unwrap();
+    let mut captured = kernel.committed(parent);
+    captured[0].provider = parent;
+    let mut episode = ChildEpisode::new(parent, captured);
+
+    assert_eq!(
+        episode.admit_current(&kernel),
+        Err(ChildError::Kernel(Error::Changed))
+    );
+    assert!(!episode.is_pending());
+    assert!(!episode.is_settled());
+    assert!(episode.is_empty());
+    assert_eq!(kernel.phase(parent), Some(Phase::Loading));
+}
+
+#[test]
+fn checked_child_landing_retries_after_reservation_release_with_the_same_pending_inverse() {
+    let mut kernel = Kernel::new();
+    let port = Port { key: 82, realm: 3 };
+    let parent = kernel.insert(None, vec![], vec![]).unwrap();
+    kernel.begin(parent).unwrap();
+    let mut episode = ChildEpisode::attach(&kernel, parent).unwrap();
+    assert_eq!(episode.admit_current(&kernel), Ok(true));
+    let prefix = episode.land_child(&mut kernel, vec![], vec![]).unwrap();
+    assert_eq!(episode.admit_current(&kernel), Ok(true));
+    assert_eq!(episode.check_child(&kernel, &[], &[port]), Ok(()));
+    let blocker = kernel.insert(Some(parent), vec![], vec![port]).unwrap();
+    assert_eq!(
+        episode.check_child(&kernel, &[], &[port]),
+        Err(ChildError::Kernel(Error::Conflict))
+    );
+    assert_eq!(
+        episode.land_child(&mut kernel, vec![], vec![port]),
+        Err(ChildError::Kernel(Error::Conflict))
+    );
+    assert!(episode.is_pending());
+    assert!(!episode.is_settled());
+    assert_eq!(episode.child_at(0), Some(prefix));
+    assert_eq!(episode.len(), 1);
+    kernel.retire(blocker).unwrap();
+    assert_eq!(
+        episode.check_child(&kernel, &[], &[port]),
+        Err(ChildError::Kernel(Error::Conflict))
+    );
+    kernel.remove(blocker).unwrap();
+    assert_eq!(episode.check_child(&kernel, &[], &[port]), Ok(()));
+    let child = episode.land_child(&mut kernel, vec![], vec![port]).unwrap();
+    assert_eq!(episode.child_at(0), Some(prefix));
+    assert_eq!(episode.child_at(1), Some(child));
+    assert!(!episode.is_pending());
+    episode.cancel();
+    kernel.retire(parent).unwrap();
+    kernel.leave_if_changed(parent).unwrap();
+    episode.finish_restore(&mut kernel).unwrap();
+    assert!(kernel.retired(prefix));
+    assert!(kernel.retired(child));
+}

@@ -1,4 +1,4 @@
-use cordis_driver::shared::{Decision, HostStatus, LifecycleDriver};
+use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
 use cordis_driver::ActionKind;
 use cordis_kernel::{Error, Port};
 
@@ -39,11 +39,16 @@ fn withdrawal_keeps_action_ownership_until_the_inflight_result_lands() {
     assert_eq!(cleanup.generation, setup.generation);
     assert!(cleanup.action > setup.action);
     assert_eq!(driver.finish_cleanup(id), Err(Error::InvalidState));
-    driver.complete_action(&cleanup).unwrap();
+    driver
+        .complete_cleanup(&cleanup, CleanupOutcome::Succeeded)
+        .unwrap();
     driver.finish_cleanup(id).unwrap();
     driver.remove(id).unwrap();
     assert_eq!(
-        driver.complete_action(&cleanup).unwrap_err().code,
+        driver
+            .complete_cleanup(&cleanup, CleanupOutcome::Succeeded)
+            .unwrap_err()
+            .code,
         "StaleAction"
     );
 }
@@ -68,7 +73,9 @@ fn common_cleanup_arbitration_waits_for_consumer_setup_and_inverse() {
     driver.begin_cleanup(consumer).unwrap();
     let cleanup = driver.pending_action(consumer).unwrap().clone();
     assert_eq!(driver.begin_cleanup(provider), Err(Error::Relied));
-    driver.complete_action(&cleanup).unwrap();
+    driver
+        .complete_cleanup(&cleanup, CleanupOutcome::Succeeded)
+        .unwrap();
     driver.finish_cleanup(consumer).unwrap();
     driver.begin_cleanup(provider).unwrap();
 }
@@ -90,11 +97,16 @@ fn action_domains_and_retry_attempts_cannot_acknowledge_each_other() {
     first.leave(id).unwrap();
     first.begin_cleanup(id).unwrap();
     let failed = first.pending_action(id).unwrap().clone();
-    first.complete_action(&failed).unwrap();
+    first
+        .complete_cleanup(&failed, CleanupOutcome::Failed)
+        .unwrap();
     let retry = first.retry_cleanup(id).unwrap();
     assert!(retry.action > failed.action);
     assert_eq!(
-        first.complete_action(&failed).unwrap_err().code,
+        first
+            .complete_cleanup(&failed, CleanupOutcome::Succeeded)
+            .unwrap_err()
+            .code,
         "StaleAction"
     );
     assert_eq!(first.pending_action(id), Some(&retry));

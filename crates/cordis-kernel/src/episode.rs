@@ -10,6 +10,83 @@ use vstd::prelude::*;
 
 verus! {
 
+/// The paper observes complete provider bindings, not their buffer order or
+/// multiplicity. Captured vectors themselves remain unchanged across a stage.
+pub open spec fn binding_set(bindings: Seq<Binding>) -> ISet<Binding> {
+    ISet::new(|b: Binding| bindings.contains(b))
+}
+
+fn contains_binding(bindings: &[Binding], binding: Binding) -> (found: bool)
+    ensures found == bindings@.contains(binding),
+{
+    let mut i = 0;
+    while i < bindings.len()
+        invariant i <= bindings.len(),
+            forall|j: int| 0 <= j < i ==> bindings@[j] != binding,
+        decreases bindings.len() - i,
+    {
+        if bindings[i] == binding { return true; }
+        i += 1;
+    }
+    false
+}
+
+/// Compare the full (key, realm, provider) identity sets. The normal capture
+/// order uses a linear fast path; reordered or repeated entries use a bounded,
+/// allocation-free membership fallback. Conflicting identities remain distinct.
+pub fn same_bindings(left: &[Binding], right: &[Binding]) -> (same: bool)
+    ensures same == (binding_set(left@) == binding_set(right@)),
+{
+    if left.len() == right.len() {
+        let mut i = 0;
+        while i < left.len()
+            invariant i <= left.len(), left.len() == right.len(),
+                forall|j: int| 0 <= j < i ==> left@[j] == right@[j],
+            decreases left.len() - i,
+        {
+            if left[i] != right[i] { break; }
+            i += 1;
+        }
+        if i == left.len() {
+            proof { assert(left@ =~= right@); }
+            return true;
+        }
+    }
+    let mut i = 0;
+    while i < left.len()
+        invariant i <= left.len(),
+            forall|j: int| 0 <= j < i ==> right@.contains(left@[j]),
+        decreases left.len() - i,
+    {
+        if !contains_binding(right, left[i]) {
+            proof {
+                assert(binding_set(left@).contains(left@[i as int]));
+                assert(!binding_set(right@).contains(left@[i as int]));
+            }
+            return false;
+        }
+        i += 1;
+    }
+    let mut j = 0;
+    while j < right.len()
+        invariant j <= right.len(),
+            forall|k: int| 0 <= k < left.len() ==> right@.contains(left@[k]),
+            forall|k: int| 0 <= k < j ==> left@.contains(right@[k]),
+        decreases right.len() - j,
+    {
+        if !contains_binding(left, right[j]) {
+            proof {
+                assert(binding_set(right@).contains(right@[j as int]));
+                assert(!binding_set(left@).contains(right@[j as int]));
+            }
+            return false;
+        }
+        j += 1;
+    }
+    proof { assert(binding_set(left@) =~= binding_set(right@)); }
+    true
+}
+
 /// This phase belongs to the effect accumulator, not to the independently
 /// published kernel control phase. In-flight diversion is delayed until landing.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
@@ -109,43 +186,29 @@ impl StageProtocol {
             done: true, cancelled: false }
     }
 
-    fn same_target(&self, target: &[Binding]) -> (same: bool)
-        ensures same == (target@ == self.committed_view()),
-    {
-        if target.len() != self.committed.len() { return false; }
-        let mut i = 0;
-        while i < target.len()
-            invariant i <= target.len(), target.len() == self.committed.len(),
-                forall|j: int| 0 <= j < i ==> target@[j] == self.committed@[j],
-            decreases target.len() - i,
-        {
-            if target[i] != self.committed[i] { return false; }
-            i += 1;
-        }
-        proof { assert(target@ =~= self.committed@); }
-        true
-    }
-
     /// Admit a new stage only against its committed target. Once admitted, a
     /// pending stage may land even after cancellation or loss of the target.
     /// `None` denotes retirement, failure, restart, or an unavailable target.
+    /// The exact guard includes sufficiency: a fresh unsettled stage with its
+    /// committed target is admitted. This is local enabledness, not a promise
+    /// that the host polls it or that its callback terminates (Theorem 73).
     pub fn admit(&mut self, target: Option<&[Binding]>) -> (poll: bool)
         requires old(self).wf(),
         ensures final(self).wf(),
             final(self).committed_view() == old(self).committed_view(),
             final(self).inverse_view() == old(self).inverse_view(),
             poll == final(self).pending(),
-            poll ==> old(self).pending() || (!old(self).settled()
+            poll == (old(self).pending() || (!old(self).settled()
                 && !old(self).cancellation() && target.is_some()
-                && target.unwrap()@ == old(self).committed_view()),
-            old(self).pending() ==> poll,
-            !poll ==> final(self).settled(),
-            old(self).cancellation() ==> final(self).cancellation(),
+                && binding_set(target.unwrap()@) == binding_set(old(self).committed_view()))),
+            final(self).settled() == !poll,
+            final(self).cancellation() == (old(self).cancellation()
+                || !(target.is_some() && binding_set(target.unwrap()@) == binding_set(old(self).committed_view()))),
             poll ==> accumulator_step(old(self).abstract_view(), final(self).abstract_view(), AccumulatorRule::Stutter),
             !poll ==> boundary_diversion(old(self).abstract_view(), final(self).abstract_view()),
     {
         let matches = match target {
-            Some(target) => self.same_target(target),
+            Some(target) => same_bindings(target, self.committed.as_slice()),
             None => false,
         };
         if !matches { self.cancelled = true; }
@@ -276,10 +339,43 @@ impl StageProtocol {
     pub fn can_finish(&self, target: &[Binding]) -> (ready: bool)
         requires self.wf(),
         ensures ready == (self.settled() && !self.pending()
-            && target@ == self.committed_view()),
+            && binding_set(target@) == binding_set(self.committed_view())),
     {
-        self.done && self.same_target(target)
+        self.done && same_bindings(target, self.committed.as_slice())
     }
+}
+
+/// A checked executable client of the admission contract. A matching target
+/// really enables the first poll; cancellation retains that poll through a
+/// missing target until the supplied terminal result lands. This witnesses the
+/// Table 1 local admission/late-diversion path, not callback or scheduler
+/// termination. The optional token is already supplied by the caller.
+pub fn cancelled_admission_witness(committed: Vec<Binding>, target: &[Binding],
+    inverse: Option<usize>) -> (out: StageProtocol)
+    requires binding_set(target@) == binding_set(committed@),
+    ensures out.wf(), out.committed_view() == committed@,
+        out.cancellation(), out.settled(), !out.pending(),
+        out.inverse_view() == match inverse {
+            Some(token) => seq![token],
+            None => Seq::<usize>::empty(),
+        },
+{
+    let mut stage = StageProtocol::iterator(committed);
+    let _admitted = stage.admit(Some(target));
+    assert(_admitted);
+    assert(stage.pending() && !stage.settled() && !stage.cancellation());
+    stage.cancel();
+    let _continued = stage.admit(None);
+    assert(_continued && stage.pending() && !stage.settled());
+    let _early = stage.pop();
+    assert(_early.is_none());
+    match inverse {
+        Some(token) => { let _accepted = stage.land(token); assert(_accepted); },
+        None => { let _accepted = stage.end(); assert(_accepted); },
+    }
+    let _restarted = stage.admit(Some(target));
+    assert(!_restarted);
+    stage
 }
 
 } // verus!

@@ -15,7 +15,7 @@ use cordis_kernel::publication::{LeaseId, PublicationError, PublicationId, Publi
 use cordis_kernel::{Error as KernelError, Phase, Port};
 pub use protocol::{ActionKind, ActionTicket, Command, HostAction, Profile, ServicePort};
 use serde_json::{json, Value};
-use shared::{Decision, HostStatus, LifecycleDriver};
+use shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -788,7 +788,17 @@ impl Driver {
             ));
         }
         let id = ticket.id;
-        self.kernel.complete_action(&ticket)?;
+        match ticket.kind {
+            ActionKind::Setup => self.kernel.complete_action(&ticket)?,
+            ActionKind::Cleanup => self.kernel.complete_cleanup(
+                &ticket,
+                if success {
+                    CleanupOutcome::Succeeded
+                } else {
+                    CleanupOutcome::Failed
+                },
+            )?,
+        }
         self.nodes.get_mut(&id).unwrap().pending = None;
         match ticket.kind {
             ActionKind::Setup => {
@@ -829,7 +839,9 @@ impl Driver {
                     return Ok(());
                 }
                 let prepared_cleanup = self.nodes[&id].prepared_cleanup;
-                if !prepared_cleanup {
+                if prepared_cleanup {
+                    self.kernel.finish_reservation_cleanup(id)?;
+                } else {
                     self.kernel.finish_cleanup(id)?;
                 }
                 let node = self.nodes.get_mut(&id).unwrap();
@@ -872,11 +884,7 @@ impl Driver {
                 "no failed cleanup to retry",
             ));
         }
-        if node.prepared_cleanup {
-            self.kernel.begin_reservation_cleanup(id)?;
-        } else {
-            self.kernel.retry_cleanup(id)?;
-        }
+        self.kernel.retry_cleanup(id)?;
         let ticket = self.next_ticket(id, ActionKind::Cleanup)?;
         self.nodes.get_mut(&id).unwrap().cleanup_failed = false;
         Ok(HostAction::Cleanup { id, ticket })
@@ -1080,7 +1088,9 @@ impl Driver {
                     }
                 }
                 if matches!(phase, Phase::Loading | Phase::Active)
-                    && target.as_ref() != Some(&committed)
+                    && !target.as_ref().is_some_and(|target| {
+                        cordis_kernel::episode::same_bindings(target, &committed)
+                    })
                 {
                     blockers.push(json!({"code": "TargetChanged"}));
                 }

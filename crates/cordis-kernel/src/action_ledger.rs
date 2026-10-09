@@ -33,12 +33,12 @@ impl ActionLedger {
     pub closed spec fn domain_id(&self) -> u64 { self.domain }
     pub closed spec fn next_id(&self) -> u64 { self.next }
     pub closed spec fn records(&self) -> Seq<ActionTicket> { self.entries@ }
-    pub closed spec fn recorded(&self, ticket: ActionTicket) -> bool { self.entries@.contains(ticket) }
-    pub closed spec fn outstanding(&self, id: usize) -> bool {
-        exists|i: int| 0 <= i < self.entries.len() && self.entries[i].id == id
+    pub open spec fn recorded(&self, ticket: ActionTicket) -> bool { self.records().contains(ticket) }
+    pub open spec fn outstanding(&self, id: usize) -> bool {
+        exists|i: int| 0 <= i < self.records().len() && self.records()[i].id == id
     }
-    pub closed spec fn unchanged(&self, prior: &Self) -> bool {
-        self.domain == prior.domain && self.next == prior.next && self.entries@ == prior.entries@
+    pub open spec fn unchanged(&self, prior: &Self) -> bool {
+        self.domain_id() == prior.domain_id() && self.next_id() == prior.next_id() && self.records() == prior.records()
     }
     pub closed spec fn wf(&self) -> bool {
         &&& self.next > 0
@@ -46,6 +46,18 @@ impl ActionLedger {
             && 0 < self.entries[i].action < self.next
         &&& forall|i: int, j: int| 0 <= i < j < self.entries.len()
             ==> self.entries[i].id != self.entries[j].id && self.entries[i].action != self.entries[j].action
+    }
+
+    /// Exact pending tickets for the same owner are identical. This exposes the
+    /// needed uniqueness fact without unfolding storage invariants in clients.
+    pub proof fn recorded_owner_unique(&self, a: ActionTicket, b: ActionTicket)
+        requires self.wf(), self.recorded(a), self.recorded(b), a.id == b.id,
+        ensures a == b,
+    {
+        let i = choose|i:int| 0 <= i < self.entries.len() && self.entries[i] == a;
+        let j = choose|j:int| 0 <= j < self.entries.len() && self.entries[j] == b;
+        if i < j { assert(a.id != b.id); }
+        if j < i { assert(a.id != b.id); }
     }
 
     pub fn new(domain: u64) -> (ledger: Self)
@@ -100,7 +112,10 @@ impl ActionLedger {
     pub fn issue(&mut self, id: usize, generation: u64, kind: ActionKind) -> (out: Result<ActionTicket, ActionError>)
         requires old(self).wf(),
         ensures final(self).wf(), final(self).domain_id() == old(self).domain_id(),
+            out.is_ok() == (!old(self).outstanding(id) && old(self).next_id() < u64::MAX && old(self).records().len() < usize::MAX),
             out.is_err() ==> final(self).unchanged(old(self)),
+            out.is_ok() ==> (forall|n:usize| final(self).outstanding(n) == (n == id || old(self).outstanding(n))),
+            out.is_ok() ==> 0 < out.unwrap().action,
             out.is_ok() ==> out.unwrap() == (ActionTicket { domain: old(self).domain_id(), id, generation,
                     action: old(self).next_id(), kind })
                 && final(self).records() == old(self).records().push(out.unwrap())
@@ -109,7 +124,22 @@ impl ActionLedger {
         self.can_issue(id)?;
         let ticket = ActionTicket { domain: self.domain, id, generation, action: self.next, kind };
         self.next += 1;
+        let ghost before = self.entries@;
         self.entries.push(ticket);
+        proof {
+            assert forall|n:usize| self.outstanding(n) == (n == id || old(self).outstanding(n)) by {
+                if n == id { assert(self.entries[before.len() as int].id == n); }
+                if old(self).outstanding(n) {
+                    let j = choose|j:int| 0 <= j < before.len() && before[j].id == n;
+                    assert(self.entries[j].id == n);
+                }
+                if self.outstanding(n) {
+                    let j = choose|j:int| 0 <= j < self.entries.len() && self.entries[j].id == n;
+                    if j < before.len() { assert(before[j].id == n); }
+                    else { assert(n == id); }
+                }
+            }
+        }
         Ok(ticket)
     }
 
@@ -119,6 +149,8 @@ impl ActionLedger {
         requires old(self).wf(),
         ensures final(self).wf(), final(self).domain_id() == old(self).domain_id(),
             final(self).next_id() == old(self).next_id(),
+            out.is_ok() == old(self).recorded(ticket),
+            out.is_ok() ==> (forall|n:usize| final(self).outstanding(n) == (n != ticket.id && old(self).outstanding(n))),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> old(self).recorded(ticket) && !final(self).outstanding(ticket.id)
                 && final(self).records().len() + 1 == old(self).records().len(),
@@ -167,6 +199,19 @@ impl ActionLedger {
                             let a = choose|a: int| 0 <= a < self.entries.len() && self.entries[a] == other;
                             let b = if a < i { a } else { a + 1 };
                             assert(before[b] == other);
+                        }
+                    }
+                    assert forall|n:usize| self.outstanding(n) == (n != ticket.id && old(self).outstanding(n)) by {
+                        if self.outstanding(n) {
+                            let a = choose|a:int| 0 <= a < self.entries.len() && self.entries[a].id == n;
+                            let b = if a < i { a } else { a + 1 };
+                            assert(before[b].id == n);
+                        }
+                        if n != ticket.id && old(self).outstanding(n) {
+                            let a = choose|a:int| 0 <= a < before.len() && before[a].id == n;
+                            assert(a != i);
+                            let b = if a < i { a } else { a - 1 };
+                            assert(self.entries[b].id == n);
                         }
                     }
                 }

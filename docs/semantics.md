@@ -99,6 +99,28 @@ Rust 外层支持宿主 mount 与 `Setup/AsyncSetup::mount` 动态创建 child�
 
 这些约束现已全部写入 `wf`，并由实际转换方法保持。`resolution_unique` 从 provision 唯一性推出同一 port 的解析唯一。`draining_can_progress` 进一步证明：有限 registry 中若至少一个 fiber installed，且所有 installed fiber 均为尚未恢复的 Unloading，则至少一个 fiber 没有 committed dependent、可通过 cleanup guard。证明选取最后登记的 live link 的 consumer；若无 live link，任一 installed fiber 即可。它排除了这个状态下依赖守卫的死锁，不保证用户 future 完成，也不等于完整 Theorem 73。payload、effect history 和外层调度尚不属于内核状态，不能把 `wf` 直接称为整个 calculus 的 refinement。机器结果以当前源码的完整验证记录为准。
 
+可执行入口还公开了局部使能性的充要条件：`begin` 在且仅在 `begin_enabled`（含 generation 容量边界）时成功，`begin_cleanup` 在且仅在 `cleanup_enabled` 时成功；后者将 `draining_can_progress` 的守卫见证接到真实调用。`StageProtocol::admit` 及资源／程序包装层也明确给出 pending 或新阶段目标匹配时的接纳条件，并由真实可执行客户端验证取消后的落地路径。`paper_coherence` 和 `paper_iteration_guard` 已将内核守卫与论文投影接通，`check_iteration`、`finish` 在且仅在 Loading/coherent 时成功，不再附加向量顺序／重复次数检查。固定 `ProgramEpisode` 的构造检查精确识别合法指令；真实执行循环推出逐步成功、递减终止和含最后一次终态调用的计数，`execute_and_recover` 再调用真实逆操作恢复输入资源。这不改变 Theorem 73 的部分完成状态；完整宿主捕获、动态 child／一般 continuation 以及整段宿主执行仍需连接。论文条目、代码路径和 `verus-tla` 的适用判断见[进展合同审查](progress-contracts.zh-CN.md)。
+
+定义 53 的绑定投影现在由 `episode::binding_set` 和实际 `same_bindings` 比较接通，保留完整 `(key, realm, provider)` 身份，忽略完全相同绑定的顺序与重复次数。`Kernel::paper_captured_target` 在 `wf`、已登记 Loading actor、捕获集合等于 committed 的前提下，将真实 `target` 观测的匹配条件证明为论文控制投影的 coherence。`Driver::admit`、`ProgramDriver::admit` 在且仅在 actor 已登记且 Loading 时返回 `Ok`，其中布尔接纳值恰好为 pending 或 fresh、未取消且 coherent；`ChildEpisode::admit_current` 还检查捕获和 generation，旧 episode 不因绑定相同而复活。`begin_preserves_target` 还将成功 Begin 接到后态 iteration guard；两个已验证 driver 的 Begin 建立 fresh、未取消且 coherent 的 episode，`Driver::begin_and_admit` 顺序执行真实 Begin 与接纳，在且仅在有界 `begin_enabled` 下建立首个 pending 阶段，不要求调用者假设接纳成功，也不执行其效果。普通 `LifecycleDriver`、阻塞诊断及原生宿主的迭代／发布守卫复用相同比较，但外围异步代码与真实捕获值仍是测试边界。匹配采用同序 O(n) 快路径及非同序 O(nm) 双向成员扫描，不额外分配集合，不据此宣称性能改善；捕获向量、逆序日志及 child 顺序均不改写。
+
+动态 child 注册的真实定义域也已连接：`Kernel::check_insert` 只读检查 `insert_enabled`，实际 `insert` 复用该检查并公开成功 iff。`refinement::insertion_domain` 与 `Kernel::paper_insert_domain` 将 O-Insert 的 parent 登记／provision 预留条件，与实现的有限身份容量、声明向量各自无重复分开说明；不要求 child dependency 已可用或 parent 活跃，退休但仍登记的节点仍预留 provision。规范谓词 `ChildEpisode::current_matches`、`land_enabled` 描述 pending、当前捕获／generation 与该插入域，实际校验由 `check_snapshot`、`check_child` 执行；自身及 `ChildDriver` 的 `check_child`、`land_child` 都有相同域下的成功充要条件。`ChildDriver::check_and_land_child` 在没有注册表操作插入的一次调用中执行真实预检查与落地，从检查通过推出实际落地成功，无需调用者假设返回成功。预检查既不预留端口也不绑定 generation，interleaving 后实际落地仍重新检查；失败保留 Kernel/control、逆操作前缀与 pending，但 detached generation 可能已捕获，wrapper cancellation 也可能被刷新。这只是注册域合同，不是任意 child body 的 Component membership 或总性证明；`guarded_child_domains` 的预留冲突反例、失败语义和原始完整 Component／context 义务不变。
+
+同步闭合 `MixedDriver`／`FreshDriver` 还公开了真实单步的充分必要条件。`MixedDriver::insert` 在且仅在蓝图索引、所需蓝图库前缀与 Kernel 插入域有效时成功；`provider` 的成功等价于实际 primitive resolver 返回身份，`execute` 的成功等价于独立的 `primitive_enabled`。`ready` 检查已登记 Loading/coherent actor 及当前指令，`step_enabled` 再要求实际效果定义域与终态 `complete_after`。后者允许本次 Provide 补齐最后的值，不错误要求调用前就完整发布；`commit_landing` 使用落地后的实际表。Fresh 的 `selected_instruction` 以当前 `next_id` 实例化 Child，仍保留预留冲突与值域检查。公共 `step` 成功 iff `step_enabled`，错误通过副本事务保留完整 `same`；内部 `execute`／`step_inner` 的失败可能已修改副本，不具有无条件回滚合同。同一执行方法由 Cargo 编译并接受 Verus 检查。这补齐同步单步局部使能性；跨调用 admitted landing 的精确域在下文单列。两者都不是整段动态执行终止或原论文完整总性证明，第 57、73 条继续 partial。详见[进展合同审查](progress-contracts.zh-CN.md#真实-mixedfresh-解释器的精确单步定义域)。
+
+`FreshDriver::run_until_blocked` 进一步执行真实的同步 step 循环，只要求 `wf()`，不传 fuel，也不假设下一步成功。它从实际前向 pc 导出 `code.len() - pc + 1` 的秩（位置缺失或无效为一），在终态 Finished／finished Child 或首个真实错误处有限返回。`RunReport.steps` 是 `u128`，只统计已提交调用并包含终态调用；错误尝试不计入，成功前缀保留而失败步通过原有事务回滚，零提交时完整机器满足 `same`。无错时当前 actor Active 且 current 为 None；错误时最终 `step_enabled` 为 false。新 child 保持 Inactive，不自动执行。报告的 `refines` 条件化地延伸输入机器已经表示的任意良构源配置，源序列由实际成功调用构造，公共 proof 方法 `RunReport::advance_source` 在已有 `refines`、输入 representation 与源良构条件下提取该执行供组合；它不从任意 `wf` 推出输入 representation 的存在，也不单独证明 empty 起源。ghost outcomes／源序列在运行时擦除。这是单 actor 的有限返回与前缀连接，不是全图静止、primitive 总性或整个定理 73。
+
+[`run_from_empty`](../crates/cordis-kernel/src/fresh_bootstrap.rs) 则从真实 new/empty 构造机器，先调用 `run_script`，仅全部准备命令成功后才运行指定 actor。它无需输入机器、源表示、fuel 或未来成功假设。`FromEmptyReport::refines` 建立同一条从 empty 出发的源执行，在准备接缝与终点分别表示实际 prepared 和返回机器，并证明每态良构且 `resource_safe`；公共 `source_execution` 提取该见证。真实准备路径建立原有条件化 `RunReport` 的输入前提，两段在相同状态接缝处合并，不重复接缝或引入失败事件。
+
+报告区分 `SetupFailed`、`Blocked` 与 `Finished`：准备失败立即停止，保留成功准备前缀，自主 `steps` 为零，不能推出所选 actor 不满足 `step_enabled`；只有全部准备成功后的自主阻塞才保证最终 `!step_enabled`。`setup: Vec<Transition>` 是真实成功准备调用的运行时记录，`steps` 只统计随后自主提交的步骤，包含终态调用但不含准备调用和失败尝试；prepared、自主 outcomes 与源轨迹是擦除的 ghost 数据。这个入口建立成功调用从 empty 出发的存在性，尚未覆盖多个 actor／动态 child 的自主调度、其余准备和恢复域与全局递减量；新 child 仍 Inactive，strict primitive 仍可阻塞，引理 57／定理 73 保持 partial。
+
+[`fresh_preparation.rs`](../crates/cordis-kernel/src/fresh_preparation.rs) 的 `preparation_command` 选取 Insert/Begin/Step，`preparation_enabled` 分别复用 Fresh 的 `insertion_enabled`、`begin_enabled`、`step_enabled`。Insert 包含 Mixed 蓝图索引／合法 bank 前缀与 Kernel 插入检查；Begin 要求已登记、保留 journal 为空及 Kernel Begin 域，包括目标可用和 generation 容量；Step 保留 primitive 与终态发布域。真实 `apply` 对该范围满足成功 iff 调用前谓词，运行分支与错误顺序未改。`run_script` 的失败命令若在此范围，返回机器不满足该命令的谓词；`run_from_empty` 的 SetupFailed 同时对真实 prepared 与返回机器传播此结论。谓词在成功前缀之后的失败处求值，不要求全部命令在初始 empty 状态就使能，成功前缀也可以含其他命令。
+
+Retire/Depart/Unload/Remove 仍受支持；`preparation_enabled` 对它们为 false 只表示不在该证明范围，受 `preparation_command` 限制的等价合同不会据此拒绝它们。直接 Unload 的精确域另见下文；其余命令和更广 dispatcher 的域、具体错误枚举的逐项对应仍未证明。这些 proof-only 谓词刻画实现域，保留蓝图合法性、有限容量和 strict 值可用性，不等于所有论文已使能准备命令均可被接纳。
+
+Mixed/Fresh 公共 `unload` 现有精确成功合同：`unload_enabled = kernel.cleanup_enabled(actor) && restore_receipts(journal(actor), primitive_state).is_some()`。控制许可和实际完整逆日志的有定义性是独立条件，不能从 `wf()` 或 `!relied` 推出任意逆日志可恢复。`restore_receipts` 在当前 primitive 状态上按 LIFO 解释真实 receipts；内部 `undo_one` 成功 iff 对应 `mixed_grammar::undo` 有定义，成功结果与它相等，失败保持自己的输入，且保持全部 restoring 标志。真实循环在清理期间保持 actor restoring，以实际 journal 长度递减；成功后 `unload_inner` 的结果是完整模型恢复后释放 commitment、进入 Inactive，journal 与当前指令清空。公共包装层给出既有 Unload acknowledgement。
+
+公共 Mixed/Fresh Unload 错误保持完整机器；内部 `unload_inner` 可能已进入清理并执行部分逆操作，不具备相同回滚合同。Child inverse 只退休捕获身份，不删除条目、自动执行 child 清理或回退分配器。`FreshDriver::same_unload_domain` 连接完整 `same` 与定义域相等。这补充引理 57 的实际 inverse 接线、推论 69 的恢复执行证据及定理 73 的局部有限清理；仍不建立一般 foreign replay 观察等价、任意资源物理恢复或动态全局终止。准备 dispatcher 的 iff 范围仍仅 Insert/Begin/Step，没有据此扩大到 Unload。
+
 `lifecycle_ordering` 从实际九规则 trace 证明 episode 边界、固定 committed、provider 整个表域保持和严格 episode 排序；Loading 只占唯一初始区间，Iter／Finish 使用 opening committed。`grammar_ordering` 将值变化接到精确 key/provider 的实际 Operation 或 LIFO inverse，并可从空 history 回溯到先前 landing。`rule_frames` 证明冻结状态映射／字段修改分解及 metadata lifetime。`indexed_ordering` 和 `mixed_ordering` 进一步覆盖同一 arbitrary-index dependent／child 执行；观察版本不要求 primitive 字面恢复，真实 LIFO 保留 child retirement 的中间状态，并追到原始 operation landing。`observational_execution` 从真实 Begin／成功 Unload 推导观察恢复及 owner 空表，仍要求 identity-extended scalar generators 观察交换。这个接口与一般 strict-partial coeffect 的对应、可执行混合程序模拟及异步宿主仍须额外证明；有限前缀不保证最终发生 Unload。
 
 `isolated_deletion` 构造受限 owner 的删减后生命周期前缀，保留注册条目、外部编排与真实 foreign journals；它不允许 owner 的 dependencies 或 Child landing，并要求声明接口分离。`strict_journal` 的严格 partial 事件恢复可以推导 inverse 成功域，但任意 foreign Unload 及实际 continuation 重演尚须另证。`causal_normalization` 保留完整外部输入并终止于没有可用局部交换的轨迹；名称或 captured-child 读取可能阻止前移，因此不主张编排优先顺序或一般 confluence。
@@ -140,7 +162,7 @@ Rust 外层把 callback 存为 `Vec<Option<CleanupAction>>`，每个效果组使
 | 任意 callback 都能恢复自己的外部副作用 | callback 的 inverse witness、异常/取消边界、资源是否全部经 context 登记 |
 | 效果恢复等于物理世界完全回滚 | 论文只在 key operations 定义的观察等价下恢复；消息、磁盘外部状态、allocator 历史需各自边界 |
 | Theorem 68 / Corollary 69 在完整宿主上的 recovery exactness | 已从真实 mixed grammar 的 Begin／Unload 推导恢复，无需 caller episode profile；仍要求显式 identity-extension scalar 交换，尚缺一般观察范围及宿主历史 refinement |
-| Theorem 73 的完整进展和终止 | 已证明有 provider rank 的非静止控制状态存在下一步，并提升为完整规则的 landing witness；固定 registry 的实际轨迹已导出计数前提并可构造完整规则执行到 quiet；动态 child、无限 orchestration、future 最终完成与 scheduler 契约仍在边界外 |
+| Theorem 73 的完整进展和终止 | 已证明有 provider rank 的非静止控制状态存在下一步，并提升为完整规则的 landing witness；固定 registry 的实际轨迹已导出计数前提并可构造完整规则执行到 quiet；单 actor Fresh 循环已对含 child 注册的真实执行给出有限返回界；整个动态 child 图的自治进展、无限 orchestration、future 最终完成与 scheduler 契约仍在边界外 |
 | Theorem 80 的完整 confluence | 已证明动态独立 family confluence、静止控制唯一及实际固定程序轨迹的完整终态唯一；已具备 full-rule name-renaming、fresh allocation 匹配及条件 suffix 删除；仍需一般动态 child lifecycle 的合法前缀删除、交换和观察 canonical form |
 | JS Cordis 或完整 DeepSeek Harness 已验证 | 还需完整 API、宿主运行时、插件生态与应用逻辑的实现及证明 |
 
@@ -180,6 +202,8 @@ landing Divert。`admitted::script::run_script` 从 empty 构造同一程序的�
 明确区分 Call／Land 与 Admit／Release 元数据步骤，并证明事件完整性和输入顺序。
 失败或旧准入不改变机器；这补齐该闭合语言的两阶段模拟，仍不证明任意 future 或
 callback 的内部效果，也不替代普通 Rust Runtime 的多组异步 scheduler。
+
+该协议还给出精确成功域：`FreshDriver::admit` 在且仅在 `admission_enabled = ready` 时成功；票据接纳不预留值或端口。成功接纳还保证返回票据的 `land_enabled` 等于调用前机器的 `step_enabled(actor)`，所以无中间操作的立即落地与同步 step 接纳域一致，但较弱的 `ready` 本身并不保证落地成功。`Admission::selected_instruction` 保持捕获模板，并在落地时以当前 `next_id` 实例化 Child。`land` 在且仅在 `land_enabled` 时成功：未消费、当前机器仍满足捕获身份的 `bound`、实际 primitive 域有效，且仅 coherent 终态需满足 `complete_after`。目标丢失时可在不完整发布的情况下执行真实 primitive、记录 inverse 并 Divert，但值缺失或 child 冲突仍会拒绝。成功结果的 `diverted` 恰好等于调用前不 coherent，返回 child 使用落地前的 next ID；`commit_divert` 在原前提下保证成功。错误保持完整机器、票据身份与 consumed，未消费票据可在解除冲突后重试；stale／重复落地仍被拒绝。这是跨调用的局部定义域证明，不是任意 Future 最终返回或整段动态执行终止。
 
 
 `providing_owner_execution` 将共享依赖删除扩展到会提供服务的 owner：owner 初始

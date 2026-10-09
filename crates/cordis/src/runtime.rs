@@ -8,7 +8,7 @@ pub mod static_host;
 
 use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, StorageStats};
 use crate::future_support::poll_catching_unwind;
-use cordis_driver::shared::{Decision, HostStatus, LifecycleDriver};
+use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
 use cordis_kernel::episode::StageProtocol;
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::Any;
@@ -2290,7 +2290,13 @@ impl Runtime {
                             .pending_action(id)
                             .cloned()
                             .expect("restoration owns its cleanup action");
-                        if let Err(error) = self.kernel.complete_action(&ticket) {
+                        // FnOnce inverses are consumed even when they report an
+                        // error. Drained records that policy explicitly; it does
+                        // not assert successful recovery or retain a retryable inverse.
+                        if let Err(error) = self
+                            .kernel
+                            .complete_cleanup(&ticket, CleanupOutcome::Drained)
+                        {
                             return Poll::Ready(Err(kernel_error(error)));
                         }
                         if let Err(error) = self.kernel.finish_cleanup(id) {

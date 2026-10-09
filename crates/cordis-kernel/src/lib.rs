@@ -28,6 +28,7 @@ pub mod indexed_ordering;
 pub mod iterator_bridge;
 pub mod iterator_independence;
 pub mod iterators;
+pub mod lifecycle_actions;
 pub mod lifecycle_ordering;
 pub mod mediated;
 pub mod mixed_driver;
@@ -86,6 +87,12 @@ struct Node { present: bool, retired: bool, phase: Phase, restoring: bool, paren
 struct Declaration { owner: usize, port: Port, provides: bool }
 #[derive(Copy, Clone)]
 struct Link { consumer: usize, binding: Binding, live: bool }
+
+/// Duplicate declaration entries are rejected by the executable API even
+/// though the paper represents an interface as a set.
+pub open spec fn distinct_ports(ports: Seq<Port>) -> bool {
+    forall|i: int, j: int| 0 <= i < j < ports.len() ==> ports[i] != ports[j]
+}
 
 pub struct Kernel { nodes: Vec<Node>, declarations: Vec<Declaration>, links: Vec<Link> }
 
@@ -347,6 +354,14 @@ impl Kernel {
         &&& forall|i: int| 0 <= i < self.declarations.len() && !self.declarations[i].provides && self.declarations[i].owner == id
             ==> Self::view_has_port(bindings, self.declarations[i].port)
     }
+    /// Executable L-Begin admission includes the bounded episode-generation
+    /// counter, which is erased by the paper control projection.
+    pub closed spec fn begin_enabled(&self, id: usize) -> bool {
+        &&& self.phase_of(id) == Some(Phase::Inactive)
+        &&& !self.unavailable(id)
+        &&& self.generation_of(id).is_some()
+        &&& self.generation_of(id).unwrap() < u64::MAX
+    }
     pub closed spec fn unavailable(&self, id: usize) -> bool {
         !self.registered(id) || self.nodes[id as int].retired
             || exists|i: int| 0 <= i < self.declarations.len() && !self.declarations[i].provides
@@ -369,6 +384,73 @@ impl Kernel {
                 && self.links[j].binding.key == source.declarations[i].port.key && self.links[j].binding.realm == source.declarations[i].port.realm
     }
     pub closed spec fn coherent(&self, id: usize) -> bool { self.committed_from(self, id) }
+    /// The concrete membership contract and the paper target relation agree.
+    /// Ordering and multiplicity of the private buffers are not paper guards.
+    #[verifier::spinoff_prover]
+    pub proof fn paper_coherence(&self, id: usize)
+        requires self.wf(),
+        ensures self.coherent(id) == refinement::coherent(self.paper(), id),
+    {
+        if self.coherent(id) { self.paper_target(self, id); }
+        if refinement::coherent(self.paper(), id) {
+            assert forall|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == id
+                implies self.binding_is_target(id, self.links[j].binding) by {
+                let b = self.links[j].binding;
+                let p = Port { key: b.key, realm: b.realm };
+                assert(self.paper_fiber(id).committed.contains(b));
+                assert(refinement::publishes(self.paper(), p, b.provider));
+                assert(Self::node_ok(self.nodes@, b.provider as int));
+                assert(self.active_provider(b.provider));
+                assert(Self::declares(self.declarations@, b.provider, p, true));
+                assert(self.resolves_to(p, b.provider));
+                assert(Self::declares(self.declarations@, id, p, false));
+            }
+            assert forall|i: int| 0 <= i < self.declarations.len() && !self.declarations[i].provides
+                && self.declarations[i].owner == id
+                implies exists|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == id
+                    && self.links[j].binding.key == self.declarations[i].port.key
+                    && self.links[j].binding.realm == self.declarations[i].port.realm by {
+                let p = self.declarations[i].port;
+                assert(self.paper_fiber(id).dependencies.contains(p));
+                let b = choose|b: Binding| self.paper_fiber(id).committed.contains(b) && b.key == p.key && b.realm == p.realm;
+                assert(self.binding_recorded(id, b));
+            }
+        }
+    }
+    /// Connect a real target observation to an episode captured by L-Begin.
+    /// The invariant records binding identities as a set, so admission must not
+    /// add a private-vector ordering or multiplicity premise.
+    pub proof fn paper_captured_target(&self, id: usize, captured: Seq<Binding>, target: Option<Seq<Binding>>)
+        requires self.wf(), refinement::registered(self.paper(), id),
+            self.paper().fibers[id].phase == Phase::Loading,
+            episode::binding_set(captured) == self.paper().fibers[id].committed,
+            target.is_some() ==> self.complete_target(id, target.unwrap()),
+            target.is_none() ==> self.unavailable(id),
+        ensures (target.is_some() && episode::binding_set(target.unwrap()) == episode::binding_set(captured))
+            == refinement::coherent(self.paper(), id),
+    {
+        self.paper_coherence(id);
+        if let Some(bindings) = target {
+            self.refines_paper();
+            self.paper_target_vector(id, bindings);
+            refinement::available_installed_coherent(self.paper(), id, episode::binding_set(bindings));
+            refinement::target_unique(self.paper(), id, episode::binding_set(bindings), episode::binding_set(captured));
+        } else {
+            self.unavailable_not_coherent(id);
+        }
+    }
+    pub closed spec fn iteration_enabled(&self, id: usize) -> bool {
+        self.phase_of(id) == Some(Phase::Loading) && self.coherent(id)
+    }
+    /// The actual admission predicate is exactly Table 1's control guard.
+    pub proof fn paper_iteration_guard(&self, id: usize)
+        requires self.wf(),
+        ensures self.iteration_enabled(id) == (refinement::registered(self.paper(), id)
+            && self.paper().fibers[id].phase == Phase::Loading && refinement::coherent(self.paper(), id)),
+    {
+        self.paper_coherence(id);
+        self.paper_observations(id);
+    }
     pub closed spec fn same_bindings(&self, other: &Self) -> bool { self.links@ == other.links@ }
     pub closed spec fn restoration_guarded(&self, id: usize) -> bool {
         id < self.nodes.len() && self.nodes[id as int].restoring
@@ -391,9 +473,59 @@ impl Kernel {
         forall|i: int| 0 <= i < declarations.len() && declarations[i].provides && nodes[declarations[i].owner as int].present
             ==> declarations[i].port != port
     }
+    pub closed spec fn provisions_available(&self, ports: Seq<Port>) -> bool {
+        distinct_ports(ports) && forall|i: int| 0 <= i < ports.len()
+            ==> Self::provision_admissible(self.nodes@, self.declarations@, ports[i])
+    }
+    /// The concrete insertion domain includes bounded identities and distinct
+    /// declarations. Neither dependency availability nor parent activity is
+    /// required; a retired but registered owner still reserves its provisions.
+    pub closed spec fn insert_enabled(&self, parent: Option<usize>, dependencies: Seq<Port>, provisions: Seq<Port>) -> bool {
+        &&& self.nodes.len() < usize::MAX
+        &&& (parent.is_some() ==> self.registered(parent.unwrap()))
+        &&& self.provisions_available(provisions)
+        &&& distinct_ports(dependencies)
+    }
+
+    /// The runtime insertion guard is the paper's parent/reservation guard,
+    /// together with bounded IDs and duplicate-free input declarations.
+    #[verifier::spinoff_prover]
+    pub proof fn paper_insert_domain(&self, parent: Option<usize>, dependencies: Seq<Port>, provisions: Seq<Port>)
+        requires self.wf(),
+        ensures self.insert_enabled(parent, dependencies, provisions)
+            == (self.next_id() < usize::MAX && distinct_ports(dependencies) && distinct_ports(provisions)
+                && refinement::insertion_domain(self.paper(), parent, ISet::new(|p: Port| provisions.contains(p)))),
+    {
+        if let Some(p) = parent { self.paper_observations(p); }
+        let reserved = ISet::new(|p: Port| provisions.contains(p));
+        if self.provisions_available(provisions) {
+            assert forall|n: usize, p: Port| refinement::registered(self.paper(), n)
+                && self.paper().fibers[n].provisions.contains(p) implies !reserved.contains(p) by {
+                let j = choose|j: int| 0 <= j < self.declarations.len() && self.declarations[j].owner == n
+                    && self.declarations[j].provides && self.declarations[j].port == p;
+                if reserved.contains(p) {
+                    let i = choose|i: int| 0 <= i < provisions.len() && provisions[i] == p;
+                    assert(Self::provision_admissible(self.nodes@, self.declarations@, provisions[i]));
+                }
+            }
+        }
+        if refinement::insertion_domain(self.paper(), parent, reserved) {
+            assert forall|i: int| 0 <= i < provisions.len() implies
+                Self::provision_admissible(self.nodes@, self.declarations@, provisions[i]) by {
+                assert(reserved.contains(provisions[i]));
+                assert forall|j: int| 0 <= j < self.declarations.len() && self.declarations[j].provides
+                    && self.nodes[self.declarations[j].owner as int].present implies self.declarations[j].port != provisions[i] by {
+                    let d = self.declarations[j];
+                    assert(refinement::registered(self.paper(), d.owner));
+                    assert(self.paper().fibers[d.owner].provisions.contains(d.port));
+                }
+            }
+        }
+    }
     fn check_provisions(&self, ports: &[Port]) -> (ok: bool)
         requires self.wf(),
-        ensures ok ==> (forall|i: int| 0 <= i < ports.len() ==> Self::provision_admissible(self.nodes@, self.declarations@, ports[i]))
+        ensures ok == self.provisions_available(ports@),
+            ok ==> (forall|i: int| 0 <= i < ports.len() ==> Self::provision_admissible(self.nodes@, self.declarations@, ports[i]))
             && (forall|i: int, j: int| 0 <= i < j < ports.len() ==> ports[i] != ports[j]),
     {
         let mut i = 0;
@@ -406,20 +538,30 @@ impl Kernel {
             let p = ports[i];
             let mut j = 0;
             while j < i
-                invariant j <= i, i < ports.len(), forall|a: int| 0 <= a < j ==> ports[a] != p,
+                invariant j <= i, i < ports.len(), p == ports@[i as int],
+                    forall|a: int| 0 <= a < j ==> ports[a] != p,
                 decreases i - j,
             {
-                if ports[j] == p { return false; }
+                if ports[j] == p {
+                    proof { assert(!distinct_ports(ports@)); }
+                    return false;
+                }
                 j += 1;
             }
             let mut k = 0;
             while k < self.declarations.len()
                 invariant k <= self.declarations.len(), self.wf(),
+                    i < ports.len(), p == ports@[i as int],
                     forall|a: int| 0 <= a < k && self.declarations[a].provides && self.nodes[self.declarations[a].owner as int].present
                         ==> self.declarations[a].port != p,
                 decreases self.declarations.len() - k,
             {
                 let d = self.declarations[k];
+                proof {
+                    if d.provides && d.port == p && self.nodes[d.owner as int].present {
+                        assert(!Self::provision_admissible(self.nodes@, self.declarations@, ports@[i as int]));
+                    }
+                }
                 if d.provides && d.port == p && self.nodes[d.owner].present { return false; }
                 k += 1;
             }
@@ -881,6 +1023,10 @@ impl Kernel {
             r.is_ok() ==> final(self).nodes_frame(old(self), id),
             old(self).registered(id) && node.present && !node.restoring && node.phase != Phase::Inactive
                 && node.parent == old(self).nodes[id as int].parent ==> r.is_ok(),
+            old(self).registered(id) && node.present && node.restoring && node.phase == Phase::Unloading
+                && node.parent == old(self).nodes[id as int].parent
+                && (forall|j: int| 0 <= j < old(self).links.len()
+                    ==> !(old(self).links[j].live && old(self).links[j].binding.provider == id)) ==> r.is_ok(),
             r.is_ok() && !node.present ==> forall|m: int| 0 <= m < old(self).nodes.len()
                 ==> !(old(self).nodes[m].present && old(self).nodes[m].parent == Some(id)),
     {
@@ -1322,10 +1468,54 @@ impl Kernel {
         Ok(())
     }
 
+    /// Check the actual insertion domain without allocating an identity or
+    /// reserving a port. The result describes this state only; insert repeats
+    /// these same checks, so an intervening registration can invalidate it.
+    pub fn check_insert(&self, parent: Option<usize>, dependencies: &[Port], provisions: &[Port]) -> (r: Result<(), Error>)
+        requires self.wf(),
+        ensures r.is_ok() == self.insert_enabled(parent, dependencies@, provisions@),
+            (r == Err(Error::Capacity)) == (self.next_id() == usize::MAX),
+            (r == Err(Error::Unknown)) == (self.next_id() < usize::MAX
+                && parent.is_some() && !self.registered(parent.unwrap())),
+            (r == Err(Error::Conflict)) == (self.next_id() < usize::MAX
+                && (parent.is_some() ==> self.registered(parent.unwrap()))
+                && (!self.provisions_available(provisions@) || !distinct_ports(dependencies@))),
+    {
+        if self.nodes.len() == usize::MAX { return Err(Error::Capacity); }
+        if let Some(p) = parent {
+            if !self.contains(p) { return Err(Error::Unknown); }
+        }
+        if !self.check_provisions(provisions) { return Err(Error::Conflict); }
+        let mut d = 0;
+        while d < dependencies.len()
+            invariant d <= dependencies.len(), self.next_id() < usize::MAX,
+                (parent.is_some() ==> self.registered(parent.unwrap())), self.provisions_available(provisions@),
+                forall|a: int, b: int| 0 <= a < b < d ==> dependencies@[a] != dependencies@[b],
+            decreases dependencies.len() - d,
+        {
+            let mut j = 0;
+            while j < d
+                invariant j <= d, d < dependencies.len(), self.next_id() < usize::MAX,
+                (parent.is_some() ==> self.registered(parent.unwrap())), self.provisions_available(provisions@),
+                    forall|a: int| 0 <= a < j ==> dependencies@[a] != dependencies@[d as int],
+                decreases d - j,
+            {
+                if dependencies[j] == dependencies[d] {
+                    proof { assert(!distinct_ports(dependencies@)); }
+                    return Err(Error::Conflict);
+                }
+                j += 1;
+            }
+            d += 1;
+        }
+        Ok(())
+    }
+
     #[verifier::rlimit(30)]
     pub fn insert(&mut self, parent: Option<usize>, dependencies: Vec<Port>, provisions: Vec<Port>) -> (r: Result<usize, Error>)
         requires old(self).wf(),
         ensures final(self).generations_preserved(old(self)), final(self).wf(),
+            r.is_ok() == old(self).insert_enabled(parent, dependencies@, provisions@),
             r.is_ok() ==> r.unwrap() == old(self).next_id()
                 && final(self).next_id() == old(self).next_id() + 1
                 && final(self).phase_of(r.unwrap()) == Some(Phase::Inactive)
@@ -1336,34 +1526,9 @@ impl Kernel {
                 && (forall|p: Port| final(self).paper().fibers[r.unwrap()].provisions.contains(p) == provisions@.contains(p)),
             r.is_err() ==> final(self).unchanged(old(self)),
     {
-        if self.nodes.len() == usize::MAX { return Err(Error::Capacity); }
-        if let Some(p) = parent {
-            if !self.contains(p) { return Err(Error::Unknown); }
-        }
-        // Ports are reservations, not effect values. Existing reservations
-        // persist through inactivity and retirement. Native hosts may extend
-        // this interface using declare_provision and release drained ports with
-        // release_provision. Registry removal also releases reservations.
-        if !self.check_provisions(provisions.as_slice()) { return Err(Error::Conflict); }
+        self.check_insert(parent, dependencies.as_slice(), provisions.as_slice())?;
         let ghost initial_declarations = self.declarations@;
         let ghost initial_nodes = self.nodes@;
-        let mut d = 0;
-        while d < dependencies.len()
-            invariant d <= dependencies.len(), self.wf(), self.unchanged(old(self)),
-                self.declarations@ == initial_declarations, self.nodes@ == initial_nodes,
-                forall|a: int| 0 <= a < provisions.len() ==> Self::provision_admissible(initial_nodes, initial_declarations, provisions[a]),
-            decreases dependencies.len() - d,
-        {
-            let mut j = 0;
-            while j < d
-                invariant j <= d, d < dependencies.len(), self.wf(), self.unchanged(old(self)),
-                decreases d - j,
-            {
-                if dependencies[j] == dependencies[d] { return Err(Error::Conflict); }
-                j += 1;
-            }
-            d += 1;
-        }
         let id = self.nodes.len();
         let ghost prior = self.nodes@;
         self.nodes.push(Node { present: true, retired: false, phase: Phase::Inactive, restoring: false, parent, generation:0 });
@@ -1375,7 +1540,7 @@ impl Kernel {
         let ghost created = self.nodes@;
         let mut i = 0;
         while i < dependencies.len()
-            invariant i <= dependencies.len(), self.wf(), id < self.nodes.len(), self.nodes@ == created, self.nodes[id as int].phase == Phase::Inactive,
+            invariant old(self).insert_enabled(parent, dependencies@, provisions@), i <= dependencies.len(), self.wf(), id < self.nodes.len(), self.nodes@ == created, self.nodes[id as int].phase == Phase::Inactive,
                 self.links@ == old(self).links@,
                 self.declarations.len() == initial_declarations.len() + i,
                 forall|a: int| 0 <= a < i ==> self.declarations[initial_declarations.len() + a] == (Declaration { owner: id, port: dependencies[a], provides: false }),
@@ -1395,7 +1560,7 @@ impl Kernel {
         }
         let mut i = 0;
         while i < provisions.len()
-            invariant i <= provisions.len(), self.wf(), id < self.nodes.len(), self.nodes@ == created, self.nodes[id as int].phase == Phase::Inactive,
+            invariant old(self).insert_enabled(parent, dependencies@, provisions@), i <= provisions.len(), self.wf(), id < self.nodes.len(), self.nodes@ == created, self.nodes[id as int].phase == Phase::Inactive,
                 self.links@ == old(self).links@,
                 self.declarations.len() == initial_declarations.len() + dependencies.len() + i,
                 forall|a: int| 0 <= a < dependencies.len() ==> self.declarations[initial_declarations.len() + a] == (Declaration { owner: id, port: dependencies[a], provides: false }),
@@ -1634,6 +1799,8 @@ impl Kernel {
     pub fn begin(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
         ensures final(self).wf(),
+            r.is_ok() == old(self).begin_enabled(id),
+            r.is_ok() ==> final(self).iteration_enabled(id),
             r.is_ok() ==> old(self).generation_of(id).is_some() && final(self).generation_of(id).is_some()
                 && final(self).generation_of(id).unwrap() as nat == old(self).generation_of(id).unwrap() as nat + 1,
             forall|n:usize| n != id ==> final(self).generation_of(n) == old(self).generation_of(n), final(self).next_id() == old(self).next_id(),
@@ -1648,13 +1815,24 @@ impl Kernel {
         if node.retired { return Err(Error::Retired); }
         if node.generation == u64::MAX { return Err(Error::Capacity); }
         let bindings = match self.target(id) { Some(b) => b, None => return Err(Error::MissingDependency) };
+        proof {
+            assert forall|j: int| 0 <= j < self.declarations.len() && !self.declarations[j].provides
+                && self.declarations[j].owner == id implies self.has_provider(self.declarations[j].port) by {
+                let p = self.declarations[j].port;
+                let k = choose|k: int| 0 <= k < bindings.len() && bindings[k].key == p.key && bindings[k].realm == p.realm;
+                assert(self.binding_is_target(id, bindings[k]));
+                assert(self.resolves_to(p, bindings[k].provider));
+            }
+            assert(old(self).begin_enabled(id));
+            assert(Self::node_ok(self.nodes@, id as int));
+        }
         let ghost before = self.nodes@;
         node.phase = Phase::Loading;
         node.generation += 1;
         self.update_node(id, node)?;
         let mut i = 0;
         while i < bindings.len()
-            invariant i <= bindings.len(), self.safety_wf(), old(self).wf(),
+            invariant i <= bindings.len(), self.safety_wf(), old(self).wf(), old(self).begin_enabled(id),
                 self.nodes@ == before.update(id as int, node),
                 before == old(self).nodes@,
                 self.nodes_frame(old(self), id),
@@ -1735,37 +1913,37 @@ impl Kernel {
             assert(self.paper_fiber(id).dependencies =~= old(self).paper_fiber(id).dependencies);
             assert(self.paper_fiber(id).provisions =~= old(self).paper_fiber(id).provisions);
         }
+        proof {
+            refinement::begin_preserves_target(old(self).paper(), self.paper(), id);
+            self.paper_iteration_guard(id);
+        }
         Ok(())
     }
 
-    /// Validate a stage against the current resolution before starting it.
-    /// An already-started asynchronous stage may land after this becomes false;
-    /// its inverse must then be collected before diverting to Unloading.
+    /// Validate the paper's Loading/coherent guard. The existing uniqueness,
+    /// typing and coverage invariants make an available target agree with every
+    /// installed commitment, independent of private vector order/multiplicity.
+    /// A stage already admitted by the host may still land after this is false.
     pub fn check_iteration(&self, id: usize) -> (r: Result<(), Error>)
         requires self.wf(),
-        ensures r.is_ok() ==> self.phase_of(id) == Some(Phase::Loading) && self.coherent(id)
-            && refinement::step(self.paper(), self.paper(), id, refinement::Rule::Iter),
+        ensures r.is_ok() == self.iteration_enabled(id),
+            r.is_ok() ==> self.phase_of(id) == Some(Phase::Loading) && self.coherent(id)
+                && refinement::step(self.paper(), self.paper(), id, refinement::Rule::Iter),
     {
         if !self.contains(id) { return Err(Error::Unknown); }
         if self.nodes[id].phase != Phase::Loading { return Err(Error::InvalidState); }
-        let target = match self.target(id) { Some(t) => t, None => return Err(Error::Changed) };
-        let bound = self.committed(id);
-        if target.len() != bound.len() { return Err(Error::Changed); }
-        let mut i = 0;
-        while i < target.len()
-            invariant i <= target.len(), target.len() == bound.len(), self.wf(),
-                self.complete_target(id, target@), self.all_bindings_in(id, bound@),
-                forall|j: int| 0 <= j < bound.len() ==> self.binding_recorded(id, #[trigger] bound[j]),
-                forall|j: int| 0 <= j < i ==> target[j] == bound[j],
-            decreases target.len() - i,
-        {
-            if target[i] != bound[i] { return Err(Error::Changed); }
-            i += 1;
-        }
+        let _target = match self.target(id) {
+            Some(target) => target,
+            None => {
+                proof { self.paper_coherence(id); self.unavailable_not_coherent(id); }
+                return Err(Error::Changed);
+            },
+        };
         proof {
-            assert(target@ =~= bound@);
-            assert(self.coherent(id));
-            self.paper_target(self, id);
+            self.refines_paper();
+            self.paper_target_vector(id, _target@);
+            refinement::available_installed_coherent(self.paper(), id, ISet::new(|b: Binding| _target@.contains(b)));
+            self.paper_coherence(id);
         }
         Ok(())
     }
@@ -1774,12 +1952,14 @@ impl Kernel {
         requires old(self).wf(),
         ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
  final(self).same_bindings(old(self)),
+            r.is_ok() == old(self).iteration_enabled(id),
             r.is_ok() ==> old(self).coherent(id),
             r.is_ok() ==> final(self).phase_of(id) == Some(Phase::Active)
                 && refinement::step(old(self).paper(), final(self).paper(), id, refinement::Rule::Finish),
             r.is_err() ==> final(self).unchanged(old(self)),
     {
         self.check_iteration(id)?;
+        assert(Self::node_ok(self.nodes@, id as int));
         let ghost prior = *self;
         let mut node = self.nodes[id];
         node.phase = Phase::Active;
@@ -1900,6 +2080,7 @@ impl Kernel {
     pub fn begin_cleanup(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
         ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+            r.is_ok() == old(self).cleanup_enabled(id),
             r.is_ok() ==> final(self).is_restoring(id),
  final(self).same_bindings(old(self)),
             r.is_ok() ==> final(self).restoration_guarded(id),
@@ -1914,6 +2095,10 @@ impl Kernel {
         let result = self.update_node(id, node);
         proof {
             if result.is_ok() {
+                assert forall|j: int| 0 <= j < prior.links.len()
+                    implies !(prior.links[j].live && prior.links[j].binding.provider == id) by {
+                    assert(Self::link_ok(self.nodes@, self.links[j]));
+                }
                 self.paper_frame(&prior, id);
                 assert(self.paper_fiber(id).dependencies =~= prior.paper_fiber(id).dependencies);
                 assert(self.paper_fiber(id).provisions =~= prior.paper_fiber(id).provisions);
@@ -2197,3 +2382,6 @@ pub mod foreign_child_deletion;
 pub mod foreign_child_deletion_example;
 
 pub mod paper_trace_independence;
+
+#[cfg(test)]
+mod iteration_tests;

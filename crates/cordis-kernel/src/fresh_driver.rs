@@ -133,6 +133,87 @@ impl FreshDriver {
     pub closed spec fn same(&self,other:&Self)->bool {self.inner.same(&other.inner)}
     pub closed spec fn journal(&self,actor:usize)->Seq<super::Receipt> {self.inner.journal(actor)}
     pub closed spec fn next_id(&self)->nat {self.inner.rows.len() as nat}
+    /// Preserve the concrete insertion checks, including the full valid bank prefix.
+    pub closed spec fn insertion_enabled(&self,parent:Option<usize>,blueprint:usize)->bool {
+        self.inner.insertion_enabled(parent,blueprint)
+    }
+    /// Guarded cleanup and the exact inverse domain of the retained journal.
+    pub closed spec fn unload_enabled(&self,actor:usize)->bool {self.inner.unload_enabled(actor)}
+    pub proof fn same_unload_domain(&self,other:&Self,actor:usize)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.unload_enabled(actor)==other.unload_enabled(actor),
+    {self.inner.same_unload_domain(&other.inner,actor);}
+    /// Starting an episode also requires an empty retained journal. The kernel
+    /// predicate includes target availability and its bounded generation counter.
+    pub closed spec fn begin_enabled(&self,id:usize)->bool {
+        r::registered(self.control(),id) && id<self.inner.rows.len()
+            && self.inner.rows[id as int].journal.len()==0 && self.inner.kernel.begin_enabled(id)
+    }
+    proof fn same_begin_check(left:&crate::Kernel,right:&crate::Kernel,id:usize)
+        requires left.wf(),right.wf(),left.unchanged(right),
+        ensures left.begin_enabled(id)==right.begin_enabled(id),
+    {
+        left.unchanged_observations(right);
+        left.paper_observations(id);right.paper_observations(id);
+        if left.registered(id) {left.generation_frame(right,id);}
+        reveal(crate::Kernel::begin_enabled);
+        reveal(crate::Kernel::unavailable);
+        reveal(crate::Kernel::has_provider);
+        reveal(crate::Kernel::active_provider);
+        reveal(crate::Kernel::unchanged);
+    }
+    pub proof fn same_start_domains(&self,other:&Self,parent:Option<usize>,blueprint:usize,id:usize)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.insertion_enabled(parent,blueprint)==other.insertion_enabled(parent,blueprint),
+            self.begin_enabled(id)==other.begin_enabled(id),
+    {
+        self.inner.same_insertion_domain(&other.inner,parent,blueprint);
+        Self::same_begin_check(&self.inner.kernel,&other.inner.kernel,id);
+        self.inner.kernel.unchanged_observations(&other.inner.kernel);
+    }
+    pub proof fn same_step_domain(&self,other:&Self,actor:usize)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.step_enabled(actor)==other.step_enabled(actor),
+    {
+        self.inner.same_domains(&other.inner,actor,self.selected_instruction(actor));
+        if self.inner.ready(actor) {
+            assert(self.selected_instruction(actor)==other.selected_instruction(actor));
+        }
+    }
+    /// The runtime selects a fresh identity at this step, while retaining the
+    /// installed child blueprint and continuation.
+    pub closed spec fn selected_instruction(&self,actor:usize)->super::Instruction {
+        match self.inner.installed_instruction(actor) {
+            super::Instruction::Child {blueprint,next,..}=>super::Instruction::Child {
+                expected:self.inner.rows.len(),blueprint,next,
+            },
+            instruction=>instruction,
+        }
+    }
+    /// Exact synchronous step domain. Fresh allocation does not bypass value,
+    /// child registration, or terminal provision requirements.
+    pub closed spec fn step_enabled(&self,actor:usize)->bool {
+        self.inner.ready(actor) && self.inner.instruction_enabled(actor,self.selected_instruction(actor))
+    }
+    /// Remaining forward positions plus the possible terminal Unit call.
+    /// An invalid/missing position still allows one real call to report its error.
+    pub closed spec fn run_budget(&self,actor:usize)->nat {
+        if actor<self.inner.rows.len() {
+            let row=self.inner.rows[actor as int];
+            if row.blueprint<self.inner.blueprints.len() && row.current.is_some()
+                && row.current.unwrap()<=self.inner.blueprints[row.blueprint as int].code().len() {
+                (self.inner.blueprints[row.blueprint as int].code().len()-row.current.unwrap()) as nat+1
+            } else {1}
+        } else {1}
+    }
+    pub closed spec fn run_finished(&self,actor:usize)->bool {
+        r::registered(self.control(),actor) && self.control().fibers[actor].phase==Phase::Active
+            && actor<self.inner.rows.len() && self.inner.rows[actor as int].current.is_none()
+    }
+    pub proof fn run_budget_bounds(&self,actor:usize)
+        requires self.wf(),
+        ensures 1<=self.run_budget(actor)<=usize::MAX as nat+1,
+    { }
     pub closed spec fn bank(&self)->Seq<super::Blueprint> {self.inner.blueprints@}
     pub closed spec fn represents(&self,bank:Seq<super::Blueprint>,a:mx::Configuration<u64,Index>)->bool {self.inner.represents(bank,a)}
     pub fn new(blueprints:Vec<Blueprint>)->(out:Self)
@@ -151,10 +232,12 @@ impl FreshDriver {
     pub fn insert(&mut self,parent:Option<usize>,blueprint:usize)->(out:Result<usize,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+            out.is_ok()==old(self).insertion_enabled(parent,blueprint),
             out.is_ok() ==> old(self).ack(final(self),out.unwrap(),r::Rule::Insert,None),
     {
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
+        proof {draft.same_insertion_domain(&self.inner,parent,blueprint);}
         match draft.insert_inner(parent,blueprint) {
             Err(e)=>Err(e),Ok(id)=>{proof {draft.fresh_administrative_simulation(&initial,id,r::Rule::Insert);reveal(MixedDriver::fresh_ack);}*self=Self {inner:draft};Ok(id)},
         }
@@ -162,12 +245,14 @@ impl FreshDriver {
     pub fn begin(&mut self,id:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+            out.is_ok()==old(self).begin_enabled(id),
             out.is_ok() ==> old(self).ack(final(self),id,r::Rule::Begin,None),
     {
         if !self.inner.registered(id) {return Err(DriverError::Unknown);}
         if !self.inner.rows[id].journal.is_empty() {return Err(DriverError::Retained);}
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
+        proof {Self::same_begin_check(&draft.kernel,&self.inner.kernel,id);}
         match draft.kernel.begin(id) {
             Err(e)=>Err(DriverError::Kernel(e)),
             Ok(())=>{draft.rows[id].current=Some(0);proof {draft.fresh_administrative_simulation(&initial,id,r::Rule::Begin);reveal(MixedDriver::fresh_ack);}*self=Self {inner:draft};Ok(())},
@@ -198,10 +283,12 @@ impl FreshDriver {
     pub fn unload(&mut self,actor:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+            out.is_ok()==old(self).unload_enabled(actor),
             out.is_ok() ==> old(self).ack(final(self),actor,r::Rule::Unload,None),
     {
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
+        proof {draft.same_unload_domain(&self.inner,actor);}
         match draft.unload_inner(actor) {Err(e)=>Err(e),Ok(())=>{
             proof {draft.fresh_unload_simulation(&initial,actor);reveal(MixedDriver::fresh_ack);}
             *self=Self {inner:draft};Ok(())
@@ -247,19 +334,42 @@ impl FreshDriver {
     pub fn step(&mut self,actor:usize)->(out:Result<Outcome,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+            out.is_ok()==old(self).step_enabled(actor),
+            out.is_err() ==> final(self).run_budget(actor)==old(self).run_budget(actor)
+                && final(self).step_enabled(actor)==old(self).step_enabled(actor)
+                && final(self).journal(actor)==old(self).journal(actor),
+            out.is_ok() ==> if super::outcome_rule(out.unwrap())==r::Rule::Iter {
+                final(self).run_budget(actor)<old(self).run_budget(actor)
+            } else {final(self).run_finished(actor)},
             out.is_ok() ==> final(self).journal(actor).len()==old(self).journal(actor).len()+1
                 && (choice(out.unwrap()).is_some() ==> choice(out.unwrap()).unwrap()==old(self).next_id())
                 && old(self).ack(final(self),actor,super::outcome_rule(out.unwrap()),choice(out.unwrap())),
     {
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
+        proof {
+            initial.same_domains(&self.inner,actor,self.selected_instruction(actor));
+            draft.kernel.paper_iteration_guard(actor);
+            reveal(MixedDriver::ready);
+            reveal(MixedDriver::installed_instruction);
+            reveal(MixedDriver::instruction_enabled);
+        }
         if !draft.registered(actor) {return Err(DriverError::Unknown);}
         if let Err(e)=draft.kernel.check_iteration(actor) {return Err(DriverError::Kernel(e));}
         proof {draft.row_bounds(actor);}
         let pc=match draft.rows[actor].current {None=>return Err(DriverError::InvalidInstruction),Some(pc)=>pc};
         let blueprint=draft.rows[actor].blueprint;let length=draft.blueprints[blueprint].code.len();
+        proof {assert(old(self).run_budget(actor)==(length-pc) as nat+1);}
         let template=if pc==length {super::Instruction::Unit} else {draft.blueprints[blueprint].code[pc]};
         let instruction=instantiate_template(&draft,template);
+        proof {
+            assert(initial.ready(actor));
+            assert(template==initial.installed_instruction(actor));
+            assert(instruction==self.selected_instruction(actor));
+            assert(template.valid(pc,length,blueprint,initial.blueprints[blueprint as int].dependencies(),
+                initial.blueprints[blueprint as int].provisions()));
+            assert(instruction.continuation()==template.continuation());
+        }
         let next=match instruction {super::Instruction::Unit=>None,super::Instruction::Provide {next,..}=>next,
             super::Instruction::Xor {next,..}=>next,super::Instruction::Child {next,..}=>next};
         if let Some(next)=next {if next<=pc || next>length {return Err(DriverError::InvalidInstruction);}}
@@ -274,12 +384,23 @@ impl FreshDriver {
             draft.fresh_landing_simulation(&initial,&landed,actor,blueprint,pc,template,instruction,receipt,next,outcome);
             reveal(MixedDriver::fresh_ack);
         }
-        *self=Self {inner:draft};Ok(outcome)
+        *self=Self {inner:draft};
+        proof {
+            if next.is_some() {
+                assert(self.inner.rows[actor as int].current==next);
+                assert(self.inner.rows[actor as int].blueprint==blueprint);
+                assert(self.inner.blueprints[blueprint as int].code().len()==length);
+                assert(self.run_budget(actor)==(length-next.unwrap()) as nat+1);
+                assert(self.run_budget(actor)<old(self).run_budget(actor));
+            } else {assert(self.run_finished(actor));}
+        }
+        Ok(outcome)
     }
     /// Dispatch through the same checked executable methods used individually.
     pub fn apply(&mut self,command:Command)->(out:Result<Transition,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+            preparation::preparation_command(command) ==> out.is_ok()==old(self).preparation_enabled(command),
             out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),label(out.unwrap()).0,label(out.unwrap()).1,label(out.unwrap()).2),
     {
@@ -611,6 +732,23 @@ impl ScriptReport {
             &&& forall|i:int|0<=i<states.len() ==> fs::well_formed(super::library(),programs(bank),states[i]) && crate::preservation::resource_safe(states[i].state)
         }
     }
+    /// Expose the source history already established by the actual script,
+    /// including the safe prefix returned when a checked command fails.
+    pub proof fn source_execution(&self,bank:Seq<super::Blueprint>)->(states:Seq<mx::Configuration<u64,Index>>)
+        requires self.refines(bank),
+        ensures fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),
+            states.first()==mx::empty::<u64,Index>(),self.machine.represents(bank,states.last()),
+            forall|i:int|0<=i<states.len() ==> fs::well_formed(super::library(),programs(bank),states[i])
+                && crate::preservation::resource_safe(states[i].state),
+    {
+        choose|states:Seq<mx::Configuration<u64,Index>>| {
+            &&& fs::execution(super::library(),programs(bank),states,labels(self.transitions@))
+                && states.first()==mx::empty::<u64,Index>()
+            &&& self.machine.represents(bank,states.last())
+            &&& forall|i:int|0<=i<states.len() ==> fs::well_formed(super::library(),programs(bank),states[i])
+                && crate::preservation::resource_safe(states[i].state)
+        }
+    }
     proof fn establish(&self,bank:Seq<super::Blueprint>,states:Seq<mx::Configuration<u64,Index>>)
         requires fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
@@ -620,13 +758,16 @@ impl ScriptReport {
 
 /// Executes until the first checked error. The successful prefix refines one
 /// source execution from new/empty, with no caller-supplied model or history.
-/// Checked errors preserve the complete machine; source error completeness is
-/// not claimed for this synchronous, total-publication profile.
+/// A failed Insert/Begin/Step is disabled in the returned machine under its
+/// exact implementation domain. Other command domains and individual error
+/// variants are not characterized here. Checked errors preserve the machine.
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
     ensures out.machine.wf(),out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
+        out.error.is_some() && preparation::preparation_command(commands[out.transitions.len() as int])
+            ==> !out.machine.preparation_enabled(commands[out.transitions.len() as int]),
         forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
     let ghost bank=blueprints@.map(|_:int,bp:Blueprint|bp.compiled());
@@ -643,7 +784,10 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
         let ghost before=machine;
         match machine.apply(commands[i]) {
             Err(error)=>{
-                proof {machine.same_representation(&before,bank,states.last());}
+                proof {
+                    machine.same_representation(&before,bank,states.last());
+                    machine.same_preparation_domain(&before,commands[i as int]);
+                }
                 let out=ScriptReport {machine,transitions,error:Some(error)};
                 proof {out.establish(bank,states);}return out;
             },
@@ -679,3 +823,14 @@ proof fn append_source(bank:Seq<super::Blueprint>,states:Seq<mx::Configuration<u
 
 #[path = "admitted_fresh_driver.rs"]
 pub mod admitted;
+
+#[path = "fresh_run.rs"]
+pub mod runner;
+pub use runner::RunReport;
+
+#[path = "fresh_bootstrap.rs"]
+pub mod bootstrap;
+pub use bootstrap::{run_from_empty, FromEmptyReport, FromEmptyStatus};
+
+#[path = "fresh_preparation.rs"]
+pub mod preparation;

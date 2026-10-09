@@ -231,3 +231,145 @@ fn admission_rejection_returns_the_same_owned_machine() {
     assert_eq!(rejected.machine.inverse_count(client), Some(0));
     assert_eq!(rejected.machine.read(provider, key()), Some(7));
 }
+
+#[test]
+fn terminal_provision_retries_the_same_ticket_by_diverting_after_target_loss() {
+    let saved = Port { key: 80, realm: 3 };
+    let landed = Port { key: 81, realm: 3 };
+    let missing = Port { key: 82, realm: 3 };
+    let incomplete = Blueprint::new(
+        vec![key()],
+        vec![saved, landed, missing],
+        vec![
+            Instruction::Provide {
+                key: saved,
+                value: 55,
+                next: Some(1),
+            },
+            Instruction::Provide {
+                key: landed,
+                value: 66,
+                next: None,
+            },
+        ],
+    );
+    let mut driver = FreshDriver::new(vec![provider(), incomplete]);
+    let provider = install(&mut driver, 0);
+    let actor = driver.insert(None, 1).unwrap();
+    driver.begin(actor).unwrap();
+    assert_eq!(driver.step(actor), Ok(Outcome::Advanced));
+    let mut admitted = admit(driver, actor);
+
+    assert_eq!(
+        admitted.land(),
+        Err(AdmissionError::Driver(DriverError::IncompleteProvision))
+    );
+    assert!(!admitted.is_consumed());
+    assert_eq!(admitted.phase(actor), Some(Phase::Loading));
+    assert_eq!(admitted.inverse_count(actor), Some(1));
+    assert_eq!(admitted.read(actor, saved), Some(55));
+    assert_eq!(admitted.read(actor, landed), None);
+    assert_eq!(admitted.read(actor, missing), None);
+    assert_eq!(admitted.read(provider, key()), Some(7));
+
+    // The same ticket and terminal instruction can land after target loss:
+    // Divert retains the inverse without requiring complete publication.
+    admitted.apply(Command::Retire { actor: provider }).unwrap();
+    admitted.apply(Command::Depart { actor: provider }).unwrap();
+    let result = admitted.land().unwrap();
+    assert_eq!(result.actor, actor);
+    assert_eq!(result.outcome, Outcome::Finished);
+    assert!(result.diverted);
+    assert!(admitted.is_consumed());
+    assert_eq!(admitted.phase(actor), Some(Phase::Unloading));
+    assert_eq!(admitted.inverse_count(actor), Some(2));
+    assert_eq!(admitted.read(actor, saved), Some(55));
+    assert_eq!(admitted.read(actor, landed), Some(66));
+    assert_eq!(admitted.read(actor, missing), None);
+    assert_eq!(admitted.land(), Err(AdmissionError::StaleAdmission));
+    assert_eq!(admitted.inverse_count(actor), Some(2));
+
+    admitted.apply(Command::Unload { actor }).unwrap();
+    assert_eq!(admitted.phase(actor), Some(Phase::Inactive));
+    assert_eq!(admitted.inverse_count(actor), Some(0));
+    assert_eq!(admitted.read(actor, saved), None);
+    assert_eq!(admitted.read(actor, landed), None);
+    assert_eq!(admitted.read(provider, key()), Some(7));
+    admitted.apply(Command::Unload { actor: provider }).unwrap();
+}
+
+#[test]
+fn admitted_child_rechecks_interleaved_reservations_and_retries_without_consuming_ticket() {
+    let child_key = Port { key: 90, realm: 3 };
+    let child = Blueprint::new(
+        vec![],
+        vec![child_key],
+        vec![Instruction::Provide {
+            key: child_key,
+            value: 42,
+            next: None,
+        }],
+    );
+    let parent = Blueprint::new(
+        vec![],
+        vec![],
+        vec![Instruction::Child {
+            blueprint: 0,
+            next: None,
+        }],
+    );
+    let mut driver = FreshDriver::new(vec![child, parent]);
+    let actor = driver.insert(None, 1).unwrap();
+    driver.begin(actor).unwrap();
+    let mut admitted = admit(driver, actor);
+    let reservation = admitted
+        .apply(Command::Insert {
+            parent: None,
+            blueprint: 0,
+        })
+        .unwrap()
+        .actor();
+    assert_eq!(reservation, 1);
+    assert_eq!(admitted.phase(reservation), Some(Phase::Inactive));
+    assert_eq!(admitted.read(reservation, child_key), None);
+    assert_eq!(
+        admitted.land(),
+        Err(AdmissionError::Driver(DriverError::Kernel(Error::Conflict)))
+    );
+    assert!(!admitted.is_consumed());
+    assert_eq!(admitted.phase(actor), Some(Phase::Loading));
+    assert_eq!(admitted.inverse_count(actor), Some(0));
+    assert_eq!(admitted.phase(2), None);
+
+    admitted
+        .apply(Command::Retire { actor: reservation })
+        .unwrap();
+    assert_eq!(
+        admitted.land(),
+        Err(AdmissionError::Driver(DriverError::Kernel(Error::Conflict)))
+    );
+    assert!(!admitted.is_consumed());
+    assert_eq!(admitted.inverse_count(actor), Some(0));
+    admitted
+        .apply(Command::Remove { actor: reservation })
+        .unwrap();
+    let result = admitted.land().unwrap();
+    assert_eq!(result.actor, actor);
+    assert_eq!(
+        result.outcome,
+        Outcome::Child {
+            child: 2,
+            finished: true,
+        }
+    );
+    assert!(!result.diverted);
+    assert!(admitted.is_consumed());
+    assert_eq!(admitted.phase(actor), Some(Phase::Active));
+    assert_eq!(admitted.inverse_count(actor), Some(1));
+    assert_eq!(admitted.phase(2), Some(Phase::Inactive));
+    assert_eq!(admitted.land(), Err(AdmissionError::StaleAdmission));
+    assert_eq!(admitted.phase(3), None);
+    admitted.apply(Command::Begin { actor: 2 }).unwrap();
+    admitted.apply(Command::Step { actor: 2 }).unwrap();
+    assert_eq!(admitted.read(2, child_key), Some(42));
+}

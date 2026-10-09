@@ -97,6 +97,19 @@ child、写入的 payload 和消耗的 ID 都不会泄漏到原机器。这个�
 复制当前机器，时间和空间代价随已保存数据增长；它是可审查的验证执行路径，
 当前没有生产吞吐量保证。
 
+Mixed/Fresh 公共 `unload(actor)` 现在成功 iff `unload_enabled(actor)`：Kernel 的
+清理守卫成立，且当前真实 journal 的整段 `restore_receipts` 有定义。清理守卫要求已
+登记的 Unloading actor、尚未 restoring 且没有存活 committed dependent；它本身不
+保证所有 inverse 都有效。真实代码执行 LIFO 逆操作并最终释放 commitment，循环以
+journal 长度递减。`undo_one` 的实际成功域等于对应模型 undo 的定义域，并保持
+restoring 标志。一次 inverse 失败保持它自己的输入，但整个内部草稿可能已经执行了
+其他 inverses；只有公共事务错误保证完整机器不变。
+
+该谓词只用于证明，不是新增一次运行时预检查。Child inverse 仍是退休捕获的 child，
+不删除它或自动运行其清理。`FreshDriver::same_unload_domain` 证明完整 `same` 的机器
+有相同定义域。直接 Unload 的这一合同没有扩大 `preparation_command` 的
+Insert/Begin/Step 范围；也未证明任意良构日志可恢复、全部历史的 foreign replay
+观察等价或全局终止。详见[真实清理定义域](progress-contracts.zh-CN.md#真实-lifo-清理的精确定义域)。
 当前蓝图明确使用固定的 `expected` child 名称。一次成功创建后，重新激活
 同一个蓝图可能因单调分配器返回新 ID 而得到 `UnexpectedChild`；错误本身
 经过原子性证明，尚未等同于论文的动态 fresh-name binder。测试覆盖这一
@@ -107,9 +120,11 @@ child、写入的 payload 和消耗的 ID 都不会泄漏到原机器。这个�
 可运行测试。该路径不把宿主的任意 async callback、事件、timer 或 loader
 工厂自动纳入 Verus 证明。
 
+同步 `MixedDriver::step` 现在以 `step_enabled` 精确刻画成功：actor 必须已登记、Loading 且 coherent，有当前指令，满足 `primitive_enabled`；终态还须满足执行本条指令后的 `complete_after`。Provide 可以在本次调用补齐最后一个空槽；Xor 既要求解析到 provider，也要求其表中实际已有值；Child 仍需 expected 身份与分配器一致、蓝图及插入域有效。公共 Step 的事务错误保持完整机器，但内部执行副本可能已发生变化。该合同排除使能状态下无故拒绝请求，未证明整个程序的动态执行必然结束，详见[进展合同](progress-contracts.zh-CN.md#真实-mixedfresh-解释器的精确单步定义域)。
+
 ## 自动 fresh child 的已验证驱动
 
-`cordis_kernel::mixed_driver::fresh` 导出 `FreshDriver`、`Blueprint`、`Instruction` 与 `run_script`。Child 指令写为 `Instruction::Child { blueprint, next }`，每次成功 landing 从实际 allocator 获取新 ID，以 `Outcome::Child { child, finished }` 返回。跨 provider 的 Xor、Provision、Child 与 LIFO 恢复仍共用一条真实 journal；Blueprint 的 DAG、forward continuation 和完整发布要求与 MixedDriver 相同。
+`cordis_kernel::mixed_driver::fresh` 导出 `FreshDriver`、`Blueprint`、`Instruction`、`RunReport`、`run_script`，以及 `run_from_empty`、`FromEmptyReport`、`FromEmptyStatus`。Child 指令写为 `Instruction::Child { blueprint, next }`，每次成功 landing 从实际 allocator 获取新 ID，以 `Outcome::Child { child, finished }` 返回。跨 provider 的 Xor、Provision、Child 与 LIFO 恢复仍共用一条真实 journal；Blueprint 的 DAG、forward continuation 和完整发布要求与 MixedDriver 相同。
 
 ```rust
 use cordis_kernel::mixed_driver::fresh::{Blueprint, FreshDriver, Instruction, Outcome};
@@ -125,6 +140,104 @@ assert_eq!(driver.step(owner), Ok(Outcome::Child { child: 1, finished: true }));
 
 `run_script` 接受相同 Command 序列，返回机器、成功 transitions 与首个错误。从 new/empty 到终点的源轨迹由验证器从实际调用构造，程序的结构 naturality 也已证明。[执行测试](../crates/cordis-kernel/tests/fresh_driver.rs) 覆盖两次激活之间的外部 allocation、provider replacement、真实 XOR/Child/XOR 恢复、retained child、错误后的 payload/journal/allocator 原子保持，以及非零 child blueprint。事务仍复制机器，成本随已保存数据增长；异步在途落地和开放 callback 不属于这一接口的证明范围。
 
+`FreshDriver::selected_instruction` 以当前 `next_id` 实例化 Child 模板，其 `step_enabled` 使用相同的 primitive 与终态发布条件。实际 `step` 在且仅在该条件下成功；自动选取 fresh 身份不消除 provision 冲突或值缺失。此结论限定同步单步；下述跨调用已准入协议有单独的精确落地成功域合同。
+
+## 将一个已开始的 Fresh 程序运行到终态或阻塞
+
+`FreshDriver::run_until_blocked(actor)` 自行调用真实 `step`，直到终态或第一次错误。
+调用者不传 fuel，也不用承诺各步成功。返回的 `RunReport.steps: u128` 只统计已提交
+调用，包括终态调用；`error` 为第一条真实错误。错误保持已经提交的前缀，只撤销失败
+那一步，之后仍可按已有协议处理、重试或恢复；零提交时完整机器满足 `same`。
+
+```rust
+use cordis_kernel::mixed_driver::fresh::{Blueprint, FreshDriver, Instruction, RunReport};
+use cordis_kernel::{Phase, Port};
+let output = Port { key: 91, realm: 0 };
+let leaf = Blueprint::new(vec![], vec![], vec![Instruction::Unit]);
+let parent = Blueprint::new(vec![], vec![output], vec![
+    Instruction::Provide { key: output, value: 42, next: Some(1) },
+    Instruction::Child { blueprint: 0, next: None },
+]);
+let mut driver = FreshDriver::new(vec![leaf, parent]);
+let actor = driver.insert(None, 1).unwrap();
+driver.begin(actor).unwrap();
+let report: RunReport = driver.run_until_blocked(actor);
+assert_eq!(report.steps, 2);
+assert!(report.error.is_none());
+assert_eq!(driver.phase(actor), Some(Phase::Active));
+assert_eq!(driver.phase(1), Some(Phase::Inactive));
+```
+
+成功只代表当前 actor 已 Active、current 为空。示例中的 child 已登记，但不会自动
+Begin 或执行。空程序仍计一次终态 Unit；跳到代码末尾也需该调用。对未知、Inactive
+或已经 Active 的 actor 调用，会返回既有 `step` 错误，不能把第二次运行当作成功空操作。
+
+有限界来自真实前向程序位置的 `run_budget`：有效位置为 `code.len() - pc + 1`，
+无效或缺失位置为一。成功步数不超过输入预算；阻塞时连同失败尝试也不超过预算，且
+最终不满足 `step_enabled`。报告的 `refines` 从真实调用延伸**输入已表示的任意良构
+源状态**；公共 proof 方法 `RunReport::advance_source` 可在已有 representation 与
+源良构前提下提取这一扩展。它不从任意 `wf()` 独立断言 source 存在；下述
+`run_from_empty` 通过真实准备调用建立该输入路径。
+ghost 历史在运行时擦除，不为报告分配真实 history 向量。此结果不保证全图 quiet、
+阻塞最终解除或任意 Future 完成，详见[进展合同](progress-contracts.zh-CN.md#将单个-fresh-actor-运行到终态或首个错误)。
+
+## 从 empty 完成准备并自主运行
+
+`run_from_empty` 将真实准备脚本和单 actor 执行组合成一个入口，无需调用者先构造机器
+或提供源表示证明。以下准备命令安装并 Begin 父程序；随后循环执行 Provide 和 Child。
+
+```rust
+use cordis_kernel::mixed_driver::fresh::{
+    run_from_empty, Blueprint, Command, FromEmptyStatus, Instruction,
+};
+use cordis_kernel::{Phase, Port};
+let output = Port { key: 91, realm: 0 };
+let leaf = Blueprint::new(vec![], vec![], vec![Instruction::Unit]);
+let parent = Blueprint::new(vec![], vec![output], vec![
+    Instruction::Provide { key: output, value: 42, next: Some(1) },
+    Instruction::Child { blueprint: 0, next: None },
+]);
+let setup = [
+    Command::Insert { parent: None, blueprint: 1 },
+    Command::Begin { actor: 0 },
+];
+let report = run_from_empty(vec![leaf, parent], &setup, 0);
+assert_eq!(report.status, FromEmptyStatus::Finished);
+assert_eq!(report.setup.len(), 2);
+assert_eq!(report.steps, 2);
+assert_eq!(report.machine.phase(0), Some(Phase::Active));
+assert_eq!(report.machine.phase(1), Some(Phase::Inactive));
+```
+
+`setup` 保存成功准备调用的实际 `Vec<Transition>`；即使脚本包含 `Command::Step`，
+也只记在准备部分。`steps` 仅计之后自主运行的已提交步数，包括终态调用，不计失败尝试。
+`SetupFailed(error)` 传播第一次准备调用的真实错误并立即返回，不执行自主循环；此时
+`steps == 0`，但所选 actor 可能已经可运行。全部准备成功后，`Blocked(error)` 才表示
+自主 step 出错且最终不满足 `step_enabled`；`Finished` 表示本次自主执行到达终态。
+准备期间已经完成的 actor，再交给自主循环仍会返回既有 step 错误。
+
+`FromEmptyReport::refines` 无输入源前提，建立一条从 empty 出发的执行，同时表示
+真实准备后的机器与返回机器，每态良构且资源安全；公共 proof 方法 `source_execution`
+可提取该执行。它以真实准备路径满足 `RunReport` 原有条件化合同的前提，拼接不增加
+失败事件。prepared、自主 outcomes 和源轨迹被擦除，准备记录向量仍在运行时存在。
+准备调用的精确接纳现覆盖 `Insert`、`Begin`、`Step`，由 proof-only 的
+`preparation_command` 限定，`preparation_enabled` 按当前机器分别调用
+`insertion_enabled`、`begin_enabled`、`step_enabled`。Insert 检查所需蓝图库前缀和
+Kernel 插入域；Begin 要求已登记、保留 journal 为空及 Kernel Begin 域，包括目标可用
+和 generation 容量；Step 使用已有 primitive／完整终态发布域。真实 `apply` 在此范围
+成功 iff 调用前谓词，运行分支和错误顺序不变。
+
+`run_script` 出错且下一条命令在此范围时，该命令在返回机器中不满足谓词；
+`run_from_empty` 的 SetupFailed 同时保证其在 `prepared` 与返回机器中不满足谓词。
+这里的“下一条”是 `setup_commands[setup.len()]`，按成功前缀后的状态判断。不是在
+初始 empty 状态一次性要求全部命令使能；前缀可包含 Retire 等其他成功命令。
+Retire/Depart/Unload/Remove 仍可执行，只未纳入 dispatcher 的这条精确域等价；
+直接 Unload 的独立合同见上文。准备谓词对它们返回 false 不能用作拒绝结论。
+合同尚未按输入谓词区分具体错误枚举值，也不保证全部论文已使能
+命令都被接纳：蓝图合法性、容量和 strict 值可用性仍是实现域边界。新 child 仍需自行
+Begin／执行；这不是全图静止或 strict primitive 总性。
+详见[入口合同与边界](progress-contracts.zh-CN.md#从新机器经过真实准备与执行)。
+
 ## 已准入阶段的两阶段协议
 
 `mixed_driver::fresh::admitted::Admission` 拥有整个 FreshDriver，并私有保存 actor、
@@ -133,6 +246,12 @@ episode generation、蓝图、pc 和指令模板。`FreshDriver::admit(self, act
 `apply` 允许其间执行其它已检查调用。`land` 再检查原身份和代码位置，执行捕获的
 闭合动作，保存真实 inverse，并依据当前 target 返回正常 Iter/Finish 或 landing Divert。
 已准入 Child 的名字仍在实际落地时分配。目标丢失后，落地使用原 committed providers。
+
+`admit` 成功 iff `admission_enabled = ready`，只接纳当前已登记、Loading/coherent 且有指令的 actor，不预留服务值和 provision。`land` 成功 iff `land_enabled`：票据尚未消费、捕获的 generation／蓝图／pc／模板仍绑定当前机器，所选 primitive 的定义域有效，且 coherent 终态执行后能完整发布。`Admission::selected_instruction` 在调用时以当前 `next_id` 实例化 Child。目标丢失时会 Divert，不要求完整发布，但仍检查值可用与 child 注册域；成功返回的 `diverted` 恰好反映调用前不 coherent。
+
+成功 `admit` 还保证返回票据的 `land_enabled()` 等于调用前机器的 `step_enabled(actor)`。无其它操作插入时，立即落地与同步 step 的成功条件相同；这不是结果等价或跨任意中间调用保留定义域的声明。
+
+因此接纳成功并不保证下一次落地成功。值缺失、其它调用预留了 child provision 或 coherent 终态未完整发布，都可能使落地失败。失败保持同一票据未消费，可在通过已检查调用解除对应条件后重试；冲突条目只有退休还不够，须移除才释放预留端口。真实运行分支与错误顺序保持不变。这是局部成功合同，不是任意 Future 的终止承诺。
 
 成功落地会消费准入资格，重复落地失败；同 actor 已前进或重新开始了 episode 时，
 旧准入也失败。所有落地错误保持完整机器、准入身份和消费标志不变。

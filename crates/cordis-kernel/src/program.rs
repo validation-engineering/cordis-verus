@@ -4,6 +4,8 @@
 //! its operands and continuation from that code and the owned entry context;
 //! callers cannot supply a different write or continuation after admission.
 #[cfg(verus_keep_ghost)]
+use crate::episode::binding_set;
+#[cfg(verus_keep_ghost)]
 use crate::refinement as paper;
 use crate::resources::Cell;
 use crate::witnessed::{EpisodeError, ResourceEpisode};
@@ -82,6 +84,17 @@ pub enum Outcome { Advanced, Finished }
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
 pub enum LandOutcome { Advanced, Terminal, Diverted }
 
+/// Counts actual interpreter calls. The final `Finished` call is included in
+/// `steps`; a wider counter also covers `usize::MAX` writes plus that call.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
+pub struct RunCount { pub writes: usize, pub steps: u128 }
+
+/// The constructor checks precisely this domain, including both destinations
+/// of a data-dependent branch. Every continuation moves strictly forward.
+pub open spec fn valid_program(code: Seq<Instruction>, cells: nat) -> bool {
+    forall|i: int| 0 <= i < code.len() ==> code[i].valid(i as usize, code.len() as usize, cells)
+}
+
 pub struct ProgramEpisode {
     code:Vec<Instruction>,
     owner:u64,
@@ -100,6 +113,7 @@ impl ProgramEpisode {
     pub closed spec fn depth(&self) -> nat { self.episode.depth() }
     pub closed spec fn pending(&self) -> bool { self.episode.pending() }
     pub closed spec fn settled(&self) -> bool { self.episode.settled() }
+    pub closed spec fn cancellation(&self) -> bool { self.episode.cancellation() }
     pub closed spec fn ended(&self) -> bool { self.ended }
     pub closed spec fn committed(&self) -> Seq<Binding> { self.episode.committed() }
     pub closed spec fn wf(&self) -> bool {
@@ -122,10 +136,15 @@ impl ProgramEpisode {
     /// Reject invalid resource indices and non-forward continuations before any
     /// stage can run. The language is finite without imposing external fuel.
     pub fn new(code:Vec<Instruction>,values:Vec<u64>,owner:u64,committed:Vec<Binding>) -> (out:Result<Self,ProgramError>)
-        ensures out.is_ok() ==> out.unwrap().wf() && out.unwrap().code() == code@
+        ensures out.is_ok() == valid_program(code@, values.len() as nat),
+            out.is_err() ==> out == Err(ProgramError::InvalidInstruction),
+            out.is_ok() ==> out.unwrap().wf() && out.unwrap().code() == code@
             && out.unwrap().owner() == owner && out.unwrap().position() == 0 && out.unwrap().depth() == 0
             && out.unwrap().view() == out.unwrap().initial() && out.unwrap().view().len() == values.len() && !out.unwrap().pending()
-            && !out.unwrap().settled() && !out.unwrap().ended() && out.unwrap().committed() == committed@,
+            && !out.unwrap().settled() && !out.unwrap().cancellation()
+            && !out.unwrap().ended() && out.unwrap().committed() == committed@
+            && forall|i: int| 0 <= i < values.len() ==> out.unwrap().initial()[i]
+                == (Cell { value: values[i], owner: None, depth: 0 }),
     {
         let mut i = 0;
         while i < code.len()
@@ -145,7 +164,12 @@ impl ProgramEpisode {
             final(self).view() == old(self).view(),final(self).initial() == old(self).initial(),
             final(self).position() == old(self).position(),final(self).depth() == old(self).depth(),
             final(self).committed() == old(self).committed(),final(self).ended() == old(self).ended(),accepted == final(self).pending(),
-            accepted ==> old(self).pending() || (target.is_some() && target.unwrap()@ == old(self).committed()),
+            accepted == (old(self).pending() || (!old(self).settled()
+                && !old(self).cancellation() && target.is_some()
+                && binding_set(target.unwrap()@) == binding_set(old(self).committed()))),
+            final(self).settled() == !accepted,
+            final(self).cancellation() == (old(self).cancellation()
+                || !(target.is_some() && binding_set(target.unwrap()@) == binding_set(old(self).committed()))),
     { self.episode.admit(target) }
 
     /// Land the admitted instruction selected by private code and pc. Branches
@@ -155,11 +179,13 @@ impl ProgramEpisode {
         requires old(self).wf(),
         ensures final(self).wf(),final(self).code() == old(self).code(),final(self).owner() == old(self).owner(),
             final(self).initial() == old(self).initial(),final(self).committed() == old(self).committed(),
+            final(self).cancellation() == old(self).cancellation(),
             result.is_ok() == old(self).pending(),
             result == Ok(Outcome::Advanced) ==> {
                 let expected = interpret(old(self).code(),old(self).position() as usize,old(self).owner(),old(self).view());
                 &&& final(self).view() == expected.cells && final(self).position() == expected.next
                 &&& final(self).depth() == old(self).depth()+1 && !final(self).pending() && !final(self).ended()
+                &&& final(self).settled() == old(self).cancellation()
                 &&& final(self).remaining() < old(self).remaining()
             },
             result == Ok(Outcome::Finished) ==> old(self).position() == old(self).code().len()
@@ -204,12 +230,95 @@ impl ProgramEpisode {
         Ok(Outcome::Advanced)
     }
 
+    /// Run this fixed program with its complete binding set held constant;
+    /// target order and repeated bindings do not change provider identity. The actual first
+    /// admission rejects a mismatched target or a closed/cancelled episode;
+    /// an already pending stage is retained and rejected before admission.
+    /// Every subsequent admission and landing follows from the checked domain.
+    /// This synchronous client covers neither dynamic children nor arbitrary
+    /// host futures, target changes, cancellation, or service publication.
+    pub fn run_to_completion(&mut self, target: &[Binding]) -> (result: Result<RunCount, ProgramError>)
+        requires old(self).wf(),
+        ensures final(self).wf(), final(self).code() == old(self).code(),
+            final(self).owner() == old(self).owner(), final(self).initial() == old(self).initial(),
+            final(self).committed() == old(self).committed(),
+            result.is_ok() == (!old(self).pending() && !old(self).settled()
+                && !old(self).cancellation() && binding_set(target@) == binding_set(old(self).committed())),
+            result.is_ok() ==> !final(self).cancellation() && final(self).ended()
+                && final(self).settled() && !final(self).pending()
+                && final(self).position() == final(self).code().len()
+                && final(self).depth() == old(self).depth() + result.unwrap().writes
+                && result.unwrap().writes <= old(self).remaining()
+                && result.unwrap().steps == result.unwrap().writes as nat + 1,
+            result.is_err() ==> result == Err(ProgramError::NotAdmitted)
+                && final(self).view() == old(self).view() && final(self).depth() == old(self).depth()
+                && final(self).position() == old(self).position() && final(self).ended() == old(self).ended()
+                && final(self).pending() == old(self).pending(),
+    {
+        if self.is_pending() { return Err(ProgramError::NotAdmitted); }
+        if !self.admit(Some(target)) { return Err(ProgramError::NotAdmitted); }
+        let mut writes: usize = 0;
+        let mut steps: u128 = 0;
+        while !self.has_ended()
+            invariant self.wf(), !self.cancellation(),
+                self.pending() == !self.ended(), self.settled() == self.ended(),
+                self.code() == old(self).code(), self.owner() == old(self).owner(),
+                self.initial() == old(self).initial(), self.committed() == old(self).committed(),
+                binding_set(target@) == binding_set(self.committed()),
+                self.depth() == old(self).depth() + writes,
+                writes as nat + self.remaining() <= old(self).remaining(),
+                steps == writes as nat + if self.ended() { 1nat } else { 0nat },
+            decreases self.remaining() + if self.ended() { 0nat } else { 1nat },
+        {
+            let outcome = self.step();
+            assert(outcome.is_ok());
+            steps += 1;
+            match outcome.unwrap() {
+                Outcome::Advanced => {
+                    writes += 1;
+                    let _admitted = self.admit(Some(target));
+                    assert(_admitted);
+                },
+                Outcome::Finished => {},
+            }
+        }
+        Ok(RunCount { writes, steps })
+    }
+
+    /// Construct, execute every real stage through `Finished`, and invoke the
+    /// actual inverse journal. Invalid instructions are rejected by `new`;
+    /// accepted programs return their original cells and an exact call count.
+    pub fn execute_and_recover(code: Vec<Instruction>, values: Vec<u64>, owner: u64,
+        committed: Vec<Binding>, target: &[Binding]) -> (out: Result<(Self, RunCount), ProgramError>)
+        ensures out.is_ok() == (valid_program(code@, values.len() as nat) && binding_set(target@) == binding_set(committed@)),
+            !valid_program(code@, values.len() as nat) ==> out == Err(ProgramError::InvalidInstruction),
+            valid_program(code@, values.len() as nat) && binding_set(target@) != binding_set(committed@) ==> out == Err(ProgramError::NotAdmitted),
+            out.is_ok() ==> {
+                let recovered = out.unwrap().0;
+                let count = out.unwrap().1;
+                &&& recovered.wf() && recovered.code() == code@ && recovered.owner() == owner
+                &&& recovered.committed() == committed@ && recovered.view() == recovered.initial()
+                &&& recovered.view().len() == values.len() && recovered.depth() == 0
+                &&& recovered.position() == 0 && recovered.settled() && !recovered.pending() && !recovered.ended()
+                &&& count.writes <= code.len() && count.steps == count.writes as nat + 1
+                &&& forall|i: int| 0 <= i < values.len() ==> recovered.view()[i]
+                    == (Cell { value: values[i], owner: None, depth: 0 })
+            },
+    {
+        let mut program = Self::new(code, values, owner, committed)?;
+        let count = program.run_to_completion(target)?;
+        let _restored = program.rollback();
+        assert(_restored);
+        Ok((program, count))
+    }
+
     pub fn cancel(&mut self)
         requires old(self).wf(),
         ensures final(self).wf(),final(self).code() == old(self).code(),final(self).owner() == old(self).owner(),
             final(self).view() == old(self).view(),final(self).initial() == old(self).initial(),
             final(self).position() == old(self).position(),final(self).depth() == old(self).depth(),
             final(self).pending() == old(self).pending(),final(self).settled() == !old(self).pending(),
+            final(self).cancellation(),
             final(self).ended() == old(self).ended(),
             final(self).committed() == old(self).committed(),
     { self.episode.cancel(); }
@@ -238,9 +347,10 @@ impl ProgramEpisode {
             final(self).depth() == old(self).depth(),
             accepted == (old(self).depth() == 0 && !old(self).pending()),
             accepted ==> final(self).position() == 0 && !final(self).pending() && !final(self).settled() && !final(self).ended()
-                && final(self).committed() == committed@,
+                && !final(self).cancellation() && final(self).committed() == committed@,
             !accepted ==> final(self).committed() == old(self).committed()
-                && final(self).pending() == old(self).pending() && final(self).settled() == old(self).settled(),
+                && final(self).pending() == old(self).pending() && final(self).settled() == old(self).settled()
+                && final(self).cancellation() == old(self).cancellation(),
             !accepted ==> final(self).position() == old(self).position(),
     {
         let accepted = self.episode.restart(committed);
@@ -372,6 +482,8 @@ impl ProgramDriver {
     pub closed spec fn owner(&self,id:usize) -> u64 { self.episodes[id as int].owner() }
     pub closed spec fn initial(&self, id: usize) -> Seq<crate::resources::Cell> { self.episodes[id as int].initial() }
     pub closed spec fn pending(&self, id: usize) -> bool { self.episodes[id as int].pending() }
+    pub closed spec fn settled(&self, id: usize) -> bool { self.episodes[id as int].settled() }
+    pub closed spec fn cancellation(&self, id: usize) -> bool { self.episodes[id as int].cancellation() }
     pub open spec fn good(s: paper::State, e: &ProgramEpisode, id: usize, layout:Seq<Port>) -> bool {
         &&& layout.len() == e.view().len()
         &&& forall|i:int,j:int| 0 <= i < layout.len() && 0 <= j < layout.len() && layout[i] == layout[j] ==> i == j
@@ -464,6 +576,8 @@ impl ProgramDriver {
             r.is_ok() ==> paper::step(old(self).control(), final(self).control(), id, paper::Rule::Begin)
                 && final(self).resource(id) == final(self).initial(id)
                 && final(self).resource(id) == old(self).resource(id)
+                && !final(self).pending(id) && !final(self).settled(id) && !final(self).cancellation(id)
+                && paper::coherent(final(self).control(), id)
                 && crate::program_refinement::begin_ack(old(self).snapshot(),final(self).snapshot(),id),
     {
         let ghost prior = *self;
@@ -474,7 +588,7 @@ impl ProgramDriver {
                 let bindings = self.kernel.committed(id);
                 let _restarted = self.episodes[id].restart(bindings);
                 assert(_restarted);
-                proof { self.episodes[id as int].complete_recovery(); self.framed(&prior, id); crate::program_refinement::domain_preserved(prior.control(),self.control(),id); self.snapshot_frame(&prior,id); }
+                proof { self.kernel.paper_iteration_guard(id); self.episodes[id as int].complete_recovery(); self.framed(&prior, id); crate::program_refinement::domain_preserved(prior.control(),self.control(),id); self.snapshot_frame(&prior,id); }
                 Ok(())
             },
         }
@@ -485,13 +599,30 @@ impl ProgramDriver {
     pub fn admit(&mut self, id: usize) -> (r: Result<bool, ProgramDriverError>)
         requires old(self).wf(),
         ensures final(self).wf(), final(self).control() == old(self).control(),
-            r.is_ok() ==> crate::program_refinement::administrative(old(self).snapshot(),final(self).snapshot(),id),
+            r.is_ok() == (paper::registered(old(self).control(), id)
+                && old(self).control().fibers[id].phase == Phase::Loading),
+            r.is_err() ==> *final(self) == *old(self),
+            r.is_ok() ==> crate::program_refinement::administrative(old(self).snapshot(),final(self).snapshot(),id)
+                && r.unwrap() == (old(self).pending(id) || (!old(self).settled(id)
+                    && !old(self).cancellation(id) && paper::coherent(old(self).control(), id)))
+                && final(self).pending(id) == r.unwrap() && final(self).settled(id) == !r.unwrap()
+                && final(self).cancellation(id) == (old(self).cancellation(id)
+                    || !paper::coherent(old(self).control(), id)),
     {
         let ghost prior = *self;
         proof { self.kernel.paper_observations(id); }
         if self.kernel.phase(id) != Some(Phase::Loading) { return Err(ProgramDriverError::Kernel(Error::InvalidState)); }
         let target = self.kernel.target(id);
-        let result = match target { Some(target) => self.episodes[id].admit(Some(target.as_slice())), None => self.episodes[id].admit(None) };
+        let result = match target {
+            Some(target) => {
+                proof { self.kernel.paper_captured_target(id, self.episodes[id as int].committed(), Some(target@)); }
+                self.episodes[id].admit(Some(target.as_slice()))
+            },
+            None => {
+                proof { self.kernel.paper_captured_target(id, self.episodes[id as int].committed(), None); }
+                self.episodes[id].admit(None)
+            },
+        };
         proof { self.framed(&prior, id); self.snapshot_frame(&prior,id); }
         Ok(result)
     }

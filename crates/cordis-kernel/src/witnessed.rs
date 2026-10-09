@@ -3,6 +3,8 @@
 //! Each successful stage writes one cell of an owned Journal. Its cleanup token
 //! is exactly that journal entry's position, so a token cannot name an unrelated
 //! inverse. This is a verified resource episode, not an arbitrary-closure host.
+#[cfg(verus_keep_ghost)]
+use crate::episode::binding_set;
 use crate::episode::StageProtocol;
 use crate::history::Journal;
 #[cfg(verus_keep_ghost)]
@@ -32,11 +34,12 @@ impl ResourceEpisode {
     pub closed spec fn depth(&self) -> nat { self.journal.depth() }
     pub closed spec fn pending(&self) -> bool { self.protocol.pending() }
     pub closed spec fn settled(&self) -> bool { self.protocol.settled() }
+    pub closed spec fn cancellation(&self) -> bool { self.protocol.cancellation() }
     pub closed spec fn committed(&self) -> Seq<Binding> { self.protocol.committed_view() }
 
     pub fn new(values: Vec<u64>, committed: Vec<Binding>) -> (out: Self)
         ensures out.wf(), out.depth() == 0, out.initial() == out.view(),
-            !out.pending(), !out.settled(), out.committed() == committed@,
+            !out.pending(), !out.settled(), !out.cancellation(), out.committed() == committed@,
             out.view().len() == values.len(),
             forall|i: int| 0 <= i < values.len() ==> out.view()[i]
                 == (Cell { value: values[i], owner: None, depth: 0 }),
@@ -52,9 +55,11 @@ impl ResourceEpisode {
             final(self).initial() == old(self).initial(), final(self).history() == old(self).history(),
             final(self).depth() == old(self).depth(),
             accepted == (old(self).depth() == 0 && !old(self).pending()),
-            accepted ==> final(self).committed() == committed@ && !final(self).pending() && !final(self).settled(),
+            accepted ==> final(self).committed() == committed@ && !final(self).pending()
+                && !final(self).settled() && !final(self).cancellation(),
             !accepted ==> final(self).committed() == old(self).committed()
-                && final(self).pending() == old(self).pending() && final(self).settled() == old(self).settled(),
+                && final(self).pending() == old(self).pending() && final(self).settled() == old(self).settled()
+                && final(self).cancellation() == old(self).cancellation(),
     {
         if !self.journal.is_empty() || self.protocol.is_pending() { return false; }
         self.protocol = StageProtocol::iterator(committed);
@@ -66,9 +71,13 @@ impl ResourceEpisode {
         ensures final(self).wf(), final(self).initial() == old(self).initial(),
             final(self).history() == old(self).history(), final(self).depth() == old(self).depth(),
             final(self).view() == old(self).view(), final(self).committed() == old(self).committed(),
-            accepted == final(self).pending(), old(self).pending() ==> accepted,
-            accepted ==> old(self).pending() || (!old(self).settled() && target.is_some() && target.unwrap()@ == old(self).committed()),
-            !accepted ==> final(self).settled(),
+            accepted == final(self).pending(),
+            accepted == (old(self).pending() || (!old(self).settled()
+                && !old(self).cancellation() && target.is_some()
+                && binding_set(target.unwrap()@) == binding_set(old(self).committed()))),
+            final(self).settled() == !accepted,
+            final(self).cancellation() == (old(self).cancellation()
+                || !(target.is_some() && binding_set(target.unwrap()@) == binding_set(old(self).committed()))),
     { self.protocol.admit(target) }
 
     pub fn cancel(&mut self)
@@ -77,6 +86,7 @@ impl ResourceEpisode {
             final(self).history() == old(self).history(), final(self).depth() == old(self).depth(),
             final(self).view() == old(self).view(), final(self).committed() == old(self).committed(),
             final(self).pending() == old(self).pending(), final(self).settled() == !old(self).pending(),
+            final(self).cancellation(),
     { self.protocol.cancel(); }
 
     /// One landed stage: the actual Store inverse and protocol token are created
@@ -85,10 +95,12 @@ impl ResourceEpisode {
         requires old(self).wf(),
         ensures final(self).wf(), final(self).initial() == old(self).initial(),
             final(self).committed() == old(self).committed(),
+            final(self).cancellation() == old(self).cancellation(),
             (old(self).pending() && old(self).depth() < usize::MAX && index < old(self).view().len()
                 && (old(self).view()[index as int].owner.is_none() || old(self).view()[index as int].owner == Some(owner))
                 && old(self).view()[index as int].depth < u64::MAX) ==> result.is_ok(),
             result.is_ok() ==> old(self).pending() && !final(self).pending()
+                && final(self).settled() == old(self).cancellation()
                 && final(self).depth() == old(self).depth() + 1
                 && final(self).history() == old(self).history().push(final(self).view())
                 && index < old(self).view().len()
@@ -118,6 +130,7 @@ impl ResourceEpisode {
         ensures final(self).wf(), final(self).initial() == old(self).initial(),
             final(self).history() == old(self).history(), final(self).depth() == old(self).depth(),
             final(self).view() == old(self).view(), final(self).committed() == old(self).committed(),
+            final(self).cancellation() == old(self).cancellation(),
             accepted == old(self).pending(), accepted ==> final(self).settled() && !final(self).pending(),
     { self.protocol.end() }
 

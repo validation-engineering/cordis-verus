@@ -18,9 +18,12 @@ impl Default for Driver {
 }
 impl Driver {
     pub closed spec fn control(&self) -> paper::State { self.kernel.paper() }
+    pub closed spec fn begin_enabled(&self, id: usize) -> bool { self.kernel.begin_enabled(id) }
     pub closed spec fn resource(&self, id: usize) -> Seq<crate::resources::Cell> { self.episodes[id as int].view() }
     pub closed spec fn initial(&self, id: usize) -> Seq<crate::resources::Cell> { self.episodes[id as int].initial() }
     pub closed spec fn pending(&self, id: usize) -> bool { self.episodes[id as int].pending() }
+    pub closed spec fn settled(&self, id: usize) -> bool { self.episodes[id as int].settled() }
+    pub closed spec fn cancellation(&self, id: usize) -> bool { self.episodes[id as int].cancellation() }
     pub open spec fn good(s: paper::State, e: &ResourceEpisode, id: usize) -> bool {
         &&& e.wf()
         &&& (!paper::registered(s, id) || s.fibers[id].phase == Phase::Inactive ==> e.depth() == 0 && !e.pending())
@@ -81,15 +84,19 @@ impl Driver {
     pub fn begin(&mut self, id: usize) -> (r: Result<(), DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),
+            r.is_ok() == old(self).begin_enabled(id),
+            r.is_ok() ==> paper::coherent(final(self).control(), id),
+            r.is_err() ==> final(self).control() == old(self).control(),
             r.is_ok() ==> paper::step(old(self).control(), final(self).control(), id, paper::Rule::Begin)
                 && final(self).resource(id) == final(self).initial(id)
-                && final(self).resource(id) == old(self).resource(id),
+                && final(self).resource(id) == old(self).resource(id)
+                && !final(self).pending(id) && !final(self).settled(id) && !final(self).cancellation(id),
     {
         let ghost prior = *self;
         match self.kernel.begin(id) {
             Err(e) => { proof { self.kernel.unchanged_observations(&prior.kernel); } Err(DriverError::Kernel(e)) },
             Ok(()) => {
-                proof { self.kernel.paper_observations(id); }
+                proof { self.kernel.paper_observations(id); self.kernel.paper_iteration_guard(id); }
                 let bindings = self.kernel.committed(id);
                 let _restarted = self.episodes[id].restart(bindings);
                 assert(_restarted);
@@ -99,17 +106,58 @@ impl Driver {
         }
     }
 
+    /// Begin the real episode and admit its first stage in one checked call.
+    /// A successful begin establishes the target agreement needed by admission;
+    /// this does not schedule or run the stage's effect.
+    pub fn begin_and_admit(&mut self, id: usize) -> (r: Result<(), DriverError>)
+        requires old(self).wf(),
+        ensures final(self).wf(), r.is_ok() == old(self).begin_enabled(id),
+            r.is_ok() ==> paper::step(old(self).control(), final(self).control(), id, paper::Rule::Begin)
+                && paper::coherent(final(self).control(), id)
+                && final(self).pending(id) && !final(self).settled(id) && !final(self).cancellation(id)
+                && final(self).resource(id) == final(self).initial(id)
+                && final(self).resource(id) == old(self).resource(id),
+            r.is_err() ==> final(self).control() == old(self).control(),
+    {
+        self.begin(id)?;
+        let _admitted = self.admit(id)?;
+        assert(_admitted);
+        Ok(())
+    }
+
     /// New admission observes the live kernel target; outstanding stages remain
     /// admitted across target drift, exactly as the witnessed protocol requires.
     pub fn admit(&mut self, id: usize) -> (r: Result<bool, DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(), final(self).control() == old(self).control(),
+            r.is_ok() == (paper::registered(old(self).control(), id)
+                && old(self).control().fibers[id].phase == Phase::Loading),
+            r.is_ok() ==> r.unwrap() == (old(self).pending(id)
+                || (!old(self).settled(id) && !old(self).cancellation(id)
+                    && paper::coherent(old(self).control(), id))),
+            r.is_ok() ==> final(self).resource(id) == old(self).resource(id)
+                && final(self).initial(id) == old(self).initial(id),
+            r.is_ok() ==> r.unwrap() == final(self).pending(id)
+                && final(self).settled(id) == !r.unwrap()
+                && final(self).cancellation(id) == (old(self).cancellation(id)
+                    || !paper::coherent(old(self).control(), id)),
+            r.is_err() ==> *final(self) == *old(self),
     {
         let ghost prior = *self;
         proof { self.kernel.paper_observations(id); }
         if self.kernel.phase(id) != Some(Phase::Loading) { return Err(DriverError::Kernel(Error::InvalidState)); }
+        let ghost captured = self.episodes[id as int].committed();
         let target = self.kernel.target(id);
-        let result = match target { Some(target) => self.episodes[id].admit(Some(target.as_slice())), None => self.episodes[id].admit(None) };
+        let result = match target {
+            Some(target) => {
+                proof { self.kernel.paper_captured_target(id, captured, Some(target@)); }
+                self.episodes[id].admit(Some(target.as_slice()))
+            },
+            None => {
+                proof { self.kernel.paper_captured_target(id, captured, None); }
+                self.episodes[id].admit(None)
+            },
+        };
         proof { self.framed(&prior, id); }
         Ok(result)
     }

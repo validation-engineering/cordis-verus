@@ -3,9 +3,9 @@
 //! The yielded inverse is the identity of the child actually inserted by this
 //! stage. Recovery consumes those identities in reverse order and requests
 //! retirement; it never removes a child or waits for the child's lifecycle.
-use crate::episode::StageProtocol;
 #[cfg(verus_keep_ghost)]
-use crate::episode::{accumulator_step, AccumulatorRule, AccumulatorView};
+use crate::episode::{accumulator_step, binding_set, AccumulatorRule, AccumulatorView};
+use crate::episode::{same_bindings, StageProtocol};
 #[cfg(verus_keep_ghost)]
 use crate::refinement;
 use crate::{Binding, Error, Kernel, Phase, Port};
@@ -123,7 +123,22 @@ impl ChildEpisode {
     pub closed spec fn view(&self) -> AccumulatorView { self.protocol.abstract_view() }
     pub closed spec fn pending(&self) -> bool { self.protocol.pending() }
     pub closed spec fn settled(&self) -> bool { self.protocol.settled() }
+    pub closed spec fn cancellation(&self) -> bool { self.protocol.cancellation() }
     pub closed spec fn committed(&self) -> Seq<Binding> { self.protocol.committed_view() }
+    /// The checked handle must still describe this Loading activation. Current
+    /// target availability is deliberately absent: pending work may still land.
+    pub open spec fn current_matches(&self, kernel: &Kernel) -> bool {
+        refinement::registered(kernel.paper(), self.owner())
+            && kernel.paper().fibers[self.owner()].phase == Phase::Loading
+            && self.generation_matches(kernel)
+            && binding_set(self.committed()) == kernel.paper().fibers[self.owner()].committed
+    }
+
+    pub open spec fn land_enabled(&self, kernel: &Kernel, dependencies: Seq<Port>, provisions: Seq<Port>) -> bool {
+        self.pending() && self.current_matches(kernel)
+            && kernel.insert_enabled(Some(self.owner()), dependencies, provisions)
+    }
+
     pub closed spec fn retirable(&self, registry: refinement::State) -> bool {
         forall|i: int| 0 <= i < self.children.len() ==> refinement::registered(registry, self.children[i])
     }
@@ -134,7 +149,7 @@ impl ChildEpisode {
     /// Kernel must belong to the same Kernel instance; IDs are instance-local.
     pub fn new(actor: usize, committed: Vec<Binding>) -> (out: Self)
         ensures out.wf(), out.owner() == actor, out.children() == Seq::<usize>::empty(),
-            out.committed() == committed@, !out.pending(), !out.settled(), out.captured_generation().is_none(),
+            out.committed() == committed@, !out.pending(), !out.settled(), !out.cancellation(), out.captured_generation().is_none(),
     {
         let mut captured = Vec::new();
         let mut i = 0;
@@ -158,6 +173,7 @@ impl ChildEpisode {
         ensures result.is_ok() == (kernel.phase_of(actor) == Some(Phase::Loading)),
             result.is_ok() ==> result.unwrap().wf() && result.unwrap().owner() == actor
             && result.unwrap().children().len() == 0 && !result.unwrap().pending() && !result.unwrap().settled()
+            && !result.unwrap().cancellation()
             && result.unwrap().captured_generation().is_some()
             && result.unwrap().captured_generation() == kernel.generation_of(actor)
             && refinement::registered(kernel.paper(), actor) && kernel.paper().fibers[actor].phase == Phase::Loading
@@ -169,23 +185,6 @@ impl ChildEpisode {
         let mut episode = Self::new(actor, committed);
         episode.generation = kernel.episode_generation(actor);
         Ok(episode)
-    }
-
-    fn same_bindings(left: &[Binding], right: &[Binding]) -> (same: bool)
-        ensures same == (left@ == right@),
-    {
-        if left.len() != right.len() { return false; }
-        let mut i = 0;
-        while i < left.len()
-            invariant i <= left.len(), left.len() == right.len(),
-                forall|j: int| 0 <= j < i ==> left@[j] == right@[j],
-            decreases left.len() - i,
-        {
-            if left[i] != right[i] { return false; }
-            i += 1;
-        }
-        proof { assert(left@ =~= right@); }
-        true
     }
 
     /// A captured generation rejects a later episode even when its providers
@@ -201,12 +200,47 @@ impl ChildEpisode {
         Ok(())
     }
 
+    fn check_snapshot(&self, kernel: &Kernel) -> (result: Result<(), ChildError>)
+        requires self.wf(), kernel.wf(),
+        ensures result.is_ok() == self.current_matches(kernel),
+    {
+        proof { kernel.paper_observations(self.actor); }
+        if kernel.phase(self.actor) != Some(Phase::Loading) { return Err(ChildError::Kernel(Error::InvalidState)); }
+        self.check_generation(kernel)?;
+        let current = kernel.committed(self.actor);
+        if !same_bindings(current.as_slice(), self.captured.as_slice()) {
+            return Err(ChildError::Kernel(Error::Changed));
+        }
+        Ok(())
+    }
+
+    /// Inspect the actual landing domain without admitting a stage, capturing
+    /// a generation, allocating a child, or consuming an inverse. This check
+    /// makes no reservation against intervening registry changes.
+    pub fn check_child(&self, kernel: &Kernel, dependencies: &[Port], provisions: &[Port])
+        -> (result: Result<(), ChildError>)
+        requires self.wf(), kernel.wf(),
+        ensures result.is_ok() == self.land_enabled(kernel, dependencies@, provisions@),
+    {
+        if !self.protocol.is_pending() { return Err(ChildError::NotAdmitted); }
+        self.check_snapshot(kernel)?;
+        match kernel.check_insert(Some(self.actor), dependencies, provisions) {
+            Ok(()) => Ok(()),
+            Err(error) => Err(ChildError::Kernel(error)),
+        }
+    }
+
     fn check_current(&mut self, kernel: &Kernel) -> (result: Result<(), ChildError>)
         requires old(self).wf(), kernel.wf(),
         ensures final(self).wf(),final(self).owner() == old(self).owner(),
             final(self).children() == old(self).children(),final(self).committed() == old(self).committed(),
             final(self).view() == old(self).view(),final(self).pending() == old(self).pending(),
             final(self).settled() == old(self).settled(),final(self).generation_extends(old(self)),
+            final(self).cancellation() == old(self).cancellation(),
+            result.is_ok() == (refinement::registered(kernel.paper(), old(self).owner())
+                && kernel.paper().fibers[old(self).owner()].phase == Phase::Loading
+                && old(self).generation_matches(kernel)
+                && binding_set(old(self).committed()) == kernel.paper().fibers[old(self).owner()].committed),
             result.is_err() ==> *final(self) == *old(self),
             result.is_ok() ==> refinement::registered(kernel.paper(), final(self).owner())
                 && kernel.paper().fibers[final(self).owner()].phase == Phase::Loading
@@ -215,12 +249,7 @@ impl ChildEpisode {
                 && final(self).captured_generation() == kernel.generation_of(final(self).owner()),
     {
         proof { kernel.paper_observations(self.actor); }
-        if kernel.phase(self.actor) != Some(Phase::Loading) { return Err(ChildError::Kernel(Error::InvalidState)); }
-        self.check_generation(kernel)?;
-        let current = kernel.committed(self.actor);
-        if !Self::same_bindings(current.as_slice(), self.captured.as_slice()) {
-            return Err(ChildError::Kernel(Error::Changed));
-        }
+        self.check_snapshot(kernel)?;
         self.generation = kernel.episode_generation(self.actor);
         Ok(())
     }
@@ -232,6 +261,17 @@ impl ChildEpisode {
         requires old(self).wf(), kernel.wf(),
         ensures !old(self).generation_matches(kernel) ==> result.is_err(), final(self).generation_extends(old(self)), final(self).wf(), final(self).owner() == old(self).owner(),
             final(self).children() == old(self).children(), final(self).committed() == old(self).committed(),
+            result.is_ok() == (refinement::registered(kernel.paper(), old(self).owner())
+                && kernel.paper().fibers[old(self).owner()].phase == Phase::Loading
+                && old(self).generation_matches(kernel)
+                && binding_set(old(self).committed()) == kernel.paper().fibers[old(self).owner()].committed),
+            result.is_ok() ==> final(self).current_matches(kernel),
+            result.is_ok() ==> result.unwrap() == (old(self).pending()
+                || (!old(self).settled() && !old(self).cancellation()
+                    && refinement::coherent(kernel.paper(), old(self).owner()))),
+            result.is_ok() ==> final(self).settled() == !result.unwrap()
+                && final(self).cancellation() == (old(self).cancellation()
+                    || !refinement::coherent(kernel.paper(), old(self).owner())),
             result.is_ok() ==> final(self).captured_generation().is_some()
                 && final(self).captured_generation() == kernel.generation_of(old(self).owner()),
             result.is_ok() ==> result.unwrap() == final(self).pending()
@@ -241,15 +281,19 @@ impl ChildEpisode {
                 || refinement::target(kernel.paper(), old(self).owner(), ISet::new(|b: Binding| old(self).committed().contains(b))),
             result.is_ok() && old(self).pending() ==> result == Ok(true),
             result.is_err() ==> final(self).view() == old(self).view()
-                && final(self).pending() == old(self).pending() && final(self).settled() == old(self).settled(),
+                && final(self).pending() == old(self).pending() && final(self).settled() == old(self).settled()
+                && final(self).cancellation() == old(self).cancellation(),
     {
         self.check_current(kernel)?;
         match kernel.target(self.actor) {
             Some(target) => {
-                proof { kernel.paper_target_vector(self.actor, target@); }
+                proof { kernel.paper_captured_target(self.actor, self.committed(), Some(target@)); }
                 Ok(self.protocol.admit(Some(target.as_slice())))
             },
-            None => Ok(self.protocol.admit(None)),
+            None => {
+                proof { kernel.paper_captured_target(self.actor, self.committed(), None); }
+                Ok(self.protocol.admit(None))
+            },
         }
     }
 
@@ -260,7 +304,11 @@ impl ChildEpisode {
         ensures final(self).captured_generation() == old(self).captured_generation(), final(self).wf(), final(self).owner() == old(self).owner(),
             final(self).children() == old(self).children(), final(self).committed() == old(self).committed(),
             accepted == final(self).pending(), old(self).pending() ==> accepted,
-            accepted ==> old(self).pending() || (target.is_some() && target.unwrap()@ == old(self).committed()),
+            accepted == (old(self).pending() || (!old(self).settled() && !old(self).cancellation()
+                && target.is_some() && binding_set(target.unwrap()@) == binding_set(old(self).committed()))),
+            final(self).settled() == !accepted,
+            final(self).cancellation() == (old(self).cancellation()
+                || !(target.is_some() && binding_set(target.unwrap()@) == binding_set(old(self).committed()))),
     { self.protocol.admit(target) }
 
     pub fn cancel(&mut self)
@@ -268,6 +316,7 @@ impl ChildEpisode {
         ensures final(self).captured_generation() == old(self).captured_generation(), final(self).wf(), final(self).owner() == old(self).owner(),
             final(self).children() == old(self).children(), final(self).committed() == old(self).committed(),
             final(self).pending() == old(self).pending(), final(self).settled() == !old(self).pending(),
+            final(self).cancellation(),
     { self.protocol.cancel(); }
 
     /// Execute the admitted instantiation and capture its real retirement
@@ -276,7 +325,8 @@ impl ChildEpisode {
     pub fn land_child(&mut self, kernel: &mut Kernel, dependencies: Vec<Port>, provisions: Vec<Port>)
         -> (result: Result<usize, ChildError>)
         requires old(self).wf(), old(kernel).wf(),
-        ensures !old(self).generation_matches(old(kernel)) ==> result.is_err(), final(self).generation_extends(old(self)), final(self).wf(), final(kernel).wf(), final(self).owner() == old(self).owner(),
+        ensures result.is_ok() == old(self).land_enabled(old(kernel), dependencies@, provisions@),
+            !old(self).generation_matches(old(kernel)) ==> result.is_err(), final(self).generation_extends(old(self)), final(self).wf(), final(kernel).wf(), final(self).owner() == old(self).owner(),
             final(self).committed() == old(self).committed(),
             old(self).retirable(old(kernel).paper()) ==> final(self).retirable(final(kernel).paper()),
             result.is_ok() ==> result.unwrap() == old(kernel).next_id()

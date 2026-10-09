@@ -33,7 +33,9 @@ Node 兼容层由单独的 crate 和 JS 包组成，不是必须开启的 `cordi
 
 另一条可选路径是 [`ProcessPlugin`](process-plugins.md)：Rust 宿主通过有界 JSON-RPC 启动独立可执行文件。它可以使用其他语言，只需要该插件自身要求的运行环境；协议并不要求 Node，也不能直接把任意原版 Cordis 插件当作进程插件运行。
 
-Rust Runtime 与 Node facade 共用 [`LifecycleDriver`](../crates/cordis-driver/src/shared.rs) 的内核控制和 `ActionLedger`；值、Future/JS callback 与 backend journal 留在各自宿主。生命周期内核决定可接受的转换，宿主执行 setup、回调与真实资源清理。这种分层让兼容工作集中在语言和宿主边界，同时保留独立的 Rust 使用路径。
+Rust Runtime 与 Node facade 共用 [`LifecycleDriver`](../crates/cordis-driver/src/shared.rs) 的内核控制和已验证 `LifecycleActions` 协议；值、Future/JS callback 与 backend journal 留在各自宿主。生命周期内核决定可接受的转换，宿主执行 setup、回调与真实资源清理。这种分层让兼容工作集中在语言和宿主边界，同时保留独立的 Rust 使用路径。
+
+`LifecycleActions` 在真实执行路径中检查清理结果和重试票据：失败结果阻止完成卸载，成功结果才允许 Node 路径释放 episode 的依赖。普通 Rust `FnOnce` 宿主显式使用 `Drained` 表示清理尝试已排空，不代表所有回调成功。合同和验证边界见[清理协议](cleanup-protocol.zh-CN.md)（[English](cleanup-protocol.md)）。
 
 ## 构建、运行与验证的依赖
 

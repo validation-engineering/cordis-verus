@@ -842,8 +842,8 @@ def mutation_manifest():
         ),
         (
             'mixed-driver-xor-skips-payload', 'mixed_driver.rs',
-            'self.write_slot(provider,index,Some(value^mask));\n                Inverse::Xor {provider,key,mask}',
-            'self.write_slot(provider,index,Some(value));\n                Inverse::Xor {provider,key,mask}',
+            'self.write_slot(provider,index,Some(value^mask));\n',
+            'self.write_slot(provider,index,Some(value));\n',
         ),
         (
             'observational-runs-domain-bypass',

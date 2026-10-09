@@ -1,14 +1,16 @@
 //! Shared lifecycle arbitration for Rust and JavaScript executors.
 //!
-//! This layer owns the kernel and the outstanding setup/cleanup action ledger.
+//! This layer owns the kernel and the verified setup/cleanup result protocol.
 //! Executors supply availability and failure facts, retain their own values and
 //! futures, and run callbacks only after the borrow of this driver has ended.
 //! Ownership restoration order is an executor policy: retirement does not add
 //! an implicit dependency between a parent and its children.
 use crate::{ActionKind, ActionTicket, DriverError};
 use cordis_kernel::action_ledger::{
-    ActionError, ActionKind as KernelActionKind, ActionLedger, ActionTicket as KernelActionTicket,
+    ActionError, ActionKind as KernelActionKind, ActionTicket as KernelActionTicket,
 };
+pub use cordis_kernel::lifecycle_actions::CleanupOutcome;
+use cordis_kernel::lifecycle_actions::LifecycleActions;
 use cordis_kernel::{Error, Kernel, Phase, Port};
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -33,14 +35,14 @@ pub enum Decision {
     Remove,
 }
 
-/// One control graph and its exactly-once outstanding action ownership.
+/// One control graph and its verified action and cleanup-result protocol.
 ///
 /// Dereferencing permits kernel observations, but intentionally provides no
-/// mutable access that could bypass the action ledger.
+/// mutable access that could bypass the cleanup-result protocol.
 pub struct LifecycleDriver {
     kernel: Kernel,
-    actions: ActionLedger,
-    // Serialization views only; the verified ledger authorizes transitions.
+    actions: LifecycleActions,
+    // Serialization views only; the verified protocol authorizes transitions.
     pending_views: BTreeMap<usize, ActionTicket>,
 }
 impl Deref for LifecycleDriver {
@@ -56,7 +58,7 @@ impl LifecycleDriver {
             .map_err(|_| DriverError::new("Capacity", "domain identity exhausted"))?;
         Ok(Self {
             kernel: Kernel::new(),
-            actions: ActionLedger::new(domain),
+            actions: LifecycleActions::new(domain),
             pending_views: BTreeMap::new(),
         })
     }
@@ -72,13 +74,13 @@ impl LifecycleDriver {
             {
                 Some(Decision::Withdraw)
             }
-            Phase::Unloading if !self.cleanup_started(id) && self.actions.pending(id).is_none() => {
+            Phase::Unloading if !self.cleanup_started(id) && !self.actions.blocked(id) => {
                 Some(Decision::BeginCleanup)
             }
             Phase::Inactive
                 if self.retired(id)
                     && self.children(id).is_empty()
-                    && self.actions.pending(id).is_none() =>
+                    && !self.actions.blocked(id) =>
             {
                 Some(Decision::Remove)
             }
@@ -86,6 +88,7 @@ impl LifecycleDriver {
                 if !self.retired(id)
                     && !status.failed
                     && status.available
+                    && !self.actions.blocked(id)
                     && self.target(id).is_some()
                     && !self.children(id).iter().any(|child| self.retired(*child)) =>
             {
@@ -97,7 +100,9 @@ impl LifecycleDriver {
     pub fn coherent(&self, id: usize, restart: bool) -> bool {
         !self.retired(id)
             && !restart
-            && self.target(id).as_ref() == Some(&self.committed(id))
+            && self.target(id).is_some_and(|target| {
+                cordis_kernel::episode::same_bindings(&target, &self.committed(id))
+            })
             && (self.phase(id) != Some(Phase::Loading) || self.check_iteration(id).is_ok())
     }
     pub fn insert(
@@ -126,45 +131,36 @@ impl LifecycleDriver {
         let count = u64::try_from(count).map_err(|_| Error::Capacity)?;
         self.actions.check_capacity(count).map_err(ledger_error)
     }
-    fn reserve_action(&self, id: usize) -> Result<(), Error> {
-        self.actions.can_issue(id).map_err(ledger_error)
-    }
-    fn issue(&mut self, id: usize, kind: ActionKind) {
-        let generation = self
-            .episode_generation(id)
-            .expect("registered action owner");
-        let ticket = self
-            .actions
-            .issue(id, generation, kernel_kind(kind))
-            .expect("action ownership and capacity checked before kernel admission");
-        self.pending_views.insert(id, host_ticket(ticket));
-    }
     /// Admit setup and register its ownership before any executor sees it.
     pub fn begin(&mut self, id: usize) -> Result<(), Error> {
-        self.reserve_action(id)?;
-        self.kernel.begin(id)?;
-        self.issue(id, ActionKind::Setup);
+        let ticket = self.actions.begin(&mut self.kernel, id)?;
+        self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     pub fn pending_action(&self, id: usize) -> Option<&ActionTicket> {
         self.pending_views.get(&id)
     }
-    /// Consume a result exactly once. Withdrawal never discards an outstanding
-    /// setup ticket: its eventual inverse still belongs to the original episode.
+    /// Consume a setup result exactly once. Cleanup requires an explicit outcome;
+    /// this setup-only entry point cannot authorize dependency release.
+    /// Withdrawal never discards an outstanding setup ticket.
     pub fn complete_action(&mut self, ticket: &ActionTicket) -> Result<(), DriverError> {
         self.actions
-            .complete(kernel_ticket(ticket))
-            .map_err(|error| match error {
-                ActionError::WrongDomain => {
-                    DriverError::new("WrongDomain", "action belongs to another driver")
-                }
-                ActionError::Stale => {
-                    DriverError::new("StaleAction", "action is unknown or already completed")
-                }
-                ActionError::Capacity | ActionError::Pending => {
-                    DriverError::new("InvalidState", "invalid action completion")
-                }
-            })?;
+            .complete_setup(kernel_ticket(ticket))
+            .map_err(completion_error)?;
+        self.pending_views.remove(&ticket.id);
+        Ok(())
+    }
+    /// Record an exact cleanup attempt's outcome. Failed attempts retain a
+    /// blocking receipt until explicit retry; only Succeeded or Drained can
+    /// authorize finish_cleanup. The host remains responsible for that report.
+    pub fn complete_cleanup(
+        &mut self,
+        ticket: &ActionTicket,
+        outcome: CleanupOutcome,
+    ) -> Result<(), DriverError> {
+        self.actions
+            .complete_cleanup(kernel_ticket(ticket), outcome)
+            .map_err(completion_error)?;
         self.pending_views.remove(&ticket.id);
         Ok(())
     }
@@ -183,7 +179,7 @@ impl LifecycleDriver {
         Ok(())
     }
     pub fn finish(&mut self, id: usize) -> Result<(), Error> {
-        if self.actions.pending(id).is_some() {
+        if self.actions.blocked(id) {
             return Err(Error::InvalidState);
         }
         self.kernel.finish(id)
@@ -195,48 +191,30 @@ impl LifecycleDriver {
         self.kernel.retire(id)
     }
     pub fn begin_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        // An outstanding action may still be using the committed dependencies.
-        if self.actions.pending(id).is_some() {
-            return Err(Error::Relied);
-        }
-        self.reserve_action(id)?;
-        self.kernel.begin_cleanup(id)?;
-        self.issue(id, ActionKind::Cleanup);
+        let ticket = self.actions.begin_cleanup(&mut self.kernel, id)?;
+        self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     /// Restore host resources registered while a fiber was reserved, before
-    /// its first kernel episode. This is a host extension, not a paper Step:
-    /// the kernel remains Inactive while the verified ledger owns the action.
+    /// its first kernel episode. This is a host extension, not a paper Step.
     pub fn begin_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        if !self.kernel.contains(id) {
-            return Err(Error::Unknown);
-        }
-        if !self.kernel.retired(id)
-            || self.kernel.phase(id) != Some(Phase::Inactive)
-            || self.kernel.episode_generation(id) != Some(0)
-        {
-            return Err(Error::InvalidState);
-        }
-        self.reserve_action(id)?;
-        self.issue(id, ActionKind::Cleanup);
+        let ticket = self.actions.begin_reservation_cleanup(&self.kernel, id)?;
+        self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     pub fn retry_cleanup(&mut self, id: usize) -> Result<ActionTicket, Error> {
-        if !self.cleanup_started(id) || self.phase(id) != Some(Phase::Unloading) {
-            return Err(Error::InvalidState);
-        }
-        self.reserve_action(id)?;
-        self.issue(id, ActionKind::Cleanup);
-        Ok(self.pending_views[&id].clone())
+        let ticket = host_ticket(self.actions.retry_cleanup(&self.kernel, id)?);
+        self.pending_views.insert(id, ticket.clone());
+        Ok(ticket)
     }
     pub fn finish_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        if self.actions.pending(id).is_some() {
-            return Err(Error::InvalidState);
-        }
-        self.kernel.finish_cleanup(id)
+        self.actions.finish_cleanup(&mut self.kernel, id)
+    }
+    pub fn finish_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
+        self.actions.finish_reservation_cleanup(&self.kernel, id)
     }
     pub fn remove(&mut self, id: usize) -> Result<(), Error> {
-        if self.actions.pending(id).is_some() {
+        if self.actions.blocked(id) {
             return Err(Error::InvalidState);
         }
         self.kernel.remove(id)
@@ -253,6 +231,20 @@ fn ledger_error(error: ActionError) -> Error {
     match error {
         ActionError::Capacity => Error::Capacity,
         ActionError::Pending | ActionError::WrongDomain | ActionError::Stale => Error::InvalidState,
+    }
+}
+fn completion_error(error: ActionError) -> DriverError {
+    match error {
+        ActionError::WrongDomain => {
+            DriverError::new("WrongDomain", "action belongs to another driver")
+        }
+        ActionError::Stale => DriverError::new(
+            "StaleAction",
+            "action is unknown, already completed, or has the wrong kind",
+        ),
+        ActionError::Capacity | ActionError::Pending => {
+            DriverError::new("InvalidState", "invalid action completion")
+        }
     }
 }
 fn kernel_kind(kind: ActionKind) -> KernelActionKind {

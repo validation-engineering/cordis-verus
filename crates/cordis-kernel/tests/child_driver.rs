@@ -159,6 +159,9 @@ fn pending_child_lands_atomically_in_unloading_after_target_loss() {
     driver.retire(provider).unwrap();
     driver.depart(provider).unwrap();
     assert_eq!(driver.depart(parent), Err(ChildDriverError::Pending));
+    assert_eq!(driver.check_child(parent, &[], &[]), Ok(()));
+    assert_eq!(driver.phase(parent), Some(Phase::Loading));
+    assert_eq!(driver.inverse_count(parent), Some(0));
     let child = driver.land_child(parent, vec![], vec![]).unwrap();
     assert_eq!(driver.phase(parent), Some(Phase::Unloading));
     assert_eq!(driver.inverse_count(parent), Some(1));
@@ -206,4 +209,59 @@ fn external_parent_link_is_not_an_effect_inverse_or_a_service_dependency() {
     driver.unload(external_child).unwrap();
     driver.remove(external_child).unwrap();
     driver.remove(parent).unwrap();
+}
+
+#[test]
+fn child_preflight_rechecks_live_reservations_and_retry_keeps_the_inverse_prefix() {
+    let mut driver = ChildDriver::new();
+    let port = Port { key: 81, realm: 2 };
+    let parent = driver.insert(None, vec![], vec![]).unwrap();
+    let other_parent = driver.insert(None, vec![], vec![]).unwrap();
+    driver.begin(parent).unwrap();
+    assert!(driver.admit(parent).unwrap());
+    let prefix = driver.land_child(parent, vec![], vec![]).unwrap();
+    assert!(driver.admit(parent).unwrap());
+    assert_eq!(driver.check_child(parent, &[], &[port]), Ok(()));
+    assert_eq!(driver.inverse_count(parent), Some(1));
+
+    // Successful preflight does not reserve a provision for the pending stage.
+    driver.begin(other_parent).unwrap();
+    assert!(driver.admit(other_parent).unwrap());
+    let blocker = driver.land_child(other_parent, vec![], vec![port]).unwrap();
+    let conflict = ChildDriverError::Episode(ChildError::Kernel(Error::Conflict));
+    assert_eq!(driver.check_child(parent, &[], &[port]), Err(conflict));
+    assert_eq!(driver.check_child(parent, &[], &[port]), Err(conflict));
+    assert_eq!(driver.land_child(parent, vec![], vec![port]), Err(conflict));
+    assert_eq!(driver.inverse_count(parent), Some(1));
+    assert_eq!(driver.depart(parent), Err(ChildDriverError::Pending));
+    assert_eq!(driver.phase(parent), Some(Phase::Loading));
+    assert!(!driver.retired(prefix));
+
+    finish(&mut driver, other_parent);
+    driver.retire(other_parent).unwrap();
+    driver.depart(other_parent).unwrap();
+    driver.unload(other_parent).unwrap();
+    assert!(driver.retired(blocker));
+    assert_eq!(driver.phase(blocker), Some(Phase::Inactive));
+    assert_eq!(driver.check_child(parent, &[], &[port]), Err(conflict));
+    assert_eq!(driver.land_child(parent, vec![], vec![port]), Err(conflict));
+    assert_eq!(
+        driver.check_and_land_child(parent, vec![], vec![port]),
+        Err(conflict)
+    );
+    assert_eq!(driver.inverse_count(parent), Some(1));
+
+    // Retirement and an empty inverse journal do not release the registry slot.
+    driver.remove(blocker).unwrap();
+    assert_eq!(driver.check_child(parent, &[], &[port]), Ok(()));
+    let child = driver
+        .check_and_land_child(parent, vec![], vec![port])
+        .unwrap();
+    assert_eq!(driver.inverse_count(parent), Some(2));
+    finish(&mut driver, parent);
+    driver.retire(parent).unwrap();
+    driver.depart(parent).unwrap();
+    driver.unload(parent).unwrap();
+    assert!(driver.retired(prefix));
+    assert!(driver.retired(child));
 }
