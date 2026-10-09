@@ -41,7 +41,7 @@
 | [`Kernel::check_insert` / `insert`](../crates/cordis-kernel/src/lib.rs) | 在且仅在 `insert_enabled(parent, dependencies, provisions)` 时成功：身份容量足够、指定的 parent 已登记、声明无重复、provision 端口未被预留。 | O-Insert 的真实注册定义域，将实现表示边界与论文谓词分开列出。 |
 | [`Kernel::begin`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.begin_enabled(id)`：Inactive、目标可用、generation 存在且小于 `u64::MAX`。成功后递增 generation，并提交实际目标。 | L-Begin 的可执行接纳条件。保留实现中有限计数器的边界；论文投影擦除了该计数器。 |
 | [`Kernel::begin_cleanup`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.cleanup_enabled(id)`：已登记、Unloading、尚未开始恢复、没有存活的 committed dependent。 | 受保护 L-Unload 的实际起点。该调用在论文投影中保持状态，开放恢复过程；`finish_cleanup` 才完成投影中的 Unload。 |
-| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs)、[`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | 在且仅在 `unload_enabled` 时成功：Kernel 允许清理，**且** `restore_receipts(journal(actor), primitive_state).is_some()`。 | 执行 L-Unload 的真实有限 LIFO 恢复；控制守卫本身不保证逆操作有定义。公共错误保持完整机器，内部草稿错误不具备同样保证。 |
+| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs)、[`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | 在且仅在 `unload_enabled` 时成功：Kernel 允许清理，**且** `restore_receipts(journal(actor), primitive_state).is_some()`。对真实 Unit/Child 日志，`unit_child_recovery` 可消解 inverse 条件。 | 执行 L-Unload 的真实有限 LIFO 恢复；受限恢复事实来自已表示的历史，不来自任意 `wf()`。公共错误保持完整机器，内部草稿错误不具备同样保证。 |
 | [`Kernel::check_iteration` / `finish`](../crates/cordis-kernel/src/lib.rs) | 在且仅在 Loading 且 `coherent(id)` 时成功。`paper_coherence`、`paper_iteration_guard` 证明此条件恰好对应投影中的论文守卫。 | L-Iter 接纳和 L-Finish 控制转换。利用已有的 provider 唯一性、绑定类型与覆盖不变式检查身份，不依赖缓冲区的顺序或重复次数。 |
 | [`StageProtocol::admit`](../crates/cordis-kernel/src/episode.rs) | `accepted == (old.pending || (!old.settled && !old.cancelled && matching_target))`。`matching_target` 指 target 存在且完整绑定身份集合相等。已接纳的阶段在取消或目标丢失后仍保持接纳；结束与取消标记的更新也有精确合同。 | 迭代阶段的接纳与保留。`land`、`end` 提供 Iter/Finish 或延迟 Divert 在 token 层的累积器转换。显式宿主取消是扩展行为，不能据此认定论文目标已变化。 |
 | [`ChildEpisode::check_child` / `land_child`](../crates/cordis-kernel/src/ownership.rs)、[`ChildDriver` 包装层](../crates/cordis-kernel/src/child_driver.rs) | 在且仅在 `land_enabled` 时成功：已有 pending、捕获身份和 generation 仍匹配、满足当前插入定义域。 | 定义 52 中有条件的真实 child 注册及逆操作捕获；接纳本身不保证插入成功。 |
@@ -386,11 +386,46 @@ receipts 与清理状态。Child inverse 退休捕获的 child，不移除注册
 对定理 73，它把允许且有定义的清理接到一次真实有限调用，不证明动态 child 全局进展
 或最终调度。这三项在清单中均保持 **partial**。
 
-准备 dispatcher 的精确范围仍只有 Insert/Begin/Step。直接 `FreshDriver::unload`
-调用已有新合同，但 `preparation_command` 不包含 Unload，通用 `apply` 的成功等价
-未扩大。[已有 Mixed driver 测试](../crates/cordis-kernel/tests/mixed_driver.rs)覆盖
+`preparation_command` 范围仍只有 Insert/Begin/Step。实际 Mixed/Fresh `apply` 的
+Unload 分支另外给出成功 iff 输入满足 `unload_enabled`，并未扩大该准备范围。
+[已有 Mixed driver 测试](../crates/cordis-kernel/tests/mixed_driver.rs)覆盖
 被依赖 provider 的清理拒绝、捕获的 provider 与混合 Xor/Child/Xor 恢复；测试补充合同，
 不能证明任意 inverse 都有定义。
+
+## 真实 Unit/Child 日志的恢复有定义性
+
+[`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs) 中
+proof-only 的 `unit_child_journal(actor)` 按**实际保留的 receipts** 分类：每条均为
+`Inverse::Unit` 或 `Inverse::Child`。`unit_child_recovery()` 表示，对每个已登记且
+日志符合此分类的 actor，`restore_receipts` 解释其当前完整日志均有定义。这是当前
+机器的性质，不是未来调用成功的承诺，也不要求系统中所有 actor 都只使用这些指令。
+
+证明从机器已表示的一份良构源状态出发。实际 journal 项对应源 accumulator 指向的
+history receipt；源 `retained` 因而给出每个仍被引用的 captured child 当前仍已登记。
+仅有 receipt 的真实来源并不足够：`history_sound` 给出当初落地时 inverse 有定义，
+retention 才补上**当前**需要的身份。Unit 保持状态，Child 退休捕获的已登记身份；
+两者都保持 registry 成员，因此递归可推出剩余全部 LIFO 位置都有定义。
+
+Mixed/Fresh `run_script` 从真实调用构造的源历史自动导出 `unit_child_recovery()`，
+包括因错误停止时。`run_from_empty` 同时为 prepared 与返回机器建立此性质。没有
+增加运行时 history buffer、恢复算法或强化 `wf()` 前提；论证所用历史是被擦除的
+ghost 数据。
+
+`cleanup_permitted(actor)` 暴露 Kernel 清理守卫。`unit_child_unload_domain` 将
+恢复性质与日志分类组合，证明 `unload_enabled(actor) == cleanup_permitted(actor)`。
+因此在这些条件下，实际公共 `unload` 在且仅在允许清理时成功。若 `run_script` 在
+Unload 错误处停止，且该 actor 的日志仅含 Unit/Child，则返回机器不允许清理。
+这是对真实停止状态中守卫的结论，不逐项刻画具体错误枚举，也不要求所有输入命令
+最初就已使能。
+
+这直接将定义 52 的已登记名称前提接到真实恢复，参见
+[PR-02](paper-review-guide.zh-CN.md#pr-02-子插件退役要求被引用的身份继续保留在注册表中)。
+退休 child 在合法 Remove 前仍保留注册；退休不删除它，也不运行它自身的清理。
+parent 所有权不构成隐式服务依赖。Provision、Xor 等非平凡 Table receipts 仍在此
+有定义性结论之外，仍可能因 strict 当前状态检查而失败。Unit receipt 自身在模型中
+表示为 `Table(Unit)`，因此范围以具体 receipt 分类为准，不能按模型名称排除所有 Table。
+它补充引理 57 的受限 inverse 桥与定理 73 的局部清理进展，两项均保持 **partial**；
+并未补齐推论 69 的一般 foreign replay 方程、owner 表空结论或整个系统终止。
 
 ## 从新机器经过真实准备与执行
 
@@ -439,8 +474,9 @@ prepared 快照、自主 outcomes 和源状态都是运行时擦除的 ghost 数
 
 `Retire`、`Depart`、`Unload`、`Remove` 仍由 dispatcher 正常支持。
 `preparation_enabled` 对它们返回 false，只因为它们不属于这一证明范围；成功等价条件
-受 `preparation_command` 限制，这不是拒绝这些命令的声明。直接 Unload 已有上文的
-独立精确域，但 dispatcher 范围未扩大；其余命令的域与 dispatcher 等价仍须补齐。
+受 `preparation_command` 限制，这不是拒绝这些命令的声明。Unload 已有上文独立的
+`apply` 分支精确合同，但准备范围未扩大；Retire/Depart/Remove 的域与 dispatcher
+等价仍须补齐。
 合同也尚未逐个从输入谓词刻画 `Unknown`、`Retained` 等具体错误枚举值。这里证明的是
 明确实现域内的接纳，保留蓝图合法性、有限容量和 strict 值可用性约束，并不保证所有
 论文中已使能的准备命令都被接纳。原有成功前缀的源执行结论保持不变。
@@ -470,7 +506,8 @@ Begin/Step 失败时的前缀保留。新 child 仍保持 Inactive。这个真�
    初始源状态并组合单个 actor 的执行，无需把这一入口前提留给调用者。
    Insert/Begin/Step 准备范围已有精确接纳域，直接 Mixed/Fresh Unload 也已有守卫加
    inverse 的精确域。Retire/Depart/Remove、更广的 dispatcher 与其他恢复路径仍需
-   定义域等价；从可达历史推出逆操作有定义，与执行有定义的逆序列仍是不同义务。
+   定义域等价；可达历史现已推出真实 Unit/Child 日志有定义，但一般 strict Table
+   恢复仍须补充当前状态下的定义域论证。
    准备谓词也未刻画具体错误枚举值。还须组合多个 actor、
    动态 child 与恢复，接到论文的全局计数／递减量论证。这些入口没有为整个宿主实例化 `termination.rs`。若目标命题
    包含可能延迟已使能生命周期工作的宿主执行，还须明确调度合同。

@@ -47,7 +47,7 @@ error behavior, rather than treating these summaries as independent axioms.
 | [`Kernel::check_insert` / `insert`](../crates/cordis-kernel/src/lib.rs) | Success iff `insert_enabled(parent, dependencies, provisions)`: identity capacity, a registered parent when supplied, distinct declarations and unreserved provision ports. | The actual O-Insert registration domain, with representation bounds stated separately from the paper predicate. |
 | [`Kernel::begin`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.begin_enabled(id)`: Inactive, target available, generation present and below `u64::MAX`. Success increments the generation and commits the actual target. | Executable admission for L-Begin, with the implementation's bounded generation counter retained explicitly. The counter is erased by the paper projection. |
 | [`Kernel::begin_cleanup`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.cleanup_enabled(id)`: registered, Unloading, not already restoring, and no live committed dependent. | The executable start of guarded L-Unload. It preserves the paper state while enabling restoration; `finish_cleanup` performs the projected Unload. |
-| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | Success iff `unload_enabled`: Kernel cleanup permission **and** `restore_receipts(journal(actor), primitive_state).is_some()`. | Executes the actual finite LIFO restoration for L-Unload. The control guard alone does not establish inverse definedness. Public errors preserve the complete machine; internal draft errors need not. |
+| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | Success iff `unload_enabled`: Kernel cleanup permission **and** `restore_receipts(journal(actor), primitive_state).is_some()`. For actual Unit/Child journals, `unit_child_recovery` discharges the inverse condition. | Executes the actual finite LIFO restoration for L-Unload. The restricted recovery fact is derived from represented histories, not arbitrary `wf()`. Public errors preserve the complete machine; internal draft errors need not. |
 | [`Kernel::check_iteration` / `finish`](../crates/cordis-kernel/src/lib.rs) | Success iff Loading and `coherent(id)`. `paper_coherence` and `paper_iteration_guard` prove that this is exactly the projected paper guard. | L-Iter admission and the control transition L-Finish. Provider identity is checked through existing uniqueness, typing and coverage invariants, independent of buffer order or duplicates. |
 | [`StageProtocol::admit`](../crates/cordis-kernel/src/episode.rs) | `accepted == (old.pending || (!old.settled && !old.cancelled && matching_target))`. `matching_target` means a present target with the same complete binding-identity set. An already admitted stage stays admitted across cancellation or target loss. The final settled/cancellation flags are specified exactly. | Admission and retention of an outstanding iteration. `land`/`end` supply the token-level accumulator transitions for Iter/Finish or late Divert. Explicit host cancellation is an extension, not evidence that the paper target changed. |
 | [`ChildEpisode::check_child` / `land_child`](../crates/cordis-kernel/src/ownership.rs), [`ChildDriver` wrappers](../crates/cordis-kernel/src/child_driver.rs) | Success iff `land_enabled`: pending, current captured identity/generation, and the current insertion domain. | Conditional Definition 52 registration and capture of the actual child inverse. Admission alone does not guarantee insertion. |
@@ -497,13 +497,60 @@ Theorem 73, it connects a permitted and defined cleanup to a real finite call;
 it does not prove global progress across dynamic children or eventual scheduling.
 All three ledger items remain **partial**.
 
-The setup dispatcher profile is still only Insert/Begin/Step. A direct
-`FreshDriver::unload` call has this new contract, but `preparation_command` does
-not include Unload and the generic `apply` success equivalence has not been
-extended. Existing [Mixed driver tests](../crates/cordis-kernel/tests/mixed_driver.rs)
+The `preparation_command` profile is still only Insert/Begin/Step. Separately,
+the actual Mixed/Fresh `apply` Unload branch now succeeds iff its input
+`unload_enabled` holds; this does not expand that preparation profile.
+Existing [Mixed driver tests](../crates/cordis-kernel/tests/mixed_driver.rs)
 exercise blocked provider cleanup, captured providers and mixed Xor/Child/Xor
 restoration; tests complement the contracts without proving arbitrary inverse
 definedness.
+
+## Defined restoration for actual Unit/Child journals
+
+In [`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs),
+the proof-only `unit_child_journal(actor)` classifies the **actual retained
+receipts** as `Inverse::Unit` or `Inverse::Child`. `unit_child_recovery()` states
+that, for every registered actor in this profile, interpreting its entire
+current journal with `restore_receipts` succeeds. This is a property of the
+current machine, not a promise about a future call or a restriction that every
+actor in the system must use only those instructions.
+
+The bridge starts with a well-formed source represented by the machine. Actual
+journal entries identify the source accumulator's history receipts; source
+`retained` then gives a registered identity for every captured child that is
+still referenced. A receipt's authentic origin alone would not suffice:
+`history_sound` gives inverse definedness at its original landing, whereas
+retention supplies the identity needed **now**. Unit leaves the state unchanged;
+Child retires its captured registered identity. Both preserve registry
+membership, so recursion proves that all remaining LIFO positions are defined.
+
+Mixed/Fresh `run_script` derive `unit_child_recovery()` from the source histories
+constructed by their real calls, including when they stop at an error.
+`run_from_empty` also establishes it for both its prepared and returned machines.
+There is no new runtime history buffer, restoration algorithm or strengthened
+`wf()` assumption. The histories used for this argument are erased ghost data.
+
+`cleanup_permitted(actor)` exposes the Kernel cleanup guard.
+`unit_child_unload_domain` combines the recovery property and journal
+classification to prove `unload_enabled(actor) == cleanup_permitted(actor)`.
+The actual public `unload` therefore succeeds iff cleanup is permitted under
+these conditions. If `run_script` stops on an Unload error and that actor's
+journal contains only Unit/Child receipts, the returned machine does not permit
+cleanup. This says which guard is false at the real stopping point; it does not
+classify the specific error enum or require every input command to be enabled
+initially.
+
+This directly connects Definition 52's registered-name premise to executable
+recovery, as reviewed in [PR-02](paper-review-guide.md#pr-02-child-retirement-needs-the-referenced-identity-to-remain-registered).
+A retired child stays registered until a legal Remove; retirement neither removes
+it nor executes its own cleanup. Parent ownership creates no implicit service
+dependency. Nontrivial Table receipts, including Provision and Xor, remain
+outside this definedness result and can still fail under strict current-state
+checks. The Unit receipt itself is modeled as `Table(Unit)`, so the boundary is
+the concrete receipt classification, not all receipts called Table in the model.
+This supplies a restricted inverse bridge for Lemma 57 and local cleanup progress
+for Theorem 73; both remain **partial**. It does not add Corollary 69's general
+foreign-replay equation, empty-owner-table conclusion or whole-system termination.
 
 ## From a new machine through setup and execution
 
@@ -564,10 +611,10 @@ the separately selected autonomous actor is blocked.
 
 `Retire`, `Depart`, `Unload` and `Remove` remain executable dispatcher commands.
 `preparation_enabled` returns false for them solely because they are outside
-this profile; the success equivalence is guarded by `preparation_command`, so
-this is not a rejection claim. Direct Unload now has the separate exact domain
-above; the dispatcher profile has not expanded. The remaining commands' domains
-and dispatcher equivalences still require work. The contracts also do not
+this profile; the preparation equivalence is guarded by `preparation_command`,
+so this is not a rejection claim. Unload has the separate exact `apply` branch
+contract above; the preparation profile has not expanded. Retire/Depart/Remove
+domains and dispatcher equivalences still require work. The contracts also do not
 identify each error enum value (`Unknown`, `Retained`,
 and so on) from an input predicate. They establish acceptance within the stated
 implementation domain, including blueprint validity, finite capacity and strict
@@ -609,8 +656,9 @@ for a whole-system progress result. Lemma 57 and Theorem 73 remain **partial**.
    Insert/Begin/Step preparation profile now has exact acceptance domains;
    direct Mixed/Fresh Unload now also has an exact guard-plus-inverse domain.
    Retire/Depart/Remove, the wider dispatcher and other recovery paths still
-   need their own domain equivalences. Proving inverse definedness from a
-   reachable history remains distinct from executing a defined inverse sequence.
+   need their own domain equivalences. Reachable histories now establish inverse
+   definedness for actual Unit/Child journals; general strict Table restoration
+   still needs its own current-state domain argument.
    Individual error variants are not characterized by the preparation predicates.
    Compose execution across multiple actors, dynamic children and recovery with
    the paper's global count/rank argument. These entry points do not instantiate

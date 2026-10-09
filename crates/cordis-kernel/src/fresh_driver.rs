@@ -143,6 +143,20 @@ impl FreshDriver {
         requires self.wf(),other.wf(),self.same(other),
         ensures self.unload_enabled(actor)==other.unload_enabled(actor),
     {self.inner.same_unload_domain(&other.inner,actor);}
+    /// Classify the actual remaining inverse journal, not all installed code.
+    pub closed spec fn unit_child_journal(&self,actor:usize)->bool {self.inner.unit_child_journal(actor)}
+    pub closed spec fn cleanup_permitted(&self,actor:usize)->bool {self.inner.cleanup_permitted(actor)}
+    pub closed spec fn unit_child_recovery(&self)->bool {self.inner.unit_child_recovery()}
+    /// The existing real source execution supplies current retention, rather
+    /// than an assumption that this actor's inverse sequence will succeed.
+    pub proof fn unit_child_recovery_from_source(&self,bank:Seq<super::Blueprint>,a:mx::Configuration<u64,Index>)
+        requires self.wf(),self.represents(bank,a),fs::well_formed(super::library(),programs(bank),a),
+        ensures self.unit_child_recovery(),
+    {self.inner.unit_child_recovery_from_source(bank,a);}
+    pub proof fn unit_child_unload_domain(&self,actor:usize)
+        requires self.wf(),self.unit_child_recovery(),self.unit_child_journal(actor),
+        ensures self.unload_enabled(actor)==self.cleanup_permitted(actor),
+    {self.inner.unit_child_unload_domain(actor);}
     /// Starting an episode also requires an empty retained journal. The kernel
     /// predicate includes target availability and its bounded generation counter.
     pub closed spec fn begin_enabled(&self,id:usize)->bool {
@@ -284,8 +298,13 @@ impl FreshDriver {
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).unload_enabled(actor),
+            old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
+                ==> out.is_ok()==old(self).cleanup_permitted(actor),
             out.is_ok() ==> old(self).ack(final(self),actor,r::Rule::Unload,None),
     {
+        proof {
+            if self.unit_child_recovery() && self.unit_child_journal(actor) {self.unit_child_unload_domain(actor);}
+        }
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
         proof {draft.same_unload_domain(&self.inner,actor);}
@@ -401,6 +420,7 @@ impl FreshDriver {
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             preparation::preparation_command(command) ==> out.is_ok()==old(self).preparation_enabled(command),
+            match command {Command::Unload {actor}=>out.is_ok()==old(self).unload_enabled(actor),_=>true},
             out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),label(out.unwrap()).0,label(out.unwrap()).1,label(out.unwrap()).2),
     {
@@ -750,24 +770,34 @@ impl ScriptReport {
         }
     }
     proof fn establish(&self,bank:Seq<super::Blueprint>,states:Seq<mx::Configuration<u64,Index>>)
-        requires fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
+        requires self.machine.wf(),fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
-        ensures self.refines(bank),
-    {weak_theory();fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));}
+        ensures self.refines(bank),self.machine.unit_child_recovery(),
+    {
+        weak_theory();fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
+        self.machine.unit_child_recovery_from_source(bank,states.last());
+    }
 }
 
 /// Executes until the first checked error. The successful prefix refines one
 /// source execution from new/empty, with no caller-supplied model or history.
 /// A failed Insert/Begin/Step is disabled in the returned machine under its
-/// exact implementation domain. Other command domains and individual error
-/// variants are not characterized here. Checked errors preserve the machine.
+/// exact implementation domain. A failed Unload with an actual Unit/Child
+/// journal has a disabled kernel cleanup guard: its inverse domain follows from
+/// the constructed history. Other commands and individual error variants remain
+/// outside these domains. Checked errors preserve the machine.
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
-    ensures out.machine.wf(),out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
+    ensures out.machine.wf(),out.machine.unit_child_recovery(),
+        out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
         out.error.is_some() && preparation::preparation_command(commands[out.transitions.len() as int])
             ==> !out.machine.preparation_enabled(commands[out.transitions.len() as int]),
+        out.error.is_some() ==> match commands[out.transitions.len() as int] {
+            Command::Unload {actor}=>out.machine.unit_child_journal(actor) ==> !out.machine.cleanup_permitted(actor),
+            _=>true,
+        },
         forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
     let ghost bank=blueprints@.map(|_:int,bp:Blueprint|bp.compiled());
@@ -787,9 +817,16 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
                 proof {
                     machine.same_representation(&before,bank,states.last());
                     machine.same_preparation_domain(&before,commands[i as int]);
+                    if let Command::Unload {actor}=commands[i as int] {machine.same_unload_domain(&before,actor);}
                 }
                 let out=ScriptReport {machine,transitions,error:Some(error)};
-                proof {out.establish(bank,states);}return out;
+                proof {
+                    out.establish(bank,states);
+                    if let Command::Unload {actor}=commands[i as int] {
+                        if out.machine.unit_child_journal(actor) {out.machine.unit_child_unload_domain(actor);}
+                    }
+                }
+                return out;
             },
             Ok(transition)=>{
                 let ghost previous=transitions@;

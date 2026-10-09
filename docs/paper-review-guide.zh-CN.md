@@ -53,8 +53,9 @@ python3 scripts/check-paper-review.py
 资源安全。`SetupFailed` 在自主循环前停止，并不表示 actor 被阻塞。Insert/Begin/Step
 现由 `preparation_enabled` 给出精确实现接纳域；该范围内的失败命令在真实失败状态不
 满足定义域，即使此前缀含其他命令也成立，不要求全部命令最初就使能。
-Retire/Depart/Unload/Remove 仍受支持，但不在该 dispatcher 等价范围内。直接
-Mixed/Fresh Unload 另有清理守卫加 inverse 的精确域；其余命令与 dispatcher 的域、
+Retire/Depart/Unload/Remove 仍受支持，但不在该准备范围内。实际 Mixed/Fresh
+Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源历史还导出实际
+Unit/Child 日志的 inverse 有定义性，见 PR-02。其余命令与 dispatcher 的域、
 具体错误枚举、整个系统进展、任意 Future 完成及宿主调度仍有独立义务。这些合同修复不需要引入
 时序逻辑依赖。
 
@@ -90,7 +91,8 @@ Mixed/Fresh Unload 另有清理守卫加 inverse 的精确域；其余命令与 
   journal 长度。公共错误保持完整机器，内部草稿则可能已经恢复部分前缀。它将守卫
   接到真实有限清理；`!relied` 本身不保证任意 inverse 有效。对应引理 57、推论 69
   和定理 73 的范围仍为 partial：执行有定义的恢复，不等于一般 foreign replay
-  观察等价或整个系统进展。
+  观察等价或整个系统进展。下文 PR-02 为真实 Unit/Child 日志的受限范围导出
+  inverse 条件，不改变清理守卫。
 - [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs)：
   `LifecycleActions` 将精确动作票据、清理结果和实际的
   `Kernel::finish_cleanup` 调用连接起来。失败结果保留阻塞凭据；显式重试获得新票据。
@@ -146,6 +148,22 @@ cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_ret
   `has_reference` 扫描每份日志；成功时保证 `remove_unreferenced`，返回 `Retained`
   则意味着确实存在引用。`unload` 调用 `ChildEpisode::finish_restore`；成功时
   保证 `ownership::child_unload` 且日志为空。
+- [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) 和
+  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs)：
+  [`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs)
+  将已表示的良构源状态中保留的 child 身份接到实际 receipts。
+  `history_sound` 本身只保证当初落地时 inverse 有定义；retention 才给出当前事实。
+  对已登记 actor 的 `unit_child_journal`，Unit 恒等操作与 Child retirement 均保持
+  registry 成员，因而整个真实 LIFO journal 的恢复有定义。实际 `run_script` 返回
+  机器具有此性质；`run_from_empty` 也在准备及返回处建立它。不新增运行时 history
+  buffer、替代恢复实现或强化 `wf`。
+- `unit_child_unload_domain` 再于上述恢复性质和日志分类下，证明 `unload_enabled`
+  等于 `cleanup_permitted`。公共 Unload 与实际 `apply` 分支将该域接到执行。
+  脚本若在仅含 Unit/Child 的 Unload 处停止，则该停止状态不允许清理。退休 child
+  在合法 Remove 前仍已登记；parent 所有权不产生服务依赖，也不要求 child 先完成
+  清理才能执行 parent 的 inverses。Provision/Xor 等非平凡 Table 恢复仍受 strict
+  当前状态域约束。这是定义 52、引理 57 和定理 73 的受限桥，不是推论 69 的一般
+  foreign replay 恢复方程；引理 57 和定理 73 仍为 partial。
 
 **执行检查：**
 
@@ -153,12 +171,21 @@ cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_ret
 cargo test --offline -p cordis-kernel --test paper_vestige retiring_an_already_removed_child_requires_an_idempotent_extension -- --exact
 cargo test --offline -p cordis-kernel --test child_driver retired_inactive_child_is_retained_until_real_inverse_is_consumed -- --exact
 cargo test --offline -p cordis-kernel --test child_driver all_actual_journals_retain_their_children_through_nested_recovery -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery fresh_history_retains_retired_children_until_parent_recovery -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery mixed_history_retires_captured_children_without_running_their_journals -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery failed_script_retained_removal_keeps_a_recoverable_actual_prefix -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery bootstrap_terminal_publication_failure_keeps_a_recoverable_child_receipt -- --exact
 ```
 
 第一个测试暴露了公开 Kernel 路径上因名称不存在而失败的情况。持有内部状态的
 ChildDriver 测试展示了额外的保留策略如何防止过早移除，并消耗已捕获的退役操作。
 公开 Kernel 原有的 O-Remove 没有被悄悄收紧。其他适配器必须各自建立相应的保留行为；
 本案例不能证明任意 JS 子插件回调的行为。
+
+新 Unit/Child 测试通过公共脚本检查退休身份的保留、parent 恢复不执行 child 自身
+日志，以及 Retained 错误后成功前缀仍可恢复。外部插入、只有同一 parent 而未被
+receipt 捕获的 child 不会因此退休。它们是行为回归；Unit 恒等操作本身不能让测试
+观察出逆操作先后顺序，LIFO 与有定义性仍须审查证明合同。
 
 **负控候选：** `child-removal-ignores-retained-token` 弱化对已退役子插件的保留条件。
 当前检出版本的验收证据仍需单独取得。

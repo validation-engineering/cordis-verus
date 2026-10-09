@@ -205,6 +205,71 @@
           "file": "crates/cordis-kernel/src/child_driver.rs",
           "symbol": "unload",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "symbol": "unit_child_receipts",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "symbol": "restore_unit_children",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "symbol": "retained_children_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "symbol": "unit_child_recovery_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "symbol": "unit_child_unload_domain",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "cleanup_permitted",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "apply",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "unload",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "apply",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_script",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "symbol": "run_from_empty",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -222,6 +287,26 @@
           "package": "cordis-kernel",
           "target": "child_driver",
           "name": "all_actual_journals_retain_their_children_through_nested_recovery"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "unit_child_recovery",
+          "name": "fresh_history_retains_retired_children_until_parent_recovery"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "unit_child_recovery",
+          "name": "mixed_history_retires_captured_children_without_running_their_journals"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "unit_child_recovery",
+          "name": "failed_script_retained_removal_keeps_a_recoverable_actual_prefix"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "unit_child_recovery",
+          "name": "bootstrap_terminal_publication_failure_keeps_a_recoverable_child_receipt"
         }
       ],
       "negativeControl": {

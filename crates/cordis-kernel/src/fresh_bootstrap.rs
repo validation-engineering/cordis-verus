@@ -69,14 +69,17 @@ impl FromEmptyReport {
     }
     #[verifier::spinoff_prover]
     proof fn establish(&self,bank:Seq<core::Blueprint>,states:Seq<mx::Configuration<u64,core::Index>>)
-        requires fs::execution(core::library(),super::programs(bank),states,self.labels()),
+        requires self.machine.wf(),self.prepared@.wf(),
+            fs::execution(core::library(),super::programs(bank),states,self.labels()),
             states.first()==mx::empty::<u64,core::Index>(),
             self.prepared@.represents(bank,states[self.setup.len() as int]),
             self.machine.represents(bank,states.last()),
-        ensures self.refines(bank),
+        ensures self.refines(bank),self.machine.unit_child_recovery(),self.prepared@.unit_child_recovery(),
     {
         super::weak_theory();
         fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,core::library(),super::programs(bank),states,self.labels());
+        self.machine.unit_child_recovery_from_source(bank,states.last());
+        self.prepared@.unit_child_recovery_from_source(bank,states[self.setup.len() as int]);
     }
 }
 
@@ -114,6 +117,7 @@ proof fn concatenate(bank:Seq<core::Blueprint>,prefix:Seq<mx::Configuration<u64,
 #[verifier::spinoff_prover]
 pub fn run_from_empty(blueprints:Vec<Blueprint>,setup_commands:&[Command],actor:usize)->(out:FromEmptyReport)
     ensures out.machine.wf(),out.prepared@.wf(),out.actor==actor,
+        out.machine.unit_child_recovery(),out.prepared@.unit_child_recovery(),
         out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
         out.setup.len()<=setup_commands.len(),
         forall|i:int|0<=i<out.setup.len() ==> out.setup[i].command()==setup_commands[i],

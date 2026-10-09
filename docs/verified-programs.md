@@ -107,9 +107,25 @@ restoring 标志。一次 inverse 失败保持它自己的输入，但整个内�
 
 该谓词只用于证明，不是新增一次运行时预检查。Child inverse 仍是退休捕获的 child，
 不删除它或自动运行其清理。`FreshDriver::same_unload_domain` 证明完整 `same` 的机器
-有相同定义域。直接 Unload 的这一合同没有扩大 `preparation_command` 的
-Insert/Begin/Step 范围；也未证明任意良构日志可恢复、全部历史的 foreign replay
-观察等价或全局终止。详见[真实清理定义域](progress-contracts.zh-CN.md#真实-lifo-清理的精确定义域)。
+有相同定义域。实际 `apply` 的 Unload 分支另有成功 iff `unload_enabled` 的合同，
+但没有扩大 `preparation_command` 的 Insert/Begin/Step 范围；也未证明任意良构日志
+可恢复、全部历史的 foreign replay 观察等价或全局终止。详见[真实清理定义域](progress-contracts.zh-CN.md#真实-lifo-清理的精确定义域)。
+对真实日志还有受限的 `unit_child_recovery()` 结论：每个已登记 actor 若满足
+`unit_child_journal(actor)`，即全部 receipts 为 Unit 或 Child，其完整逆序列就有定义。
+证明用已表示源状态的 `retained` 得到当前仍登记的 captured child，再利用 Unit 恒等与
+Child 退休都保持 registry 成员递归完成。`history_sound` 只保证原始落地时 inverse
+有定义，不能替代当前保留事实。Mixed/Fresh `run_script` 从真实成功前缀自动导出该
+性质，即使随后命令返回错误也成立；`run_from_empty` 为 prepared 和最终机器建立它。
+没有增加运行时 history buffer、恢复算法或 `wf()` 条件。
+
+`unit_child_unload_domain` 在该性质与日志分类下，把 `unload_enabled` 化为
+`cleanup_permitted`，即 Kernel 的实际清理守卫。真实 Unload 因而成功 iff 允许清理；
+脚本在此类日志的 Unload 处失败，就意味着返回状态不允许清理。Child inverse 仍不
+删除身份或执行 child 自身清理，所有权也不构成服务依赖。Provision/Xor 等非平凡
+Table inverse 的 strict 状态域未被消解；Unit 在模型中叫 `Table(Unit)`，范围按实际
+receipt 分类。这是定义 52 及引理 57／定理 73 的受限连接，不补齐推论 69 的一般
+foreign replay 方程、owner 表空或整个系统终止，相关 partial 状态不变。
+
 当前蓝图明确使用固定的 `expected` child 名称。一次成功创建后，重新激活
 同一个蓝图可能因单调分配器返回新 ID 而得到 `UnexpectedChild`；错误本身
 经过原子性证明，尚未等同于论文的动态 fresh-name binder。测试覆盖这一
@@ -231,8 +247,9 @@ Kernel 插入域；Begin 要求已登记、保留 journal 为空及 Kernel Begin
 `run_from_empty` 的 SetupFailed 同时保证其在 `prepared` 与返回机器中不满足谓词。
 这里的“下一条”是 `setup_commands[setup.len()]`，按成功前缀后的状态判断。不是在
 初始 empty 状态一次性要求全部命令使能；前缀可包含 Retire 等其他成功命令。
-Retire/Depart/Unload/Remove 仍可执行，只未纳入 dispatcher 的这条精确域等价；
-直接 Unload 的独立合同见上文。准备谓词对它们返回 false 不能用作拒绝结论。
+Retire/Depart/Unload/Remove 仍可执行，只未纳入准备范围的这条精确域等价；
+Unload 的实际 `apply` 分支另有上文的独立合同。准备谓词对它们返回 false 不能用作
+拒绝结论。
 合同尚未按输入谓词区分具体错误枚举值，也不保证全部论文已使能
 命令都被接纳：蓝图合法性、容量和 strict 值可用性仍是实现域边界。新 child 仍需自行
 Begin／执行；这不是全图静止或 strict primitive 总性。

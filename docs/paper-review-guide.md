@@ -63,9 +63,11 @@ actor. Insert/Begin/Step now have exact implementation acceptance domains throug
 `preparation_enabled`; a failed command in that profile is disabled at the actual
 failure state, even after a prefix containing other commands. This does not
 require all commands to be enabled initially. Retire/Depart/Unload/Remove remain
-supported but outside that dispatcher equivalence. Direct Mixed/Fresh Unload
-now has its own exact cleanup-guard-plus-inverse domain. The remaining command
-and dispatcher domains, individual error variants, whole-system progress,
+supported but outside the preparation profile. The actual Mixed/Fresh Unload
+dispatcher branch now has its own exact cleanup-guard-plus-inverse domain. Real
+source histories also establish inverse definedness for actual Unit/Child
+journals, as reviewed in PR-02. The remaining command and dispatcher domains,
+individual error variants, whole-system progress,
 arbitrary Future completion and host scheduling remain
 separate; these repairs do not require a temporal-logic dependency.
 
@@ -108,7 +110,8 @@ consumer may temporarily disagree with its current target.
   finite cleanup; `!relied` alone does not establish arbitrary inverse validity.
   Its contribution to Lemma 57, Corollary 69 and Theorem 73 remains partial:
   defined restoration is separate from general foreign-replay equivalence or
-  whole-system progress.
+  whole-system progress. PR-02 below derives the inverse condition for the
+  restricted actual Unit/Child journal profile, without changing the guard.
 - [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs):
   `LifecycleActions` joins exact action tickets with cleanup outcomes and the
   actual `Kernel::finish_cleanup` call. A failed completion retains a blocking
@@ -176,6 +179,27 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   `remove_unreferenced`, while `Retained` means a real reference exists.
   `unload` calls `ChildEpisode::finish_restore`; success ensures
   `ownership::child_unload` and an empty journal.
+- [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) and
+  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs):
+  [`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs)
+  connects a represented well-formed source's retained
+  child identities to the actual receipts. `history_sound` alone only gives
+  inverse definedness at the original landing; retention is the current-state
+  fact. For a registered actor's `unit_child_journal`, Unit identity and Child
+  retirement preserve registry membership, giving defined restoration of the
+  complete real LIFO journal. Actual `run_script` outputs have this property;
+  `run_from_empty` also establishes it at preparation and return. No runtime
+  history buffer, alternate restore implementation or stronger `wf` is added.
+- `unit_child_unload_domain` then equates `unload_enabled` with
+  `cleanup_permitted` under that recovery property and journal classification.
+  Public Unload and the actual `apply` branch connect this domain to execution.
+  If a script stops on Unload with a Unit/Child journal, cleanup is not permitted
+  at that stopping point. A retired child remains registered until legal Remove;
+  parent ownership does not create a service dependency or force child cleanup
+  before the parent's inverses. Provision/Xor and other nontrivial Table recovery
+  remain subject to strict state-dependent domains. This is a restricted bridge
+  for Definition 52, Lemma 57 and Theorem 73, not Corollary 69's general
+  foreign-replay recovery equation. Lemma 57 and Theorem 73 remain partial.
 
 **Executable review:**
 
@@ -183,6 +207,10 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
 cargo test --offline -p cordis-kernel --test paper_vestige retiring_an_already_removed_child_requires_an_idempotent_extension -- --exact
 cargo test --offline -p cordis-kernel --test child_driver retired_inactive_child_is_retained_until_real_inverse_is_consumed -- --exact
 cargo test --offline -p cordis-kernel --test child_driver all_actual_journals_retain_their_children_through_nested_recovery -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery fresh_history_retains_retired_children_until_parent_recovery -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery mixed_history_retires_captured_children_without_running_their_journals -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery failed_script_retained_removal_keeps_a_recoverable_actual_prefix -- --exact
+cargo test --offline -p cordis-kernel --test unit_child_recovery bootstrap_terminal_publication_failure_keeps_a_recoverable_child_receipt -- --exact
 ```
 
 The first test exposes the missing-name failure on the public Kernel path.
@@ -190,6 +218,13 @@ The owning ChildDriver tests show the additional retention policy preventing
 premature removal and consuming the captured retirement. The public Kernel's
 original O-Remove was not silently tightened. Other adapters must establish their
 own retention behavior; this case does not prove arbitrary JS child callbacks.
+
+The new Unit/Child tests use public scripts to check retired identity retention,
+parent recovery without running a child's journal, and recovery of the successful
+prefix after a Retained error. An externally inserted child with the same parent,
+but no captured receipt, is not retired by that recovery. These are behavior
+regressions: Unit identity alone does not make inverse order observable in a
+test; review the proof contracts for LIFO and definedness.
 
 **Negative-control candidate:** `child-removal-ignores-retained-token` weakens
 retention for a retired child. Acceptance evidence for this checkout remains a

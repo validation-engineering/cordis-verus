@@ -731,6 +731,8 @@ impl MixedDriver {
                 other.blueprints[blueprint as int].provisions@);
         }
     }
+    /// The checked lifecycle guard before restoring any retained inverse.
+    pub closed spec fn cleanup_permitted(&self,actor:usize)->bool {self.kernel.cleanup_enabled(actor)}
     /// Exact domain of guarded recovery over the actual retained LIFO journal.
     /// Cleanup permission alone does not imply that every inverse is defined.
     pub closed spec fn unload_enabled(&self,actor:usize)->bool {
@@ -1214,6 +1216,7 @@ impl MixedDriver {
 
     /// The executable primitive interpreter, directly related to the existing
     /// mixed grammar. This runs table writes and real kernel child insertion.
+    #[verifier::spinoff_prover]
     fn execute(&mut self,actor:usize,_blueprint:usize,instruction:Instruction)->(out:Result<Receipt,DriverError>)
         requires old(self).wf(),actor<old(self).rows.len(),r::registered(old(self).control(),actor),
             old(self).control().fibers[actor].phase==Phase::Loading,
@@ -1535,9 +1538,12 @@ impl MixedDriver {
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).observation()==old(self).observation() && final(self).same(old(self)),
             out.is_ok()==old(self).unload_enabled(actor),
+            old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
+                ==> out.is_ok()==old(self).cleanup_permitted(actor),
             out.is_ok() ==> final(self).journal(actor).len()==0
                 && final(self).control().fibers[actor].phase==Phase::Inactive && old(self).ack(final(self),actor,r::Rule::Unload),
     {
+        proof {if self.unit_child_recovery() && self.unit_child_journal(actor) {self.unit_child_unload_domain(actor);}}
         let mut draft=self.duplicate();
         let ghost initial=draft;
         proof {draft.same_unload_domain(self,actor);}
@@ -1748,6 +1754,9 @@ impl MixedDriver {
     pub fn apply(&mut self,command:Command)->(out:Result<Transition,DriverError>)
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+            match command {Command::Unload {actor}=>out.is_ok()==old(self).unload_enabled(actor)
+                && (old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
+                    ==> out.is_ok()==old(self).cleanup_permitted(actor)),_=>true},
             out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),out.unwrap().label().0,out.unwrap().label().1),
     {
@@ -1888,11 +1897,29 @@ impl ScriptReport {
             &&& forall|i:int|0<=i<states.len() ==> mx::well_formed(library(),programs(bank),states[i]) && crate::preservation::resource_safe(states[i].state)
         }
     }
+    /// Recover the source witness already established by the real script.
+    pub proof fn source_execution(&self,bank:Seq<Blueprint>)->(states:Seq<mx::Configuration<u64,Index>>)
+        requires self.refines(bank),
+        ensures mx::execution(library(),programs(bank),states,labels(self.transitions@)),
+            states.first()==mx::empty::<u64,Index>(),self.machine.represents(bank,states.last()),
+            forall|i:int|0<=i<states.len() ==> mx::well_formed(library(),programs(bank),states[i])
+                && crate::preservation::resource_safe(states[i].state),
+    {
+        choose|states:Seq<mx::Configuration<u64,Index>>| {
+            &&& mx::execution(library(),programs(bank),states,labels(self.transitions@)) && states.first()==mx::empty::<u64,Index>()
+            &&& self.machine.represents(bank,states.last())
+            &&& forall|i:int|0<=i<states.len() ==> mx::well_formed(library(),programs(bank),states[i])
+                && crate::preservation::resource_safe(states[i].state)
+        }
+    }
     proof fn establish(&self,bank:Seq<Blueprint>,states:Seq<mx::Configuration<u64,Index>>)
-        requires mx::execution(library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
+        requires self.machine.wf(),mx::execution(library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
-        ensures self.refines(bank),
-    {library_theory();mx::from_empty_safe(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));}
+        ensures self.refines(bank),self.machine.unit_child_recovery(),
+    {
+        library_theory();mx::from_empty_safe(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));
+        self.machine.unit_child_recovery_from_source(bank,states.last());
+    }
 }
 
 /// Actual execution, including the first strict failure. Its correspondence
@@ -1900,8 +1927,12 @@ impl ScriptReport {
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
     ensures out.machine.wf(),out.refines(blueprints@),out.transitions.len()<=commands.len(),
+        out.machine.unit_child_recovery(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
+        out.error.is_some() ==> match commands[out.transitions.len() as int] {
+            Command::Unload {actor}=>out.machine.unit_child_journal(actor) ==> !out.machine.cleanup_permitted(actor),_=>true,
+        },
         forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
     let ghost bank=blueprints@;
@@ -1915,10 +1946,18 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
             machine.represents(bank,states.last()),mx::well_formed(library(),programs(bank),states.last()),
         decreases commands.len()-i,
     {
+        proof {machine.unit_child_recovery_from_source(bank,states.last());}
         let ghost before=machine;
         match machine.apply(commands[i]) {
             Err(error)=>{
-                proof {machine.same_representation(&before,bank,states.last());}
+                proof {
+                    machine.same_representation(&before,bank,states.last());
+                    machine.unit_child_recovery_from_source(bank,states.last());
+                    if let Command::Unload {actor}=commands[i as int] {
+                        machine.same_unload_domain(&before,actor);
+                        if machine.unit_child_journal(actor) {machine.unit_child_unload_domain(actor);}
+                    }
+                }
                 let out=ScriptReport {machine,transitions,error:Some(error)};
                 proof {out.establish(bank,states);}return out;
             },
@@ -1951,6 +1990,9 @@ proof fn append_source(bank:Seq<Blueprint>,states:Seq<mx::Configuration<u64,Inde
 }
 
 }
+
+#[path = "unit_child_recovery.rs"]
+pub mod recovery;
 
 #[path = "fresh_driver.rs"]
 pub mod fresh;
