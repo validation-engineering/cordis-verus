@@ -207,6 +207,23 @@ pub open spec fn successor<V>(model:s::Model<V>,a:s::State<V>,z:s::State<V>,b:s:
     }
 }
 
+/// Function fields of a fresh row are discharged independently of the table
+/// observation and structural preservation obligations.
+#[verifier::spinoff_prover]
+proof fn inserted_fields_related<V>(eq:spec_fn(Port,V,V)->bool,model:s::Model<V>,a:s::State<V>,z:s::State<V>,b:s::State<V>,y:s::State<V>,n:usize)
+    requires related(eq,model,a,b),p::insert_map(a,z,n),p::insert_map(b,y,n),z.control==y.control,
+        iterator_related(eq,model,n,z.effects[n],y.effects[n]),observed(eq,z,y),
+    ensures related(eq,model,z,y),
+{
+    empty_accumulators(eq,model);
+    assert forall|k:usize| s::registered(z,k) implies {
+        &&& iterator_related(eq,model,k,z.effects[k],y.effects[k])
+        &&& continuations(eq,model,k,z.iterators[k],y.iterators[k])
+        &&& accumulators_related(eq,model,z.accumulators[k],y.accumulators[k])
+    } by {if k!=n {assert(s::registered(a,k));}}
+}
+
+#[verifier::spinoff_prover]
 pub proof fn insert_simulates<V>(eq:spec_fn(Port,V,V)->bool,model:s::Model<V>,a:s::State<V>,z:s::State<V>,b:s::State<V>,n:usize,new_effect:nat)
     requires p::well_formed(a),p::well_formed(b),related(eq,model,a,b),s::step(model,a,z,n,r::Rule::Insert),
         iterator_related(eq,model,n,z.effects[n],new_effect),
@@ -220,11 +237,7 @@ pub proof fn insert_simulates<V>(eq:spec_fn(Port,V,V)->bool,model:s::Model<V>,a:
     assert(p::insert_map(b,y,n));p::insert_preservation(b,y,n);
     projection::empty_insertion(a,z,n,ISet::full());projection::empty_insertion(b,y,n,ISet::full());
     empty_accumulators(eq,model);
-    assert forall|k:usize| s::registered(z,k) implies {
-        &&& iterator_related(eq,model,k,z.effects[k],y.effects[k])
-        &&& continuations(eq,model,k,z.iterators[k],y.iterators[k])
-        &&& accumulators_related(eq,model,z.accumulators[k],y.accumulators[k])
-    } by {if k!=n {assert(s::registered(a,k));}}
+    inserted_fields_related(eq,model,a,z,b,y,n);
 }
 
 pub proof fn same_tables_projection<V>(a:s::State<V>,b:s::State<V>)

@@ -263,6 +263,7 @@ impl core::MixedDriver {
             !result.diverted && next.is_some() ==> self.control()==landed.control(),
         ensures initial.fresh_ack(self,actor,result.label().1,super::choice(result.outcome)),
     {
+        hide(fs::entry);
         reveal(core::MixedDriver::fresh_ack);
         let length=initial.blueprints[blueprint as int].code.len();
         super::weak_theory();
@@ -272,6 +273,7 @@ impl core::MixedDriver {
             } by {
                 let rule=result.label().1;let phase=if rule==r::Rule::Divert {Phase::Unloading} else if rule==r::Rule::Iter {Phase::Loading} else {Phase::Active};
                 let z=fs::land(core::library(),super::programs(bank),a,actor,phase,super::choice(result.outcome));
+                super::selected_landing_entry(bank,a,actor,super::choice(result.outcome));
                 assert(a.current[actor]==Some(Index {blueprint,pc}));
                 assert(bank[blueprint as int].same(&initial.blueprints[blueprint as int]));
                 assert(instruction.valid(pc,length,blueprint,initial.blueprints[blueprint as int].dependencies(),initial.blueprints[blueprint as int].provisions()));

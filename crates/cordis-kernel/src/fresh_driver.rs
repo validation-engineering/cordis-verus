@@ -125,6 +125,29 @@ fn instantiate_template(draft:&MixedDriver,template:super::Instruction)->(out:su
     }
 }
 
+/// Expose the receipt kind and acting fiber frame needed by commit_landing.
+/// The wrapper can then compose execution contracts without unfolding the
+/// table operation or rechecking its captured provider in the same query.
+#[verifier::spinoff_prover]
+proof fn instruction_receipt_metadata(bank:Seq<super::Blueprint>,blueprint:usize,instruction:super::Instruction,
+    a:s::State<u64>,actor:usize,receipt:Receipt)
+    requires mx::run(super::library(),super::instruction_node(bank,blueprint,instruction),a,actor).is_some(),
+        receipt.model()==mx::run(super::library(),super::instruction_node(bank,blueprint,instruction),a,actor).unwrap().receipt,
+    ensures (match receipt.inverse {super::Inverse::Child {child}=>Some(child),_=>None})
+        ==match instruction {super::Instruction::Child {expected,..}=>Some(expected),_=>None},
+        s::registered(mx::run(super::library(),super::instruction_node(bank,blueprint,instruction),a,actor).unwrap().state,actor),
+        mx::run(super::library(),super::instruction_node(bank,blueprint,instruction),a,actor).unwrap().state.control.fibers[actor]
+            ==a.control.fibers[actor],
+{
+    match instruction {
+        super::Instruction::Child {expected,..}=>{
+            assert(!r::registered(a.control,expected));
+            assert(expected!=actor);
+        },
+        _=>{},
+    }
+}
+
 pub struct FreshDriver {inner:super::MixedDriver}
 impl FreshDriver {
     pub closed spec fn control(&self)->r::State {self.inner.control()}
@@ -364,6 +387,7 @@ impl FreshDriver {
                 && (choice(out.unwrap()).is_some() ==> choice(out.unwrap()).unwrap()==old(self).next_id())
                 && old(self).ack(final(self),actor,super::outcome_rule(out.unwrap()),choice(out.unwrap())),
     {
+        hide(crate::grammar_lift::run);
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
         proof {
@@ -394,6 +418,7 @@ impl FreshDriver {
         if let Some(next)=next {if next<=pc || next>length {return Err(DriverError::InvalidInstruction);}}
         let receipt=draft.execute(actor,blueprint,instruction)?;
         let ghost landed=draft;
+        proof {instruction_receipt_metadata(initial.blueprints@,blueprint,instruction,initial.primitive_state(),actor,receipt);}
         draft.commit_landing(actor,receipt,next)?;
         let outcome=match receipt.inverse {
             super::Inverse::Child {child}=>Outcome::Child {child,finished:next.is_none()},
@@ -492,6 +517,17 @@ pub proof fn program_member(bank:Seq<super::Blueprint>,actor:usize,id:Index)
     assert(fg::obligation(super::library(),ps(actor)(id),actor,keys,provisions,fg::members(super::library(),ps)));
     fg::constructor_member(super::library(),ps,actor,keys,provisions,id);
 }
+
+/// Pin the source record to the allocation choice before reasoning about
+/// driver rows. Keeping this equality separate avoids unfolding the complete
+/// landing history inside every row and journal obligation.
+#[verifier::spinoff_prover]
+proof fn selected_landing_entry(bank:Seq<super::Blueprint>,a:mx::Configuration<u64,Index>,actor:usize,selected:Option<usize>)
+    ensures fs::entry(super::library(),programs(bank),a,actor,selected)==(mx::Entry {
+        input:a.state,iterator:a.current[actor].unwrap(),
+        landed:fg::run(super::library(),programs(bank)(actor)(a.current[actor].unwrap()),a.state,actor,selected).unwrap(),
+    }),
+{ }
 
 impl MixedDriver {
     #[verifier::opaque]
@@ -665,6 +701,7 @@ impl MixedDriver {
             next.is_some() ==> self.control()==landed.control(),
         ensures initial.fresh_ack(self,actor,super::outcome_rule(outcome),choice(outcome)),
     {
+        hide(fs::entry);
         reveal(MixedDriver::fresh_ack);
         let length=initial.blueprints[blueprint as int].code.len();
         weak_theory();
@@ -674,6 +711,7 @@ impl MixedDriver {
             } by {
                 let rule=super::outcome_rule(outcome);let phase=if rule==r::Rule::Iter {Phase::Loading} else {Phase::Active};
                 let z=fs::land(super::library(),programs(bank),a,actor,phase,choice(outcome));
+                selected_landing_entry(bank,a,actor,choice(outcome));
                 assert(a.current[actor]==Some(Index {blueprint,pc}));
                 assert(bank[blueprint as int].same(&initial.blueprints[blueprint as int]));
                 assert(instruction.valid(pc,length,blueprint,initial.blueprints[blueprint as int].dependencies(),initial.blueprints[blueprint as int].provisions()));

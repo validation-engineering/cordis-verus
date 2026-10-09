@@ -254,12 +254,40 @@ pub proof fn invocation_prior_landing<V,O>(eq:spec_fn(Port,V,V)->bool,programs:g
     assert(operation_at(programs(actor)(states[i].state.iterators[actor].unwrap()),states[i].state,actor,provider,key));
 }
 
+/// Isolate the single-step provenance argument from the quantified episode.
+/// The caller supplies the catalog frame; this lemma still derives the actual
+/// forward node or retained inverse from the grammar step itself.
+#[verifier::spinoff_prover]
+proof fn pinned_operation_origins<V,O>(programs:g::Programs<V,O>,allowed:grammar::Allowed<Port,V,O>,
+    model:full::Model<V>,a:g::Configuration<V>,z:g::Configuration<V>,actor:usize,rule:control::Rule,
+    consumer:usize,binding:Binding)
+    requires inv::well_formed(a.state),g::history_sound(programs,a.history),g::step(programs,allowed,a,z,actor,rule),
+        full::step(model,a.state,z.state,actor,rule),inv::admissible_step(model,a.state,z.state,actor,rule),
+        order::installed(a.state,consumer),a.state.control.fibers[consumer].committed.contains(binding),
+        a.state.control.fibers[binding.provider].phase==Phase::Active || a.state.control.fibers[binding.provider].phase==Phase::Unloading,
+    ensures forall|key:Port| a.state.tables[binding.provider].dom().contains(key)
+        && a.state.tables[binding.provider][key]!=z.state.tables[binding.provider][key] ==> {
+        &&& a.state.control.fibers[actor].dependencies.contains(key)
+        &&& step_operation_origin(programs,a,z,actor,rule,binding.provider,key)
+    },
+{
+    order::pinned_table_step(model,a.state,z.state,actor,rule,consumer,binding);
+    assert forall|key:Port| a.state.tables[binding.provider].dom().contains(key)
+        && a.state.tables[binding.provider][key]!=z.state.tables[binding.provider][key] implies {
+        &&& a.state.control.fibers[actor].dependencies.contains(key)
+        &&& step_operation_origin(programs,a,z,actor,rule,binding.provider,key)
+    } by {
+        foreign_step_operation_origin(programs,allowed,a,z,actor,rule,binding.provider,key);
+    }
+}
+
 /// Theorem 70 on actual finite grammar executions: begin publication, fixed
 /// commitments, provider episode order and persistent domains all follow from
 /// the catalog refinement. Every changed provider value additionally identifies
 /// its concrete operation or an actual LIFO invocation of a retained inverse.
 /// The grammar here contains unit, operation and provision nodes. Child and
 /// arbitrary host effects are not asserted to have this grammar provenance.
+#[verifier::spinoff_prover]
 pub proof fn episode_operation_ordering<V,O>(eq:spec_fn(Port,V,V)->bool,programs:g::Programs<V,O>,allowed:grammar::Allowed<Port,V,O>,
     states:Seq<g::Configuration<V>>,labels:Seq<(usize,control::Rule)>,consumer:usize,binding:Binding,b:int,u:int,pb:int,pu:int)
     requires grammar::primitive_theory(eq,allowed),g::execution(programs,allowed,states,labels),g::well_formed(programs,allowed,states.first()),
@@ -304,14 +332,7 @@ pub proof fn episode_operation_ordering<V,O>(eq:spec_fn(Port,V,V)->bool,programs
         })
     } by {
         if t<labels.len() {
-            order::pinned_table_step(model,states[t].state,states[t+1].state,labels[t].0,labels[t].1,consumer,binding);
-            assert forall|key:Port| states[t].state.tables[binding.provider].dom().contains(key)
-                && states[t].state.tables[binding.provider][key]!=states[t+1].state.tables[binding.provider][key] implies {
-                &&& states[t].state.control.fibers[labels[t].0].dependencies.contains(key)
-                &&& step_operation_origin(programs,states[t],states[t+1],labels[t].0,labels[t].1,binding.provider,key)
-            } by {
-                foreign_step_operation_origin(programs,allowed,states[t],states[t+1],labels[t].0,labels[t].1,binding.provider,key);
-            }
+            pinned_operation_origins(programs,allowed,model,states[t],states[t+1],labels[t].0,labels[t].1,consumer,binding);
         }
     }
 }

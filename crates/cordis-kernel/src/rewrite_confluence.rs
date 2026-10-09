@@ -16,6 +16,13 @@ verus! {
 pub open spec fn related<U,I>(a:Seq<g::Configuration<U,I>>,z:Seq<g::Configuration<U,I>>)->bool {
     a.len()==z.len() && forall|i:int| 0<=i<a.len() ==> tr::related(a[i],z[i])
 }
+/// The full configuration relation includes captured receipt correspondence.
+/// Extract that premise before entering a proof about primitive transitions.
+pub proof fn configuration_correspondence<U,I>(a:Seq<g::Configuration<U,I>>,z:Seq<g::Configuration<U,I>>)
+    requires related(a,z),
+    ensures a.len()==z.len(),forall|i:int| 0<=i<a.len() ==> tr::related(a[i],z[i]),
+{ }
+
 pub proof fn reflexive<U,I>(a:Seq<g::Configuration<U,I>>)
     ensures related(a,a),
 { }
@@ -112,26 +119,12 @@ pub proof fn swap_frame<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X
         &&& c::inputs(z,zl)==c::inputs(a,labels)
     },
 {
-    // Compose the verified step lemmas without unfolding their primitive laws.
-    hide(og::primitive_theory);
-    ol::execution_preservation(eq,lib,programs,a,labels);
+    hide(og::primitive_theory);hide(c::swap_states);
     c::adjacent_swap(eq,lib,programs,a,labels,i);
+    c::swap_construction(lib,programs,a,labels,i);
+    c::swap_suffix(eq,lib,programs,a,labels,i);
     let z=c::swap_states(lib,programs,a,labels,i);let source=a.subrange(i+2,a.len() as int);let tail=labels.subrange(i+2,labels.len() as int);
     let endpoint=c::swapped_endpoint(lib,programs,a,labels,i);
-    assert(g::execution(lib,programs,source,tail)) by {
-        assert forall|j:int| 0<=j<tail.len() implies g::step(lib,programs,source[j],source[j+1],tail[j].0,tail[j].1) by {
-            assert(g::step(lib,programs,a[i+2+j],a[i+3+j],labels[i+2+j].0,labels[i+2+j].1));
-        }
-    }
-    // The endpoint relation follows from each actual local diamond.
-    if g::landing(a[i],a[i+1],labels[i].1) {
-        o::orchestration_diamond(eq,lib,programs,a[i],a[i+1],a[i+2],labels[i].0,labels[i].1,labels[i+1].0,labels[i+1].1);
-    } else if labels[i].1==r::Rule::Unload {
-        unload::diamond(eq,lib,programs,a[i],a[i+1],a[i+2],labels[i].0,labels[i+1].0,labels[i+1].1);
-    } else {
-        admin::diamond(eq,lib,programs,a[i],a[i+1],a[i+2],labels[i].0,labels[i].1,labels[i+1].0,labels[i+1].1);
-    }
-    assert(tr::related(source.first(),endpoint));tr::suffix_transport(lib,programs,source,tail,endpoint);
     let moved=tr::transport(source,tail,endpoint);
     assert forall|j:int| 0<=j<a.len() && j!=i+1 implies tr::related(a[j],z[j]) by {
         if j<=i {assert(z[j]==a[j]);}
@@ -148,6 +141,8 @@ pub proof fn swap_related<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A
     ensures c::eligible(z,labels,i),related(c::swap_states(lib,programs,a,labels,i),c::swap_states(lib,programs,z,labels,i)),
         c::inputs(c::swap_states(lib,programs,a,labels,i),c::swap_labels(labels,i))==c::inputs(c::swap_states(lib,programs,z,labels,i),c::swap_labels(labels,i)),
 {
+    hide(og::primitive_theory);hide(c::swap_states);
+    configuration_correspondence(a,z);
     eligibility(lib,programs,a,z,labels);swap_frame(eq,lib,programs,a,labels,i);swap_frame(eq,lib,programs,z,labels,i);
     let left=c::swap_states(lib,programs,a,labels,i);let right=c::swap_states(lib,programs,z,labels,i);
     assert forall|j:int| 0<=j<left.len() implies tr::related(left[j],right[j]) by {

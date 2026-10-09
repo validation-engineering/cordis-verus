@@ -162,6 +162,18 @@ pub proof fn fresh_historical<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libra
         assert forall|n:usize| full::registered(source.first().state,n) implies r::interface_same(source.first().state.control.fibers[n],z.state.control.fibers[n]) by {assert(full::registered(a.state,n));}
     }
 }
+/// Appending an authentic foreign inverse only needs its existing catalogue
+/// position. Keep the recursive forward compatibility theory out of restoration.
+#[verifier::spinoff_prover]
+proof fn inverse_source_extension<S>(eq:spec_fn(S,S)->bool,prefix:Seq<Action<S>>,initial:S,token:nat)
+    requires local_source(eq,prefix,initial),token<catalog(prefix).len(),!catalog(prefix)[token as int].own,
+    ensures local_source(eq,prefix.push(Action::Inverse {token}),initial),
+        catalog(prefix.push(Action::Inverse {token}))==catalog(prefix),
+        events(prefix.push(Action::Inverse {token}))==events(prefix).push(event(catalog(prefix),Action::Inverse {token})),
+{
+    assert(prefix.push(Action::Inverse {token}).drop_last() =~= prefix);
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(20)]
 pub proof fn actual_restore_actions<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,
@@ -177,6 +189,7 @@ pub proof fn actual_restore_actions<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g:
     },
     decreases tokens.len(),
 {
+    hide(local_source);
     hide(g::undo);
     replay::context_equivalence(eq,lib);
     if tokens.len()==0 {assert(prefix+inverse_actions::<IMap<Port,U>>(tokens,offset) =~= prefix);}
@@ -184,7 +197,8 @@ pub proof fn actual_restore_actions<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g:
         let token=tokens.last();let at=(token-offset) as nat;let entry=history[token as int];let action=Action::Inverse {token:at};let next_prefix=prefix.push(action);
         assert(offset<=token<history.len());assert(g::owner(entry.landed.receipt)==actor);assert(historical(lib,programs,entry,owner,private));
         assert(0<=at<catalog(prefix).len());assert(catalog(prefix)[at as int]==entry_pair(lib,programs,entry,owner));
-        assert(next_prefix.drop_last() =~= prefix);assert(local_source(p::context_eq(eq),next_prefix,initial));
+        inverse_source_extension(p::context_eq(eq),prefix,initial,at);
+        assert(next_prefix.drop_last() =~= prefix);
         assert(catalog(next_prefix)==catalog(prefix));
         assert(events(next_prefix) =~= events(prefix).push(event(catalog(prefix),action)));
         assert(events(next_prefix).drop_last() =~= events(prefix));

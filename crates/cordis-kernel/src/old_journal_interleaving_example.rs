@@ -158,13 +158,37 @@ pub proof fn actual_source()
     assert(g::step(lib,programs,states.last(),g::unload(states.last(),2),2,r::Rule::Unload));
 }
 
+// A bounded prefix calculation avoids unfolding all twelve nested deletion
+// calls together with every source execution postcondition.
+proof fn deletion_prefix_shape(n:int)
+    requires 0<=n<=12,
+    ensures deletion::delete(ex::library(),base::programs(),source().take(n+1),labels().take(n),1)
+        ==surviving().take(seq![1int,1,1,2,3,3,4,5,6,7,7,8,9][n]),
+    decreases n,
+{
+    reveal(source);reveal(surviving);reveal(setup);
+    if n==0 {
+        reveal(deletion::delete);
+    } else {
+        deletion_prefix_shape(n-1);
+        assert(source().take(n+1).drop_last()==source().take(n));
+        assert(labels().take(n).drop_last()==labels().take(n-1));
+        reveal(deletion::delete);
+        if n==1 {} else if n==2 {} else if n==3 {} else if n==4 {}
+        else if n==5 {} else if n==6 {} else if n==7 {} else if n==8 {}
+        else if n==9 {} else if n==10 {} else if n==11 {} else {assert(n==12);}
+    }
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(30)]
 pub proof fn deletion_shape()
     ensures target()==surviving(),
 {
-    actual_source();reveal(source);reveal(surviving);
-    reveal_with_fuel(deletion::delete,13);
+    deletion_prefix_shape(12);
+    reveal(source);reveal(surviving);
+    assert(source().take(13)==source());assert(labels().take(12)==labels());
+    assert(surviving().take(9)==surviving());
 }
 
 #[verifier::spinoff_prover]

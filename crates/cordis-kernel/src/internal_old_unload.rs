@@ -43,6 +43,21 @@ pub open spec fn landing_catalogue<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g
     }
 }
 
+/// Expose one catalogue step with the deleted owner's identity. Callers can
+/// keep the recursive catalogue opaque while composing transport contracts.
+#[verifier::spinoff_prover]
+pub proof fn landing_catalogue_equation<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,states:Seq<g::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize)
+    requires states.len()==labels.len()+1,
+    ensures labels.len()==0 ==> landing_catalogue(lib,programs,states,labels,owner)==Seq::<fu::Action<IMap<Port,U>>>::empty(),
+        labels.len()>0 ==> landing_catalogue(lib,programs,states,labels,owner)=={
+            let prefix=landing_catalogue(lib,programs,states.drop_last(),labels.drop_last(),owner);
+            let a=states[states.len()-2];let z=states.last();let label=labels.last();
+            prefix.push(if g::landing(a,z,label.1) {
+                fu::Action::Forward {call:fu::entry_pair(lib,programs,g::entry(lib,programs,a,label.0),owner)}
+            } else {fu::Action::Identity})
+        },
+{ }
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 pub proof fn source_metadata<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,source:Seq<g::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize)

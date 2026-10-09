@@ -324,7 +324,7 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
     command = [
         str(binary), str(source), "--crate-name", "cordis_negative", "--crate-type=lib",
         "--edition=2021", "--no-cheating", "--output-json", "--triggers-mode", "silent",
-        "--num-threads", str(threads),
+        "--num-threads", str(threads), "--multiple-errors", "0",
     ]
     if diagnostics:
         command += ["--trace", "--time"]

@@ -64,6 +64,33 @@ pub proof fn receipt_crosses_batch<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::
     sj::word_commutes(pi::context_eq(eq),batch::forwards(es),f);sj::word_commutes(pi::context_eq(eq),sj::journal(es),f);
 }
 
+/// Name the last logical receipt before entering the recursive recovery proof.
+/// The returned index always uses the history compression map, including old
+/// receipts before the cut. This small equation is checked independently.
+#[verifier::spinoff_prover]
+proof fn last_mapped_token<U,I>(left:Seq<g::Entry<U,I>>,offset:nat,owner:usize,tokens:Seq<nat>)->(out:(nat,nat))
+    requires tokens.len()>0,
+    ensures out.0==tokens.last(),out.1==history::index(left,offset,owner,tokens.last()),
+{
+        let token=tokens.last();let mapped=history::index(left,offset,owner,token);
+        (token,mapped)
+}
+
+#[verifier::spinoff_prover]
+proof fn mapped_receipt<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,
+    left:Seq<g::Entry<U,I>>,right:Seq<g::Entry<U,I>>,offset:nat,owner:usize,actor:usize,token:nat)
+    requires history::histories(eq,left,right,offset,owner),actor!=owner,token<left.len(),g::owner(left[token as int].landed.receipt)==actor,
+        og::primitive_theory(eq,lib),mt::permitted_history(lib,programs,left),g::history_sound(lib,programs,left),
+    ensures history::index(left,offset,owner,token)<right.len(),
+        obs::receipt_related(eq,left[token as int].landed.receipt,right[history::index(left,offset,owner,token) as int].landed.receipt),
+{
+    if token<offset {
+        reveal(history::index);
+        assert(history::index(left,offset,owner,token)==token);
+        mt::history_reflexive(eq,lib,programs,left,token as int);
+    }
+}
+
 /// Restore the same logical journal using each side's authentic receipt.
 /// Source success is a fact of the original step; target success is proved.
 #[verifier::spinoff_prover]
@@ -92,14 +119,10 @@ pub proof fn restore_mixed<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<
 {
     replay::context_equivalence(eq,lib);history::rename_laws(left,offset,owner,tokens,0);
     if tokens.len()>0 {
-        let token=tokens.last();let mapped=history::index(left,offset,owner,token);
+        let (token,mapped)=last_mapped_token(left,offset,owner,tokens);
         let e=left[token as int];let receipt=e.landed.receipt;let replacement=right[mapped as int].landed.receipt;let es=fu::events(actions);
         assert(token<left.len());assert(g::owner(receipt)==actor);assert(history::simple(receipt));
-        if token<offset {
-            reveal(history::index);assert(mapped==token);assert(right[mapped as int]==e);
-            mt::history_reflexive(eq,lib,programs,left,token as int);
-        } else {assert(g::owner(left[token as int].landed.receipt)!=owner);}
-        assert(mapped<right.len());assert(obs::receipt_related(eq,receipt,replacement));
+        mapped_receipt(eq,lib,programs,left,right,offset,owner,actor,token);
         receipt_crosses_batch(eq,lib,programs,left,actions,offset,owner,actor,token,source);
         fu::table_inverse_projects(receipt,source);let sa=g::undo(receipt,source).unwrap();
         let before=p::project(source,ISet::full());let reference=batch::undo(es)(before).unwrap();

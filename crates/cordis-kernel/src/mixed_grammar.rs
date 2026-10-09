@@ -407,10 +407,13 @@ pub proof fn state_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Librar
     assert(z.current.dom() =~= z.roots.dom());
 }
 
+// Keep the independent preservation obligations in separate solver contexts.
+// In particular, removal retention must be checked without expanding component
+// membership and the full history quantifiers in the same query.
 #[verifier::spinoff_prover]
-pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,a:Configuration<U,I>,z:Configuration<U,I>,actor:usize,rule:r::Rule)
+proof fn step_history_sound<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,a:Configuration<U,I>,z:Configuration<U,I>,actor:usize,rule:r::Rule)
     requires d::primitive_theory(eq,lib),well_formed(lib,programs,a),step(lib,programs,a,z,actor,rule),
-    ensures well_formed(lib,programs,z),
+    ensures history_sound(lib,programs,z.history),
 {
     frame(eq,lib,programs,a,z,actor,rule);state_preservation(eq,lib,programs,a,z,actor,rule);
     if landing(a,z,rule) {
@@ -424,6 +427,13 @@ pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,li
             } by {if i<a.history.len() {assert(z.history[i]==a.history[i]);} else {assert(i==a.history.len());assert(z.history[i]==e);}}
         }
     }
+}
+
+proof fn step_tokens_valid<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,a:Configuration<U,I>,z:Configuration<U,I>,actor:usize,rule:r::Rule)
+    requires d::primitive_theory(eq,lib),well_formed(lib,programs,a),step(lib,programs,a,z,actor,rule),
+    ensures tokens_valid(z),
+{
+    frame(eq,lib,programs,a,z,actor,rule);state_preservation(eq,lib,programs,a,z,actor,rule);
     assert(tokens_valid(z)) by {
         assert forall|n:usize,i:int| #![trigger z.state.accumulators[n][i]] s::registered(z.state,n) && 0<=i<z.state.accumulators[n].len() implies {
             let token=z.state.accumulators[n][i];
@@ -437,6 +447,18 @@ pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,li
                 let token=a.state.accumulators[n][i];assert(token<a.history.len());assert(z.history[token as int]==a.history[token as int]);
             }
         }
+    }
+}
+
+proof fn step_members<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,a:Configuration<U,I>,z:Configuration<U,I>,actor:usize,rule:r::Rule)
+    requires d::primitive_theory(eq,lib),well_formed(lib,programs,a),step(lib,programs,a,z,actor,rule),
+    ensures members(lib,programs,z),
+{
+    frame(eq,lib,programs,a,z,actor,rule);state_preservation(eq,lib,programs,a,z,actor,rule);
+    if landing(a,z,rule) {
+        let id=a.current[actor].unwrap();
+        run_members(eq,lib,programs,a.state,actor,id);
+        run_admissible(eq,lib,programs(actor)(id),a.state,actor);
     }
     assert(members(lib,programs,z)) by {
         assert forall|n:usize| s::registered(z.state,n) implies component_member(lib,programs,z.state,n,z.roots[n])
@@ -459,6 +481,13 @@ pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,li
             }
         }
     }
+}
+
+proof fn step_retains_children<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,a:Configuration<U,I>,z:Configuration<U,I>,actor:usize,rule:r::Rule)
+    requires d::primitive_theory(eq,lib),well_formed(lib,programs,a),step(lib,programs,a,z,actor,rule),tokens_valid(z),
+    ensures ch::retained(kind(z.history),z.state),
+{
+    frame(eq,lib,programs,a,z,actor,rule);state_preservation(eq,lib,programs,a,z,actor,rule);
     assert(ch::retained(kind(z.history),z.state)) by {
         assert forall|n:usize,token:nat,child:usize| s::registered(z.state,n) && z.state.accumulators[n].contains(token)
             && kind(z.history)(token)==Some(child) implies s::registered(z.state,child) by {
@@ -479,6 +508,17 @@ pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,li
             }
         }
     }
+}
+
+pub proof fn configuration_preservation<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,a:Configuration<U,I>,z:Configuration<U,I>,actor:usize,rule:r::Rule)
+    requires d::primitive_theory(eq,lib),well_formed(lib,programs,a),step(lib,programs,a,z,actor,rule),
+    ensures well_formed(lib,programs,z),
+{
+    frame(eq,lib,programs,a,z,actor,rule);state_preservation(eq,lib,programs,a,z,actor,rule);
+    step_history_sound(eq,lib,programs,a,z,actor,rule);
+    step_tokens_valid(eq,lib,programs,a,z,actor,rule);
+    step_members(eq,lib,programs,a,z,actor,rule);
+    step_retains_children(eq,lib,programs,a,z,actor,rule);
 }
 
 pub open spec fn execution<A,X,U,B,I>(lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,states:Seq<Configuration<U,I>>,labels:Seq<(usize,r::Rule)>)->bool {

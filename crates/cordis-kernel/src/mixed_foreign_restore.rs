@@ -111,6 +111,38 @@ pub proof fn provision_cut_crosses<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::
     sj::word_commutes(pi::context_eq(eq),batch::forwards(es),prov::cut(key));sj::word_commutes(pi::context_eq(eq),sj::journal(es),prov::cut(key));
 }
 
+// Journal shape and per-entry absence use different quantified witnesses.
+// Prove them independently so changes to unrelated transition guards cannot
+// entangle those instantiations in the aggregate absence theorem.
+proof fn pending_inverses_shrink<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,entries:Seq<g::Entry<U,I>>,actions:Seq<fu::Action<IMap<Port,U>>>,offset:nat,owner:usize,private:ISet<Port>)
+    requires offset<=entries.len(),fu::catalog(actions)==fu::fresh_records(lib,programs,entries,offset,owner),
+        forall|i:int|offset<=i<entries.len() && g::owner(entries[i].landed.receipt)==owner ==> fp::historical(lib,programs,#[trigger] entries[i],owner,private),
+    ensures forall|i:int|0<=i<sj::journal(fu::events(actions)).len() ==> fp::shrinks(#[trigger] sj::journal(fu::events(actions))[i]),
+{
+    let records=fu::catalog(actions);let word=sj::journal(fu::events(actions));fu::journal_origins(actions);
+    assert forall|i:int|0<=i<word.len() implies fp::shrinks(#[trigger] word[i]) by {
+        let j=choose|j:int|0<=j<records.len() && records[j].own && records[j].inverse==word[i];let entry=entries[offset as int+j];
+        assert(records[j]==fu::entry_pair(lib,programs,entry,owner));fp::inverse_shape(lib,programs,entry,owner,private);
+    }
+
+}
+
+proof fn pending_keys_avoid<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,entries:Seq<g::Entry<U,I>>,actions:Seq<fu::Action<IMap<Port,U>>>,offset:nat,owner:usize,private:ISet<Port>,key:Port)
+    requires offset<=entries.len(),fu::catalog(actions)==fu::fresh_records(lib,programs,entries,offset,owner),
+        forall|i:int|offset<=i<entries.len() && g::owner(entries[i].landed.receipt)==owner ==> fp::historical(lib,programs,#[trigger] entries[i],owner,private),
+        forall|i:int|0<=i<sj::journal(fu::events(actions)).len() ==> !fp::needs(#[trigger] sj::journal(fu::events(actions))[i],key),
+    ensures forall|j:int|0<=j<fu::catalog(actions).len() && fu::catalog(actions)[j].own ==>
+        pi::key(dep::stage(lib,replay::dependent(programs(owner)(#[trigger] entries[offset as int+j].iterator))))!=Some(key),
+{
+    let records=fu::catalog(actions);let word=sj::journal(fu::events(actions));
+    assert forall|j:int|0<=j<records.len() && records[j].own implies
+        pi::key(dep::stage(lib,replay::dependent(programs(owner)(#[trigger] entries[offset as int+j].iterator))))!=Some(key) by {
+        let entry=entries[offset as int+j];assert(records[j]==fu::entry_pair(lib,programs,entry,owner));
+        fp::inverse_shape(lib,programs,entry,owner,private);fp::inverse_member(actions,j);
+        let i=choose|i:int|0<=i<word.len() && #[trigger] word[i]==records[j].inverse;assert(!fp::needs(word[i],key));
+    }
+}
+
 pub proof fn pending_avoids<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,entries:Seq<g::Entry<U,I>>,actions:Seq<fu::Action<IMap<Port,U>>>,offset:nat,owner:usize,private:ISet<Port>,input:IMap<Port,U>,key:Port)
     requires offset<=entries.len(),fu::catalog(actions)==fu::fresh_records(lib,programs,entries,offset,owner),
         forall|i:int|offset<=i<entries.len() && g::owner(entries[i].landed.receipt)==owner ==> fp::historical(lib,programs,#[trigger] entries[i],owner,private),
@@ -118,18 +150,9 @@ pub proof fn pending_avoids<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Progr
     ensures forall|j:int|0<=j<fu::catalog(actions).len() && fu::catalog(actions)[j].own ==>
         pi::key(dep::stage(lib,replay::dependent(programs(owner)(#[trigger] entries[offset as int+j].iterator))))!=Some(key),
 {
-    let records=fu::catalog(actions);let word=sj::journal(fu::events(actions));fu::journal_origins(actions);
-    assert forall|i:int|0<=i<word.len() implies fp::shrinks(#[trigger] word[i]) by {
-        let j=choose|j:int|0<=j<records.len() && records[j].own && records[j].inverse==word[i];let entry=entries[offset as int+j];
-        assert(records[j]==fu::entry_pair(lib,programs,entry,owner));fp::inverse_shape(lib,programs,entry,owner,private);
-    }
-    fp::absent_word(word,input,key);
-    assert forall|j:int|0<=j<records.len() && records[j].own implies
-        pi::key(dep::stage(lib,replay::dependent(programs(owner)(#[trigger] entries[offset as int+j].iterator))))!=Some(key) by {
-        let entry=entries[offset as int+j];assert(records[j]==fu::entry_pair(lib,programs,entry,owner));
-        fp::inverse_shape(lib,programs,entry,owner,private);fp::inverse_member(actions,j);
-        let i=choose|i:int|0<=i<word.len() && #[trigger] word[i]==records[j].inverse;assert(!fp::needs(word[i],key));
-    }
+    pending_inverses_shrink(lib,programs,entries,actions,offset,owner,private);
+    fp::absent_word(sj::journal(fu::events(actions)),input,key);
+    pending_keys_avoid(lib,programs,entries,actions,offset,owner,private,key);
 }
 
 /// The strict inverse word is already defined at the actual source state by

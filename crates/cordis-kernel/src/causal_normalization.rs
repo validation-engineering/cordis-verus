@@ -157,6 +157,69 @@ pub open spec fn swap_states<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Prog
     states.subrange(0,i+1).push(middle)+moved
 }
 
+/// Expose the actual constructor separately from transition and primitive laws.
+/// Keeping this equation as its own obligation ensures that a suffix cannot be
+/// replaced by the old history while downstream proofs reason about transport.
+pub proof fn swap_construction<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,
+    states:Seq<g::Configuration<U,I>>,labels:Seq<Label>,i:int)
+    requires 0<=i && i+1<labels.len(),states.len()==labels.len()+1,
+    ensures swap_states(lib,programs,states,labels,i)
+        ==states.subrange(0,i+1).push(o::intermediate(states[i],states[i+2],labels[i+1].0,labels[i+1].1))
+            +transport::transport(states.subrange(i+2,states.len() as int),labels.subrange(i+2,labels.len() as int),
+                swapped_endpoint(lib,programs,states,labels,i)),
+{
+    hide(transport::transport);hide(o::intermediate);hide(swapped_endpoint);
+}
+
+/// Restrict an actual execution to the suffix consumed by a local rewrite.
+pub proof fn execution_suffix<A,X,U,B,I>(lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,
+    states:Seq<g::Configuration<U,I>>,labels:Seq<Label>,start:int)
+    requires g::execution(lib,programs,states,labels),0<=start<=labels.len(),
+    ensures g::execution(lib,programs,states.subrange(start,states.len() as int),labels.subrange(start,labels.len() as int)),
+{
+    let suffix=states.subrange(start,states.len() as int);let tail=labels.subrange(start,labels.len() as int);
+    assert forall|j:int| 0<=j<tail.len() implies g::step(lib,programs,suffix[j],suffix[j+1],tail[j].0,tail[j].1) by {
+        assert(g::step(lib,programs,states[start+j],states[start+j+1],labels[start+j].0,labels[start+j].1));
+    }
+}
+
+/// Compose the local diamond with transport once. Callers need only its two
+/// real reverse steps and the resulting suffix contract, not the primitive laws.
+pub proof fn swap_suffix<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,
+    states:Seq<g::Configuration<U,I>>,labels:Seq<Label>,i:int)
+    requires og::primitive_theory(eq,lib),g::well_formed(lib,programs,states.first()),g::execution(lib,programs,states,labels),eligible(states,labels,i),
+    ensures {
+        let middle=o::intermediate(states[i],states[i+2],labels[i+1].0,labels[i+1].1);
+        let reverse=swapped_endpoint(lib,programs,states,labels,i);
+        let suffix=states.subrange(i+2,states.len() as int);let tail=labels.subrange(i+2,labels.len() as int);
+        let moved=transport::transport(suffix,tail,reverse);
+        &&& g::step(lib,programs,states[i],middle,labels[i+1].0,labels[i+1].1)
+        &&& g::step(lib,programs,middle,reverse,labels[i].0,labels[i].1)
+        &&& moved.len()==suffix.len() && moved.first()==reverse
+        &&& g::execution(lib,programs,moved,tail)
+        &&& forall|j:int| 0<=j<suffix.len() ==> transport::related(suffix[j],moved[j])
+            && g::well_formed(lib,programs,moved[j])
+    },
+{
+    hide(og::primitive_theory);
+    ol::execution_preservation(eq,lib,programs,states,labels);
+    execution_suffix(lib,programs,states,labels,i+2);
+    let suffix=states.subrange(i+2,states.len() as int);let tail=labels.subrange(i+2,labels.len() as int);
+    let reverse=swapped_endpoint(lib,programs,states,labels,i);
+    if g::landing(states[i],states[i+1],labels[i].1) {
+        o::orchestration_suffix(eq,lib,programs,states[i],states[i+1],states[i+2],labels[i].0,labels[i].1,labels[i+1].0,labels[i+1].1,suffix,tail);
+    } else {
+        if labels[i].1==r::Rule::Unload {
+            unload::diamond(eq,lib,programs,states[i],states[i+1],states[i+2],labels[i].0,labels[i+1].0,labels[i+1].1);
+        } else {
+            admin::diamond(eq,lib,programs,states[i],states[i+1],states[i+2],labels[i].0,labels[i].1,labels[i+1].0,labels[i+1].1);
+        }
+        assert(reverse==states[i+2]);assert(transport::related(suffix.first(),reverse));
+        transport::suffix_transport(lib,programs,suffix,tail,reverse);
+        transport::observational_safe_suffix(eq,lib,programs,suffix,tail,reverse);
+    }
+}
+
 /// Structural extraction lemma for the states constructed by the diamond.
 /// It preserves full insertion payloads, not just actor/rule labels.
 pub proof fn payload_swap<U,I>(states:Seq<g::Configuration<U,I>>,labels:Seq<Label>,result:Seq<g::Configuration<U,I>>,i:int)
@@ -200,29 +263,12 @@ pub proof fn adjacent_swap<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<
         &&& forall|j:int| 0<=j<result.len() ==> g::well_formed(lib,programs,result[j])
     },
 {
-    // Compose the verified step lemmas without unfolding their primitive laws.
-    hide(og::primitive_theory);
-    ol::execution_preservation(eq,lib,programs,states,labels);
+    hide(og::primitive_theory);hide(swap_states);
+    swap_construction(lib,programs,states,labels,i);
+    swap_suffix(eq,lib,programs,states,labels,i);
     let suffix=states.subrange(i+2,states.len() as int);let tail=labels.subrange(i+2,labels.len() as int);
-    assert(g::execution(lib,programs,suffix,tail)) by {
-        assert forall|j:int| 0<=j<tail.len() implies g::step(lib,programs,suffix[j],suffix[j+1],tail[j].0,tail[j].1) by {
-            assert(g::step(lib,programs,states[i+2+j],states[i+3+j],labels[i+2+j].0,labels[i+2+j].1));
-        }
-    }
     let middle=o::intermediate(states[i],states[i+2],labels[i+1].0,labels[i+1].1);
     let reverse=swapped_endpoint(lib,programs,states,labels,i);
-    if g::landing(states[i],states[i+1],labels[i].1) {
-        o::orchestration_suffix(eq,lib,programs,states[i],states[i+1],states[i+2],labels[i].0,labels[i].1,labels[i+1].0,labels[i+1].1,suffix,tail);
-    } else {
-        if labels[i].1==r::Rule::Unload {
-            unload::diamond(eq,lib,programs,states[i],states[i+1],states[i+2],labels[i].0,labels[i+1].0,labels[i+1].1);
-        } else {
-            admin::diamond(eq,lib,programs,states[i],states[i+1],states[i+2],labels[i].0,labels[i].1,labels[i+1].0,labels[i+1].1);
-        }
-        assert(reverse==states[i+2]);assert(transport::related(suffix.first(),reverse));
-        transport::suffix_transport(lib,programs,suffix,tail,reverse);
-        transport::observational_safe_suffix(eq,lib,programs,suffix,tail,reverse);
-    }
     let moved=transport::transport(suffix,tail,reverse);
     let result=swap_states(lib,programs,states,labels,i);let reordered=swap_labels(labels,i);
     assert(!external(labels[i]));swap_order(labels,i);

@@ -379,6 +379,38 @@ pub proof fn run_payload(bank:Seq<Blueprint>,blueprint:usize,instruction:Instruc
     },
 {match instruction {Instruction::Unit=>{},Instruction::Provide {..}=>{},Instruction::Xor {..}=>{},Instruction::Child {..}=>{}}}
 
+/// The primitive interpreter consumes these small source-shape lemmas after
+/// its real lookup/value checks. They keep the grammar's result and captured
+/// inverse separate from driver layout and slot-preservation obligations.
+#[verifier::spinoff_prover]
+proof fn unit_run_shape(bank:Seq<Blueprint>,blueprint:usize,a:s::State<u64>,actor:usize)
+    requires s::registered(a,actor),
+    ensures mx::run(library(),instruction_node(bank,blueprint,Instruction::Unit),a,actor)==Some(mx::Landed {
+        state:a,receipt:(Receipt {actor,inverse:Inverse::Unit}).model(),next:None,spawn:None,
+    }),
+{ }
+
+#[verifier::spinoff_prover]
+proof fn provision_run_shape(bank:Seq<Blueprint>,blueprint:usize,a:s::State<u64>,actor:usize,
+    key:Port,value:u64,next:Option<usize>)
+    requires s::registered(a,actor),a.control.fibers[actor].provisions.contains(key),!a.tables[actor].dom().contains(key),
+    ensures mx::run(library(),instruction_node(bank,blueprint,Instruction::Provide {key,value,next}),a,actor)==Some(mx::Landed {
+        state:projection::update_slot(a,actor,key,Some(value)),
+        receipt:(Receipt {actor,inverse:Inverse::Provision {key}}).model(),next:continuation(blueprint,next),spawn:None,
+    }),
+{ }
+
+#[verifier::spinoff_prover]
+proof fn xor_run_shape(bank:Seq<Blueprint>,blueprint:usize,a:s::State<u64>,actor:usize,
+    provider:usize,key:Port,mask:u64,next:Option<usize>)
+    requires s::registered(a,actor),lift::resolve(a,actor,key)==Some(provider),
+        s::registered(a,provider),a.tables[provider].dom().contains(key),
+    ensures mx::run(library(),instruction_node(bank,blueprint,Instruction::Xor {key,mask,next}),a,actor)==Some(mx::Landed {
+        state:projection::update_slot(a,provider,key,Some(a.tables[provider][key]^mask)),
+        receipt:(Receipt {actor,inverse:Inverse::Xor {provider,key,mask}}).model(),next:continuation(blueprint,next),spawn:None,
+    }),
+{ }
+
 pub proof fn undo_payload(receipt:Receipt,a:s::State<u64>,b:s::State<u64>)
     requires payload_equal(a,b),
     ensures mx::undo(receipt.model(),a).is_some()==mx::undo(receipt.model(),b).is_some(),
@@ -1239,13 +1271,22 @@ impl MixedDriver {
                 }
             },
     {
+        hide(lift::run);
         let ghost before=*self;
+        proof {
+            if let Instruction::Unit=instruction {
+                unit_run_shape(before.blueprints@,_blueprint,before.primitive_state(),actor);
+            }
+        }
         let inverse=match instruction {
             Instruction::Unit=>Inverse::Unit,
             Instruction::Provide {key,value,..}=>{
                 proof {self.table_declaration(actor,key);}
                 let index=match self.tables[actor].locate(key) {Some(i)=>i,None=>return Err(DriverError::MissingBinding)};
                 if self.tables[actor].slots[index].value.is_some() {return Err(DriverError::AlreadyProvided);}
+                proof {
+                    provision_run_shape(before.blueprints@,_blueprint,before.primitive_state(),actor,key,value,instruction.continuation());
+                }
                 self.write_slot(actor,index,Some(value));
                 assert forall|i:int| 0<=i<self.tables[actor as int].view().len() implies
                     self.tables[actor as int].view()[i].value.is_some()
@@ -1259,6 +1300,11 @@ impl MixedDriver {
                 let provider=self.provider(actor,key)?;
                 let index=match self.tables[provider].locate(key) {Some(i)=>i,None=>return Err(DriverError::MissingValue)};
                 let value=match self.tables[provider].slots[index].value {Some(v)=>v,None=>return Err(DriverError::MissingValue)};
+                proof {
+                    assert(before.table(provider).dom().contains(key));
+                    assert(before.table(provider)[key]==value);
+                    xor_run_shape(before.blueprints@,_blueprint,before.primitive_state(),actor,provider,key,mask,instruction.continuation());
+                }
                 self.write_slot(provider,index,Some(value^mask));
                 assert forall|i:int| 0<=i<self.tables[actor as int].view().len() implies
                     self.tables[actor as int].view()[i].value.is_some()==before.tables[actor as int].view()[i].value.is_some() by {

@@ -1414,19 +1414,19 @@
           "kind": "module",
           "path": "causal_normalization",
           "descendants": false,
-          "function": "cordis_negative::causal_normalization::adjacent_swap"
+          "function": "cordis_negative::causal_normalization::swap_construction"
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::causal_normalization::adjacent_swap",
+          "function": "cordis_negative::causal_normalization::swap_construction",
           "module": "causal_normalization",
           "file": "causal_normalization.rs",
-          "diagnosticKind": "assertion failed",
-          "uniqueSourceAnchor": "assert(result.len()==states.len());assert(result.first()==states.first());\n    assert(result.last()==moved.last());assert(suffix.last()==states.last());\n    assert forall|j:int| 0<=j<=i implies result[j]==states[j] by { }\n    assert(result[i+1]==middle);"
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures swap_states(lib,programs,states,labels,i)\n        ==states.subrange(0,i+1).push(o::intermediate(states[i],states[i+2],labels[i+1].0,labels[i+1].1))\n            +transport::transport(states.subrange(i+2,states.len() as int),labels.subrange(i+2,labels.len() as int),\n                swapped_endpoint(lib,programs,states,labels,i)),\n"
         }
       ],
-      "selectionRationale": "The contract in cordis_negative::causal_normalization::adjacent_swap detects causal-suffix-history-bypass. The mutation remains the exact canonical change to causal_normalization.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+      "selectionRationale": "The constructor equation in cordis_negative::causal_normalization::swap_construction detects causal-suffix-history-bypass before larger composition proofs consume it. The mutation remains the exact canonical source change; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
     },
     {
       "name": "administrative-self-retire-bypass",
@@ -2375,19 +2375,19 @@
           "kind": "module",
           "path": "mixed_age_unload",
           "descendants": false,
-          "function": "cordis_negative::mixed_age_unload::restore_mixed"
+          "function": "cordis_negative::mixed_age_unload::last_mapped_token"
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::mixed_age_unload::restore_mixed",
+          "function": "cordis_negative::mixed_age_unload::last_mapped_token",
           "module": "mixed_age_unload",
           "file": "mixed_age_unload.rs",
-          "diagnosticKind": "assertion failed",
-          "uniqueSourceAnchor": "} else {assert(g::owner(left[token as int].landed.receipt)!=owner);}\n        assert(mapped<right.len());assert(obs::receipt_related(eq,receipt,replacement));\n        receipt_crosses_batch(eq,lib,programs,left,actions,offset,owner,actor,token,source);\n        fu::table_inverse_projects(receipt,source);let sa=g::undo(receipt,source).unwrap();"
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.0==tokens.last(),out.1==history::index(left,offset,owner,tokens.last()),\n"
         }
       ],
-      "selectionRationale": "The contract in cordis_negative::mixed_age_unload::restore_mixed detects mixed-age-token-identity. The mutation remains the exact canonical change to mixed_age_unload.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+      "selectionRationale": "The constructor equation in cordis_negative::mixed_age_unload::last_mapped_token detects mixed-age-token-identity before larger composition proofs consume it. The mutation remains the exact canonical source change; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
     },
     {
       "name": "old-provision-without-installed-owner",

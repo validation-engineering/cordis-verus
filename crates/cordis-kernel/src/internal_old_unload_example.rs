@@ -170,6 +170,23 @@ pub proof fn closed_transport()
     internal::closed_deletion(ex::equality(),ex::library(),age::programs(),setup(),setup_labels(),source(),labels(),1);
 }
 
+// Instantiate observation facts independently of the concrete unload trace.
+// Transporting a target entry needs the domain equality before its value relation.
+#[verifier::spinoff_prover]
+proof fn related_table_entry<U>(eq:spec_fn(crate::Port,U,U)->bool,
+    a:s::State<U>,b:s::State<U>,actor:usize,key:crate::Port)
+    requires obs::tables_related(eq,a,b),s::registered(a,actor),
+        a.tables.dom().contains(actor),b.tables.dom().contains(actor),
+        b.tables[actor].dom().contains(key),
+    ensures a.tables[actor].dom()==b.tables[actor].dom(),
+        a.tables[actor].dom().contains(key),
+        eq(key,a.tables[actor][key],b.tables[actor][key]),
+{
+    assert(a.tables[actor].dom()==b.tables[actor].dom());
+    assert(a.tables[actor].dom().contains(key));
+    assert(eq(key,a.tables[actor][key],b.tables[actor][key]));
+}
+
 /// An authentic mixed-age cleanup is followed by another real owner call.
 /// The generic theorem constructs the surviving internal cleanup and continuation.
 #[verifier::spinoff_prover]
@@ -207,7 +224,9 @@ pub proof fn actual_internal_old_unload()
     let states=source();let kept=target();let terminal=g::unload(states.last(),1);
     reveal_with_fuel(sh::labels_without,10);
     assert(sh::labels_without(labels(),1)[3]==(2usize,r::Rule::Unload));
-    assert(s::registered(terminal.state,0));assert(terminal.state.tables[0usize].dom()==kept.last().state.tables[0usize].dom());
+    assert(s::registered(terminal.state,0));
+    related_table_entry(ex::equality(),terminal.state,kept.last().state,0,ex::key(0));
+    assert(terminal.state.tables[0usize].dom()==kept.last().state.tables[0usize].dom());
     assert(ex::equality()(ex::key(0),terminal.state.tables[0usize][ex::key(0)],kept.last().state.tables[0usize][ex::key(0)]));
     assert(terminal.history==states.last().history);
 }

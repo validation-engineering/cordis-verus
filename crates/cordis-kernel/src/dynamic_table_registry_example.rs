@@ -80,6 +80,31 @@ pub proof fn actual_source_registry()
     cancellation(a,3,Some(1),ex::provided(0),ISet::empty(),0nat);
 }
 
+// Abstract the deleted owner prefix before proving registry transport.
+// Its batch/recovery quantifiers do not participate in Insert/Retire/Remove.
+proof fn deleted_prefix_start()
+    ensures target_start()==prefix().first(),
+        g::well_formed(ex::library(),base::programs(),target_start()),
+        transport::related(ex::equality(),prefix().last(),target_start(),1,1),
+        target_start().state.control.fibers[1usize].phase==Phase::Inactive,
+        target_start().state.tables[0usize][ex::key(0)]==10,
+        target_start().state.tables[1usize].is_empty(),
+{
+    fp::actual_prefix();sh::example_interface();
+    let lib=ex::library();let programs=base::programs();let eq=ex::equality();let kept=target();
+    fp::prefix_batch(eq,lib,programs,prefix(),fp::example_labels(),1);
+    // The deleted prefix contains only owner lifecycle steps. Derive its
+    // singleton result from the execution theorem, without unfolding runs.
+    deletion::delete_execution(eq,lib,programs,prefix(),fp::example_labels(),1);
+    let erased=deletion::delete(lib,programs,prefix(),fp::example_labels(),1);
+    reveal_with_fuel(sh::labels_without,4);
+    assert(sh::labels_without(fp::example_labels(),1).len()==0);
+    assert(erased.len()==1);
+    assert(erased.last()==erased.first());
+    assert(kept[0]==prefix().first());
+    reveal(fp::example_prefix);reveal(base::setup);
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 pub proof fn actual_registry_transport()
@@ -99,16 +124,7 @@ pub proof fn actual_registry_transport()
 {
     actual_source_registry();fp::actual_prefix();sh::example_interface();
     let lib=ex::library();let programs=base::programs();let eq=ex::equality();let a=prefix().last();let b=inserted();let c=retired();let d=removed();let kept=target();
-    fp::prefix_batch(eq,lib,programs,prefix(),fp::example_labels(),1);
-    // The deleted prefix contains only owner lifecycle steps. Derive its
-    // singleton result from the execution theorem, without unfolding runs.
-    deletion::delete_execution(eq,lib,programs,prefix(),fp::example_labels(),1);
-    let erased=deletion::delete(lib,programs,prefix(),fp::example_labels(),1);
-    reveal_with_fuel(sh::labels_without,4);
-    assert(sh::labels_without(fp::example_labels(),1).len()==0);
-    assert(erased.len()==1);
-    assert(erased.last()==erased.first());
-    assert(kept[0]==prefix().first());
+    deleted_prefix_start();
     assert(kept[1]==dynamic::advance(lib,programs,a,b,kept[0],3,r::Rule::Insert,1));
     dynamic::insert_transport(eq,lib,programs,a,b,kept[0],1,1,3);
     assert(g::step(lib,programs,kept[0],kept[1],3,r::Rule::Insert));

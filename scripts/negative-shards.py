@@ -457,7 +457,8 @@ def stage(directory, stem, record, expected_source, *, compile_only=False):
             'Invalid verifier command: ' + stem)
     flags = ['--crate-name', 'cordis_negative', '--crate-type=lib', '--edition=2021',
              '--no-cheating', '--output-json', '--triggers-mode', 'silent',
-             '--num-threads', str(record['execution']['threadsPerWorker']), '--trace', '--time']
+             '--num-threads', str(record['execution']['threadsPerWorker']),
+             '--multiple-errors', '0', '--trace', '--time']
     if compile_only:
         flags += ['--no-verify', '--compile', '-o', str(Path(command[1]).parent / 'compile-check.rlib')]
     require(command[2:] == flags, 'Unexpected or scoped verifier flags: ' + stem)

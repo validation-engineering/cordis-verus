@@ -273,6 +273,8 @@ pub proof fn delete_execution<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libra
     },
     decreases labels.len(),
 {
+    hide(base::landing_catalogue);
+    base::landing_catalogue_equation(lib,programs,source,labels,owner);
     support::history_from_empty(eq,lib,programs,setup,setup_labels);source_metadata(eq,lib,programs,source,labels,owner);
     reveal(execution::delete);reveal(sh::labels_without);
     let target=execution::delete(lib,programs,source,labels,owner);let kept=sh::labels_without(labels,owner);let offset=source.first().history.len();

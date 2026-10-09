@@ -576,6 +576,40 @@ raise AssertionError('signal must cancel verification')
                             for member in cleanup["snapshots"][-1]["members"]), cleanup)
         self.assert_reaped(process.pid)
 
+    def test_first_failure_diagnostics_keep_baseline_and_mutant_checks_complete(self):
+        # This fake executable tests invocation/evidence wiring, not Verus proofs.
+        binary = self.executable("""import json, sys
+from pathlib import Path
+compile_only = '--no-verify' in sys.argv
+failed = not compile_only and '= 1' in Path(sys.argv[1]).read_text()
+print(json.dumps({'verification-results': {
+    'success': not failed, 'encountered-vir-error': False,
+    'verified': 0 if compile_only else 42, 'errors': int(failed),
+    'is-verifying-entire-crate': True}}))
+if failed:
+    print('error: assertion failed', file=sys.stderr)
+sys.exit(int(failed))
+""")
+        baseline = CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs",
+                                    self.reports / "baseline", threads=1)
+        self.assertEqual(baseline.returncode, 0)
+        evidence = CHECKS.check_mutation(("example", "lib.rs", "= 0", "= 1"),
+                                         self.source, self.root, self.reports,
+                                         binary, os.environ.copy(), threads=1)
+        self.assertTrue(evidence["verification-results"]["is-verifying-entire-crate"])
+        for name in ["baseline", "example-compile", "example"]:
+            with self.subTest(stage=name):
+                metadata = json.loads((self.reports / (name + ".meta.json")).read_text())
+                command = metadata["command"]
+                self.assertEqual(Path(command[1]).name, "lib.rs")
+                self.assertIn("--crate-type=lib", command)
+                self.assertIn("--no-cheating", command)
+                self.assertEqual(command.count("--multiple-errors"), 1)
+                self.assertEqual(command[command.index("--multiple-errors") + 1], "0")
+                self.assertFalse(any(flag.startswith("--verify") for flag in command))
+                self.assertEqual("--no-verify" in command, name == "example-compile")
+                self.assertEqual(metadata["compileOnly"], name == "example-compile")
+
     def test_diagnostics_flags_preserve_json_stdout(self):
         prefix = self.reports / "diagnostics"
         binary = self.executable("import json, sys\n"

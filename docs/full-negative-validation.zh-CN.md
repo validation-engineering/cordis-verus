@@ -80,6 +80,17 @@ stderr 和调用元数据，包括共享基线。证据绑定完整源码输入�
 
 ## 证明稳定性
 
+基线与变异调用统一使用 `--multiple-errors 0`。在
+[固定版本的 Verus 实现](https://github.com/verus-lang/verus/blob/168759867f8c4ba0be848f5a3e438c75cee3e6e3/source/rust_verify/src/verifier.rs#L806)
+中，它只在某个 `CheckValid` 首次得到 `Invalid` 后停止追加诊断查询，不跳过首次查询、
+其他函数，也不减少正常基线必须完成的主证明义务。默认的追加查错可能在已有明确合同
+失败后再次耗尽资源；此设置只控制该诊断搜索，不缩小证明范围或增加资源上限。
+主查询因资源限制返回 `unknown` 仍是失败，任何实际报告的资源错误仍会使负控结果被
+拒绝。调用元数据与汇总器要求基线和所有变异统一采用这个固定设置。
+
+该固定版本在追加诊断预算为零时，也会给成功查询输出“not all errors may have been
+reported”提示。此提示本身不表示跳过证明，仍以验证统计与完整错误日志判定结果。
+
 `Kernel::release_provision` 使用 `#[verifier::spinoff_prover]` 获得独立求解上下文，避免
 变异 crate 中此前失败查询的影响。它的可执行函数体、前置条件、后置条件和资源上限
 均未改变。完整正向及负控检查仍负责验证这种证明组织方式；单独的诊断检查不是发布证据。
@@ -114,3 +125,14 @@ observational journal 不变量组合已验证的单项 `provided_journal_entry`
 另见[验证门槛](validation.md)、[发布流程](releasing.md)，以及
 [执行器](../scripts/check-negative.py)／[汇总器](../scripts/negative-shards.py)在
 `scripts/tests/` 中的回归。
+
+构造等式与单条记录的事实先由独立引理证明，再供较大的组合证明使用。
+`swap_construction` 确定运输后的后缀，`last_mapped_token` 确定压缩后的日志位置，
+`landing_catalogue_equation` 确定捕获的 owner。顺序、插入、保留和 Fresh 落地证明
+也将局部事实与带量词的整段执行推理分开。`FreshDriver::step` 通过
+`instruction_receipt_metadata` 获取 receipt 身份和 actor 控制记录保持不变的事实；
+旧卸载示例通过 `related_table_entry` 获取表域与值关系。这些事实先由小引理证明，
+再供包装层组合使用。既有公开前提与后置条件保持不变，
+错误变异可以在更小的引理中被拒绝，减少下游组合查询的资源耗尽。每个引理仍须
+通过未变异整库的验证，其结论不会被作为未经证明的假设加入。选定证明的探针
+仅用于调试，完整 crate 的负向验收标准保持不变。

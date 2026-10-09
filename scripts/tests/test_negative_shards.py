@@ -75,7 +75,8 @@ class ShardEvidenceTests(unittest.TestCase):
         code = 1 if kind == 'negative' else 0
         command = ['/pinned/verus', '/temporary/source/lib.rs', '--crate-name', 'cordis_negative',
                    '--crate-type=lib', '--edition=2021', '--no-cheating', '--output-json',
-                   '--triggers-mode', 'silent', '--num-threads', '2', '--trace', '--time']
+                   '--triggers-mode', 'silent', '--num-threads', '2',
+                   '--multiple-errors', '0', '--trace', '--time']
         if compile_only:
             command += ['--no-verify', '--compile', '-o', '/temporary/source/compile-check.rlib']
         SHARDS.save(directory / (stem + '.stdout.json'), {'verification-results': stats, 'verus': self.version})
@@ -206,6 +207,29 @@ class ShardEvidenceTests(unittest.TestCase):
     def test_scoped_or_extra_verifier_flags_are_rejected(self):
         self.edit('0/first.meta.json', lambda value: value['command'].extend(['--verify-only-module', 'effects']), rehash=True)
         self.rejected('Unexpected or scoped')
+
+    def test_first_failure_diagnostic_setting_is_required_for_every_stage(self):
+        for name in ['baseline', 'first-compile', 'first']:
+            for change in ['missing', 'changed', 'duplicate']:
+                with self.subTest(stage=name, change=change):
+                    paths = [self.inputs / ('0/' + name + '.meta.json'),
+                             self.inputs / '0/shard.json']
+                    originals = [path.read_bytes() for path in paths]
+                    def alter(value):
+                        command = value['command']
+                        index = command.index('--multiple-errors')
+                        if change == 'missing':
+                            del command[index:index + 2]
+                        elif change == 'changed':
+                            command[index + 1] = '2'
+                        else:
+                            command.extend(['--multiple-errors', '0'])
+                    try:
+                        self.edit('0/' + name + '.meta.json', alter, rehash=True)
+                        self.rejected('Unexpected or scoped')
+                    finally:
+                        for path, original in zip(paths, originals):
+                            path.write_bytes(original)
 
     def test_compilation_must_succeed(self):
         self.edit('0/first-compile.meta.json', lambda value: value.update(returncode=1), rehash=True)
@@ -367,7 +391,8 @@ class SharedPreflightEvidenceTests(unittest.TestCase):
                     {key: changed, **({'baselineThreads': changed} if key == 'threadsPerWorker' else {})}))
                 self.rejected('Preflight verifier parameters differ')
         for change in [lambda command: command.extend(['--verify-only-module', 'effects']),
-                       lambda command: command.remove('--trace'), lambda command: command.remove('--time')]:
+                       lambda command: command.remove('--trace'), lambda command: command.remove('--time'),
+                       lambda command: command.__setitem__(command.index('--multiple-errors') + 1, '2')]:
             with self.subTest(change=change), self.restore_inputs():
                 self.tamper(0, 'baseline.meta.json', lambda value: change(value['command']))
                 self.rejected('Unexpected or scoped')

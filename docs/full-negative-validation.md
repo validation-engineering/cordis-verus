@@ -103,6 +103,22 @@ and are not interchangeable with locally generated records.
 
 ## Proof stability
 
+Baseline and mutant invocations both use `--multiple-errors 0`. In the
+[pinned Verus implementation](https://github.com/verus-lang/verus/blob/168759867f8c4ba0be848f5a3e438c75cee3e6e3/source/rust_verify/src/verifier.rs#L806),
+this stops additional diagnostic queries after the first `Invalid` result for a
+`CheckValid`; it does not skip its initial query, other functions, or any primary
+obligation in a successful baseline. The default additional-error search can itself
+exhaust resources after a concrete contract failure. This setting controls that
+search, without selecting fewer proofs or raising resource limits. A primary
+query returning resource `unknown` remains a failure, and any reported resource
+error still invalidates the negative result. Invocation metadata and the collector
+require the same fixed setting for the baseline and every mutant.
+
+The pinned verifier also prints “not all errors may have been reported” for
+successful queries when the additional diagnostic budget is zero. This note alone
+does not indicate a skipped proof; acceptance still depends on the verification
+summary and the complete error log.
+
 `Kernel::release_provision` uses `#[verifier::spinoff_prover]` to give its proof an
 independent solver context. This avoids interference from earlier failed queries
 in a mutated crate. Its executable body, preconditions, postconditions and resource
@@ -150,3 +166,19 @@ any resource failure still invalidates the complete negative result.
 See [validation gates](validation.md), the [release procedure](releasing.md), and
 the [runner](../scripts/check-negative.py) / [collector](../scripts/negative-shards.py)
 regressions in `scripts/tests/`.
+
+Constructor equations and per-entry facts are checked separately before larger
+composition proofs consume them. `swap_construction` fixes the transported suffix,
+`last_mapped_token` fixes the compressed journal position, and
+`landing_catalogue_equation` fixes the captured owner. Ordering, insertion,
+retention and Fresh landing proofs similarly separate their local facts from the
+quantified execution argument. `FreshDriver::step` consumes
+`instruction_receipt_metadata` for receipt identity and the actor control frame.
+The old-unload example consumes `related_table_entry` for table-domain and value
+relations. These facts are established in small proofs before the wrapper combines
+them. The existing public preconditions and
+postconditions remain unchanged. A mutation can therefore fail in a smaller
+helper instead of exhausting a downstream composition query. Every helper must
+still pass the unchanged whole-crate baseline; its conclusion is never added as
+an unproved assumption. Selected-proof probes are debugging tools only, and the
+full-crate negative acceptance criteria remain unchanged.
