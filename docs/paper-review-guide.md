@@ -65,8 +65,8 @@ failure state, even after a prefix containing other commands. This does not
 require all commands to be enabled initially. Retire/Depart/Unload/Remove remain
 supported but outside the preparation profile. The actual Mixed/Fresh Unload
 dispatcher branch now has its own exact cleanup-guard-plus-inverse domain. Real
-source histories also establish inverse definedness for actual Unit/Child
-journals, as reviewed in PR-02. The remaining command and dispatcher domains,
+source histories also establish inverse definedness for the complete concrete
+Unit/Child/Provision/Xor journal, as reviewed in PR-02. The remaining command and dispatcher domains,
 individual error variants, whole-system progress,
 arbitrary Future completion and host scheduling remain
 separate; these repairs do not require a temporal-logic dependency.
@@ -111,7 +111,7 @@ consumer may temporarily disagree with its current target.
   Its contribution to Lemma 57, Corollary 69 and Theorem 73 remains partial:
   defined restoration is separate from general foreign-replay equivalence or
   whole-system progress. PR-02 below derives the inverse condition for the
-  restricted actual Unit/Child journal profile, without changing the guard.
+  complete concrete Unit/Child/Provision/Xor journal, without changing the guard.
 - [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs):
   `LifecycleActions` joins exact action tickets with cleanup outcomes and the
   actual `Kernel::finish_cleanup` call. A failed completion retains a blocking
@@ -196,10 +196,36 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   If a script stops on Unload with a Unit/Child journal, cleanup is not permitted
   at that stopping point. A retired child remains registered until legal Remove;
   parent ownership does not create a service dependency or force child cleanup
-  before the parent's inverses. Provision/Xor and other nontrivial Table recovery
-  remain subject to strict state-dependent domains. This is a restricted bridge
+  before the parent's inverses. The source invariants below extend this result
+  to Provision and Xor. This is a restricted bridge
   for Definition 52, Lemma 57 and Theorem 73, not Corollary 69's general
   foreign-replay recovery equation. Lemma 57 and Theorem 73 remain partial.
+
+- [`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) and
+  [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+  extend the actual-journal result to Unit/Child/Provision. Execution from empty
+  derives `live_provisions`: each retained Provision has an occupied owner slot,
+  with distinct provision keys within each live owner journal. Foreign Xor may
+  change payloads while preserving those slots. The receipt bridge derives
+  `provision_recovery`, and `provision_unload_domain` connects it to the same
+  Kernel cleanup guard. Mixed/Fresh scripts and bootstrap outputs establish
+  the property from real histories. The following stronger result also covers
+  journals containing Xor.
+- [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs) and
+  [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs)
+  establish `journal_recovery` for all four concrete receipt variants.
+  `live_operations` derives current captured-provider resolution, provider/value
+  retention and the order condition that a later Provision cannot remove an
+  earlier operation's slot. Together with Provision uniqueness and child
+  retention, `restore_all` proves defined restoration of the actual LIFO journal.
+  The provider facts connect to Definitions 53/54 and the commitment guard in
+  PR-01: retirement or target drift does not replace the provider captured by Xor.
+  Actual script outputs and both bootstrap machines carry the stronger property;
+  `journal_unload_domain` removes the receipt-profile restriction from the
+  cleanup-guard equivalence. A script Unload failure means cleanup is not
+  permitted at that stopping point. This is the concrete synchronous `u64`/Xor
+  language, not arbitrary scalar effects, host callbacks, the general
+  foreign-replay equation, an empty-owner-table theorem or global termination.
 
 **Executable review:**
 
@@ -211,6 +237,14 @@ cargo test --offline -p cordis-kernel --test unit_child_recovery fresh_history_r
 cargo test --offline -p cordis-kernel --test unit_child_recovery mixed_history_retires_captured_children_without_running_their_journals -- --exact
 cargo test --offline -p cordis-kernel --test unit_child_recovery failed_script_retained_removal_keeps_a_recoverable_actual_prefix -- --exact
 cargo test --offline -p cordis-kernel --test unit_child_recovery bootstrap_terminal_publication_failure_keeps_a_recoverable_child_receipt -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery mixed_history_recovers_distinct_provisions_and_only_its_captured_child -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery foreign_xor_preserves_a_real_provision_until_dependency_cleanup_allows_recovery -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery duplicate_provide_failure_keeps_the_actual_provision_and_child_prefix_recoverable -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery bootstrap_missing_publication_still_recovers_committed_provision_and_child -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery mixed_script_recovers_self_xors_before_removing_their_provisions -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery retired_provider_stays_available_to_the_consumers_captured_xor_inverses -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery interleaved_consumers_recover_only_their_xors_and_keep_the_provider_value -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery bootstrap_failure_recovers_its_self_and_foreign_xors_from_the_real_prefix -- --exact
 ```
 
 The first test exposes the missing-name failure on the public Kernel path.
@@ -224,7 +258,12 @@ parent recovery without running a child's journal, and recovery of the successfu
 prefix after a Retained error. An externally inserted child with the same parent,
 but no captured receipt, is not retired by that recovery. These are behavior
 regressions: Unit identity alone does not make inverse order observable in a
-test; review the proof contracts for LIFO and definedness.
+test; review the proof contracts for LIFO and definedness. The Xor cases make
+that order observable: self Xor must recover before its Provision removes the
+value. They also check consumer recovery after provider retirement, preservation
+of a second consumer's interleaved effects, and successful-prefix recovery after
+bootstrap publication fails. These tests construct public histories and do not
+inject private journal state.
 
 **Negative-control candidate:** `child-removal-ignores-retained-token` weakens
 retention for a retired child. Acceptance evidence for this checkout remains a

@@ -121,10 +121,37 @@ Child 退休都保持 registry 成员递归完成。`history_sound` 只保证原
 `unit_child_unload_domain` 在该性质与日志分类下，把 `unload_enabled` 化为
 `cleanup_permitted`，即 Kernel 的实际清理守卫。真实 Unload 因而成功 iff 允许清理；
 脚本在此类日志的 Unload 处失败，就意味着返回状态不允许清理。Child inverse 仍不
-删除身份或执行 child 自身清理，所有权也不构成服务依赖。Provision/Xor 等非平凡
-Table inverse 的 strict 状态域未被消解；Unit 在模型中叫 `Table(Unit)`，范围按实际
+删除身份或执行 child 自身清理，所有权也不构成服务依赖。下述额外源不变式先覆盖
+Provision，再覆盖 Xor inverse 的 strict 状态域；Unit 在模型中叫 `Table(Unit)`，范围按实际
 receipt 分类。这是定义 52 及引理 57／定理 73 的受限连接，不补齐推论 69 的一般
 foreign replay 方程、owner 表空或整个系统终止，相关 partial 状态不变。
+
+进一步的 [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+覆盖 `unit_child_provision_journal(actor)`，允许同一真实日志包含 Unit、Child 和
+Provision。源 `live_provisions` 由从 empty 的 Mixed/Fresh 执行导出，说明保留的
+Provision 对应仍有值的 owner 槽，且同一日志的 Provision key 互异；因此逆序删除
+不会提前清空其他保留 receipt 需要的槽。外部 actor 可执行 Xor 修改值，但保持槽有值。
+实际 `run_script` 和 `run_from_empty` 的 prepared／最终机器带有 `provision_recovery()`，
+包括失败或阻塞返回。`provision_unload_domain` 将该范围内的 Unload 域化为 Kernel
+清理守卫，脚本该类 Unload 失败则意味着停止状态不允许清理。证明数据在运行时擦除；
+自身含 Xor 的日志由下述更强结论覆盖，一般 foreign replay 仍是独立义务；
+Bootstrap 的 SetupFailed 诊断范围也未扩大。详见[Provision 恢复合同](progress-contracts.zh-CN.md#provision-值保留到真实-inverse-执行)。
+
+完整的具体日志由 [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs)
+覆盖。源 [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs)
+导出的 `live_operations` 保证保留 operation 的 captured provider 仍可由 episode
+commitment 解析、仍已登记且目标槽有值，并保证较后 Provision 不会删去较早 operation
+所需的槽。Provider 退休或 target 漂移不改变捕获身份；依赖守卫阻止过早清理。
+自身 Xor 的历史顺序保证先恢复 Xor，再撤销创建其值的 Provision。
+`restore_all` 将这些事实与 Provision 唯一性、child retention 组合，证明 Unit、Child、
+Provision、Xor 四种实际 receipt 的 LIFO 恢复有定义；具体 `u64` Xor inverse 为全函数。
+
+所有实际 `run_script` 返回及 `run_from_empty` 的 prepared／最终机器都带有
+`journal_recovery()`。`journal_unload_domain` 无须日志分类即可将 Unload 域化为
+Kernel 清理守卫，脚本 Unload 失败则意味着真实停止状态不允许清理。已有两项更窄
+恢复 API 保留；没有新增运行时日志或恢复实现，也没有强化 `wf()`。范围是同步的
+具体指令语言，任意 plugin scalar、宿主 callback、一般 foreign replay 观察方程、
+owner 表空与全局终止仍未由此证明。详见[Xor 恢复域](progress-contracts.zh-CN.md#xor-补齐具体日志的当前状态恢复域)。
 
 当前蓝图明确使用固定的 `expected` child 名称。一次成功创建后，重新激活
 同一个蓝图可能因单调分配器返回新 ID 而得到 `UnexpectedChild`；错误本身

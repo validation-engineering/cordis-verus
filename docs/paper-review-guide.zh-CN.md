@@ -55,7 +55,7 @@ python3 scripts/check-paper-review.py
 满足定义域，即使此前缀含其他命令也成立，不要求全部命令最初就使能。
 Retire/Depart/Unload/Remove 仍受支持，但不在该准备范围内。实际 Mixed/Fresh
 Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源历史还导出实际
-Unit/Child 日志的 inverse 有定义性，见 PR-02。其余命令与 dispatcher 的域、
+完整具体 Unit/Child/Provision/Xor 日志的 inverse 有定义性，见 PR-02。其余命令与 dispatcher 的域、
 具体错误枚举、整个系统进展、任意 Future 完成及宿主调度仍有独立义务。这些合同修复不需要引入
 时序逻辑依赖。
 
@@ -91,7 +91,7 @@ Unit/Child 日志的 inverse 有定义性，见 PR-02。其余命令与 dispatch
   journal 长度。公共错误保持完整机器，内部草稿则可能已经恢复部分前缀。它将守卫
   接到真实有限清理；`!relied` 本身不保证任意 inverse 有效。对应引理 57、推论 69
   和定理 73 的范围仍为 partial：执行有定义的恢复，不等于一般 foreign replay
-  观察等价或整个系统进展。下文 PR-02 为真实 Unit/Child 日志的受限范围导出
+  观察等价或整个系统进展。下文 PR-02 为完整具体 Unit/Child/Provision/Xor 日志导出
   inverse 条件，不改变清理守卫。
 - [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs)：
   `LifecycleActions` 将精确动作票据、清理结果和实际的
@@ -161,9 +161,27 @@ cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_ret
   等于 `cleanup_permitted`。公共 Unload 与实际 `apply` 分支将该域接到执行。
   脚本若在仅含 Unit/Child 的 Unload 处停止，则该停止状态不允许清理。退休 child
   在合法 Remove 前仍已登记；parent 所有权不产生服务依赖，也不要求 child 先完成
-  清理才能执行 parent 的 inverses。Provision/Xor 等非平凡 Table 恢复仍受 strict
-  当前状态域约束。这是定义 52、引理 57 和定理 73 的受限桥，不是推论 69 的一般
+  清理才能执行 parent 的 inverses。下述源不变式将该结论扩展到 Provision 与 Xor。这是定义 52、引理 57 和定理 73 的受限桥，不是推论 69 的一般
   foreign replay 恢复方程；引理 57 和定理 73 仍为 partial。
+
+- [`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) 与
+  [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+  进一步覆盖真实 Unit/Child/Provision 日志。从 empty 的实际执行导出
+  `live_provisions`：每条保留的 Provision 都对应 owner 中有值的槽，同一 owner
+  活跃日志中的 Provision key 互异。外部 Xor 可修改 payload，但保持槽占用。
+  receipt 桥导出 `provision_recovery`，`provision_unload_domain` 再连接同一个
+  Kernel 清理守卫；Mixed/Fresh 脚本和 bootstrap 返回值从真实历史建立该性质。
+  下述更强结论也覆盖自身含 Xor 的日志。
+- [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs) 与
+  [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs)
+  为全部四种具体 receipt 建立 `journal_recovery`。`live_operations` 导出当前仍
+  解析到捕获的 provider、provider 与值保留，以及较后 Provision 不删除较早 operation
+  所需槽的顺序条件。与 Provision 唯一性及 child retention 组合后，`restore_all`
+  证明实际 LIFO 日志恢复有定义。Provider 事实连接定义 53/54 与 PR-01 的 commitment
+  守卫：退休或 target 漂移不会替换 Xor 捕获的 provider。实际脚本返回及两份 bootstrap
+  机器均带有更强性质；`journal_unload_domain` 不再需要 receipt 分类来化简清理域。
+  脚本在 Unload 处失败意味着停止状态不允许清理。范围是具体的同步 `u64`/Xor 语言，
+  不包括任意 scalar 效果、宿主回调、一般 foreign replay 方程、owner 表空定理或全局终止。
 
 **执行检查：**
 
@@ -175,6 +193,14 @@ cargo test --offline -p cordis-kernel --test unit_child_recovery fresh_history_r
 cargo test --offline -p cordis-kernel --test unit_child_recovery mixed_history_retires_captured_children_without_running_their_journals -- --exact
 cargo test --offline -p cordis-kernel --test unit_child_recovery failed_script_retained_removal_keeps_a_recoverable_actual_prefix -- --exact
 cargo test --offline -p cordis-kernel --test unit_child_recovery bootstrap_terminal_publication_failure_keeps_a_recoverable_child_receipt -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery mixed_history_recovers_distinct_provisions_and_only_its_captured_child -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery foreign_xor_preserves_a_real_provision_until_dependency_cleanup_allows_recovery -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery duplicate_provide_failure_keeps_the_actual_provision_and_child_prefix_recoverable -- --exact
+cargo test --offline -p cordis-kernel --test provision_recovery bootstrap_missing_publication_still_recovers_committed_provision_and_child -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery mixed_script_recovers_self_xors_before_removing_their_provisions -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery retired_provider_stays_available_to_the_consumers_captured_xor_inverses -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery interleaved_consumers_recover_only_their_xors_and_keep_the_provider_value -- --exact
+cargo test --offline -p cordis-kernel --test xor_recovery bootstrap_failure_recovers_its_self_and_foreign_xors_from_the_real_prefix -- --exact
 ```
 
 第一个测试暴露了公开 Kernel 路径上因名称不存在而失败的情况。持有内部状态的
@@ -185,7 +211,10 @@ ChildDriver 测试展示了额外的保留策略如何防止过早移除，并�
 新 Unit/Child 测试通过公共脚本检查退休身份的保留、parent 恢复不执行 child 自身
 日志，以及 Retained 错误后成功前缀仍可恢复。外部插入、只有同一 parent 而未被
 receipt 捕获的 child 不会因此退休。它们是行为回归；Unit 恒等操作本身不能让测试
-观察出逆操作先后顺序，LIFO 与有定义性仍须审查证明合同。
+观察出逆操作先后顺序，LIFO 与有定义性仍须审查证明合同。Xor 案例使顺序可观察：
+自身 Xor 必须先恢复，其 Provision 才能删值。另检查 provider 退休后的 consumer 恢复、
+保留另一 consumer 的交错效果，以及启动 publication 失败后的成功前缀恢复。测试都
+从公开历史构造状态，没有注入私有 journal。
 
 **负控候选：** `child-removal-ignores-retained-token` 弱化对已退役子插件的保留条件。
 当前检出版本的验收证据仍需单独取得。

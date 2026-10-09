@@ -47,7 +47,7 @@ error behavior, rather than treating these summaries as independent axioms.
 | [`Kernel::check_insert` / `insert`](../crates/cordis-kernel/src/lib.rs) | Success iff `insert_enabled(parent, dependencies, provisions)`: identity capacity, a registered parent when supplied, distinct declarations and unreserved provision ports. | The actual O-Insert registration domain, with representation bounds stated separately from the paper predicate. |
 | [`Kernel::begin`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.begin_enabled(id)`: Inactive, target available, generation present and below `u64::MAX`. Success increments the generation and commits the actual target. | Executable admission for L-Begin, with the implementation's bounded generation counter retained explicitly. The counter is erased by the paper projection. |
 | [`Kernel::begin_cleanup`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.cleanup_enabled(id)`: registered, Unloading, not already restoring, and no live committed dependent. | The executable start of guarded L-Unload. It preserves the paper state while enabling restoration; `finish_cleanup` performs the projected Unload. |
-| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | Success iff `unload_enabled`: Kernel cleanup permission **and** `restore_receipts(journal(actor), primitive_state).is_some()`. For actual Unit/Child journals, `unit_child_recovery` discharges the inverse condition. | Executes the actual finite LIFO restoration for L-Unload. The restricted recovery fact is derived from represented histories, not arbitrary `wf()`. Public errors preserve the complete machine; internal draft errors need not. |
+| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | Success iff `unload_enabled`: Kernel cleanup permission **and** `restore_receipts(journal(actor), primitive_state).is_some()`. For the complete concrete Unit/Child/Provision/Xor journal, `journal_recovery` derived from actual histories discharges the inverse condition. | Executes the actual finite LIFO restoration for L-Unload. The recovery fact is derived from represented histories, not arbitrary `wf()`. Public errors preserve the complete machine; internal draft errors need not. |
 | [`Kernel::check_iteration` / `finish`](../crates/cordis-kernel/src/lib.rs) | Success iff Loading and `coherent(id)`. `paper_coherence` and `paper_iteration_guard` prove that this is exactly the projected paper guard. | L-Iter admission and the control transition L-Finish. Provider identity is checked through existing uniqueness, typing and coverage invariants, independent of buffer order or duplicates. |
 | [`StageProtocol::admit`](../crates/cordis-kernel/src/episode.rs) | `accepted == (old.pending || (!old.settled && !old.cancelled && matching_target))`. `matching_target` means a present target with the same complete binding-identity set. An already admitted stage stays admitted across cancellation or target loss. The final settled/cancellation flags are specified exactly. | Admission and retention of an outstanding iteration. `land`/`end` supply the token-level accumulator transitions for Iter/Finish or late Divert. Explicit host cancellation is an extension, not evidence that the paper target changed. |
 | [`ChildEpisode::check_child` / `land_child`](../crates/cordis-kernel/src/ownership.rs), [`ChildDriver` wrappers](../crates/cordis-kernel/src/child_driver.rs) | Success iff `land_enabled`: pending, current captured identity/generation, and the current insertion domain. | Conditional Definition 52 registration and capture of the actual child inverse. Admission alone does not guarantee insertion. |
@@ -544,13 +544,108 @@ This directly connects Definition 52's registered-name premise to executable
 recovery, as reviewed in [PR-02](paper-review-guide.md#pr-02-child-retirement-needs-the-referenced-identity-to-remain-registered).
 A retired child stays registered until a legal Remove; retirement neither removes
 it nor executes its own cleanup. Parent ownership creates no implicit service
-dependency. Nontrivial Table receipts, including Provision and Xor, remain
-outside this definedness result and can still fail under strict current-state
-checks. The Unit receipt itself is modeled as `Table(Unit)`, so the boundary is
+dependency. The following source invariants extend this result first to Provision
+and then to the complete concrete journal including Xor. The Unit receipt itself is modeled as `Table(Unit)`, so the boundary is
 the concrete receipt classification, not all receipts called Table in the model.
 This supplies a restricted inverse bridge for Lemma 57 and local cleanup progress
 for Theorem 73; both remain **partial**. It does not add Corollary 69's general
 foreign-replay equation, empty-owner-table conclusion or whole-system termination.
+
+## Provision slots survive until their real inverse
+
+[`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) adds a
+current-state invariant, `live_provisions`, for actual source accumulators:
+every retained Provision receipt refers to a value still present in its owner's
+slot, and that owner's live Provision receipts have distinct keys. The invariant
+is derived by induction over Mixed/Fresh execution from empty. It is not an
+extra premise silently inserted into executable `wf()`.
+
+These two facts are both necessary. A defined Provision inverse removes an
+existing value; if two retained receipts claimed the same slot, the later
+inverse could make the earlier one undefined. Foreign Xor operations may change
+the value, but preserve the occupied slot. The invariant does not require that
+the current payload equal the originally provided payload.
+
+[`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+connects that source invariant and child retention to the **actual receipts**.
+`unit_child_provision_journal(actor)` permits Unit, Child and Provision in the
+owner's current journal. `provision_recovery()` then states that every registered
+actor in that profile has a defined entire `restore_receipts` sequence. In the
+LIFO induction, Provision removes its own distinct slot while leaving the other
+retained provision slots occupied; Unit and Child preserve table contents and
+registry membership. Other actors may have Xor receipts: the restriction is on
+the journal being restored, not all programs in the system.
+
+Mixed/Fresh `run_script` derive this property from their real successful prefix,
+including error returns. `run_from_empty` derives it for both the prepared and
+final machine, whether setup fails, execution blocks or execution finishes.
+These are erased proof data and contracts on the existing execution path, with
+no new runtime buffer or recovery algorithm. `provision_unload_domain` reduces
+`unload_enabled` to `cleanup_permitted` for this profile; public `unload` succeeds
+iff that cleanup guard holds. A script Unload failure in the profile therefore
+means the returned state does not permit cleanup. Bootstrap's `SetupFailed`
+diagnostics remain limited to the separate Insert/Begin/Step preparation profile.
+
+This extends the current-state inverse connection for Lemma 57 and the local
+cleanup obligation in Theorem 73. The next result covers Xor journals as well.
+Corollary 69's general foreign-replay equation, its empty-owner-table conclusion
+and global termination remain separate obligations.
+
+## Xor completes the current-state domain of the concrete journal
+
+[`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs)
+extends the source argument to retained operations. `operation_slot` identifies
+the captured provider and port of an operation receipt; `operation_at` relates it
+to a live accumulator position. `live_operations` records three facts: the
+receipt still resolves to its captured provider under the episode's committed
+bindings; that provider remains registered with a value at the captured port;
+and a later Provision in the same journal cannot remove a slot needed by an
+earlier operation. The last condition matters for self operations: a successful
+self Xor needs an earlier Provide, so LIFO recovery undoes the Xor before deleting
+that value. It is a condition on actual history order, not an assumption that
+arbitrary inverse operations commute.
+
+`mixed_from_empty` and `fresh_from_empty` derive these facts throughout the real
+source trace. Provider retirement or a changed current target does not replace
+the episode's committed identity. The dependency guard prevents provider cleanup
+while its consumer still holds that commitment, connecting the provider-lifetime
+rules in Definitions 53/54 to the value needed by the inverse. This argument
+complements Definition 52's child-name retention; it does not treat ownership as
+a service dependency.
+
+[`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs), exposed
+as `mixed_driver::recovery_all`, connects this source invariant to the **actual
+receipts** through `operations_from_source`. `restore_all` combines `live_xors`,
+Provision uniqueness and value presence, and retained child identities to prove
+defined LIFO restoration for every concrete receipt variant: Unit, Child,
+Provision and Xor. Xor preserves the occupied slot, and its concrete `u64` scalar
+inverse is total. These are the existing executable inverse operations, with no
+new runtime journal or alternate recovery algorithm.
+
+`journal_recovery_from_source` establishes `journal_recovery()`: every registered
+actor's complete current journal has a defined `restore_receipts`. Mixed/Fresh
+`run_script` derive it on every return, including the successful prefix before
+an error. `run_from_empty` derives it for both the prepared and final machine in
+all statuses. Under this property, `journal_unload_domain` proves
+`unload_enabled(actor) == cleanup_permitted(actor)` without a receipt-profile
+restriction. The real public Unload therefore succeeds iff the Kernel cleanup
+guard holds; a script stopped by Unload has a false cleanup guard at its actual
+stopping state. Bootstrap's `SetupFailed` error diagnostics remain limited to
+the separate Insert/Begin/Step preparation profile.
+
+The earlier `unit_child_recovery` and `provision_recovery` APIs remain available
+as narrower results. This stronger result covers the complete synchronous
+`u64`/Xor instruction language, not arbitrary plugin scalars or host callbacks.
+It discharges the concrete journal's inverse-definedness obstacle for Lemma 57
+and local cleanup in Theorem 73. Corollary 69's general foreign-replay observation
+equation and empty-owner-table conclusion, global progress and host scheduling
+remain separate obligations; the paper-wide statuses remain **partial**.
+
+The [Xor recovery tests](../crates/cordis-kernel/tests/xor_recovery.rs) run real
+scripts and bootstrap calls: self Xors interleaved with Provision/Child, captured
+providers after retirement, two consumers with interleaved effects, and recovery
+of a bootstrap prefix after incomplete publication. These are concrete behavior
+regressions alongside the proof, not a proof for arbitrary host effects.
 
 ## From a new machine through setup and execution
 
@@ -657,8 +752,9 @@ for a whole-system progress result. Lemma 57 and Theorem 73 remain **partial**.
    direct Mixed/Fresh Unload now also has an exact guard-plus-inverse domain.
    Retire/Depart/Remove, the wider dispatcher and other recovery paths still
    need their own domain equivalences. Reachable histories now establish inverse
-   definedness for actual Unit/Child journals; general strict Table restoration
-   still needs its own current-state domain argument.
+   definedness for the complete actual Unit/Child/Provision/Xor journal. This
+   concrete inverse-domain result still needs composition with the general
+   foreign-replay observation equation and host-effect contracts.
    Individual error variants are not characterized by the preparation predicates.
    Compose execution across multiple actors, dynamic children and recovery with
    the paper's global count/rank argument. These entry points do not instantiate

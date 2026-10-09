@@ -269,6 +269,29 @@ class ProcessLifecycleTests(unittest.TestCase):
             time.sleep(0.01)
         self.fail(f"Process did not become ready: {path}")
 
+    @contextlib.contextmanager
+    def started_when_ready(self, supervisor, ready):
+        # These timeout cases require the child's SIGTERM handler to be installed.
+        # A fixed timeout alone cannot guarantee Python has reached that point.
+        start = supervisor.start
+        started = []
+
+        def start_ready(*args, **kwargs):
+            process = start(*args, **kwargs)
+            started.append(process)
+            self.assertEqual(self.wait_file(ready), str(process.pid))
+            return process
+
+        try:
+            with patch.object(supervisor, "start", side_effect=start_ready):
+                yield
+        finally:
+            # Inner fault-injection patches have exited. Also clean up if the
+            # readiness assertion failed before run_verus received its handle.
+            for process in started:
+                if process in supervisor.processes:
+                    supervisor.finish(process, terminate=True)
+
     def assert_reaped(self, pid):
         with self.assertRaises(ChildProcessError):
             os.waitpid(pid, os.WNOHANG)
@@ -468,8 +491,10 @@ raise AssertionError('signal must cancel verification')
 
     def test_timeout_cleanup_permission_error_keeps_primary_failure_and_live_process_diagnostics(self):
         prefix = self.reports / "kill-denied"
-        binary = self.executable("import signal, time\n"
-                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(30)\n")
+        ready = self.root / "kill-denied-ready"
+        binary = self.executable("import os, signal, time\nfrom pathlib import Path\n"
+                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                                 f"Path({str(ready)!r}).write_text(str(os.getpid()))\ntime.sleep(30)\n")
         supervisor = CHECKS.ProcessSupervisor(terminate_grace=0.01)
         killpg = os.killpg
 
@@ -479,7 +504,8 @@ raise AssertionError('signal must cancel verification')
             return killpg(pid, number)
 
         try:
-            with patch.object(CHECKS.os, "killpg", side_effect=deny_kill), \
+            with self.started_when_ready(supervisor, ready), \
+                    patch.object(CHECKS.os, "killpg", side_effect=deny_kill), \
                     self.assertRaisesRegex(PermissionError, "live group denied"):
                 CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs", prefix,
                                  timeout=0.5, supervisor=supervisor)
@@ -542,10 +568,13 @@ raise AssertionError('signal must cancel verification')
 
     def test_snapshot_failure_still_kills_and_reaps_the_retained_group(self):
         prefix = self.reports / "snapshot-denied"
+        ready = self.root / "snapshot-denied-ready"
         supervisor = CHECKS.ProcessSupervisor(terminate_grace=0.01)
-        binary = self.executable("import signal, time\n"
-                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(30)\n")
-        with patch.object(supervisor, "_group_snapshot", side_effect=OSError("test ps failed")), \
+        binary = self.executable("import os, signal, time\nfrom pathlib import Path\n"
+                                 "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                                 f"Path({str(ready)!r}).write_text(str(os.getpid()))\ntime.sleep(30)\n")
+        with self.started_when_ready(supervisor, ready), \
+                patch.object(supervisor, "_group_snapshot", side_effect=OSError("test ps failed")), \
                 self.assertRaisesRegex(OSError, "test ps failed"):
             CHECKS.run_verus(binary, os.environ.copy(), self.source / "lib.rs", prefix,
                              timeout=0.5, supervisor=supervisor)

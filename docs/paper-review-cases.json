@@ -101,6 +101,31 @@
           "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
           "symbol": "finish_cleanup",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "operation_slot",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "live_operations",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "mixed_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "fresh_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "symbol": "operations_from_source",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -270,6 +295,96 @@
           "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
           "symbol": "run_from_empty",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_history.rs",
+          "symbol": "provision_key",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_history.rs",
+          "symbol": "live_provisions",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_history.rs",
+          "symbol": "mixed_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_history.rs",
+          "symbol": "fresh_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "symbol": "live_receipts",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "symbol": "restore_unit_child_provisions",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "symbol": "provisions_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "symbol": "provision_recovery_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "symbol": "provision_unload_domain",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "operation_slot",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "live_operations",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "mixed_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/operation_history.rs",
+          "symbol": "fresh_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "symbol": "live_xors",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "symbol": "restore_all",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "symbol": "operations_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "symbol": "journal_recovery_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "symbol": "journal_unload_domain",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -307,6 +422,46 @@
           "package": "cordis-kernel",
           "target": "unit_child_recovery",
           "name": "bootstrap_terminal_publication_failure_keeps_a_recoverable_child_receipt"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "provision_recovery",
+          "name": "mixed_history_recovers_distinct_provisions_and_only_its_captured_child"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "provision_recovery",
+          "name": "foreign_xor_preserves_a_real_provision_until_dependency_cleanup_allows_recovery"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "provision_recovery",
+          "name": "duplicate_provide_failure_keeps_the_actual_provision_and_child_prefix_recoverable"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "provision_recovery",
+          "name": "bootstrap_missing_publication_still_recovers_committed_provision_and_child"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "xor_recovery",
+          "name": "mixed_script_recovers_self_xors_before_removing_their_provisions"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "xor_recovery",
+          "name": "retired_provider_stays_available_to_the_consumers_captured_xor_inverses"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "xor_recovery",
+          "name": "interleaved_consumers_recover_only_their_xors_and_keep_the_provider_value"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "xor_recovery",
+          "name": "bootstrap_failure_recovers_its_self_and_foreign_xors_from_the_real_prefix"
         }
       ],
       "negativeControl": {

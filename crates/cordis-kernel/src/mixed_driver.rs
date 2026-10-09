@@ -1586,10 +1586,17 @@ impl MixedDriver {
             out.is_ok()==old(self).unload_enabled(actor),
             old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
                 ==> out.is_ok()==old(self).cleanup_permitted(actor),
+            old(self).provision_recovery() && old(self).unit_child_provision_journal(actor)
+                ==> out.is_ok()==old(self).cleanup_permitted(actor),
+            old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor),
             out.is_ok() ==> final(self).journal(actor).len()==0
                 && final(self).control().fibers[actor].phase==Phase::Inactive && old(self).ack(final(self),actor,r::Rule::Unload),
     {
-        proof {if self.unit_child_recovery() && self.unit_child_journal(actor) {self.unit_child_unload_domain(actor);}}
+        proof {
+            if self.unit_child_recovery() && self.unit_child_journal(actor) {self.unit_child_unload_domain(actor);}
+            if self.provision_recovery() && self.unit_child_provision_journal(actor) {self.provision_unload_domain(actor);}
+            if self.journal_recovery() {self.journal_unload_domain(actor);}
+        }
         let mut draft=self.duplicate();
         let ghost initial=draft;
         proof {draft.same_unload_domain(self,actor);}
@@ -1802,7 +1809,10 @@ impl MixedDriver {
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             match command {Command::Unload {actor}=>out.is_ok()==old(self).unload_enabled(actor)
                 && (old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
-                    ==> out.is_ok()==old(self).cleanup_permitted(actor)),_=>true},
+                    ==> out.is_ok()==old(self).cleanup_permitted(actor))
+                && (old(self).provision_recovery() && old(self).unit_child_provision_journal(actor)
+                    ==> out.is_ok()==old(self).cleanup_permitted(actor))
+                && (old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor)),_=>true},
             out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),out.unwrap().label().0,out.unwrap().label().1),
     {
@@ -1961,10 +1971,14 @@ impl ScriptReport {
     proof fn establish(&self,bank:Seq<Blueprint>,states:Seq<mx::Configuration<u64,Index>>)
         requires self.machine.wf(),mx::execution(library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
-        ensures self.refines(bank),self.machine.unit_child_recovery(),
+        ensures self.refines(bank),self.machine.unit_child_recovery(),self.machine.provision_recovery(),self.machine.journal_recovery(),
     {
         library_theory();mx::from_empty_safe(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));
         self.machine.unit_child_recovery_from_source(bank,states.last());
+        crate::provision_history::mixed_from_empty(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));
+        self.machine.provision_recovery_from_source(bank,states.last());
+        crate::operation_history::mixed_from_empty(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));
+        self.machine.journal_recovery_from_source(bank,states.last());
     }
 }
 
@@ -1973,11 +1987,11 @@ impl ScriptReport {
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
     ensures out.machine.wf(),out.refines(blueprints@),out.transitions.len()<=commands.len(),
-        out.machine.unit_child_recovery(),
+        out.machine.unit_child_recovery(),out.machine.provision_recovery(),out.machine.journal_recovery(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
         out.error.is_some() ==> match commands[out.transitions.len() as int] {
-            Command::Unload {actor}=>out.machine.unit_child_journal(actor) ==> !out.machine.cleanup_permitted(actor),_=>true,
+            Command::Unload {actor}=>!out.machine.cleanup_permitted(actor),_=>true,
         },
         forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
@@ -2005,7 +2019,14 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
                     }
                 }
                 let out=ScriptReport {machine,transitions,error:Some(error)};
-                proof {out.establish(bank,states);}return out;
+                proof {
+                    out.establish(bank,states);
+                    if let Command::Unload {actor}=commands[i as int] {
+                        if out.machine.unit_child_provision_journal(actor) {out.machine.provision_unload_domain(actor);}
+                        out.machine.journal_unload_domain(actor);
+                    }
+                }
+                return out;
             },
             Ok(transition)=>{
                 let ghost previous=transitions@;
@@ -2039,6 +2060,12 @@ proof fn append_source(bank:Seq<Blueprint>,states:Seq<mx::Configuration<u64,Inde
 
 #[path = "unit_child_recovery.rs"]
 pub mod recovery;
+
+#[path = "provision_recovery.rs"]
+pub mod provision_recovery;
+
+#[path = "journal_recovery.rs"]
+pub mod recovery_all;
 
 #[path = "fresh_driver.rs"]
 pub mod fresh;

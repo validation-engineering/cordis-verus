@@ -5,7 +5,8 @@
 use super::{Blueprint, Command, DriverError, FreshDriver, Outcome, Transition};
 #[cfg(verus_keep_ghost)]
 use crate::{
-    fresh_semantics as fs, mixed_driver as core, mixed_grammar as mx, refinement as r, Port,
+    fresh_semantics as fs, mixed_driver as core, mixed_grammar as mx, operation_history as oh,
+    provision_history as ph, refinement as r, Port,
 };
 use vstd::prelude::*;
 
@@ -75,11 +76,19 @@ impl FromEmptyReport {
             self.prepared@.represents(bank,states[self.setup.len() as int]),
             self.machine.represents(bank,states.last()),
         ensures self.refines(bank),self.machine.unit_child_recovery(),self.prepared@.unit_child_recovery(),
+            self.machine.provision_recovery(),self.prepared@.provision_recovery(),
+            self.machine.journal_recovery(),self.prepared@.journal_recovery(),
     {
         super::weak_theory();
         fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,core::library(),super::programs(bank),states,self.labels());
         self.machine.unit_child_recovery_from_source(bank,states.last());
         self.prepared@.unit_child_recovery_from_source(bank,states[self.setup.len() as int]);
+        ph::fresh_from_empty(|_:Port,x:u64,y:u64|x==y,core::library(),super::programs(bank),states,self.labels());
+        self.machine.provision_recovery_from_source(bank,states.last());
+        self.prepared@.provision_recovery_from_source(bank,states[self.setup.len() as int]);
+        oh::fresh_from_empty(|_:Port,x:u64,y:u64|x==y,core::library(),super::programs(bank),states,self.labels());
+        self.machine.journal_recovery_from_source(bank,states.last());
+        self.prepared@.journal_recovery_from_source(bank,states[self.setup.len() as int]);
     }
 }
 
@@ -118,6 +127,8 @@ proof fn concatenate(bank:Seq<core::Blueprint>,prefix:Seq<mx::Configuration<u64,
 pub fn run_from_empty(blueprints:Vec<Blueprint>,setup_commands:&[Command],actor:usize)->(out:FromEmptyReport)
     ensures out.machine.wf(),out.prepared@.wf(),out.actor==actor,
         out.machine.unit_child_recovery(),out.prepared@.unit_child_recovery(),
+        out.machine.provision_recovery(),out.prepared@.provision_recovery(),
+        out.machine.journal_recovery(),out.prepared@.journal_recovery(),
         out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
         out.setup.len()<=setup_commands.len(),
         forall|i:int|0<=i<out.setup.len() ==> out.setup[i].command()==setup_commands[i],
