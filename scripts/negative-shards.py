@@ -337,7 +337,8 @@ def validate_preflight(directory, expected_binding, expected_source, execution):
 
 
 def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, timeout=2400,
-              compile_timeout=300, preflight=None):
+              compile_timeout=300, preflight=None, keep_going=False):
+    require(type(keep_going) is bool, 'Diagnostic keep-going selection must be boolean')
     require(type(timeout) is int and timeout > 0 and type(compile_timeout) is int and compile_timeout > 0,
             'Timeouts must be positive')
     checks = checker()
@@ -351,9 +352,14 @@ def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, ti
               'baselineMode': 'preflight' if preflight is not None else 'local',
               'shard': {'index': index, 'count': count, 'names': [item[0] for item in selected]},
               'execution': {**budget, 'timeoutSeconds': timeout,
-                            'compileTimeoutSeconds': compile_timeout, 'diagnostics': True}}
+                            'compileTimeoutSeconds': compile_timeout, 'diagnostics': True, 'keepGoing': keep_going}}
+    if keep_going:
+        record['releaseAcceptance'] = False
     save(output / 'shard.json', record)
+    diagnostic = None
     try:
+        if keep_going:
+            diagnostic = checks.MutationDiagnostics(selected, output)
         with tempfile.TemporaryDirectory(prefix='cordis-full-shard-') as temporary:
             temporary = Path(temporary)
             baseline = temporary / 'baseline'
@@ -373,12 +379,15 @@ def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, ti
                     _, _, copied_hash = validate_preflight(output, before, baseline_source, record['execution'])
                     require(copied_hash == preflight_hash, 'Preflight changed while copying evidence')
                     record['preflightSha256'] = preflight_hash
+                record.update(baseline=whole['verification-results'], verus=whole['verus'])
+                save(output / 'shard.json', record)
                 print(f"OK unmodified kernel ({record['baselineMode']}): "
                       f"{whole['verification-results']['verified']} verified, 0 errors", flush=True)
                 controls = checks.check_mutations(selected, baseline, temporary, output, binary, environment,
                                                  jobs=budget['jobs'], threads=budget['threadsPerWorker'],
                                                  timeout=timeout, compile_timeout=compile_timeout,
-                                                 supervisor=supervisor, diagnostics=True)
+                                                 supervisor=supervisor, diagnostics=True,
+                                                 keep_going=keep_going, diagnostic=diagnostic)
                 supervisor.check()
             supervisor.check()
         require(binding(checks, binary) == before, 'Sources/toolchain changed during shard execution')
@@ -389,16 +398,37 @@ def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, ti
             names.append('preflight.json')
         for item in selected:
             names += stage_files(item[0] + '-compile') + stage_files(item[0])
-        record.update(status='passed', checkedAt=datetime.now(timezone.utc).isoformat(),
+        if keep_going:
+            names.append('diagnostic.json')
+            attach_diagnostic(output, record)
+        record.update(status='diagnostic-passed' if keep_going else 'passed', checkedAt=datetime.now(timezone.utc).isoformat(),
                       baseline=whole['verification-results'], verus=whole['verus'], mutations=controls,
                       files={name: digest(safe_file(output, name)) for name in names})
         supervisor.check()
         save(output / 'shard.json', record)
-        print(f'Full-crate shard {index + 1}/{count} passed: {len(selected)} controls. Not complete release evidence.')
+        if keep_going:
+            print(f'Diagnostic shard {index + 1}/{count} completed: {len(selected)} controls. Not release evidence.')
+        else:
+            print(f'Full-crate shard {index + 1}/{count} passed: {len(selected)} controls. Not complete release evidence.')
     except BaseException as error:
+        if diagnostic is not None:
+            try:
+                if not isinstance(error, checks.MutationBatchError):
+                    diagnostic.finish('interrupted' if isinstance(error, (checks.RunCancelled, KeyboardInterrupt)) else 'failed', error)
+                attach_diagnostic(output, record)
+            except Exception as reporting_error:
+                record['diagnosticReportingError'] = f'{type(reporting_error).__name__}: {reporting_error}'
         record_failure(output, 'shard.json', record, error)
         raise
     return record
+
+
+def attach_diagnostic(output, record):
+    """Link diagnostic coverage to its raw artifact without accepting it as proof."""
+    path = safe_file(output, 'diagnostic.json')
+    report = read_json(path)
+    record['diagnosticReport'] = {'file': path.name, 'sha256': digest(path),
+                                'complete': report['complete'], 'counts': report['counts']}
 
 
 def validate_cleanup(metadata, stem):
@@ -484,6 +514,10 @@ def collect(input_directory, output):
     paths = sorted(input_directory.rglob('shard.json'))
     require(paths, 'No full-crate shard reports found')
     reports = [read_json(path) for path in paths]
+    for path, record in zip(paths, reports):
+        require(record.get('execution', {}).get('keepGoing', False) is False
+                and 'diagnosticReport' not in record and not (path.parent / 'diagnostic.json').exists(),
+                'Diagnostic keep-going reports cannot be collected as release evidence')
     for path in paths:
         parts = path.relative_to(input_directory).parts
         require(not input_directory.is_symlink()
@@ -594,6 +628,8 @@ def main():
     run.add_argument('--timeout', type=int, default=2400)
     run.add_argument('--compile-timeout', type=int, default=300)
     run.add_argument('--preflight', type=Path, help='Reuse raw baseline evidence from this CI run/attempt only')
+    run.add_argument('--keep-going', action='store_true',
+                     help='Diagnostic only: collect all mutation failures; never produce release evidence')
     gather = commands.add_parser('collect')
     gather.add_argument('--input', type=Path, required=True)
     gather.add_argument('--output', type=Path, required=True)
@@ -606,7 +642,7 @@ def main():
         require(args.timeout > 0, 'Timeout must be positive')
         run_shard(args.shard_index, args.shard_count, args.output, jobs=args.jobs,
                   threads=args.threads, cpu_budget=args.cpu_budget, timeout=args.timeout,
-                  compile_timeout=args.compile_timeout, preflight=args.preflight)
+                  compile_timeout=args.compile_timeout, preflight=args.preflight, keep_going=args.keep_going)
     else:
         collect(args.input, args.output)
 

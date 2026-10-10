@@ -194,6 +194,9 @@ pub proof fn allocation_monotone(states:Seq<p::Snapshot>,events:Seq<Event>)
     ensures forall|i:int| 0 <= i < states.len() ==> states[i].allocated <= states.last().allocated,
     decreases events.len(),
 {
+    // Compose the proved acknowledgement contract without unfolding every
+    // event's transition relation again in the trace induction.
+    hide(ack);
     if events.len() > 0 {
         allocation_monotone(states.drop_last(),events.drop_last());
         acknowledgement_frame(states[events.len()-1],states.last(),events.last());

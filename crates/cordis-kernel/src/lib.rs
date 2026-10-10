@@ -865,6 +865,82 @@ impl Kernel {
     pub closed spec fn same_live_bindings(&self, other: &Self) -> bool {
         forall|id: usize, b: Binding| self.binding_recorded(id, b) == other.binding_recorded(id, b)
     }
+    // Keep the local sequence proof separate from the executable filter loop.
+    // A retained record must be live; the checked premise rejects an inverted
+    // retention condition without entangling it with the final graph proof.
+    proof fn compact_bindings_push(links: Seq<Link>, kept: Seq<Link>, positions: Seq<int>, i: int)
+        requires 0 <= i < links.len(), links[i].live, positions.len() == kept.len(),
+            forall|a: int| 0 <= a < kept.len() ==> 0 <= #[trigger] positions[a] < i
+                && kept[a] == links[positions[a]] && kept[a].live,
+            forall|a: int, b: int| 0 <= a < b < kept.len() ==> positions[a] < positions[b],
+        ensures
+            forall|a: int| 0 <= a < kept.push(links[i]).len() ==> 0 <= #[trigger] positions.push(i)[a] < i + 1
+                && kept.push(links[i])[a] == links[positions.push(i)[a]] && kept.push(links[i])[a].live,
+            forall|a: int, b: int| 0 <= a < b < kept.push(links[i]).len() ==> positions.push(i)[a] < positions.push(i)[b],
+    {
+        let next_kept = kept.push(links[i]);
+        let next_positions = positions.push(i);
+        assert forall|a: int| 0 <= a < next_kept.len() implies 0 <= next_positions[a] < i + 1
+            && next_kept[a] == links[next_positions[a]] && next_kept[a].live by {
+            if a < kept.len() { assert(next_positions[a] == positions[a]); assert(next_kept[a] == kept[a]); }
+            else { assert(next_positions[a] == i); assert(next_kept[a] == links[i]); }
+        }
+        assert forall|a: int, b: int| 0 <= a < b < next_kept.len() implies next_positions[a] < next_positions[b] by {
+            if b < positions.len() { assert(positions[a] < positions[b]); }
+            else { assert(next_positions[b] == i); assert(positions[a] < i); }
+        }
+    }
+    // Only the completed position map is needed to transport graph invariants
+    // and live-binding observations to the compacted sequence.
+    proof fn compact_bindings_preserves(&self, prior: &Self, positions: Seq<int>)
+        requires prior.wf(), self.nodes@ == prior.nodes@, self.declarations@ == prior.declarations@,
+            positions.len() == self.links.len(),
+            forall|a: int| 0 <= a < self.links.len() ==> 0 <= #[trigger] positions[a] < prior.links.len()
+                && self.links[a] == prior.links[positions[a]] && self.links[a].live,
+            forall|a: int, b: int| 0 <= a < b < self.links.len() ==> positions[a] < positions[b],
+            forall|a: int| 0 <= a < prior.links.len() && #[trigger] prior.links[a].live ==> positions.contains(a),
+        ensures self.wf(), self.same_live_bindings(prior),
+    {
+        let before = prior.links@;
+        assert forall|a: int| 0 <= a < self.links.len() implies self.links[a].live
+            && Self::typed_link(self.declarations@, self.links[a]) && Self::link_ok(self.nodes@, self.links[a]) by {
+            assert(before[positions[a]] == self.links[a]);
+            assert(Self::typed_link(self.declarations@, before[positions[a]]));
+            assert(Self::link_ok(self.nodes@, before[positions[a]]));
+        }
+        assert forall|a: int, b: int| 0 <= a < self.links.len() && 0 <= b < self.links.len()
+            && self.links[a].live && self.links[b].live && self.links[a].binding.provider == self.links[b].consumer
+            implies b < a by {
+            assert(before[positions[a]] == self.links[a]);
+            assert(before[positions[b]] == self.links[b]);
+            assert(positions[b] < positions[a]);
+        }
+        assert forall|a: int| 0 <= a < self.declarations.len() && !self.declarations[a].provides
+            && self.nodes[self.declarations[a].owner as int].present && self.nodes[self.declarations[a].owner as int].phase != Phase::Inactive
+            implies exists|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == self.declarations[a].owner
+                && self.links[j].binding.key == self.declarations[a].port.key && self.links[j].binding.realm == self.declarations[a].port.realm by {
+            let d = self.declarations[a];
+            let k = choose|k: int| 0 <= k < before.len() && before[k].live && before[k].consumer == d.owner
+                && before[k].binding.key == d.port.key && before[k].binding.realm == d.port.realm;
+            assert(positions.contains(k));
+            let j = choose|j: int| 0 <= j < positions.len() && positions[j] == k;
+            assert(self.links[j] == before[k]);
+        }
+        assert forall|id: usize, b: Binding| self.binding_recorded(id, b) == prior.binding_recorded(id, b) by {
+            if prior.binding_recorded(id, b) {
+                let k = choose|k: int| 0 <= k < before.len() && before[k].live && before[k].consumer == id && before[k].binding == b;
+                assert(positions.contains(k));
+                let j = choose|j: int| 0 <= j < positions.len() && positions[j] == k;
+                assert(self.links[j] == before[k]);
+                assert(self.binding_recorded(id, b));
+            }
+            if self.binding_recorded(id, b) {
+                let j = choose|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == id && self.links[j].binding == b;
+                assert(before[positions[j]] == self.links[j]);
+                assert(prior.binding_recorded(id, b));
+            }
+        }
+    }
     /// Reclaim obsolete episode links without changing identities, declarations,
     /// live bindings, or their order. Safe even while consumers are unloading.
     pub fn compact_bindings(&mut self) -> (removed: usize)
@@ -899,15 +975,7 @@ impl Kernel {
                 kept.push(self.links[i]);
                 proof {
                     positions = positions.push(i as int);
-                    assert forall|a: int| 0 <= a < kept.len() implies 0 <= positions[a] < i + 1
-                        && kept[a] == self.links[positions[a]] && kept[a].live by {
-                        if a < prior_kept.len() { assert(positions[a] == prior_positions[a]); assert(kept[a] == prior_kept[a]); }
-                        else { assert(positions[a] == i); assert(kept[a] == self.links[i as int]); }
-                    }
-                    assert forall|a: int, b: int| 0 <= a < b < kept.len() implies positions[a] < positions[b] by {
-                        if b < prior_positions.len() { assert(prior_positions[a] < prior_positions[b]); }
-                        else { assert(positions[b] == i); assert(prior_positions[a] < i); }
-                    }
+                    Self::compact_bindings_push(self.links@, prior_kept, prior_positions, i as int);
                 }
             }
             proof {
@@ -923,48 +991,8 @@ impl Kernel {
         }
         proof { assert(self.links@.subrange(0, i as int) =~= self.links@); }
         let removed = self.links.len() - kept.len();
-        let ghost before = self.links@;
         self.links = kept;
-        proof {
-            assert forall|a: int| 0 <= a < self.links.len() implies self.links[a].live
-                && Self::typed_link(self.declarations@, self.links[a]) && Self::link_ok(self.nodes@, self.links[a]) by {
-                assert(before[positions[a]] == self.links[a]);
-                assert(Self::typed_link(self.declarations@, before[positions[a]]));
-                assert(Self::link_ok(self.nodes@, before[positions[a]]));
-            }
-            assert forall|a: int, b: int| 0 <= a < self.links.len() && 0 <= b < self.links.len()
-                && self.links[a].live && self.links[b].live && self.links[a].binding.provider == self.links[b].consumer
-                implies b < a by {
-                assert(before[positions[a]] == self.links[a]);
-                assert(before[positions[b]] == self.links[b]);
-                assert(positions[b] < positions[a]);
-            }
-            assert forall|a: int| 0 <= a < self.declarations.len() && !self.declarations[a].provides
-                && self.nodes[self.declarations[a].owner as int].present && self.nodes[self.declarations[a].owner as int].phase != Phase::Inactive
-                implies exists|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == self.declarations[a].owner
-                    && self.links[j].binding.key == self.declarations[a].port.key && self.links[j].binding.realm == self.declarations[a].port.realm by {
-                let d = self.declarations[a];
-                let k = choose|k: int| 0 <= k < before.len() && before[k].live && before[k].consumer == d.owner
-                    && before[k].binding.key == d.port.key && before[k].binding.realm == d.port.realm;
-                assert(positions.contains(k));
-                let j = choose|j: int| 0 <= j < positions.len() && positions[j] == k;
-                assert(self.links[j] == before[k]);
-            }
-            assert forall|id: usize, b: Binding| self.binding_recorded(id, b) == old(self).binding_recorded(id, b) by {
-                if old(self).binding_recorded(id, b) {
-                    let k = choose|k: int| 0 <= k < before.len() && before[k].live && before[k].consumer == id && before[k].binding == b;
-                    assert(positions.contains(k));
-                let j = choose|j: int| 0 <= j < positions.len() && positions[j] == k;
-                    assert(self.links[j] == before[k]);
-                    assert(self.binding_recorded(id, b));
-                }
-                if self.binding_recorded(id, b) {
-                    let j = choose|j: int| 0 <= j < self.links.len() && self.links[j].live && self.links[j].consumer == id && self.links[j].binding == b;
-                    assert(before[positions[j]] == self.links[j]);
-                    assert(old(self).binding_recorded(id, b));
-                }
-            }
-        }
+        proof { self.compact_bindings_preserves(old(self), positions); }
         proof { self.paper_stutter(old(self)); }
         removed
     }

@@ -26,8 +26,8 @@ SMT solver. Timeout changes affect wall time, not solver resource limits or proo
 contracts. Ordinary local release validation still executes all controls afresh.
 
 Each verifier invocation owns a process group. Timeout, cancellation and termination
-stop its Verus and solver descendants; failed workers stop further dispatch and
-cancel active siblings. Standard output, diagnostics and `.meta.json` stage records
+stop its Verus and solver descendants; by default, failed workers stop further
+dispatch and cancel active siblings. Standard output, diagnostics and `.meta.json` stage records
 are retained, including elapsed time, command, exit status, source fingerprint and
 cancellation state. The queue contains only the active worker budget, rather than
 all 114 already-submitted tasks.
@@ -40,6 +40,66 @@ Stage records retain process-group snapshots, signals and any cleanup error. A
 cleanup failure cannot turn a timeout or cancellation into accepted proof evidence.
 CI steps use `exec` so cancellation reaches the supervisor. A forced kill can still
 leave incomplete stage files; collection rejects them.
+
+## Continue collecting after failures
+
+Use `--keep-going` to diagnose all mutations in a run or shard, even when an
+individual mutation fails the negative acceptance checks. For example, a resource
+limit, a timeout whose processes were successfully cleaned up, or a mutant that
+unexpectedly verifies remains a failure, but no longer hides later controls.
+The unchanged baseline must still pass first. Cancellation, cleanup failures and
+infrastructure errors still stop execution; this mode does not promise complete
+results after an interrupted run.
+
+In GitHub Actions, choose **Full release validation → Run workflow** and enable
+`diagnostic_keep_going`. Leave `create_draft` disabled. The equivalent CLI request is:
+
+```sh
+gh workflow run release-validation.yml \
+  --repo validation-engineering/cordis-verus --ref main \
+  -f diagnostic_keep_going=true -f create_draft=false \
+  -f include_macos_intel=false
+```
+
+This is opt-in; ordinary release runs retain the default stop-on-failure behavior
+inside each shard. Diagnostic runs keep the same full-crate checks, resource limits
+and process cleanup. They retain raw artifacts even on failure and do not use
+`continue-on-error`. A shard still exits unsuccessfully if any control fails.
+The quality and draft-release jobs are skipped for diagnostic runs, even if every
+control passes. Requesting both diagnostic mode and a draft release is rejected in
+the planning job before verification starts.
+
+For a local diagnostic run of all controls:
+
+```sh
+python3 scripts/check-negative.py --keep-going --jobs 1 --threads 2 --timeout 2400
+```
+
+For one local shard, use a new output directory and repeat with other indices as
+needed (a single shard covers only its assigned controls):
+
+```sh
+python3 scripts/negative-shards.py run \
+  --shard-index 0 --shard-count 18 --output target/negative-diagnostics/shard-0 \
+  --jobs 1 --threads 2 --timeout 2400 --compile-timeout 300 --keep-going
+```
+
+`diagnostic.json` records outcomes in canonical order, with an error type and message
+for each failed control. Its counts distinguish selected, attempted, passed, failed
+and unexecuted controls. `complete: true` means all selected controls were attempted;
+it can coexist with failures. The report is written to `target/proof-negative/` for the monolithic runner
+and the chosen output directory for a shard, alongside the raw stdout, stderr and
+stage metadata. A completed diagnostic shard has `shard.json` status
+`diagnostic-passed` if all its controls pass, or `failed` otherwise, and always
+`releaseAcceptance: false`. Check the report for unexecuted controls before
+calling collection complete.
+
+Diagnostic evidence cannot enter release validation: the collector explicitly
+rejects it, including an all-passing diagnostic run. After fixing the reported
+problems, run the ordinary full gate again on one final source snapshot, with
+`diagnostic_keep_going=false` (or without `--keep-going` locally). Complete diagnostic
+coverage helps plan the fixes; release acceptance still requires fresh ordinary
+validation of every selected platform.
 
 ## Parallel CI without reducing proof scope
 
@@ -182,3 +242,13 @@ helper instead of exhausting a downstream composition query. Every helper must
 still pass the unchanged whole-crate baseline; its conclusion is never added as
 an unproved assumption. Selected-proof probes are debugging tools only, and the
 full-crate negative acceptance criteria remain unchanged.
+
+`program_trace::allocation_monotone` hides the event relation `ack` and consumes
+`acknowledgement_frame`'s proved contract during sequence induction. Allocation
+monotonicity no longer expands every event's registration and history conditions.
+The historical-name mutation must still fail the original non-reuse contract.
+`Kernel::compact_bindings` separates the retained-position extension and final
+graph/binding preservation into private proved helpers. The loop consumes their
+contracts; the executable filter and its public postconditions remain unchanged.
+An inverted live-record condition must fail a checked premise, and any additional
+resource error still rejects the whole negative result.

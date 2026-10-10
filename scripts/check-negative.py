@@ -70,6 +70,86 @@ class RunCancelled(RuntimeError):
     """An interrupted process is never acceptable proof evidence."""
 
 
+class MutationFailure(RuntimeError):
+    """An expected control failure, never acceptable negative proof evidence."""
+
+
+class MutationBatchError(RuntimeError):
+    """Diagnostic collection finished, but some controls did not pass the gate."""
+
+    def __init__(self, outcomes):
+        self.outcomes = outcomes
+        failed = [row["name"] for row in outcomes if row["status"] == "failed"]
+        super().__init__(f"{len(failed)} negative control(s) failed: {', '.join(failed)}")
+
+
+class MutationDiagnostics:
+    """Atomic progress for diagnostics; deliberately never a release report."""
+
+    def __init__(self, mutations, reports):
+        self.path = reports / "diagnostic.json"
+        self.lock = threading.RLock()
+        self.report = {
+            "schema": "cordis.negative-diagnostic/v1",
+            "releaseAcceptance": False, "keepGoing": True, "status": "running",
+            "complete": False,
+            "outcomes": [{"name": mutation[0], "status": "pending", "attempted": False}
+                         for mutation in mutations],
+        }
+        self._write()
+
+    def _write(self):
+        outcomes = self.report["outcomes"]
+        attempted = sum(row["attempted"] for row in outcomes)
+        self.report["counts"] = {
+            "selected": len(outcomes), "attempted": attempted,
+            "passed": sum(row["status"] == "passed" for row in outcomes),
+            "failed": sum(row["status"] == "failed" for row in outcomes),
+            "notRun": len(outcomes) - attempted,
+        }
+        # A reader sees either the prior complete JSON value or the new one.
+        path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", dir=self.path.parent,
+                                             prefix=".diagnostic-", suffix=".tmp", delete=False) as output:
+                path = Path(output.name)
+                json.dump(self.report, output, indent=2)
+                output.write("\n")
+                output.flush()
+            os.replace(path, self.path)
+        finally:
+            if path is not None:
+                path.unlink(missing_ok=True)
+
+    def update(self, index, status, *, error=None, evidence=None, fatal=False):
+        with self.lock:
+            row = self.report["outcomes"][index]
+            row["status"] = status
+            if status == "running":
+                row["attempted"] = True
+            if error is not None:
+                row["error"] = {"type": type(error).__name__, "message": str(error)}
+            if evidence is not None:
+                row["evidence"] = evidence
+            if fatal:
+                row["fatal"] = True
+            self._write()
+
+    def finish(self, status, error=None):
+        with self.lock:
+            self.report["status"] = status
+            # Completion records exhausted controls, not successful verification.
+            # An interrupted or infrastructure-failed control is still incomplete.
+            self.report["complete"] = (
+                status in ("completed", "failed")
+                and (error is None or isinstance(error, MutationBatchError))
+                and all(row["status"] in ("passed", "failed") and not row.get("fatal", False)
+                        for row in self.report["outcomes"]))
+            if error is not None:
+                self.report["error"] = {"type": type(error).__name__, "message": str(error)}
+            self._write()
+
+
 class ProcessSupervisor:
     """Own process groups until their leaders have been reaped, including on cancellation.
 
@@ -376,6 +456,7 @@ def run_verus(binary, environment, source, report_path, compile_only=False, *, t
             if metadata["status"] not in ("timed_out", "cancelled"):
                 metadata["status"] = "error"
             metadata["cleanupError"] = f"{type(error).__name__}: {error}"
+            error._cordis_cleanup_failure = True
             raise
         finally:
             if process is not None:
@@ -404,15 +485,15 @@ def rejected_result(name, result):
             and stats["is-verifying-entire-crate"] is True
         )
     except (ValueError, KeyError, TypeError):
-        raise RuntimeError(f"Mutation {name} produced no complete verification results") from None
+        raise MutationFailure(f"Mutation {name} produced no complete verification results") from None
     if not rejected:
-        raise RuntimeError(f"Mutation {name} was not rejected by full-crate proof checking")
+        raise MutationFailure(f"Mutation {name} was not rejected by full-crate proof checking")
     if not any(line.startswith(message) for line in result.stderr.splitlines() for message in (
         "error: postcondition not satisfied", "error: precondition not satisfied",
         "error: assertion failed", "error: invariant not satisfied",
         "error: possible arithmetic underflow/overflow", "error: decreases not satisfied",
     )):
-        raise RuntimeError(f"Mutation {name} has no conclusive contract failure")
+        raise MutationFailure(f"Mutation {name} has no conclusive contract failure")
     # A real failed contract must not hide a partial, resource-limited or crashed
     # whole-crate run. Rendered source excerpts are data, not diagnostics.
     resource = re.compile(
@@ -422,7 +503,7 @@ def rejected_result(name, result):
     )
     for line in result.stderr.splitlines():
         if not re.match(r"\s*(?:[0-9]+)?\s*\|", line) and resource.search(line):
-            raise RuntimeError(f"Mutation {name} has a resource or compiler failure; this is not accepted proof evidence")
+            raise MutationFailure(f"Mutation {name} has a resource or compiler failure; this is not accepted proof evidence")
     return {"name": name, "compiles": True, "verification-results": stats}
 
 
@@ -436,7 +517,7 @@ def check_mutation(mutation, baseline, temporary, reports, binary, environment, 
     source = mutated / relative
     text = source.read_text()
     if text.count(original) != 1:
-        raise RuntimeError(f"Mutation {name} no longer has exactly one source match; update the negative check")
+        raise MutationFailure(f"Mutation {name} no longer has exactly one source match; update the negative check")
     source.write_text(text.replace(original, replacement))
     options = {"threads": threads or execution_budget()["threadsPerWorker"], "timeout": timeout}
     # Existing injectable runners only need the established threads/timeout API.
@@ -450,56 +531,100 @@ def check_mutation(mutation, baseline, temporary, reports, binary, environment, 
                           **{**options, "timeout": timeout if compile_timeout is None else compile_timeout})
         supervisor.check()
         if compiled.returncode != 0:
-            raise RuntimeError(f"Mutation {name} did not compile; this is not an accepted proof failure")
+            raise MutationFailure(f"Mutation {name} did not compile; this is not an accepted proof failure")
         failed = runner(binary, environment, mutated / "lib.rs", reports / name, **options)
         supervisor.check()
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"Mutation {name} timed out; this is not an accepted proof failure") from None
+    except subprocess.TimeoutExpired as error:
+        if getattr(error, "_cordis_cleanup_failure", False):
+            raise
+        raise MutationFailure(f"Mutation {name} timed out; this is not an accepted proof failure") from None
     return rejected_result(name, failed)
 
 
 def check_mutations(mutations, baseline, temporary, reports, binary, environment, *, jobs=1,
-                    threads=None, timeout=600, runner=run_verus, supervisor=None, diagnostics=False, compile_timeout=None):
-    """Bound dispatch to active workers, fail fast, and preserve manifest order."""
+                    threads=None, timeout=600, runner=run_verus, supervisor=None, diagnostics=False,
+                    compile_timeout=None, keep_going=False, diagnostic=None):
+    """Bound dispatch and preserve order; optionally collect expected failures."""
     supervisor = supervisor or ProcessSupervisor()
     if threads is None:
         budget = execution_budget(jobs)
         jobs, threads = budget["jobs"], budget["threadsPerWorker"]
+    if diagnostic is not None and not keep_going:
+        raise ValueError("Mutation diagnostics require keep_going=True")
+    if keep_going:
+        (reports / "report.json").unlink(missing_ok=True)
+        diagnostic = diagnostic or MutationDiagnostics(mutations, reports)
     results = [None] * len(mutations)
 
-    def checked(mutation):
+    def checked(index):
+        started = False
         try:
-            return check_mutation(mutation, baseline, temporary, reports, binary, environment,
-                                  threads=threads, timeout=timeout, runner=runner, supervisor=supervisor,
-                                  diagnostics=diagnostics, compile_timeout=compile_timeout)
+            supervisor.check()
+            if diagnostic is not None:
+                diagnostic.update(index, "running")
+            started = True
+            try:
+                evidence = check_mutation(mutations[index], baseline, temporary, reports, binary, environment,
+                                          threads=threads, timeout=timeout, runner=runner, supervisor=supervisor,
+                                          diagnostics=diagnostics, compile_timeout=compile_timeout)
+            except MutationFailure as error:
+                if not keep_going:
+                    raise
+                diagnostic.update(index, "failed", error=error)
+                return error
+            if diagnostic is not None:
+                diagnostic.update(index, "passed", evidence=evidence)
+            return evidence
         except BaseException as error:
+            # Only MutationFailure above is collectable. Signals, filesystem and
+            # cleanup failures still stop dispatch and terminate active peers.
             supervisor.cancel(error)
+            if diagnostic is not None and started:
+                status = "interrupted" if isinstance(error, (RunCancelled, KeyboardInterrupt)) else "failed"
+                diagnostic.update(index, status, error=error, fatal=True)
             raise
 
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        pending = {}
-        next_index = 0
-        try:
-            while pending or next_index < len(mutations):
-                supervisor.check()
-                while len(pending) < jobs and next_index < len(mutations):
+    try:
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            pending = {}
+            next_index = 0
+            try:
+                while pending or next_index < len(mutations):
                     supervisor.check()
-                    pending[pool.submit(checked, mutations[next_index])] = next_index
-                    next_index += 1
-                completed, _ = wait(pending, return_when=FIRST_COMPLETED)
-                # Inspect the whole completed batch before dispatching any more.
-                for future in completed:
-                    index = pending.pop(future)
-                    result = future.result()
-                    results[index] = result
-                    stats = result["verification-results"]
-                    print(f"OK {result['name']}: compiles; proof rejected ({stats['verified']} verified, {stats['errors']} errors)", flush=True)
-        except BaseException as error:
-            supervisor.cancel(error)
-            for future in pending:
-                future.cancel()
-            raise supervisor.failure or error
-    supervisor.check()
+                    while len(pending) < jobs and next_index < len(mutations):
+                        supervisor.check()
+                        pending[pool.submit(checked, next_index)] = next_index
+                        next_index += 1
+                    completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+                    # Inspect the whole completed batch before dispatching more.
+                    for future in completed:
+                        index = pending.pop(future)
+                        evidence = future.result()
+                        if isinstance(evidence, MutationFailure):
+                            print(f"FAIL {mutations[index][0]}: {evidence}", flush=True)
+                            continue
+                        results[index] = evidence
+                        stats = evidence["verification-results"]
+                        print(f"OK {evidence['name']}: compiles; proof rejected ({stats['verified']} verified, {stats['errors']} errors)", flush=True)
+            except BaseException as error:
+                supervisor.cancel(error)
+                for future in pending:
+                    future.cancel()
+                raise supervisor.failure or error
+        supervisor.check()
+    except BaseException as error:
+        # Pool teardown has joined workers, so no progress update can overwrite
+        # this terminal report or race process-group cleanup.
+        if diagnostic is not None:
+            status = "interrupted" if isinstance(error, (RunCancelled, KeyboardInterrupt)) else "failed"
+            diagnostic.finish(status, error)
+        raise
+    if diagnostic is not None:
+        failed = any(row["status"] == "failed" for row in diagnostic.report["outcomes"])
+        failure = MutationBatchError(diagnostic.report["outcomes"]) if failed else None
+        diagnostic.finish("failed" if failed else "completed", failure)
+        if failure is not None:
+            raise failure
     return results
 
 
@@ -1153,13 +1278,13 @@ def main():
                         help="total CPU budget, capped to available CPUs (default: min(available CPUs, 2))")
     parser.add_argument("--timeout", type=positive, default=os.environ.get("CORDIS_NEGATIVE_TIMEOUT", "600"),
                         help="wall-clock seconds per subprocess (default: CORDIS_NEGATIVE_TIMEOUT or 600); timeout never counts as rejection")
+    parser.add_argument("--keep-going", action="store_true",
+                        help="collect every selected negative control after expected failures; writes diagnostic.json, never release evidence")
     args = parser.parse_args()
     try:
         budget = execution_budget(args.jobs, args.threads, args.cpu_budget)
     except ValueError as error:
         parser.error(str(error))
-    threads = budget["threadsPerWorker"]
-    jobs = budget["jobs"]
     supervisor = ProcessSupervisor()
     timeout = args.timeout
     binary, environment = toolchain()
@@ -1167,6 +1292,25 @@ def main():
     reports.mkdir(parents=True, exist_ok=True)
     (reports / "report.json").unlink(missing_ok=True)
     mutations = mutation_manifest()
+    diagnostic = MutationDiagnostics(mutations, reports) if args.keep_going else None
+    try:
+        return run_checks(binary, environment, reports, mutations, supervisor, budget, timeout,
+                          keep_going=args.keep_going, diagnostic=diagnostic)
+    except BaseException as error:
+        # A signal or cleanup failure after the last mutation must not leave a
+        # successful release report behind, including in the default mode.
+        (reports / "report.json").unlink(missing_ok=True)
+        if diagnostic is not None and not isinstance(error, MutationBatchError):
+            status = "interrupted" if isinstance(error, (RunCancelled, KeyboardInterrupt)) else "failed"
+            diagnostic.finish(status, error)
+        if isinstance(error, RuntimeError):
+            sys.exit(f"{error}; see {reports}")
+        raise
+
+
+def run_checks(binary, environment, reports, mutations, supervisor, budget, timeout, *,
+               keep_going=False, diagnostic=None):
+    jobs, threads = budget["jobs"], budget["threadsPerWorker"]
     with supervisor.signal_handlers(), tempfile.TemporaryDirectory(prefix="cordis-negative-") as temporary:
         temporary = Path(temporary)
         baseline = temporary / "baseline"
@@ -1174,8 +1318,6 @@ def main():
         try:
             result = run_verus(binary, environment, baseline / "lib.rs", reports / "baseline", threads=budget["baselineThreads"],
                                timeout=timeout, supervisor=supervisor)
-        except RunCancelled as error:
-            sys.exit(str(error))
         except subprocess.TimeoutExpired:
             sys.exit(f"Unmodified kernel timed out; no proof evidence recorded; see {reports}")
         if result.returncode != 0:
@@ -1191,14 +1333,16 @@ def main():
                    "execution": {**budget, "timeoutSeconds": timeout},
                    "mutations": []}
         print(f"Checking {len(mutations)} mutations with {jobs} worker(s), {threads} Verus threads per worker", flush=True)
-        try:
-            summary["mutations"] = check_mutations(mutations, baseline, temporary, reports, binary,
-                                                  environment, jobs=jobs, threads=threads, timeout=timeout,
-                                                  supervisor=supervisor)
-        except RuntimeError as error:
-            sys.exit(f"{error}; see {reports}")
+        summary["mutations"] = check_mutations(mutations, baseline, temporary, reports, binary,
+                                              environment, jobs=jobs, threads=threads, timeout=timeout,
+                                              supervisor=supervisor, keep_going=keep_going,
+                                              diagnostic=diagnostic)
         supervisor.check()
-        (reports / "report.json").write_text(json.dumps(summary, indent=2) + "\n")
+        if not keep_going:
+            (reports / "report.json").write_text(json.dumps(summary, indent=2) + "\n")
+    # Signal handlers cancel the supervisor without throwing. Check again after
+    # temporary-tree cleanup, which can receive a signal after the body check.
+    supervisor.check()
     return 0
 
 

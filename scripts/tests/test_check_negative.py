@@ -197,6 +197,160 @@ class IsolatedRunnerTests(unittest.TestCase):
         self.assertEqual([row["name"] for row in evidence], ["first", "second"])
         self.assertEqual((self.baseline / "lib.rs").read_text(), "pub const TAG: u8 = 0;\n")
 
+    def read_diagnostic(self):
+        return json.loads((self.reports / "diagnostic.json").read_text())
+
+    def test_keep_going_collects_expected_failures_without_accepting_them(self):
+        names = ["compile", "passed", "timeout", "stale", "malformed", "resource", "unrejected"]
+        mutations = [(name, "lib.rs", "missing" if name == "stale" else "= 0", "= 1")
+                     for name in names]
+        invoked = []
+        supervisor = CHECKS.ProcessSupervisor()
+        (self.reports / "report.json").write_text('{"old": "release report"}')
+
+        def runner(binary, environment, source, report_path, compile_only=False, **kwargs):
+            name = source.parent.name
+            invoked.append((name, compile_only))
+            progress = self.read_diagnostic()
+            self.assertEqual(progress["status"], "running")
+            self.assertFalse(progress["complete"])
+            self.assertEqual(progress["outcomes"][names.index(name)]["status"], "running")
+            if compile_only:
+                return result(code=1 if name == "compile" else 0)
+            if name == "timeout":
+                raise subprocess.TimeoutExpired("verus", 5)
+            if name == "malformed":
+                return subprocess.CompletedProcess([], 1, "no JSON", "error: assertion failed")
+            if name == "resource":
+                return result(stderr="error: assertion failed\nnote: Resource limit (rlimit) exceeded")
+            if name == "unrejected":
+                return result(code=0, success=True, errors=0)
+            return result()
+
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(CHECKS.MutationBatchError) as caught:
+            CHECKS.check_mutations(mutations, self.baseline, self.root, self.reports,
+                                   "unused-verus", {}, runner=runner, threads=1,
+                                   keep_going=True, supervisor=supervisor)
+        diagnostic = self.read_diagnostic()
+        self.assertEqual(diagnostic["schema"], "cordis.negative-diagnostic/v1")
+        self.assertEqual(diagnostic["status"], "failed")
+        self.assertTrue(diagnostic["complete"])
+        self.assertTrue(diagnostic["keepGoing"])
+        self.assertFalse(diagnostic["releaseAcceptance"])
+        self.assertEqual(diagnostic["counts"], {"selected": 7, "attempted": 7,
+                                               "passed": 1, "failed": 6, "notRun": 0})
+        self.assertEqual([row["name"] for row in diagnostic["outcomes"]], names)
+        self.assertEqual(caught.exception.outcomes, diagnostic["outcomes"])
+        for row in diagnostic["outcomes"]:
+            if row["name"] == "passed":
+                self.assertEqual(row["status"], "passed")
+                self.assertTrue(row["evidence"]["compiles"])
+            else:
+                self.assertEqual(row["status"], "failed")
+                self.assertEqual(row["error"]["type"], "MutationFailure")
+                self.assertNotIn("evidence", row)
+        self.assertFalse(supervisor.cancelled.is_set())
+        self.assertNotIn(("stale", True), invoked)
+        self.assertFalse((self.reports / "report.json").exists())
+        self.assertEqual(list(self.reports.glob(".diagnostic-*.tmp")), [])
+
+    def test_keep_going_parallel_completion_keeps_manifest_order(self):
+        names = ["first", "second", "third"]
+        mutations = [(name, "lib.rs", "= 0", "= 1") for name in names]
+        barrier = threading.Barrier(2)
+        second_done = threading.Event()
+        completed = []
+
+        def runner(binary, environment, source, report_path, compile_only=False, **kwargs):
+            name = source.parent.name
+            if compile_only:
+                return result(code=0)
+            if name in ("first", "second"):
+                barrier.wait(timeout=5)
+            if name == "first":
+                self.assertTrue(second_done.wait(timeout=5))
+            completed.append(name)
+            if name == "second":
+                second_done.set()
+                return result(stderr="error: solver returned unknown")
+            return result()
+
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(CHECKS.MutationBatchError):
+            CHECKS.check_mutations(mutations, self.baseline, self.root, self.reports,
+                                   "unused-verus", {}, jobs=2, threads=1, runner=runner, keep_going=True)
+        diagnostic = self.read_diagnostic()
+        self.assertEqual(completed[0], "second")
+        self.assertEqual([row["name"] for row in diagnostic["outcomes"]], names)
+        self.assertEqual([row["status"] for row in diagnostic["outcomes"]], ["passed", "failed", "passed"])
+        self.assertTrue(diagnostic["complete"])
+
+    def test_keep_going_all_pass_returns_evidence_but_only_diagnostic_report(self):
+        def runner(*args, **kwargs):
+            return result(code=0) if len(args) == 5 and args[4] else result()
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            evidence = CHECKS.check_mutations([self.mutation], self.baseline, self.root, self.reports,
+                                              "unused-verus", {}, threads=1, runner=runner, keep_going=True)
+        self.assertEqual([row["name"] for row in evidence], ["example"])
+        diagnostic = self.read_diagnostic()
+        self.assertEqual(diagnostic["status"], "completed")
+        self.assertTrue(diagnostic["complete"])
+        self.assertFalse(diagnostic["releaseAcceptance"])
+        self.assertEqual(diagnostic["counts"]["failed"], 0)
+        self.assertFalse((self.reports / "report.json").exists())
+
+    def test_default_still_stops_at_first_failure_without_diagnostic(self):
+        calls = []
+
+        def runner(*args, **kwargs):
+            calls.append(args)
+            return result(code=1)
+
+        mutations = [self.mutation, ("later", "lib.rs", "= 0", "= 1")]
+        with self.assertRaises(CHECKS.MutationFailure):
+            CHECKS.check_mutations(mutations, self.baseline, self.root, self.reports,
+                                   "unused-verus", {}, threads=1, runner=runner)
+        self.assertEqual(len(calls), 1)
+        self.assertFalse((self.root / "later").exists())
+        self.assertFalse((self.reports / "diagnostic.json").exists())
+
+    def test_keep_going_fatal_errors_and_cancellation_stop_dispatch(self):
+        errors = [OSError("filesystem failed"), RuntimeError("unexpected runner bug"),
+                  CHECKS.RunCancelled("cancel requested"), KeyboardInterrupt()]
+        for index, error in enumerate(errors):
+            with self.subTest(error=type(error).__name__):
+                temporary = self.root / str(index)
+                temporary.mkdir()
+                mutations = [self.mutation, ("later", "lib.rs", "= 0", "= 1")]
+                supervisor = CHECKS.ProcessSupervisor()
+                with self.assertRaises(type(error)):
+                    CHECKS.check_mutations(mutations, self.baseline, temporary, self.reports,
+                                           "unused-verus", {}, threads=1, runner=Mock(side_effect=error),
+                                           supervisor=supervisor, keep_going=True)
+                diagnostic = self.read_diagnostic()
+                interrupted = isinstance(error, (CHECKS.RunCancelled, KeyboardInterrupt))
+                self.assertEqual(diagnostic["status"], "interrupted" if interrupted else "failed")
+                self.assertFalse(diagnostic["complete"])
+                self.assertEqual(diagnostic["counts"]["attempted"], 1)
+                self.assertEqual(diagnostic["counts"]["notRun"], 1)
+                self.assertTrue(diagnostic["outcomes"][0]["fatal"])
+                self.assertEqual(diagnostic["outcomes"][0]["error"]["type"], type(error).__name__)
+                self.assertEqual(diagnostic["outcomes"][1]["status"], "pending")
+                self.assertTrue(supervisor.cancelled.is_set())
+                self.assertFalse((temporary / "later").exists())
+
+    def test_cleanup_timeout_is_fatal_instead_of_collectable(self):
+        failure = subprocess.TimeoutExpired("ps", 5)
+        failure._cordis_cleanup_failure = True
+        mutations = [self.mutation, ("later", "lib.rs", "= 0", "= 1")]
+        with self.assertRaises(subprocess.TimeoutExpired):
+            CHECKS.check_mutations(mutations, self.baseline, self.root, self.reports,
+                                   "unused-verus", {}, threads=1, runner=Mock(side_effect=failure), keep_going=True)
+        diagnostic = self.read_diagnostic()
+        self.assertFalse(diagnostic["complete"])
+        self.assertEqual(diagnostic["outcomes"][0]["error"]["type"], "TimeoutExpired")
+        self.assertEqual(diagnostic["counts"]["notRun"], 1)
+
 
 
 class CpuBudgetTests(unittest.TestCase):
@@ -239,6 +393,166 @@ class CpuBudgetTests(unittest.TestCase):
             self.assertEqual(baseline_runner.call_args.kwargs["threads"], 1)
             self.assertEqual(mutations.call_args.kwargs["threads"], 1)
             self.assertEqual(mutations.call_args.kwargs["jobs"], 2)
+
+    def test_keep_going_cli_never_writes_release_report_even_when_all_controls_pass(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "crates/cordis-kernel/src"
+            source.mkdir(parents=True)
+            (source / "lib.rs").write_text("pub const TAG: u8 = 0;")
+            reports = root / "target/proof-negative"
+            reports.mkdir(parents=True)
+            (reports / "report.json").write_text("old report")
+            baseline = result(code=0, success=True, errors=0)
+            payload = json.loads(baseline.stdout)
+            payload["verus"] = {"version": "test"}
+            baseline.stdout = json.dumps(payload)
+            mutation = ("example", "lib.rs", "= 0", "= 1")
+            evidence = CHECKS.rejected_result("example", result())
+            with patch.object(CHECKS, "ROOT", root), patch.object(CHECKS, "toolchain", return_value=("verus", {})), \
+                    patch.object(CHECKS, "run_verus", return_value=baseline), \
+                    patch.object(CHECKS, "mutation_manifest", return_value=[mutation]), \
+                    patch.object(CHECKS, "check_mutation", return_value=evidence), \
+                    patch.object(sys, "argv", ["check-negative.py", "--keep-going"]), \
+                    patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(CHECKS.main(), 0)
+            diagnostic = json.loads((reports / "diagnostic.json").read_text())
+            self.assertTrue(diagnostic["complete"])
+            self.assertEqual(diagnostic["status"], "completed")
+            self.assertFalse((reports / "report.json").exists())
+
+    def test_keep_going_cli_baseline_failure_keeps_unattempted_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "crates/cordis-kernel/src"
+            source.mkdir(parents=True)
+            (source / "lib.rs").write_text("pub const TAG: u8 = 0;")
+            mutation = ("example", "lib.rs", "= 0", "= 1")
+            with patch.object(CHECKS, "ROOT", root), patch.object(CHECKS, "toolchain", return_value=("verus", {})), \
+                    patch.object(CHECKS, "run_verus", return_value=result()), \
+                    patch.object(CHECKS, "mutation_manifest", return_value=[mutation]), \
+                    patch.object(sys, "argv", ["check-negative.py", "--keep-going"]), \
+                    patch.dict(os.environ, {}, clear=True), self.assertRaises(SystemExit):
+                CHECKS.main()
+            reports = root / "target/proof-negative"
+            diagnostic = json.loads((reports / "diagnostic.json").read_text())
+            self.assertFalse(diagnostic["complete"])
+            self.assertEqual(diagnostic["status"], "failed")
+            self.assertEqual(diagnostic["counts"]["attempted"], 0)
+            self.assertEqual(diagnostic["counts"]["notRun"], 1)
+            self.assertFalse((reports / "report.json").exists())
+
+    def test_cli_refinalizes_late_cancellation_and_cleanup_failure(self):
+        for failure in [CHECKS.RunCancelled("late cancellation"), OSError("late temporary cleanup failure")]:
+            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                source = root / "crates/cordis-kernel/src"
+                source.mkdir(parents=True)
+                (source / "lib.rs").write_text("pub const TAG: u8 = 0;")
+                baseline = result(code=0, success=True, errors=0)
+                payload = json.loads(baseline.stdout)
+                payload["verus"] = {"version": "test"}
+                baseline.stdout = json.dumps(payload)
+                mutation = ("example", "lib.rs", "= 0", "= 1")
+                evidence = CHECKS.rejected_result("example", result())
+                temporary_directory = tempfile.TemporaryDirectory
+
+                class FailingCleanup(temporary_directory):
+                    def __exit__(self, *args):
+                        super().__exit__(*args)
+                        report = json.loads((root / "target/proof-negative/diagnostic.json").read_text())
+                        self_outer.assertEqual(report["status"], "completed")
+                        raise failure
+
+                self_outer = self
+                expected = SystemExit if isinstance(failure, RuntimeError) else OSError
+                with patch.object(CHECKS, "ROOT", root), patch.object(CHECKS, "toolchain", return_value=("verus", {})), \
+                        patch.object(CHECKS, "run_verus", return_value=baseline), \
+                        patch.object(CHECKS, "mutation_manifest", return_value=[mutation]), \
+                        patch.object(CHECKS, "check_mutation", return_value=evidence), \
+                        patch.object(CHECKS.tempfile, "TemporaryDirectory", FailingCleanup), \
+                        patch.object(sys, "argv", ["check-negative.py", "--keep-going"]), \
+                        patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()), \
+                        self.assertRaises(expected):
+                    CHECKS.main()
+                report = json.loads((root / "target/proof-negative/diagnostic.json").read_text())
+                self.assertEqual(report["status"], "interrupted" if isinstance(failure, CHECKS.RunCancelled) else "failed")
+                self.assertFalse(report["complete"])
+                self.assertEqual(report["counts"]["passed"], 1)
+                self.assertEqual(report["error"]["type"], type(failure).__name__)
+                self.assertFalse((root / "target/proof-negative/report.json").exists())
+
+    def test_cli_cancellation_flag_during_cleanup_prevents_success_in_both_modes(self):
+        for keep_going in [False, True]:
+            with self.subTest(keep_going=keep_going), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                source = root / "crates/cordis-kernel/src"
+                source.mkdir(parents=True)
+                (source / "lib.rs").write_text("pub const TAG: u8 = 0;")
+                reports = root / "target/proof-negative"
+                baseline = result(code=0, success=True, errors=0)
+                payload = json.loads(baseline.stdout)
+                payload["verus"] = {"version": "test"}
+                baseline.stdout = json.dumps(payload)
+                mutation = ("example", "lib.rs", "= 0", "= 1")
+                evidence = CHECKS.rejected_result("example", result())
+                supervisor = CHECKS.ProcessSupervisor()
+                temporary_directory = tempfile.TemporaryDirectory
+
+                class CancellingCleanup(temporary_directory):
+                    def __exit__(self, *args):
+                        value = super().__exit__(*args)
+                        # The real signal handler only sets the cancellation
+                        # flag; no exception escapes the context manager.
+                        supervisor.cancel(CHECKS.RunCancelled("cancelled during temporary cleanup"))
+                        return value
+
+                argv = ["check-negative.py"] + (["--keep-going"] if keep_going else [])
+                with patch.object(CHECKS, "ROOT", root), patch.object(CHECKS, "toolchain", return_value=("verus", {})), \
+                        patch.object(CHECKS, "run_verus", return_value=baseline), \
+                        patch.object(CHECKS, "mutation_manifest", return_value=[mutation]), \
+                        patch.object(CHECKS, "check_mutation", return_value=evidence), \
+                        patch.object(CHECKS, "ProcessSupervisor", return_value=supervisor), \
+                        patch.object(CHECKS.tempfile, "TemporaryDirectory", CancellingCleanup), \
+                        patch.object(sys, "argv", argv), patch.dict(os.environ, {}, clear=True), \
+                        contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                    CHECKS.main()
+                self.assertNotEqual(caught.exception.code, 0)
+                self.assertFalse((reports / "report.json").exists())
+                if keep_going:
+                    report = json.loads((reports / "diagnostic.json").read_text())
+                    self.assertEqual(report["status"], "interrupted")
+                    self.assertFalse(report["complete"])
+                    self.assertEqual(report["counts"]["passed"], 1)
+                    self.assertEqual(report["error"]["type"], "RunCancelled")
+                else:
+                    self.assertFalse((reports / "diagnostic.json").exists())
+
+    def test_keep_going_cli_batch_failure_exits_nonzero_with_complete_diagnostic(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "crates/cordis-kernel/src"
+            source.mkdir(parents=True)
+            (source / "lib.rs").write_text("pub const TAG: u8 = 0;")
+            baseline = result(code=0, success=True, errors=0)
+            payload = json.loads(baseline.stdout)
+            payload["verus"] = {"version": "test"}
+            baseline.stdout = json.dumps(payload)
+            mutation = ("example", "lib.rs", "= 0", "= 1")
+            with patch.object(CHECKS, "ROOT", root), patch.object(CHECKS, "toolchain", return_value=("verus", {})), \
+                    patch.object(CHECKS, "run_verus", return_value=baseline), \
+                    patch.object(CHECKS, "mutation_manifest", return_value=[mutation]), \
+                    patch.object(CHECKS, "check_mutation", side_effect=CHECKS.MutationFailure("resource failure")), \
+                    patch.object(sys, "argv", ["check-negative.py", "--keep-going"]), \
+                    patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()), \
+                    self.assertRaises(SystemExit) as caught:
+                CHECKS.main()
+            self.assertNotEqual(caught.exception.code, 0)
+            report = json.loads((root / "target/proof-negative/diagnostic.json").read_text())
+            self.assertEqual(report["status"], "failed")
+            self.assertTrue(report["complete"])
+            self.assertEqual(report["error"]["type"], "MutationBatchError")
+            self.assertFalse((root / "target/proof-negative/report.json").exists())
 
 
 @unittest.skipUnless(os.name == "posix", "release runners use POSIX process groups")
@@ -405,6 +719,37 @@ while True:
         self.assert_reaped(child)
         meta = json.loads((self.reports / "peer-compile.meta.json").read_text())
         self.assertEqual(meta["status"], "cancelled")
+
+    def test_keep_going_infrastructure_failure_still_terminates_peer_and_stops_queue(self):
+        ready = self.root / "peer-ready"
+        binary = self.tree_executable()
+        mutations = [(name, "lib.rs", "= 0", "= 1") for name in ["failure", "peer", "queued"]]
+        supervisor = CHECKS.ProcessSupervisor()
+        check_mutation = CHECKS.check_mutation
+
+        def checked(mutation, *args, **kwargs):
+            if mutation[0] == "failure":
+                self.wait_file(ready)
+                raise OSError("infrastructure failed")
+            return check_mutation(mutation, *args, **kwargs)
+
+        with patch.object(CHECKS, "check_mutation", side_effect=checked), \
+                self.assertRaisesRegex(OSError, "infrastructure failed"):
+            CHECKS.check_mutations(mutations, self.source, self.root, self.reports, binary,
+                                   {**os.environ, "READY": str(ready)}, jobs=2, threads=1,
+                                   timeout=30, supervisor=supervisor, keep_going=True)
+        self.assertFalse((self.root / "queued").exists())
+        self.assertFalse(supervisor.processes)
+        leader, child = map(int, self.wait_file(ready).split())
+        self.assert_reaped(leader)
+        self.assert_reaped(child)
+        diagnostic = json.loads((self.reports / "diagnostic.json").read_text())
+        self.assertEqual(diagnostic["status"], "failed")
+        self.assertFalse(diagnostic["complete"])
+        self.assertEqual([row["status"] for row in diagnostic["outcomes"]], ["failed", "interrupted", "pending"])
+        self.assertEqual(diagnostic["counts"]["notRun"], 1)
+        self.assertEqual(diagnostic["error"]["type"], "OSError")
+        self.assertEqual(json.loads((self.reports / "peer-compile.meta.json").read_text())["status"], "cancelled")
 
     def test_sigterm_cleans_active_group_and_restores_previous_handler(self):
         ready = self.root / "ready"

@@ -23,7 +23,7 @@ CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=2400 \
 不改变求解资源上限或证明合同。普通本地发布验证仍会重新执行全部负控。
 
 每次 verifier 调用拥有独立进程组。超时、取消和终止会清理 Verus 及其 solver 后代；
-一个 worker 失败后，执行器停止派发，并取消正在执行的其他 worker。标准输出、诊断及
+默认情况下，一个 worker 失败后，执行器停止派发，并取消正在执行的其他 worker。标准输出、诊断及
 `.meta.json` 阶段记录保留，包括耗时、命令、退出状态、源码指纹和取消状态。任务队列只
 保留当前 worker 预算允许的工作，不再预先提交全部 114 个任务。
 
@@ -32,6 +32,56 @@ CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=2400 \
 `kqueue(NOTE_EXIT)`；实际方法写入每次阶段记录。阶段记录保留进程组快照、信号及清理错误；清理失败不能把超时或
 取消变成可接受的证明证据。CI 步骤使用 `exec`，使取消信号直接到达监督器。强制终止
 仍可能留下不完整阶段文件，汇总器会拒绝这些文件。
+
+## 失败后继续收集
+
+使用 `--keep-going` 可以诊断本轮或本分片的全部 mutation：某项 mutation 未通过负控
+验收时，记录失败后继续执行后续项。例如资源耗尽、进程成功清理后的超时，以及变异后
+意外验证通过，仍算失败，但不会再遮挡后续负控。未修改内核的基线必须先通过。
+取消、清理失败和基础设施错误仍会停止执行；运行被中断时，该模式不保证得到完整结果。
+
+在 GitHub Actions 中选择 **Full release validation → Run workflow**，启用
+`diagnostic_keep_going`，保持 `create_draft` 关闭。对应的命令为：
+
+```sh
+gh workflow run release-validation.yml \
+  --repo validation-engineering/cordis-verus --ref main \
+  -f diagnostic_keep_going=true -f create_draft=false \
+  -f include_macos_intel=false
+```
+
+该模式须显式开启；普通发布运行仍在分片内遇到失败后停止。诊断运行保持同样的整 crate
+检查、资源上限和进程清理，失败后也保留原始工件，不使用 `continue-on-error`。
+只要有负控失败，分片最终仍以失败退出。诊断运行会跳过 quality 与 draft-release 任务，
+即使全部负控通过也不会进入这两个任务。同时请求诊断模式和创建草稿时，工作流会在
+计划任务中直接拒绝，在验证开始前报错。
+
+在本地诊断全部负控：
+
+```sh
+python3 scripts/check-negative.py --keep-going --jobs 1 --threads 2 --timeout 2400
+```
+
+在本地诊断一个分片时，使用新的输出目录，按需对其他索引重复执行。单片只覆盖分配给它的
+负控：
+
+```sh
+python3 scripts/negative-shards.py run \
+  --shard-index 0 --shard-count 18 --output target/negative-diagnostics/shard-0 \
+  --jobs 1 --threads 2 --timeout 2400 --compile-timeout 300 --keep-going
+```
+
+`diagnostic.json` 按 canonical 顺序记录各项结果，失败项包含错误类型与消息。计数区分
+选定、已尝试、通过、失败和未执行的负控；`complete: true` 表示已尝试全部选定项，
+并不表示没有失败。单体执行器将其写入 `target/proof-negative/`，分片写入指定输出目录，并保留原始 stdout、stderr
+及阶段元数据。完整执行后的诊断分片在 `shard.json` 中记录：全部负控通过时状态为
+`diagnostic-passed`，否则为 `failed`，且始终为 `releaseAcceptance: false`。
+宣称收集完整之前，应检查报告中是否仍有未执行的负控。
+
+诊断证据不能用于发布验收：汇总器会明确拒绝，包括全部通过的诊断运行。修复问题后，
+应在同一份最终源码快照上重新运行普通完整门禁，将 `diagnostic_keep_going` 设为
+`false`，或在本地去掉 `--keep-going`。完整收集诊断用于规划修复；发布验收仍要求
+每个选定平台完成新一轮普通验证。
 
 ## CI 并行执行与证明范围
 
@@ -136,3 +186,11 @@ observational journal 不变量组合已验证的单项 `provided_journal_entry`
 错误变异可以在更小的引理中被拒绝，减少下游组合查询的资源耗尽。每个引理仍须
 通过未变异整库的验证，其结论不会被作为未经证明的假设加入。选定证明的探针
 仅用于调试，完整 crate 的负向验收标准保持不变。
+
+`program_trace::allocation_monotone` 隐藏事件关系 `ack`，在序列归纳中使用
+`acknowledgement_frame` 已证明的合同，避免再次展开每种事件的注册和历史条件。
+历史名称复用变异仍须触发原有的名称不可复用合同。
+`Kernel::compact_bindings` 将保留位置的扩展、最终图不变量与绑定等价关系的恢复
+拆成私有且经过验证的辅助引理。循环使用这些引理的合同；可执行过滤过程和公开
+后置条件保持不变。反转 live 条件仍须违反经过检查的前提，任何附带的资源错误
+仍会使整个负向结果不合格。

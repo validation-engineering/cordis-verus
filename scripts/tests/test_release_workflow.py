@@ -2,9 +2,13 @@
 import fnmatch
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shlex
+import subprocess
+import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -88,7 +92,9 @@ class ReleaseWorkflowTests(unittest.TestCase):
         preflight = self.section('preflight', 'negative')
         negative = self.section('negative', 'quality')
         preflight_command = re.search(r'^        run: (exec python3 scripts/negative-shards.py preflight .+)$', preflight, re.M)[1]
-        negative_command = re.search(r'^        run: (exec python3 scripts/negative-shards.py run .+)$', negative, re.M)[1]
+        negative_command = re.search(r'^          (exec python3 scripts/negative-shards.py run .+)$', negative, re.M)[1]
+        self.assertTrue(negative_command.endswith(' "${diagnostic_args[@]}"'))
+        negative_command = negative_command.removesuffix(' "${diagnostic_args[@]}"')
         self.assertIn('timeout-minutes: ${{ matrix.preflightMinutes }}', preflight)
         self.assertIn('timeout-minutes: ${{ matrix.shardMinutes }}', negative)
         for row in self.rows:
@@ -118,6 +124,55 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn('RELEASE_TARGETS_JSON: ${{ needs.plan.outputs.targets }}', draft)
         self.assertIn('--targets-json \"$RELEASE_TARGETS_JSON\"', draft)
         self.assertNotIn('All three platforms passed', draft)
+
+
+class DiagnosticWorkflowTests(unittest.TestCase):
+    def setUp(self):
+        self.text = WORKFLOW.read_text()
+
+    def step_script(self, name):
+        section = self.text.split('      - name: ' + name + '\n', 1)[1]
+        body = re.search(r'        run: \|\n((?:          .*\n|\n)+)', section)[1]
+        return textwrap.dedent(body)
+
+    def test_diagnostic_is_opt_in_and_skips_quality_and_release(self):
+        self.assertRegex(self.text, r'diagnostic_keep_going:\n(?:        .+\n)*?        default: false\n        type: boolean')
+        quality = self.text.split('\n  quality:', 1)[1].split('\n  draft-release:', 1)[0]
+        draft = self.text.split('\n  draft-release:', 1)[1]
+        self.assertIn('if: ${{ !inputs.diagnostic_keep_going }}', quality)
+        self.assertIn('if: ${{ inputs.create_draft && !inputs.diagnostic_keep_going }}', draft)
+        self.assertNotIn('continue-on-error:', self.text)
+        negative = self.text.split('\n  negative:', 1)[1].split('\n  quality:', 1)[0]
+        self.assertIn('fail-fast: false', negative)
+        upload = negative.split('      - name: Retain negative evidence, including failures', 1)[1]
+        self.assertIn('if: always()', upload)
+
+    def test_conflicting_inputs_fail_before_any_release_work(self):
+        script = self.step_script('Reject diagnostic runs that request a draft release')
+        for diagnostic in ('false', 'true'):
+            for draft in ('false', 'true'):
+                with self.subTest(diagnostic=diagnostic, draft=draft):
+                    run = subprocess.run(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script], capture_output=True, text=True,
+                                         env={**os.environ, 'DIAGNOSTIC_KEEP_GOING': diagnostic, 'CREATE_DRAFT': draft})
+                    self.assertEqual(run.returncode, 1 if diagnostic == draft == 'true' else 0)
+
+    def test_dispatch_passes_keep_going_only_when_enabled(self):
+        row = SHARDS.release_plan()['negative']['include'][0]
+        script = ReleaseWorkflowTests.render(self.step_script('Verify this shard as complete crates'), 1, row)
+        with tempfile.TemporaryDirectory(prefix='cordis-workflow-test-') as temporary:
+            executable = Path(temporary) / 'python3'
+            executable.write_text("#!/bin/bash\nprintf '%s\\n' \"$@\"\n")
+            executable.chmod(0o755)
+            for mode in ('false', 'true'):
+                with self.subTest(mode=mode):
+                    run = subprocess.run(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script], capture_output=True, text=True,
+                                         env={**os.environ, 'PATH': temporary + os.pathsep + os.environ['PATH'],
+                                              'DIAGNOSTIC_KEEP_GOING': mode})
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    arguments = run.stdout.splitlines()
+                    self.assertEqual(arguments[:2], ['scripts/negative-shards.py', 'run'])
+                    self.assertEqual(arguments.count('--keep-going'), 1 if mode == 'true' else 0)
+                    self.assertNotIn('', arguments)
 
 
 class IntelReleaseWorkflowTests(ReleaseWorkflowTests):

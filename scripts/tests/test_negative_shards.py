@@ -9,6 +9,7 @@ import importlib.util
 import io
 import json
 import shutil
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -178,6 +179,18 @@ class ShardEvidenceTests(unittest.TestCase):
     def test_failed_shard_summary_is_not_accepted(self):
         self.edit('1/shard.json', lambda value: value.update(status='failed'))
         self.rejected('identity or selection')
+
+    def test_diagnostic_evidence_cannot_be_promoted_by_changing_passed_status(self):
+        path = self.inputs / '0/shard.json'
+        original = path.read_bytes()
+        for field, value in [('execution', {**self.execution, 'keepGoing': True}),
+                             ('diagnosticReport', {'complete': True})]:
+            with self.subTest(field=field):
+                self.edit('0/shard.json', lambda record: record.update({field: value}))
+                self.rejected('Diagnostic keep-going')
+                path.write_bytes(original)
+        (path.parent / 'diagnostic.json').write_text('{}')
+        self.rejected('Diagnostic keep-going')
 
     def test_different_source_toolchain_host_or_ci_attempt_is_rejected(self):
         for key in ['sourceHashes', 'toolHashes', 'host', 'origin', 'manifestSha256']:
@@ -493,6 +506,83 @@ class SharedPreflightEvidenceTests(unittest.TestCase):
         self.assertNotIn('preflightSha256', report)
         self.assertNotIn('preflight.json', report['files'])
 
+    def diagnostic_runner(self, failures, calls):
+        def runner(_binary, _environment, source, output, compile_only=False, **_kwargs):
+            calls.append(output.name)
+            kind = 'compile' if compile_only else 'negative'
+            self.write_stage(output.parent, output.name, CHECKS.source_fingerprint(source.parent), kind=kind)
+            stderr = output.with_suffix('.stderr.txt')
+            if not compile_only and source.parent.name in failures:
+                stderr.write_text('error: assertion failed\nerror: Resource limit (rlimit) exceeded\n')
+            return CHECKS.subprocess.CompletedProcess([], 0 if compile_only else 1,
+                output.with_suffix('.stdout.json').read_text(), stderr.read_text())
+        return runner
+
+    def run_diagnostic(self, output, failures=()):
+        # Use the actual batch/check_mutation/evidence gate; only the executable
+        # verifier is replaced by explicit synthetic raw-output fixtures.
+        calls = []
+        check_mutations = CHECKS.check_mutations
+        runner = self.diagnostic_runner(failures, calls)
+        def mutations(*args, **kwargs):
+            return check_mutations(*args, **kwargs, runner=runner)
+        with patch.object(CHECKS, 'check_mutations', side_effect=mutations), \
+             contextlib.redirect_stdout(io.StringIO()):
+            report = SHARDS.run_shard(0, 1, output, threads=2, preflight=self.preflight, keep_going=True)
+        return report, calls
+
+    def test_diagnostic_shard_runs_every_control_and_retains_failed_coverage(self):
+        output = self.root / 'diagnostic-failed'
+        with self.assertRaises(CHECKS.MutationBatchError):
+            self.run_diagnostic(output, failures=('first',))
+        report = SHARDS.read_json(output / 'shard.json')
+        diagnostic = SHARDS.read_json(output / 'diagnostic.json')
+        self.assertEqual(report['status'], 'failed')
+        self.assertIs(report['releaseAcceptance'], False)
+        self.assertIs(report['execution']['keepGoing'], True)
+        self.assertIs(report['diagnosticReport']['complete'], True)
+        self.assertEqual(report['diagnosticReport']['sha256'], SHARDS.digest(output / 'diagnostic.json'))
+        self.assertEqual(diagnostic['counts'], {'selected': 2, 'attempted': 2, 'passed': 1, 'failed': 1, 'notRun': 0})
+        self.assertEqual([row['status'] for row in diagnostic['outcomes']], ['failed', 'passed'])
+        self.assertTrue((output / 'second.stdout.json').is_file())
+        self.assertFalse((output / 'report.json').exists())
+
+    def test_all_pass_diagnostic_shard_still_cannot_enter_release_collection(self):
+        output = self.root / 'diagnostic-passed'
+        report, calls = self.run_diagnostic(output)
+        self.assertEqual(calls, ['first-compile', 'first', 'second-compile', 'second'])
+        self.assertEqual(report['status'], 'diagnostic-passed')
+        self.assertIs(report['releaseAcceptance'], False)
+        self.assertIs(report['diagnosticReport']['complete'], True)
+        self.assertIn('diagnostic.json', report['files'])
+        with self.assertRaisesRegex(RuntimeError, 'Diagnostic keep-going'):
+            SHARDS.collect(output, self.root / 'diagnostic-collected')
+        self.assertFalse((self.root / 'diagnostic-collected/report.json').exists())
+
+    def test_bad_preflight_diagnostic_lists_every_control_as_not_run(self):
+        output = self.root / 'diagnostic-invalid-preflight'
+        (self.preflight / 'baseline.stdout.json').write_text('changed')
+        with patch.object(CHECKS, 'check_mutations') as mutations, \
+             self.assertRaisesRegex(RuntimeError, 'Changed stage bytes'):
+            SHARDS.run_shard(0, 1, output, threads=2, preflight=self.preflight, keep_going=True)
+        mutations.assert_not_called()
+        report = SHARDS.read_json(output / 'diagnostic.json')
+        self.assertIs(report['complete'], False)
+        self.assertEqual(report['counts']['attempted'], 0)
+        self.assertEqual(report['counts']['notRun'], 2)
+        self.assertEqual(SHARDS.read_json(output / 'shard.json')['status'], 'failed')
+
+    def test_diagnostic_reports_source_changes_after_successful_mutants(self):
+        output = self.root / 'diagnostic-source-changed'
+        changed = {**self.bound, 'sourceHashes': {'lib.rs': 'changed'}}
+        with patch.object(SHARDS, 'binding', side_effect=[self.bound, changed]), \
+             self.assertRaisesRegex(RuntimeError, 'Sources/toolchain changed'):
+            self.run_diagnostic(output)
+        report = SHARDS.read_json(output / 'shard.json')
+        self.assertEqual(report['status'], 'failed')
+        self.assertIn('Sources/toolchain changed', report['failure'])
+        self.assertIs(report['releaseAcceptance'], False)
+
     def test_cancellation_while_restoring_handlers_cannot_write_passed_evidence(self):
         @contextlib.contextmanager
         def cancel_on_exit(supervisor):
@@ -723,6 +813,17 @@ class FailureSummaryTests(unittest.TestCase):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_cli_keep_going_is_explicit_and_forwarded_to_shard_runner(self):
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                arguments = ['negative-shards.py', 'run', '--shard-index', '0', '--shard-count', '2',
+                             '--output', 'target/diagnostic-fixture']
+                if enabled:
+                    arguments.append('--keep-going')
+                with patch.object(sys, 'argv', arguments), patch.object(SHARDS, 'run_shard') as run:
+                    SHARDS.main()
+                self.assertIs(run.call_args.kwargs['keep_going'], enabled)
+
     def test_all_114_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
         self.assertEqual(len(manifest), 114)
