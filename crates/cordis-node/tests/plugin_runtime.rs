@@ -1756,6 +1756,59 @@ fn typed_fnonce_cleanup_error_and_panic_stay_failed_across_host_retries() {
 }
 
 #[test]
+fn typed_retryable_cleanup_recovers_only_on_a_new_host_attempt() {
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let earlier = Arc::new(AtomicUsize::new(0));
+    let (calls, before) = (attempts.clone(), earlier.clone());
+    let mut registry = FactoryRegistry::new();
+    registry
+        .register_typed(TypedFactory::new("typed", move |_| {
+            let (calls, before) = (calls.clone(), before.clone());
+            Ok(cordis::Plugin::new("retryable inverse", move |setup| {
+                let before = before.clone();
+                setup.on_cleanup(move || {
+                    before.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                });
+                let calls = calls.clone();
+                setup.on_cleanup_retryable(move || {
+                    if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                        Err("temporary cleanup failure".into())
+                    } else {
+                        Ok(())
+                    }
+                });
+                Ok(())
+            }))
+        }))
+        .unwrap();
+    let mut backend = plugin::Backend::new(registry, Arc::new(|| {}));
+    let start = backend
+        .start_resolved(1, 1, "typed", Value::Null, Default::default(), vec![])
+        .unwrap();
+    assert_eq!(backend.poll()["jobs"][0]["success"], true);
+    let session = number(&start, "session");
+    backend.cancel(session).unwrap();
+    let first = typed_cleanup_result(&mut backend, session);
+    assert_eq!(first["success"], false);
+    assert!(backend.release(session).is_err());
+    assert!(backend.forget_typed(1).is_err());
+    assert!(backend
+        .start_resolved(1, 2, "typed", Value::Null, Default::default(), vec![])
+        .is_err());
+    for _ in 0..2 {
+        assert_eq!(backend.poll()["jobs"], json!([]));
+    }
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    assert_eq!(earlier.load(Ordering::SeqCst), 0);
+    assert_eq!(typed_cleanup_result(&mut backend, session)["success"], true);
+    assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    assert_eq!(earlier.load(Ordering::SeqCst), 1);
+    backend.release(session).unwrap();
+    backend.forget_typed(1).unwrap();
+}
+
+#[test]
 fn typed_cancel_reaches_escaped_setup_before_cleanup_and_late_inverse_lands() {
     let gate = Arc::new(AtomicUsize::new(0));
     let wake = Arc::new(Mutex::new(None::<Waker>));

@@ -126,6 +126,71 @@
           "file": "crates/cordis-kernel/src/journal_recovery.rs",
           "symbol": "operations_from_source",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state.rs",
+          "symbol": "LifecycleState",
+          "kind": "struct"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_release.rs",
+          "symbol": "finish_cleanup_resources",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/publication_cleanup.rs",
+          "symbol": "cleanup_batch",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/publication_cleanup.rs",
+          "symbol": "episode_resources_cleared",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_journal.rs",
+          "symbol": "begin_restore",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_journal.rs",
+          "symbol": "complete",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_journal.rs",
+          "symbol": "retry",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "register",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "land",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "pop",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "complete",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "retry",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "is_empty",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -148,6 +213,61 @@
           "package": "cordis-driver",
           "target": "cleanup_outcomes",
           "name": "failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "cleanup_resources",
+          "name": "failed_report_retains_resources_until_fresh_retry_releases_only_its_batch"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "cleanup_resources",
+          "name": "late_invalid_manifest_items_cannot_partially_release_an_accepted_cleanup"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "cleanup_resources",
+          "name": "a_foreign_registry_with_identical_local_ids_cannot_use_this_cleanup_receipt"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "cleanup_resources",
+          "name": "a_remaining_consumer_lease_blocks_the_entire_publication_batch"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "cleanup_resources",
+          "name": "reservation_cleanup_releases_generation_zero_only_after_a_successful_retry"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_journal",
+          "name": "failure_retains_selected_token_and_retry_rejects_old_or_foreign_receipts"
+        },
+        {
+          "package": "cordis",
+          "target": "retry_cleanup",
+          "name": "failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success"
+        },
+        {
+          "package": "cordis-node",
+          "target": "plugin_runtime",
+          "name": "typed_retryable_cleanup_recovers_only_on_a_new_host_attempt"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_queue",
+          "name": "retained_payload_returns_from_the_same_slot_before_late_and_earlier_work"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_queue",
+          "name": "foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work"
+        },
+        {
+          "package": "cordis",
+          "target": "retry_cleanup",
+          "name": "distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success"
         }
       ],
       "negativeControl": {
@@ -385,6 +505,116 @@
           "file": "crates/cordis-kernel/src/journal_recovery.rs",
           "symbol": "journal_unload_domain",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "provided_journals",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_recovery.rs",
+          "symbol": "restored_owner_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_coverage.rs",
+          "symbol": "mixed_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_coverage.rs",
+          "symbol": "fresh_step",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/provision_coverage.rs",
+          "symbol": "fresh_from_empty",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/owner_table_recovery.rs",
+          "symbol": "owner_table_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/owner_table_recovery.rs",
+          "symbol": "owner_table_recovery_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/owner_table_recovery.rs",
+          "symbol": "same_owner_table_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "unload_inner",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/xor_recovery_algebra.rs",
+          "symbol": "generator_is_xor",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/xor_recovery_algebra.rs",
+          "symbol": "scalar_interface",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_episode.rs",
+          "symbol": "mixed_installed_step",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_episode.rs",
+          "symbol": "mixed_installed_interval",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "terminal_episode",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "foreign_replay",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "value_observation",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "value_observation_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "terminal_replay_witness",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "terminal_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "terminal_replay_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "establish_terminal_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "symbol": "terminal_replay",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -462,6 +692,26 @@
           "package": "cordis-kernel",
           "target": "xor_recovery",
           "name": "bootstrap_failure_recovers_its_self_and_foreign_xors_from_the_real_prefix"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "owner_table_recovery",
+          "name": "failed_bootstrap_clears_all_owner_values_before_reprovide_without_clearing_child"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "owner_table_recovery",
+          "name": "mixed_script_republishes_same_registration_after_dispatcher_unload"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "terminal_replay",
+          "name": "terminal_owner_unload_absorbs_consumers_of_its_new_service_but_keeps_child_values"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "terminal_replay",
+          "name": "failed_command_after_terminal_unload_keeps_foreign_replay_of_the_successful_prefix"
         }
       ],
       "negativeControl": {

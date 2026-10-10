@@ -105,8 +105,16 @@ are checked against the original Plugin before setup, including explicit JSON nu
 An explicit dynamic service catalog also enables original publication handles
 and owned child plugins in the same native graph, preserving owner anchors,
 exact inherited dependency ports and original slots. Effect groups, configuration
-update hooks and other remaining typed Runtime operations are still outside this adapter. Legacy FnOnce cleanup failure stays permanent
-instead of accepting an empty retry. These host changes are not paper proofs.
+update hooks and other remaining typed Runtime operations are still outside this adapter.
+Explicit `FnMut` cleanup factories now retain failed work for a fresh host attempt;
+Runtime and static typed episodes use the verified `CleanupJournal` to reject stale
+receipts and retain selected tokens. Legacy static `FnOnce` cleanup failure stays
+permanent instead of accepting an empty retry. The verified `CleanupQueue<T>` now
+owns the actual callback payload vector with that journal, proving exact slot
+movement, single issuance, retention of supplied retry values, unchanged rejected
+inputs and absence of stored or issued work when empty. Executor factory choice
+and callback effects remain tested host integration; these changes do not complete
+the paper proof.
 
 Borrowed object release drops an adapter reference; owned release waits for its
 explicit cleanup and retains failed work for retry. Ordinary JS inverses must all
@@ -178,14 +186,14 @@ Component premise. See the [paper audit](paper-audit.md).
 
 ## Validation still open
 
-There are **114 canonical negative mutations**. A complete full-crate negative
+There are **118 canonical negative mutations**. A complete full-crate negative
 run for this source has not passed. The earlier 1,927-obligation snapshot's
 full quality run stopped on `mixed-removal-ignores-retention` after a timeout.
 Partial contract diagnostics were not accepted as a passed result.
 
 The opt-in scoped-negative checker and candidate selector manifest are
 experimental. Unit tests and selected probes do not establish a completed
-114-control calibration and do not replace the full release gate. The first
+118-control calibration and do not replace the full release gate. The first
 full candidate calibration accepted 11 controls, then rejected control 12
 (`begin-reuses-episode-generation`) because its real assertion failure was
 accompanied by an SMT resource-limit failure. The run is **failed**, not a

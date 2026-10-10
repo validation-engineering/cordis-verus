@@ -11,8 +11,8 @@ use super::{Inverse, MixedDriver};
 #[cfg(verus_keep_ghost)]
 use crate::{
     dependent_grammar as d, fresh_grammar as fg, fresh_semantics as fs, mixed_grammar as mx,
-    observational_grammar as og, operation_history as oh, provision_history as ph, refinement as r,
-    semantics as s,
+    mixed_recovery as mr, observational_grammar as og, operation_history as oh,
+    provision_coverage as pc, provision_history as ph, refinement as r, semantics as s,
 };
 use crate::{Phase, Port};
 use vstd::prelude::*;
@@ -156,6 +156,7 @@ impl FreshDriver {
     pub closed spec fn wf(&self)->bool {self.inner.wf()}
     pub closed spec fn same(&self,other:&Self)->bool {self.inner.same(&other.inner)}
     pub closed spec fn journal(&self,actor:usize)->Seq<super::Receipt> {self.inner.journal(actor)}
+    pub closed spec fn table(&self,actor:usize)->IMap<Port,u64> {self.inner.table(actor)}
     pub closed spec fn next_id(&self)->nat {self.inner.rows.len() as nat}
     /// Preserve the concrete insertion checks, including the full valid bank prefix.
     pub closed spec fn insertion_enabled(&self,parent:Option<usize>,blueprint:usize)->bool {
@@ -205,6 +206,17 @@ impl FreshDriver {
         requires self.wf(),self.journal_recovery(),
         ensures self.unload_enabled(actor)==self.cleanup_permitted(actor),
     {self.inner.journal_unload_domain(actor);}
+    /// Real source journals account for every owner slot, so defined reverse
+    /// execution empties that owner's table.
+    pub closed spec fn owner_table_recovery(&self)->bool {self.inner.owner_table_recovery()}
+    pub proof fn owner_table_recovery_from_source(&self,bank:Seq<super::Blueprint>,a:mx::Configuration<u64,Index>)
+        requires self.wf(),self.represents(bank,a),fs::well_formed(super::library(),programs(bank),a),mr::provided_journals(a),
+        ensures self.owner_table_recovery(),
+    {self.inner.owner_table_recovery_from_source(bank,a);}
+    pub proof fn same_owner_table_recovery(&self,other:&Self)
+        requires self.wf(),other.wf(),self.same(other),
+        ensures self.owner_table_recovery()==other.owner_table_recovery(),
+    {self.inner.same_owner_table_recovery(&other.inner);}
     /// Starting an episode also requires an empty retained journal. The kernel
     /// predicate includes target availability and its bounded generation counter.
     pub closed spec fn begin_enabled(&self,id:usize)->bool {
@@ -347,6 +359,7 @@ impl FreshDriver {
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).unload_enabled(actor),
             old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor),
+            old(self).owner_table_recovery() && out.is_ok() ==> final(self).table(actor).is_empty(),
             old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
                 ==> out.is_ok()==old(self).cleanup_permitted(actor),
             old(self).provision_recovery() && old(self).unit_child_provision_journal(actor)
@@ -360,7 +373,7 @@ impl FreshDriver {
         }
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
-        proof {draft.same_unload_domain(&self.inner,actor);}
+        proof {draft.same_unload_domain(&self.inner,actor);draft.same_owner_table_recovery(&self.inner);}
         match draft.unload_inner(actor) {Err(e)=>Err(e),Ok(())=>{
             proof {draft.fresh_unload_simulation(&initial,actor);reveal(MixedDriver::fresh_ack);}
             *self=Self {inner:draft};Ok(())
@@ -480,7 +493,8 @@ impl FreshDriver {
                     ==> out.is_ok()==old(self).cleanup_permitted(actor))
                 && (old(self).provision_recovery() && old(self).unit_child_provision_journal(actor)
                     ==> out.is_ok()==old(self).cleanup_permitted(actor))
-                && (old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor)),_=>true},
+                && (old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor))
+                && (old(self).owner_table_recovery() && out.is_ok() ==> final(self).table(actor).is_empty()),_=>true},
             out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),label(out.unwrap()).0,label(out.unwrap()).1,label(out.unwrap()).2),
     {
@@ -846,6 +860,7 @@ impl ScriptReport {
         requires self.machine.wf(),fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
         ensures self.refines(bank),self.machine.unit_child_recovery(),self.machine.provision_recovery(),self.machine.journal_recovery(),
+            self.machine.owner_table_recovery(),
     {
         weak_theory();fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
         self.machine.unit_child_recovery_from_source(bank,states.last());
@@ -853,6 +868,8 @@ impl ScriptReport {
         self.machine.provision_recovery_from_source(bank,states.last());
         oh::fresh_from_empty(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
         self.machine.journal_recovery_from_source(bank,states.last());
+        pc::fresh_from_empty(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
+        self.machine.owner_table_recovery_from_source(bank,states.last());
     }
 }
 
@@ -866,6 +883,7 @@ impl ScriptReport {
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
     ensures out.machine.wf(),out.machine.unit_child_recovery(),out.machine.provision_recovery(),out.machine.journal_recovery(),
+        out.machine.owner_table_recovery(),
         out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),

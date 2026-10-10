@@ -1264,6 +1264,30 @@ def mutation_manifest():
             'a.dependencies==b.dependencies && a.provisions==b.provisions && relation((left,a.root),(right,b.root))',
             'true && a.provisions==b.provisions && relation((left,a.root),(right,b.root))',
         ),
+        (
+            'cleanup-batch-ignores-lease-owner',
+            'publication_cleanup.rs',
+            'if entry.consumer!=Some(owner) {return Err(PublicationError::InvalidState);}',
+            'if false {return Err(PublicationError::InvalidState);}',
+        ),
+        (
+            'cleanup-commits-before-resource-validation',
+            'cleanup_release.rs',
+            '        let released=match registry.cleanup_batch(LeaseOwner {owner:id,generation},leases,publications) {\n            Ok(released)=>released,Err(e)=>return Err(CleanupReleaseError::Publication(e)),\n        };\n        if reservation {self.finish_reservation_cleanup(kernel,id).unwrap();}\n        else {self.finish_cleanup(kernel,id).unwrap();}',
+            '        if reservation {self.finish_reservation_cleanup(kernel,id).unwrap();}\n        else {self.finish_cleanup(kernel,id).unwrap();}\n        let released=match registry.cleanup_batch(LeaseOwner {owner:id,generation},leases,publications) {\n            Ok(released)=>released,Err(e)=>return Err(CleanupReleaseError::Publication(e)),\n        };',
+        ),
+        (
+            'cleanup-journal-discards-failed-inverse',
+            'cleanup_journal.rs',
+            'if outcome==RestoreOutcome::Failed {self.failed=true;}',
+            'if outcome==RestoreOutcome::Failed {self.current=None;}',
+        ),
+        (
+            'cleanup-queue-discards-retained-payload',
+            'cleanup_queue.rs',
+            'self.payloads[ticket.token]=retained;',
+            'self.payloads[ticket.token]=None;',
+        ),
     ]
 
 

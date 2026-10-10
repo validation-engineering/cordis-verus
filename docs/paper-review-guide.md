@@ -117,8 +117,27 @@ consumer may temporarily disagree with its current target.
   actual `Kernel::finish_cleanup` call. A failed completion retains a blocking
   receipt; an explicit retry receives a new ticket. The shared Driver and Node
   path call this executable protocol. See the [cleanup protocol review](cleanup-protocol.md)
-  for the contracts, reservation extension and the ordinary Rust host's distinct
-  `Drained` policy. Host reports and external inverse effects remain outside the proof.
+  for the contracts, reservation extension, retryable Rust inverses and the
+  ordinary Rust host's `Drained` policy for consumed `FnOnce` failures. Host reports and external inverse effects remain outside the proof.
+- [lifecycle_state.rs](../crates/cordis-kernel/src/lifecycle_state.rs),
+  [cleanup_release.rs](../crates/cordis-kernel/src/cleanup_release.rs) and
+  [publication_cleanup.rs](../crates/cordis-kernel/src/publication_cleanup.rs):
+  the actual shared owner keeps Kernel/protocol together. Managed finish checks
+  domain, receipt, resource provenance and manifest completeness; an atomic
+  registry batch precedes commitment release. Rejection preserves the finish
+  input; success clears that episode's managed resources and returns exact slots.
+  Host callback truth, acquisition routing and opaque value destruction remain external.
+- [cleanup_journal.rs](../crates/cordis-kernel/src/cleanup_journal.rs): the actual
+  Rust inverse journal retains a failed selected token and issues a fresh receipt
+  only on explicit retry. Earlier waiting operations and late registrations remain
+  accounted for; duplicate, old and foreign reports cannot clear the selection.
+  Runtime and static typed hosts use these checked functions around callback execution.
+- [cleanup_queue.rs](../crates/cordis-kernel/src/cleanup_queue.rs): the hosts' real
+  payload vector is owned with the journal. `register`/`land` associate an exact
+  value with its allocated token, `pop` moves it out once, and `complete` stores
+  exactly the supplied retry value or returns it unchanged on rejection. `retry`
+  requires a retained value; `is_empty` rules out orphaned stored or issued work.
+  What factory the executor returns and what that factory does remain host obligations.
 - [runtime.rs](../crates/cordis/src/runtime.rs): ordinary Rust
   `Runtime::poll_settle` calls the shared lifecycle Driver around
   host callback execution. This is an actual integration path, not a proof of
@@ -131,6 +150,17 @@ cargo test --offline -p cordis-kernel --test refinement strict_departure_preserv
 cargo test --offline -p cordis-kernel --test driver provider_resources_remain_live_until_consumer_recovery -- --exact
 cargo test --offline -p cordis --test runtime provider_waits_for_async_consumer_cleanup -- --exact
 cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources failed_report_retains_resources_until_fresh_retry_releases_only_its_batch -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources late_invalid_manifest_items_cannot_partially_release_an_accepted_cleanup -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources a_foreign_registry_with_identical_local_ids_cannot_use_this_cleanup_receipt -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources a_remaining_consumer_lease_blocks_the_entire_publication_batch -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources reservation_cleanup_releases_generation_zero_only_after_a_successful_retry -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_journal failure_retains_selected_token_and_retry_rejects_old_or_foreign_receipts -- --exact
+cargo test --offline -p cordis --test retry_cleanup failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success -- --exact
+cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanup_recovers_only_on_a_new_host_attempt -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_queue retained_payload_returns_from_the_same_slot_before_late_and_earlier_work -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_queue foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work -- --exact
+cargo test --offline -p cordis --test retry_cleanup distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success -- --exact
 ```
 
 The first test observes an unavailable current target while the consumer's old
@@ -139,8 +169,8 @@ runs actual resource recovery. The third exercises the asynchronous host and is
 **test evidence**, not a proof that every host future terminates or preserves
 its external resources. The fourth checks the production shared Driver: failed
 cleanup retains dependencies until an exact fresh retry succeeds and finish is called.
-Typed payload storage and escaped `Arc` values are
-outside this control projection.
+The queue additionally proves movement of opaque cleanup payloads. Typed service
+storage, escaped `Arc` values and callback execution remain outside this control projection.
 
 **Negative-control candidate:** `provider-lifetime-guard` removes the real
 provider guard. Its presence in the mutation suite is not a current passed
@@ -225,7 +255,40 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   cleanup-guard equivalence. A script Unload failure means cleanup is not
   permitted at that stopping point. This is the concrete synchronous `u64`/Xor
   language, not arbitrary scalar effects, host callbacks, the general
-  foreign-replay equation, an empty-owner-table theorem or global termination.
+  foreign-replay equation or global termination. The owner-table result is
+  established by the coverage bridge below.
+- [`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs) and
+  [`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+  connect Corollary 69's empty-owner-table conclusion to executable recovery.
+  `provided_journals` covers every current owner slot with a retained Provision
+  inverse. This is the converse of keeping each recorded Provision's value live.
+  `owner_table_recovery_from_source` transfers coverage to the actual receipts:
+  if full restoration is defined, its owner table is empty. `journal_recovery`
+  separately supplies definedness. Both properties hold at actual script and
+  bootstrap returns; under the input `owner_table_recovery`, successful public
+  Unload and its `apply` branch guarantee an empty actual output table.
+  Individual mutators do not all expose preservation of this property. No
+  runtime clearing operation or history buffer is added. A Child inverse still
+  retires the child without clearing its independent table. The general
+  foreign-replay equation, arbitrary host effects and global progress remain
+  separate, so Corollary 69 stays partial.
+- [`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) connects a
+  terminal value equation to actual **Mixed** `ScriptReport` output. A matching
+  Begin, last successful owner Unload and no interior owner Unload identify the
+  episode directly from `transitions`. `terminal_recovery(bank)` automatically
+  supplies its actual source execution, empty owner table and
+  `value_observation() == foreign_replay(...)`; the proof method
+  `terminal_replay` extracts this witness without a caller-supplied trace.
+  [`xor_recovery_algebra.rs`](../crates/cordis-kernel/src/xor_recovery_algebra.rs)
+  proves scalar commutation for the actual Xor library. Replay starts immediately
+  after Begin, excludes owner landings and uses foreign Unloads' actual captured
+  inverses. Definition 51's value projection includes Loading tables; it is not
+  the Active-only publication. Owner Child is allowed, and a subsequent failed
+  command does not exclude the successful-prefix result. Missing-key operations
+  are identity in the value replay, so it does **not** assert a legal lifecycle
+  execution after deleting owner steps or restored registry identities. Fresh
+  dynamic-choice replay, arbitrary host effects and full-paper recovery remain
+  separate; Theorem 68/Corollary 69 retain their partial status.
 
 **Executable review:**
 
@@ -245,6 +308,10 @@ cargo test --offline -p cordis-kernel --test xor_recovery mixed_script_recovers_
 cargo test --offline -p cordis-kernel --test xor_recovery retired_provider_stays_available_to_the_consumers_captured_xor_inverses -- --exact
 cargo test --offline -p cordis-kernel --test xor_recovery interleaved_consumers_recover_only_their_xors_and_keep_the_provider_value -- --exact
 cargo test --offline -p cordis-kernel --test xor_recovery bootstrap_failure_recovers_its_self_and_foreign_xors_from_the_real_prefix -- --exact
+cargo test --offline -p cordis-kernel --test owner_table_recovery failed_bootstrap_clears_all_owner_values_before_reprovide_without_clearing_child -- --exact
+cargo test --offline -p cordis-kernel --test owner_table_recovery mixed_script_republishes_same_registration_after_dispatcher_unload -- --exact
+cargo test --offline -p cordis-kernel --test terminal_replay terminal_owner_unload_absorbs_consumers_of_its_new_service_but_keeps_child_values -- --exact
+cargo test --offline -p cordis-kernel --test terminal_replay failed_command_after_terminal_unload_keeps_foreign_replay_of_the_successful_prefix -- --exact
 ```
 
 The first test exposes the missing-name failure on the public Kernel path.
@@ -263,7 +330,15 @@ that order observable: self Xor must recover before its Provision removes the
 value. They also check consumer recovery after provider retirement, preservation
 of a second consumer's interleaved effects, and successful-prefix recovery after
 bootstrap publication fails. These tests construct public histories and do not
-inject private journal state.
+inject private journal state. The owner-table cases exercise a further episode
+on the same registration after recovery: successful Provide detects residual
+old values, while child tables and foreign-provider values are checked separately.
+The terminal replay tests compare final values with explicit foreign-only
+calculations: a consumer of an owner-created key can become a missing-key
+identity in the value replay even though the original consumer commands would
+no longer run. Another case includes an interior foreign cleanup and a failed
+command after terminal Unload. These examples are tests of concrete observations,
+not proofs of arbitrary effects or legal lifecycle deletion.
 
 **Negative-control candidate:** `child-removal-ignores-retained-token` weakens
 retention for a retired child. Acceptance evidence for this checkout remains a

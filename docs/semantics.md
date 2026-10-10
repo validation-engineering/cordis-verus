@@ -123,13 +123,17 @@ Mixed/Fresh 公共 `unload` 现有精确成功合同：`unload_enabled = kernel.
 
 `unit_child_recovery()` 进一步从真实执行已表示的良构历史，推出每个已登记 actor 的实际 journal 若仅含 `Inverse::Unit`／`Inverse::Child`，则完整 `restore_receipts` 有定义。源 accumulator 与真实 receipt 的对应及 `retained` 给出 captured child 当前仍 registered；这比 `history_sound` 只说明原始落地时 inverse 有定义更强。Unit 恒等操作与 Child 退休都不移除 registry 成员，所以后续 LIFO 位置继续有定义。Mixed/Fresh `run_script` 自动建立此性质，包括错误返回；`run_from_empty` 为 prepared 与最终机器建立它。不新增运行时历史缓冲或恢复实现，也不强化 `wf()`。
 
-在此性质与 `unit_child_journal(actor)` 下，`unit_child_unload_domain` 证明 `unload_enabled(actor) == cleanup_permitted(actor)`，后者就是 Kernel 清理许可；真实公共 Unload 因此成功 iff 清理被允许。脚本若在此类 journal 的 Unload 处失败，返回机器不满足清理许可。该结论只涉及实际停止状态，不刻画具体错误枚举。Child 退休不等于 Remove，不运行 child 清理；父子所有权也不是隐式服务依赖。下述额外源不变式先覆盖 Provision，再覆盖 Xor inverse 的 strict 状态域；Unit 本身在源模型中表示为 `Table(Unit)`，分类依据是实际 receipt。这连接定义 52 的名称保留与受限 inverse 执行，补引理 57／定理 73 的局部义务，但不建立推论 69 的一般 foreign replay 方程、owner 表空或全局进展；partial 状态保持。
+在此性质与 `unit_child_journal(actor)` 下，`unit_child_unload_domain` 证明 `unload_enabled(actor) == cleanup_permitted(actor)`，后者就是 Kernel 清理许可；真实公共 Unload 因此成功 iff 清理被允许。脚本若在此类 journal 的 Unload 处失败，返回机器不满足清理许可。该结论只涉及实际停止状态，不刻画具体错误枚举。Child 退休不等于 Remove，不运行 child 清理；父子所有权也不是隐式服务依赖。下述额外源不变式先覆盖 Provision，再覆盖 Xor inverse 的 strict 状态域；Unit 本身在源模型中表示为 `Table(Unit)`，分类依据是实际 receipt。这连接定义 52 的名称保留与受限 inverse 执行，补引理 57／定理 73 的局部义务，但不建立推论 69 的一般 foreign replay 方程或全局进展；具体 owner 表空由下述覆盖桥另证，partial 状态保持。
 
-[`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) 和 [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs) 将上述恢复有定义性扩展到真实 Unit/Child/Provision 日志。源不变式 `live_provisions` 由从 empty 的实际 Mixed/Fresh trace 导出：每条保留的 Provision receipt 对应 owner 中仍有值的槽，同一 owner 日志中的 Provision key 互异。外部 Xor 可改变 payload，但不清空槽；不要求值等于当初提供的值。连接实际 receipts 后，LIFO 归纳证明删除一个 Provision 槽不影响其余互异槽，并结合 Child 名称保留得到 `provision_recovery()`。Mixed/Fresh `run_script` 的所有返回以及 `run_from_empty` 的 prepared／最终机器都带有该性质。对 `unit_child_provision_journal(actor)`，`provision_unload_domain` 消解 inverse 条件，真实 Unload 成功 iff Kernel 清理许可；脚本若在此范围的 Unload 失败，返回状态不允许清理。未扩展 bootstrap 的 SetupFailed 准备错误范围。没有新增运行时状态、替代恢复或 `wf()` 前提；自身含 Xor 的日志由下述更强结论覆盖；一般 foreign replay、owner 表空与全局终止仍是独立义务，引理 57／定理 73 保持 partial。
+[`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) 和 [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs) 将上述恢复有定义性扩展到真实 Unit/Child/Provision 日志。源不变式 `live_provisions` 由从 empty 的实际 Mixed/Fresh trace 导出：每条保留的 Provision receipt 对应 owner 中仍有值的槽，同一 owner 日志中的 Provision key 互异。外部 Xor 可改变 payload，但不清空槽；不要求值等于当初提供的值。连接实际 receipts 后，LIFO 归纳证明删除一个 Provision 槽不影响其余互异槽，并结合 Child 名称保留得到 `provision_recovery()`。Mixed/Fresh `run_script` 的所有返回以及 `run_from_empty` 的 prepared／最终机器都带有该性质。对 `unit_child_provision_journal(actor)`，`provision_unload_domain` 消解 inverse 条件，真实 Unload 成功 iff Kernel 清理许可；脚本若在此范围的 Unload 失败，返回状态不允许清理。未扩展 bootstrap 的 SetupFailed 准备错误范围。没有新增运行时状态、替代恢复或 `wf()` 前提；自身含 Xor 的日志由下述更强结论覆盖；一般 foreign replay 与全局终止仍是独立义务，具体 owner 表空由下述覆盖桥另证，引理 57／定理 73 保持 partial。
 
 [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs) 的 `live_operations` 从真实 Mixed/Fresh 执行导出：每个保留 operation 仍按 episode 的 committed bindings 解析到捕获的 provider，该 provider 仍已登记且相应槽有值，同一日志中较后的 Provision 不会删除较早 operation 所需的槽。Provider 退休或当前 target 漂移不更换捕获身份，依赖守卫保护 consumer 仍使用的 provider；自身 Provide/Xor 的历史顺序保证 LIFO 先恢复 Xor，再删除值。它把定义 53/54 的 commitment 约束与定义 52 的 child 名称保留组合到当前 inverse 所需状态。
 
 [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs) 通过实际 receipts 的 `live_xors` 与 `restore_all`，结合 Provision 值存在性、唯一性及 child retention，证明完整 Unit/Child/Provision/Xor 日志的恢复有定义。`journal_recovery()` 由真实脚本的成功前缀导出，包括错误返回；bootstrap 的 prepared／最终机器也都具有该性质。`journal_unload_domain` 无须 receipt 分类即可证明 `unload_enabled == cleanup_permitted`，实际公共 Unload 在且仅在 Kernel 清理许可时成功，脚本 Unload 失败则表明停止状态不允许清理。SetupFailed 准备错误诊断范围不扩大。较窄的 Unit/Child 与 Provision API 仍保留；新证明无运行时历史开销，不强化 `wf()`，覆盖的是具体同步 `u64`/Xor 语言，不是任意 scalar、宿主回调、一般 foreign replay 观察方程或全局活性。详见[Xor 恢复域](progress-contracts.zh-CN.md#xor-补齐具体日志的当前状态恢复域)。
+
+[`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs) 从 empty-origin Mixed/Fresh 执行导出 `provided_journals`：每个当前有值的 owner 槽都由保留的 Provision 逆记录覆盖。它与 `live_provisions` 的记录到值方向相反，排除“逆序列有定义，但表中另有未记录残留值”的缺口。[`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs) 将该源覆盖通过真实 receipts 接到 `owner_table_recovery()`：对已登记 actor，若完整恢复有定义，恢复后的 owner 表为空；已有 `journal_recovery()` 独立提供有定义性。两项性质从实际脚本与 bootstrap 的所有返回历史导出，包括错误前缀。在调用前具备 `owner_table_recovery()` 时，公共 `unload` 与 `apply` 的 Unload 分支成功后保证实际 `table(actor).is_empty()`；事务副本由 `same_owner_table_recovery` 传递此性质。各个单独 mutator 未统一公开其保持合同，继续变更后需要时须重新建立；没有新增运行时清空操作或历史缓冲。这补齐推论 69 的具体同步实现 owner 表空结论，不建立一般 foreign replay 观察方程、任意宿主资源恢复或全局进展。Child inverse 不清空 child 自己的表，相关 partial 状态不变。详见[owner 表恢复合同](progress-contracts.zh-CN.md#成功恢复后真实-owner-表为空)。
+
+[`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) 进一步为实际 **Mixed** `ScriptReport` 建立 `terminal_recovery(bank)`：成功转换日志包含匹配 Begin、末条为 owner Unload，且中途没有该 owner Unload 时，返回机器的 `value_observation()` 等于从 Begin 紧后源快照计算的 `foreign_replay(...)`，owner 表为空。证明方法 `terminal_replay` 可提取从 empty 的实际源轨迹与等式，调用者无须另给 installed 区间、恢复成功或源执行。观察是定义 51 的所有已登记表的值投影，包括 Loading 值，不是 Active 服务发布。`xor_recovery_algebra` 从真实 library 证明所有正向及逆 Xor mask 可交换，排除 owner landings 的值重放保留 foreign Unload 实际捕获的 journal，允许 owner Child。最后成功 Unload 后发生检查错误时，`report.error` 可为 Some，等式仍对应保持不变的返回机器。缺 key 的 operation 在值代数中为恒等；这个等式不证明删除 owner 后可合法执行剩余生命周期命令，也不恢复 registry、阶段或 allocator。Fresh 的动态 choice 终态报告桥尚未接入，任意 scalar、宿主效果与全局进展仍在边界外。定理 68／推论 69 保持 partial；详见[Mixed 终态值重放](progress-contracts.zh-CN.md#mixed-脚本终态等于其-foreign-only-值重放)。
 
 `lifecycle_ordering` 从实际九规则 trace 证明 episode 边界、固定 committed、provider 整个表域保持和严格 episode 排序；Loading 只占唯一初始区间，Iter／Finish 使用 opening committed。`grammar_ordering` 将值变化接到精确 key/provider 的实际 Operation 或 LIFO inverse，并可从空 history 回溯到先前 landing。`rule_frames` 证明冻结状态映射／字段修改分解及 metadata lifetime。`indexed_ordering` 和 `mixed_ordering` 进一步覆盖同一 arbitrary-index dependent／child 执行；观察版本不要求 primitive 字面恢复，真实 LIFO 保留 child retirement 的中间状态，并追到原始 operation landing。`observational_execution` 从真实 Begin／成功 Unload 推导观察恢复及 owner 空表，仍要求 identity-extended scalar generators 观察交换。这个接口与一般 strict-partial coeffect 的对应、可执行混合程序模拟及异步宿主仍须额外证明；有限前缀不保证最终发生 Unload。
 
@@ -171,7 +175,7 @@ Rust 外层把 callback 存为 `Vec<Option<CleanupAction>>`，每个效果组使
 | --- | --- |
 | 任意 callback 都能恢复自己的外部副作用 | callback 的 inverse witness、异常/取消边界、资源是否全部经 context 登记 |
 | 效果恢复等于物理世界完全回滚 | 论文只在 key operations 定义的观察等价下恢复；消息、磁盘外部状态、allocator 历史需各自边界 |
-| Theorem 68 / Corollary 69 在完整宿主上的 recovery exactness | 已从真实 mixed grammar 的 Begin／Unload 推导恢复，无需 caller episode profile；仍要求显式 identity-extension scalar 交换，尚缺一般观察范围及宿主历史 refinement |
+| Theorem 68 / Corollary 69 在完整宿主上的 recovery exactness | 真实 Mixed ScriptReport 已从 Begin／末条成功 Unload 导出值投影等于 foreign-only replay，具体 Xor scalar 交换由真实 library 证明；Fresh 动态 choice 报告桥、一般观察范围及宿主历史 refinement 仍待接通 |
 | Theorem 73 的完整进展和终止 | 已证明有 provider rank 的非静止控制状态存在下一步，并提升为完整规则的 landing witness；固定 registry 的实际轨迹已导出计数前提并可构造完整规则执行到 quiet；单 actor Fresh 循环已对含 child 注册的真实执行给出有限返回界；整个动态 child 图的自治进展、无限 orchestration、future 最终完成与 scheduler 契约仍在边界外 |
 | Theorem 80 的完整 confluence | 已证明动态独立 family confluence、静止控制唯一及实际固定程序轨迹的完整终态唯一；已具备 full-rule name-renaming、fresh allocation 匹配及条件 suffix 删除；仍需一般动态 child lifecycle 的合法前缀删除、交换和观察 canonical form |
 | JS Cordis 或完整 DeepSeek Harness 已验证 | 还需完整 API、宿主运行时、插件生态与应用逻辑的实现及证明 |
@@ -281,3 +285,21 @@ Definition 52 的 typed 原语在给定 registry/editor 解释下已编码：完
 受限 episode deletion 现已组合 foreign Child 与任意年龄的混合 Table／Child
 撤销栈，并保留动态 Insert／Remove。真实目标执行及最终 owner recovery 被构造
 出来；owner 的 Table／私有提供项约束及原文 Component 表示缺口仍保留。
+
+### 真实宿主清理资源批次
+
+实际共享 Driver 现在使用 `LifecycleState` 一起拥有 Kernel 与清理协议；公开变更保持
+二者不变式，宿主没有可替换或可变借出的 Kernel。Node Driver 的租约记录消费者与
+代次，publication 注册表记录 domain。`finish_cleanup_resources` 检查匹配的显式结果
+及 domain，再由 `cleanup_batch` 检查来源、唯一性、全部持有者和清单完整性，释放
+该 episode 的受管租约及 publication，最后释放 committed 绑定并建立 L-Unload。
+拒绝时保持 finish 入口的 Kernel、凭据和注册表，成功返回精确的回收 slot 并保持其他
+资源。generation-zero reservation 是独立扩展。回调报告、获取路由、值句柄删除和
+JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验证的 `CleanupJournal`
+保留失败 token，通过新凭据显式重试 `FnMut` 工厂；成功操作不重复执行，旧确认不能
+完成新尝试。Runtime 对已消耗的 `FnOnce` 错误仍采用 `Drained`；静态宿主的此类
+失败仍阻塞且不能重试。实际载荷向量已由 `CleanupQueue<T>` 与日志一起拥有，
+可执行合同证明 token／槽位对应、每次尝试只交付一次、原样保存传入的失败载荷、
+拒绝时保持队列并原样返回载荷，以及为空时没有仍保存或已交付的工作。重试必须
+仍有载荷。执行器调用后选择返回哪个工厂、回调真实性与外部效果仍属于宿主连接，
+不因容器证明而变成任意逆操作定理。详见[清理协议](cleanup-protocol.zh-CN.md)。

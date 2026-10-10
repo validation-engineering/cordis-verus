@@ -472,7 +472,13 @@ impl PluginInstance for Instance {
         })
     }
     fn cleanup(&self, _ctx: PluginContext) -> PluginFuture {
-        let future = self.episode.cleanup();
+        // Backend admits each cleanup job only after the outer host requests
+        // an attempt. A retained typed inverse uses its fresh journal receipt.
+        let future = if self.episode.can_retry_cleanup() {
+            self.episode.retry_cleanup()
+        } else {
+            self.episode.cleanup()
+        };
         Box::pin(async move {
             future?.await?;
             Ok(Value::Null)

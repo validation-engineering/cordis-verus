@@ -10,7 +10,7 @@ use cordis_kernel::action_ledger::{
     ActionError, ActionKind as KernelActionKind, ActionTicket as KernelActionTicket,
 };
 pub use cordis_kernel::lifecycle_actions::CleanupOutcome;
-use cordis_kernel::lifecycle_actions::LifecycleActions;
+use cordis_kernel::lifecycle_state::LifecycleState;
 use cordis_kernel::{Error, Kernel, Phase, Port};
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -40,15 +40,14 @@ pub enum Decision {
 /// Dereferencing permits kernel observations, but intentionally provides no
 /// mutable access that could bypass the cleanup-result protocol.
 pub struct LifecycleDriver {
-    kernel: Kernel,
-    actions: LifecycleActions,
+    state: LifecycleState,
     // Serialization views only; the verified protocol authorizes transitions.
     pending_views: BTreeMap<usize, ActionTicket>,
 }
 impl Deref for LifecycleDriver {
     type Target = Kernel;
     fn deref(&self) -> &Kernel {
-        &self.kernel
+        self.state.kernel()
     }
 }
 impl LifecycleDriver {
@@ -57,13 +56,12 @@ impl LifecycleDriver {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
             .map_err(|_| DriverError::new("Capacity", "domain identity exhausted"))?;
         Ok(Self {
-            kernel: Kernel::new(),
-            actions: LifecycleActions::new(domain),
+            state: LifecycleState::new(domain),
             pending_views: BTreeMap::new(),
         })
     }
     pub fn domain(&self) -> u64 {
-        self.actions.domain()
+        self.state.domain()
     }
     /// Decide using current kernel facts. Hosts must recompute availability
     /// after callbacks; a prior decision is not a capability to mutate state.
@@ -74,13 +72,11 @@ impl LifecycleDriver {
             {
                 Some(Decision::Withdraw)
             }
-            Phase::Unloading if !self.cleanup_started(id) && !self.actions.blocked(id) => {
+            Phase::Unloading if !self.cleanup_started(id) && !self.state.blocked(id) => {
                 Some(Decision::BeginCleanup)
             }
             Phase::Inactive
-                if self.retired(id)
-                    && self.children(id).is_empty()
-                    && !self.actions.blocked(id) =>
+                if self.retired(id) && self.children(id).is_empty() && !self.state.blocked(id) =>
             {
                 Some(Decision::Remove)
             }
@@ -88,7 +84,7 @@ impl LifecycleDriver {
                 if !self.retired(id)
                     && !status.failed
                     && status.available
-                    && !self.actions.blocked(id)
+                    && !self.state.blocked(id)
                     && self.target(id).is_some()
                     && !self.children(id).iter().any(|child| self.retired(*child)) =>
             {
@@ -111,29 +107,29 @@ impl LifecycleDriver {
         dependencies: Vec<Port>,
         provisions: Vec<Port>,
     ) -> Result<usize, Error> {
-        self.kernel.insert(parent, dependencies, provisions)
+        self.state.insert(parent, dependencies, provisions)
     }
     pub fn declare_provision(&mut self, id: usize, port: Port) -> Result<(), Error> {
-        self.kernel.declare_provision(id, port)
+        self.state.declare_provision(id, port)
     }
     pub fn configure_pending_dependencies(
         &mut self,
         id: usize,
         dependencies: Vec<Port>,
     ) -> Result<(), Error> {
-        self.kernel.configure_pending_dependencies(id, dependencies)
+        self.state.configure_pending_dependencies(id, dependencies)
     }
     pub fn release_provision(&mut self, id: usize, port: Port) -> Result<(), Error> {
-        self.kernel.release_provision(id, port)
+        self.state.release_provision(id, port)
     }
     /// Validate a complete action batch before making its first transition.
     pub fn ensure_action_capacity(&self, count: usize) -> Result<(), Error> {
         let count = u64::try_from(count).map_err(|_| Error::Capacity)?;
-        self.actions.check_capacity(count).map_err(ledger_error)
+        self.state.check_capacity(count).map_err(ledger_error)
     }
     /// Admit setup and register its ownership before any executor sees it.
     pub fn begin(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self.actions.begin(&mut self.kernel, id)?;
+        let ticket = self.state.begin(id)?;
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
@@ -144,7 +140,7 @@ impl LifecycleDriver {
     /// this setup-only entry point cannot authorize dependency release.
     /// Withdrawal never discards an outstanding setup ticket.
     pub fn complete_action(&mut self, ticket: &ActionTicket) -> Result<(), DriverError> {
-        self.actions
+        self.state
             .complete_setup(kernel_ticket(ticket))
             .map_err(completion_error)?;
         self.pending_views.remove(&ticket.id);
@@ -158,7 +154,7 @@ impl LifecycleDriver {
         ticket: &ActionTicket,
         outcome: CleanupOutcome,
     ) -> Result<(), DriverError> {
-        self.actions
+        self.state
             .complete_cleanup(kernel_ticket(ticket), outcome)
             .map_err(completion_error)?;
         self.pending_views.remove(&ticket.id);
@@ -167,7 +163,7 @@ impl LifecycleDriver {
     /// Rust executors retain the action in this driver while polling their
     /// futures. Acknowledge it only when all admitted setup work has landed.
     pub fn settle_setup(&mut self, id: usize) -> Result<(), DriverError> {
-        if let Some(ticket) = self.actions.pending(id).map(host_ticket) {
+        if let Some(ticket) = self.state.pending(id).map(host_ticket) {
             if ticket.kind != ActionKind::Setup {
                 return Err(DriverError::new(
                     "InvalidState",
@@ -179,51 +175,62 @@ impl LifecycleDriver {
         Ok(())
     }
     pub fn finish(&mut self, id: usize) -> Result<(), Error> {
-        if self.actions.blocked(id) {
-            return Err(Error::InvalidState);
-        }
-        self.kernel.finish(id)
+        self.state.finish(id)
     }
     pub fn leave(&mut self, id: usize) -> Result<(), Error> {
-        self.kernel.leave(id)
+        self.state.leave(id)
     }
     pub fn retire(&mut self, id: usize) -> Result<(), Error> {
-        self.kernel.retire(id)
+        self.state.retire(id)
     }
     pub fn begin_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self.actions.begin_cleanup(&mut self.kernel, id)?;
+        let ticket = self.state.begin_cleanup(id)?;
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     /// Restore host resources registered while a fiber was reserved, before
     /// its first kernel episode. This is a host extension, not a paper Step.
     pub fn begin_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self.actions.begin_reservation_cleanup(&self.kernel, id)?;
+        let ticket = self.state.begin_reservation_cleanup(id)?;
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     pub fn retry_cleanup(&mut self, id: usize) -> Result<ActionTicket, Error> {
-        let ticket = host_ticket(self.actions.retry_cleanup(&self.kernel, id)?);
+        let ticket = host_ticket(self.state.retry_cleanup(id)?);
         self.pending_views.insert(id, ticket.clone());
         Ok(ticket)
     }
     pub fn finish_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        self.actions.finish_cleanup(&mut self.kernel, id)
+        self.state.finish_cleanup(id)
+    }
+    /// Finish a reported cleanup only after its checked resource batch succeeds.
+    pub fn finish_cleanup_resources(
+        &mut self,
+        registry: &mut cordis_kernel::publication::PublicationRegistry,
+        id: usize,
+        reservation: bool,
+        leases: &[cordis_kernel::publication::LeaseId],
+        publications: &[cordis_kernel::publication::PublicationId],
+    ) -> Result<Vec<cordis_kernel::publication::ReleasedPublication>, DriverError> {
+        use cordis_kernel::lifecycle_actions::resources::CleanupReleaseError;
+        self.state
+            .finish_cleanup_resources(registry, id, reservation, leases, publications)
+            .map_err(|error| match error {
+                CleanupReleaseError::Lifecycle(error) => error.into(),
+                CleanupReleaseError::Publication(error) => error.into(),
+            })
     }
     pub fn finish_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        self.actions.finish_reservation_cleanup(&self.kernel, id)
+        self.state.finish_reservation_cleanup(id)
     }
     pub fn remove(&mut self, id: usize) -> Result<(), Error> {
-        if self.actions.blocked(id) {
-            return Err(Error::InvalidState);
-        }
-        self.kernel.remove(id)
+        self.state.remove(id)
     }
     pub fn compact_bindings(&mut self) -> usize {
-        self.kernel.compact_bindings()
+        self.state.compact_bindings()
     }
     pub fn compact_declarations(&mut self) -> usize {
-        self.kernel.compact_declarations()
+        self.state.compact_declarations()
     }
 }
 

@@ -232,9 +232,11 @@ withdrawal 同时更新 SDK token 和旧 `AsyncSetup` 的 episode 状态。已�
 
 普通 JS inverse 及对象清理成功之后，typed session 才执行原插件的 inverse。typed 与 JS 消费者都保留旧 publication，提供者的清理等它们完成。关闭 episode 与晚到 `on_cleanup` 注册使用同一把日志锁：inverse 要么进入日志被执行，要么因 episode 已关闭而拒绝。旧 `AsyncSetup` 不会重定向到下一代。
 
-旧 API 的 inverse 是 **`FnOnce`**。执行失败或 panic 后无法再次调用同一个函数，因此 static executor 会持续记录失败，保留未执行 inverse、槽位及图中的依赖；`retryCleanup()` 继续返回失败，不能把已被消费的 callback 当成清理成功。此时需要应用处置失败的资源并重建相应隔离环境；关闭进程或 GC 也不等于确认外部资源已恢复。需要可重试清理时，应使用普通 SDK `PluginInstance::cleanup` 并显式保存重试状态。
+旧 API 的 inverse 是 **`FnOnce`**。执行失败或 panic 后无法再次调用同一个函数，因此 static executor 会持续记录失败，保留未执行 inverse、槽位及图中的依赖；`retryCleanup()` 继续返回失败，不能把已被消费的 callback 当成清理成功。此时需要应用处置失败的资源并重建相应隔离环境；关闭进程或 GC 也不等于确认外部资源已恢复。需要可重试清理时，可使用下面的显式 `FnMut` API，或普通 SDK 的 `PluginInstance::cleanup`。
 
-既有 Plugin setup/cleanup 的受控 panic 仍按原执行器转换为失败；清理 panic 同样不可重试。接口视图、FFI 或其他未被旧执行器隔离的 panic 遵循 Node domain fault 合同。强制 abort 和任意不终止代码不在进程内隔离能力之内。
+`Setup` / `AsyncSetup` 的 `on_cleanup_retryable` 和 `on_cleanup_retryable_async` 接受并保留 `FnMut` 工厂。失败或受控 panic 后，Node 的显式 `retryCleanup()` 会让 typed bridge 调用 `StaticEpisode::retry_cleanup`，以新的尝试编号重跑失败操作；已成功的 inverse 不重复执行，更早的 inverse 和原槽位继续保留，直到确认成功。异步工厂每次产生新的 Future，插件作者负责处理部分外部效果，使重试安全。被丢弃的静态清理 Future 仍阻塞，不能通过此 API 重试。详细的可执行合同和测试见[清理协议](cleanup-protocol.zh-CN.md)。
+
+既有 Plugin setup/cleanup 的受控 panic 仍按原执行器转换为失败；只有保留了显式可重试工厂的清理才能再次执行。接口视图、FFI 或其他未被旧执行器隔离的 panic 遵循 Node domain fault 合同。强制 abort 和任意不终止代码不在进程内隔离能力之内。
 
 ## 当前范围
 

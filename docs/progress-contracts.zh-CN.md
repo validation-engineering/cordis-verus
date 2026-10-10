@@ -20,7 +20,7 @@
 | 定义 53–54、表 1 | 当前目标与已提交身份决定能否开始加载、迭代或受保护地卸载。 | `semantics.rs`、`refinement.rs` 描述这些守卫。下文的 `Kernel`、`StageProtocol` 合同把部分守卫接到真实调用。 |
 | 定理 73(1) | 在定理前提下，非静止状态至少有一条生命周期规则可应用。 | `draining_can_progress` 在全部已安装节点都处于待恢复 Unloading 的范围内证明存在可清理节点。新的 `begin_cleanup` 成功等价合同使这一守卫足以保证真实内核调用成功。内核 iteration/finish 现在恰好在论文的 Loading/coherent 守卫下成功；已验证 driver 将捕获的绑定接到该守卫；完整宿主捕获和一般 continuation 定义域仍有独立义务。 |
 | 定理 73(2) | 限制各节点步数、目标变化次数，进而说明极大生命周期序列以静止状态结束。 | `termination.rs` 已有有限轨迹计数和到达静止状态的构造，要求固定注册表、局部表修改范围、最终完整发布和 continuation 的递减秩。实际 `ProgramEpisode` 执行器从经过检查的前向指令推出有限执行；`FreshDriver::run_until_blocked` 还对单个 actor 的真实重复 step（含 child 注册）给出有限界，直到终态发布或首个实际错误。这不是完整的动态注册表结论。 |
-| 推论 69 | 终态 Unload 后，表与其他 actor 步骤的重放观察等价，owner 表为空。 | `ProgramEpisode::execute_and_recover` 在固定程序范围内恢复传入的资源单元。Mixed/Fresh `unload` 现恰好在允许清理且当前 LIFO 逆序列有定义时成功；这条执行域结论本身不证明一般的 foreign replay 方程或任意外部资源恢复。 |
+| 推论 69 | 终态 Unload 后，表与其他 actor 步骤的重放观察等价，owner 表为空。 | `ProgramEpisode::execute_and_recover` 在固定程序范围内恢复传入的资源单元。Mixed/Fresh `unload` 现恰好在允许清理且当前 LIFO 逆序列有定义时成功；真实历史覆盖还证明：在 `owner_table_recovery` 下，成功 Unload 清空 owner 表。匹配的 Mixed 脚本终态报告还建立下述 foreign-only 值方程；Fresh 重放组合和任意外部资源仍是独立义务。 |
 | 定理 71(2) | 加载中发生 Divert 的 episode 会闭合。 | 清单记录了原文允许的序列对无条件结论的反例。若加入调度条件证明最终闭合，得到的是修正后的条件性结论。 |
 | 定义 74、定理 80 | 描述支持关系，并建立规范形、合流性。 | 支持关系是状态方程；合流还需要表示、轨迹传递和交换证明。时序库不会自动提供这些缺失连接。 |
 
@@ -382,7 +382,7 @@ receipts 与清理状态。Child inverse 退休捕获的 child，不移除注册
 这是精确接纳与有限返回合同，并未证明 `wf()`、`!relied` 或清理许可足以让任意逆日志
 都可恢复。完整逆序列的有定义性仍是显式合取条件。对引理 57，它将真实 inverse 实现
 接到 strict 源语法；对推论 69，它补充模型恢复的执行证据，一般 foreign replay 的
-观察等价方程与 owner 表为空仍需相应历史及独立性论证，不承诺任意外部资源物理复原。
+终态 Mixed 值方程及其具体 scalar 独立性见下文；owner 表空已由下述[覆盖证明](#成功恢复后真实-owner-表为空)接到真实历史，通用宿主观察方程及任意外部资源物理复原仍是独立义务。
 对定理 73，它把允许且有定义的清理接到一次真实有限调用，不证明动态 child 全局进展
 或最终调度。这三项在清单中均保持 **partial**。
 
@@ -425,7 +425,8 @@ parent 所有权不构成隐式服务依赖。下述源不变式先覆盖 Provis
 包含 Xor 的完整具体日志。Unit receipt 自身在模型中
 表示为 `Table(Unit)`，因此范围以具体 receipt 分类为准，不能按模型名称排除所有 Table。
 它补充引理 57 的受限 inverse 桥与定理 73 的局部清理进展，两项均保持 **partial**；
-并未补齐推论 69 的一般 foreign replay 方程、owner 表空结论或整个系统终止。
+并未补齐推论 69 的一般 foreign replay 方程或整个系统终止；具体 owner 表空结论由
+下述覆盖证明建立。
 
 ## Provision 值保留到真实 inverse 执行
 
@@ -456,7 +457,8 @@ Mixed/Fresh `run_script` 从真实成功前缀导出该性质，包括错误返�
 Insert/Begin/Step 准备范围。
 
 这扩展引理 57 的当前状态 inverse 连接和定理 73 的局部清理义务。下一节继续覆盖
-Xor 日志；推论 69 的一般 foreign replay 方程、owner 表空结论及全局终止仍是独立义务。
+Xor 日志；推论 69 的一般 foreign replay 方程及全局终止仍是独立义务，具体 owner
+表空结论由下述覆盖证明建立。
 
 ## Xor 补齐具体日志的当前状态恢复域
 
@@ -493,13 +495,82 @@ Xor——组成的 LIFO 恢复有定义。Xor 保持槽有值，其具体 `u64` 
 已有 `unit_child_recovery` 和 `provision_recovery` API 继续保留，作为范围更窄的
 结论。新结论覆盖完整的同步 `u64`/Xor 指令语言，不覆盖任意插件 scalar 或宿主回调。
 它消解引理 57 与定理 73 局部清理中的具体日志 inverse 定义域义务；推论 69 的一般
-foreign replay 观察方程和 owner 表空结论、全局进展及宿主调度仍是独立义务，
-整篇论文的相关状态保持 **partial**。
+foreign replay 观察方程、全局进展及宿主调度仍是独立义务；具体 owner 表空结论
+由下述覆盖证明建立。整篇论文的相关状态保持 **partial**。
 
 [Xor 恢复测试](../crates/cordis-kernel/tests/xor_recovery.rs) 通过真实脚本和启动
 入口覆盖：自身 Xor 与 Provision/Child 交错、provider 退休后恢复捕获的身份、两个
 consumer 的交错效果、publication 不完整后的启动前缀恢复。这些是配合证明的具体
 行为回归，不是对任意宿主效果的证明。
+
+## 成功恢复后真实 owner 表为空
+
+[`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs)
+从 empty 出发的 Mixed/Fresh 执行导出每态的 `provided_journals`。它补上
+`live_provisions` 的反向覆盖：**每个当前有值的 owner 槽，都有保留的 Provision
+逆记录**，而不只是每条 Provision 逆记录仍有对应值。缺少这个方向，即使整个逆序列
+有定义，也可能留下未被记录的 owner 值。归纳跟随实际成功的源转换，包括动态 child、
+外部操作与清理，并不假设未来的 Unload 会成功。
+
+[`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+作为 `mixed_driver::owner_recovery` 导出，将源覆盖定理接到实际 Unload 使用的同一份
+表和 receipts。`owner_table_recovery_from_source` 建立 `owner_table_recovery()`：
+对每个已登记 actor，**若**完整 `restore_receipts` 有定义，则恢复后的 owner 表为空。
+已有 `journal_recovery()` 另外证明有定义性，新性质说明恢复的结果。两者覆盖全部
+四种具体 receipt，并在 Mixed/Fresh `run_script` 的所有返回与两份 bootstrap 机器上
+从真实历史导出，包括失败前缀。
+
+在**调用前**满足 `owner_table_recovery()` 的条件下，实际公共 `unload(actor)` 与
+`apply(Command::Unload { actor })` 成功后保证输出的 `table(actor)` 为空。
+`same_owner_table_recovery` 将性质传递给已有事务草稿。这是对原有 LIFO 实现的合同
+强化，没有新增清空操作或运行时历史缓冲。保证对应上述入口及调用边界；各个单独
+mutator 尚未统一公开该性质的保持合同，调用者在继续变更后需要时仍须重新建立它。
+公共错误行为与独立的清理守卫不变。
+
+这把**推论 69 的 owner 表为空结论**接到具体同步 Mixed/Fresh 实现，未建立一般
+foreign replay 观察方程、任意宿主资源恢复或全局进展；推论 69 保持 **partial**。
+Child 退休仍将 child 自己的表和日志留给其独立清理。
+[Owner 表恢复回归](../crates/cordis-kernel/tests/owner_table_recovery.rs) 覆盖部分
+Loading 执行的恢复和同一注册上的第二轮 episode：旧端口可重新 Provide、foreign Xor
+效果恢复，退休 child 的独立值仍在 parent 清理后保留。
+
+## Mixed 脚本终态等于其 foreign-only 值重放
+
+[`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) 作为
+`mixed_driver::terminal_replay` 导出，强化实际 **Mixed** `ScriptReport`。
+`terminal_episode(transitions, owner, begin)` 从成功转换日志中选取 Begin，要求
+最后一条成功转换是该 owner 的 Unload，并排除中途同一 owner 的 Unload。真实源
+执行据此导出 installed 区间；调用者不假设该区间，也不提供另外一份源轨迹。
+
+`run_script` 自动为返回日志中每个匹配 episode 建立 `terminal_recovery(bank)`。
+证明方法 `report.terminal_replay(bank, owner, begin)` 可提取已表示的源执行与
+返回机器的两个结论：owner 表为空，且 `value_observation()` 等于
+`foreign_replay(...)`。后者从 **Begin 紧后**的快照出发，把终态 Unload 之前的
+真实值事件送入 `entangled::foreign_state`，排除 owner 自己的 landings；foreign
+Unload 保留其**实际捕获的 inverse journal**。观察采用定义 51 的所有已登记表的值
+投影，包括 Loading 中的值，与只发布 Active 服务不同。
+
+[`xor_recovery_algebra.rs`](../crates/cordis-kernel/src/xor_recovery_algebra.rs)
+从真实解释器 library 导出 scalar 前提：所有正向操作和返回的 inverse 都是 `u64`
+Xor mask，且这些变换可交换，不要求调用者额外给出交换假设。允许 owner Child 指令，
+其 inverse 仍是通常的退休操作；定理比较投影后的**值**，不比较 registry 身份、
+阶段、journal 或 allocator 是否相等。
+
+即使 `report.error` 为 `Some`，结论仍适用于成功前缀：紧随终态 Unload 的失败命令
+保持机器不变，也不进入 `transitions`。若 Unload 后还存在成功命令，则不属于此次
+终态合同。没有新增运行时重放缓冲或第二套解释器。
+
+这里的 foreign replay 是值计算，**不表示**删除 owner 后仍可执行原生命周期命令。
+在该值代数中，对缺失 key 的 operation 为恒等。因此，实际曾使用 owner 新服务的
+consumer，在反事实值计算中仍可有定义，但若没有该 owner，其原 Begin/Step 可能
+失败。这是命题明确的边界，不是放宽真实 driver 的检查。
+
+这为 Mixed 脚本建立定理 68／推论 69 的具体终态值方程。Fresh 的动态 choice 源桥
+尚未接入此报告合同；Fresh 保留上文的逆域和空 owner 表结论。任意插件 scalar、
+宿主效果、合法的生命周期删除执行及全局进展仍有独立义务，论文相关条目保持
+**partial**。两项[终态重放回归](../crates/cordis-kernel/tests/terminal_replay.rs)
+将真实最终值与明确的 foreign-only 计算比较，覆盖 owner 新服务的 consumer 与 child
+值、区间中的 foreign Unload，以及成功终态 Unload 后紧接检查失败的命令。
 
 ## 从新机器经过真实准备与执行
 
@@ -581,7 +652,8 @@ Begin/Step 失败时的前缀保留。新 child 仍保持 Inactive。这个真�
    Insert/Begin/Step 准备范围已有精确接纳域，直接 Mixed/Fresh Unload 也已有守卫加
    inverse 的精确域。Retire/Depart/Remove、更广的 dispatcher 与其他恢复路径仍需
    定义域等价；可达历史现已推出完整的真实 Unit/Child/Provision/Xor 日志有定义。
-   这一具体 inverse 定义域结论仍须与一般 foreign replay 观察方程和宿主效果合同组合。
+   这一具体 inverse 定义域结论现已组合 Mixed 脚本报告的终态 foreign-only 值方程，
+   Fresh 动态 choice 重放与宿主效果合同仍是独立义务。
    准备谓词也未刻画具体错误枚举值。还须组合多个 actor、
    动态 child 与恢复，接到论文的全局计数／递减量论证。这些入口没有为整个宿主实例化 `termination.rs`。若目标命题
    包含可能延迟已使能生命周期工作的宿主执行，还须明确调度合同。

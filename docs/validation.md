@@ -17,7 +17,7 @@ Apple Silicon (ARM64). A manual development run can add macOS Intel with
 
 The separate **Full release validation** workflow is manually dispatched and uses
 the same two default platforms; `include_macos_intel=true` adds Intel to that run.
-It first runs one baseline preflight per selected platform, then all 114 complete-crate
+It first runs one baseline preflight per selected platform, then all 118 complete-crate
 negative controls on each platform in a platform-specific partition using strictly
 bound shared baseline evidence. The [execution plan](full-negative-validation.md)
 keeps preflight and shard deadlines consistent and reserves time for cleanup within

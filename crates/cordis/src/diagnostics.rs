@@ -29,6 +29,7 @@ pub enum Blocker {
     EffectsPending(Vec<usize>),
     CommittedConsumers(Vec<PluginId>),
     CleanupPending,
+    CleanupFailed(String),
     RetiringChildren(Vec<PluginId>),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,6 +72,7 @@ impl Blocker {
             Self::SetupPending => json!({"kind":"setup_pending"}),
             Self::EffectsPending(groups) => json!({"kind":"effects_pending","groups":groups}),
             Self::CommittedConsumers(ids) => json!({"kind":"committed_consumers","plugins":ids}),
+            Self::CleanupFailed(message) => json!({"kind":"cleanup_failed","message":message}),
             Self::CleanupPending => json!({"kind":"cleanup_pending"}),
             Self::RetiringChildren(ids) => json!({"kind":"retiring_children","plugins":ids}),
         }

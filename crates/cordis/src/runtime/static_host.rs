@@ -13,9 +13,10 @@
 //! business admission but does not complete a running future. The external host
 //! owns scheduling and must finish setup before requesting cleanup. Dropping an
 //! unfinished future leaves a sticky failure instead of claiming restoration.
-//! Cleanup runs the existing FnOnce inverse journal in reverse order. A failed
-//! inverse cannot be replayed, so that episode stays open with the same error
-//! and remaining values/inverses; restarting it is rejected.
+//! Cleanup keeps the selected token until acknowledgement. Retryable factories
+//! survive reported errors/panics and require explicit retry. Consumed FnOnce
+//! failures and abandoned futures stay sticky; both policies retain values and
+//! earlier inverses, and reject a replacement episode until cleanup succeeds.
 //!
 //! [`TypedSlot`] clones share the original `Arc<T>`, and are not revocable
 //! capabilities. The host must never expose them as a substitute for checking
@@ -482,27 +483,59 @@ impl StaticEpisode {
             })
             .collect())
     }
-    /// A legacy FnOnce inverse cannot be replayed after failure. Such failure
-    /// is sticky and retains the episode's values and unrun inverses; retries
-    /// report the same error, never an empty successful cleanup.
+    /// Begin one cleanup attempt. A reported failure remains sticky until an
+    /// explicit retry; consumed FnOnce failures and abandoned futures cannot retry.
     pub fn cleanup(&self) -> Result<StaticFuture, String> {
+        self.start_cleanup(false)
+    }
+    /// Retry only a retained retryable factory. The external authoritative host
+    /// must first admit its own fresh cleanup action and keep dependency leases.
+    pub fn retry_cleanup(&self) -> Result<StaticFuture, String> {
+        self.start_cleanup(true)
+    }
+    pub fn can_retry_cleanup(&self) -> bool {
+        let state = lock(&self.setup.state);
+        let progress = lock(&self.progress);
+        state.phase != EpisodePhase::Closed
+            && progress.abandoned.is_none()
+            && progress.cleanup_error.is_some()
+            && !progress.cleanup_running
+            && state.cleanups.get(&0).is_some_and(Cleanups::can_retry)
+    }
+    fn start_cleanup(&self, retry: bool) -> Result<StaticFuture, String> {
         let mut state = lock(&self.setup.state);
         let mut progress = lock(&self.progress);
         if state.phase == EpisodePhase::Closed {
             return Err("StaticEpisodeClosed".into());
         }
-        if let Some(error) = progress
-            .abandoned
-            .as_ref()
-            .or(progress.cleanup_error.as_ref())
-        {
+        if let Some(error) = &progress.abandoned {
             return Err(error.clone());
+        }
+        if !retry {
+            if let Some(error) = &progress.cleanup_error {
+                return Err(error.clone());
+            }
         }
         if !progress.setup_landed {
             return Err("StaticSetupStillRunning".into());
         }
         if progress.cleanup_running {
             return Err("StaticCleanupStillRunning".into());
+        }
+        if retry {
+            if progress.cleanup_error.is_none()
+                || !state.cleanups.get(&0).is_some_and(Cleanups::can_retry)
+            {
+                return Err("StaticCleanupNotRetryable".into());
+            }
+            state
+                .cleanups
+                .get_mut(&0)
+                .unwrap()
+                .protocol
+                .retry()
+                .map_err(|error| format!("StaticCleanupRetry: {error:?}"))?;
+            progress.cleanup_error = None;
         }
         state.phase = EpisodePhase::Restoring;
         progress.cleanup_running = true;
@@ -588,8 +621,8 @@ impl Drop for StaticSetupFuture {
 }
 struct StaticCleanupFuture {
     episode: StaticEpisode,
-    running: Option<CleanupFuture>,
-    child: Option<StaticChildControl>,
+    running: Option<RunningCleanup>,
+    child: Option<(RestoreTicket, StaticChildControl)>,
     finished: bool,
 }
 impl StaticCleanupFuture {
@@ -603,6 +636,31 @@ impl StaticCleanupFuture {
         self.finished = true;
         Poll::Ready(Err(error))
     }
+    fn complete_callback(
+        &mut self,
+        ticket: RestoreTicket,
+        result: CallbackResult,
+        retry: Option<RetryCleanup>,
+    ) -> CallbackResult {
+        let outcome = if result.is_ok() {
+            RestoreOutcome::Succeeded
+        } else {
+            RestoreOutcome::Failed
+        };
+        let retained = if result.is_err() {
+            retry
+        } else {
+            drop(retry);
+            None
+        };
+        let completed = lock(&self.episode.setup.state)
+            .cleanups
+            .get_mut(&0)
+            .unwrap()
+            .complete(ticket, outcome, retained);
+        assert!(completed.is_ok(), "exact issued restoration receipt");
+        result
+    }
 }
 impl Future for StaticCleanupFuture {
     type Output = CallbackResult;
@@ -614,20 +672,26 @@ impl Future for StaticCleanupFuture {
         let previous = lock(&self.episode.setup.state).driver.replace(wake);
         drop(previous);
         for _ in 0..64 {
-            if let Some(child) = self.child.as_ref() {
+            if let Some((ticket, child)) = self.child.as_ref() {
+                let ticket = *ticket;
                 match child.poll_retired(cx) {
                     Poll::Pending => return Poll::Pending,
-                    Poll::Ready(Err(error)) => return self.fail(error),
-                    Poll::Ready(Ok(())) => self.child = None,
+                    Poll::Ready(result) => {
+                        self.child = None;
+                        if let Err(error) = self.complete_callback(ticket, result, None) {
+                            return self.fail(error);
+                        }
+                    }
                 }
             }
             if self.running.is_none() {
                 let (action, released, previous, notifications) = {
                     let mut state = lock(&self.episode.setup.state);
-                    let action = state.cleanups.get_mut(&0).and_then(Cleanups::pop);
-                    if action.is_none() {
-                        // Seal under the same lock used by on_cleanup: a late
-                        // inverse is either in this journal or rejected.
+                    let journal = state.cleanups.get_mut(&0).unwrap();
+                    let action = journal.pop();
+                    if action.is_none() && journal.is_empty() {
+                        // The verified journal includes the outstanding receipt:
+                        // a failed or pending callback can never seal the episode.
                         state.phase = EpisodePhase::Closed;
                         state.cleanups.clear();
                         (
@@ -645,35 +709,53 @@ impl Future for StaticCleanupFuture {
                     }
                 };
                 drop(previous);
-                // A retained closed AsyncSetup must not retain host notification
-                // resources. Their destructors may reenter the episode.
                 drop(notifications);
                 if let Some(released) = released {
                     lock(&self.episode.progress).cleanup_running = false;
                     self.finished = true;
-                    drop(released); // User destructors never run under journal locks.
+                    drop(released);
                     return Poll::Ready(Ok(()));
                 }
-                match action.unwrap() {
-                    CleanupAction::Callback(cleanup) => match initialize_cleanup(cleanup) {
+                let Some((ticket, action)) = action else {
+                    return self.fail("StaticCleanupUnsettled".into());
+                };
+                match action {
+                    CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
                         Ok(future) => self.running = Some(future),
-                        Err(error) => return self.fail(error),
+                        Err(failure) => {
+                            let error = self
+                                .complete_callback(
+                                    failure.ticket,
+                                    Err(failure.message),
+                                    failure.retry,
+                                )
+                                .unwrap_err();
+                            return self.fail(error);
+                        }
                     },
                     CleanupAction::Child(handle) => {
                         let Some(child) = handle.external else {
+                            self.complete_callback(
+                                ticket,
+                                Err("MissingStaticChildControl".into()),
+                                None,
+                            )
+                            .unwrap_err();
                             return self.fail("MissingStaticChildControl".into());
                         };
                         child.request_retirement();
-                        self.child = Some(child);
+                        self.child = Some((ticket, child));
                         continue;
                     }
                 }
             }
-            match poll_cleanup_callback(self.running.as_mut().unwrap(), cx) {
+            match poll_cleanup_callback(&mut self.running.as_mut().unwrap().future, cx) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(result) => {
-                    self.running = None;
-                    if let Err(error) = result {
+                    let attempt = self.running.take().unwrap();
+                    if let Err(error) =
+                        self.complete_callback(attempt.ticket, result, attempt.retry)
+                    {
                         return self.fail(error);
                     }
                 }

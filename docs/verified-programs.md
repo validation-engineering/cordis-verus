@@ -124,7 +124,7 @@ Child 退休都保持 registry 成员递归完成。`history_sound` 只保证原
 删除身份或执行 child 自身清理，所有权也不构成服务依赖。下述额外源不变式先覆盖
 Provision，再覆盖 Xor inverse 的 strict 状态域；Unit 在模型中叫 `Table(Unit)`，范围按实际
 receipt 分类。这是定义 52 及引理 57／定理 73 的受限连接，不补齐推论 69 的一般
-foreign replay 方程、owner 表空或整个系统终止，相关 partial 状态不变。
+foreign replay 方程或整个系统终止；具体 owner 表空由下述覆盖桥另证，相关 partial 状态不变。
 
 进一步的 [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
 覆盖 `unit_child_provision_journal(actor)`，允许同一真实日志包含 Unit、Child 和
@@ -151,7 +151,35 @@ Provision、Xor 四种实际 receipt 的 LIFO 恢复有定义；具体 `u64` Xor
 Kernel 清理守卫，脚本 Unload 失败则意味着真实停止状态不允许清理。已有两项更窄
 恢复 API 保留；没有新增运行时日志或恢复实现，也没有强化 `wf()`。范围是同步的
 具体指令语言，任意 plugin scalar、宿主 callback、一般 foreign replay 观察方程、
-owner 表空与全局终止仍未由此证明。详见[Xor 恢复域](progress-contracts.zh-CN.md#xor-补齐具体日志的当前状态恢复域)。
+全局终止仍未由此证明。详见[Xor 恢复域](progress-contracts.zh-CN.md#xor-补齐具体日志的当前状态恢复域)。
+
+Owner 表空由 [`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+另行连接。源 [`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs)
+从真实 Mixed/Fresh 历史导出 `provided_journals`：每个现存 owner 值都有对应的
+Provision 逆记录。该反向覆盖补充先前的“每条逆记录仍有值”，并通过真实 receipt
+对应建立 `owner_table_recovery()`——若完整恢复有定义，则结果 owner 表为空。
+已有 `journal_recovery()` 另外提供有定义性。所有实际 script 返回和两份 bootstrap
+机器均具有这两项性质，包括失败前缀；调用前具备 `owner_table_recovery` 时，公共
+Unload／其 `apply` 分支成功后保证实际 `table(actor)` 为空。单独 mutator 尚未统一
+公开性质保持，后续变更后需重新建立它；既有事务草稿通过 `same_owner_table_recovery`
+传递性质，没有增加运行时清空操作。Child 表仍由 child 自己清理。此结论覆盖具体同步
+实现的推论 69 空 owner 表部分，完整 foreign replay 观察方程、宿主资源与全局进展
+仍有独立义务。详见[owner 表恢复合同](progress-contracts.zh-CN.md#成功恢复后真实-owner-表为空)。
+
+**Mixed** 的 [`ScriptReport::terminal_recovery`](../crates/cordis-kernel/src/terminal_replay.rs)
+还把终态值方程接到实际脚本返回。`terminal_episode` 从成功 `transitions` 中识别
+匹配的 Begin、末条 owner Unload，并排除中途 owner Unload。`run_script` 自动建立
+匹配 episode 的源执行见证、空 owner 表和 `value_observation() == foreign_replay(...)`；
+证明方法 `terminal_replay(bank, owner, begin)` 提取见证，调用者不提供替代源轨迹。
+值观察包含全部已登记表的 Loading 值，与 Active-only 发布不同。重放从 Begin 紧后
+快照开始，排除 owner landings，foreign Unload 使用真实捕获的 inverse journal。
+`xor_recovery_algebra` 为实际正向／逆 Xor mask 证明交换，owner Child 也在范围内。
+
+`report.error` 可以为 Some，只要最后一条成功转换仍是匹配的 Unload；后续失败命令
+保持返回机器不变。它是缺 key 操作为恒等的值代数，不是删除 owner 后原生命周期
+命令仍合法，也不声明 registry 或 allocator 回退。Fresh 暂无该终态报告保证，仍有
+上文逆域和空 owner 表结果。任意 scalar、宿主效果及全局进展仍未由此证明，定理
+68／推论 69 保持 partial。详见[Mixed 终态值重放](progress-contracts.zh-CN.md#mixed-脚本终态等于其-foreign-only-值重放)。
 
 当前蓝图明确使用固定的 `expected` child 名称。一次成功创建后，重新激活
 同一个蓝图可能因单调分配器返回新 ID 而得到 `UnexpectedChild`；错误本身

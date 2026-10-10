@@ -33,7 +33,12 @@ pub struct Publication {
 pub struct Lease {
     pub publication: PublicationId,
     pub live: bool,
+    pub consumer: Option<LeaseOwner>,
 }
+
+/// The consumer episode that acquired a managed cleanup lease.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
+pub struct LeaseOwner { pub owner: usize, pub generation: u64 }
 
 /// A stored lease carries its stable identity independently of its position.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Structural)]
@@ -47,6 +52,7 @@ pub struct LeaseRecord {
 /// The allocation high-water mark distinguishes released and unknown tokens
 /// without retaining one tombstone per historical acquisition.
 pub struct PublicationRegistry {
+    domain: Option<u64>,
     entries: Vec<Publication>,
     leases: Vec<LeaseRecord>,
     next_lease: usize,
@@ -57,6 +63,12 @@ impl Default for PublicationRegistry {
 }
 
 impl PublicationRegistry {
+    pub closed spec fn domain_id(&self)->Option<u64> {self.domain}
+    pub fn domain(&self)->(out:Option<u64>) ensures out==self.domain_id(), {self.domain}
+    pub fn for_domain(domain:u64)->(out:Self)
+        ensures out.wf(),out.domain_id()==Some(domain),out.publications().len()==0,
+            out.lease_records().len()==0,out.lease_allocations()==0,
+    {Self {domain:Some(domain),entries:Vec::new(),leases:Vec::new(),next_lease:0}}
     pub closed spec fn publications(&self) -> Seq<Publication> { self.entries@ }
     pub closed spec fn lease_records(&self) -> Seq<LeaseRecord> { self.leases@ }
     pub closed spec fn lease_allocations(&self) -> nat { self.next_lease as nat }
@@ -67,9 +79,12 @@ impl PublicationRegistry {
         } else { None }
     }
     pub closed spec fn unchanged(&self, prior: &Self) -> bool {
-        self.entries@ == prior.entries@ && self.leases@ == prior.leases@
+        self.domain==prior.domain && self.entries@ == prior.entries@ && self.leases@ == prior.leases@
             && self.next_lease == prior.next_lease
     }
+    pub proof fn unchanged_reflexive(&self)
+        ensures self.unchanged(self),
+    {}
     pub closed spec fn wf(&self) -> bool {
         &&& forall|i: int| 0 <= i < self.entries.len()
             ==> (self.entries[i].visible ==> self.entries[i].retained)
@@ -93,9 +108,9 @@ impl PublicationRegistry {
     }
 
     pub fn new() -> (out: Self)
-        ensures out.wf(), out.publications().len() == 0, out.lease_records().len() == 0,
+        ensures out.wf(), out.domain_id()==None, out.publications().len() == 0, out.lease_records().len() == 0,
             out.lease_allocations() == 0,
-    { Self { entries: Vec::new(), leases: Vec::new(), next_lease: 0 } }
+    { Self { domain:None, entries: Vec::new(), leases: Vec::new(), next_lease: 0 } }
 
     /// Stored identities, including reclaimed publication tombstones.
     pub fn publication_records(&self) -> (count: usize)
@@ -204,7 +219,7 @@ impl PublicationRegistry {
     pub fn publish(&mut self, owner: usize, generation: u64, port: Port, slot: usize)
         -> (out: Result<PublicationId, PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).lease_records() == old(self).lease_records(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).lease_records() == old(self).lease_records(),
             final(self).lease_allocations() == old(self).lease_allocations(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> out.unwrap().0 == old(self).publications().len()
@@ -266,7 +281,7 @@ impl PublicationRegistry {
     pub fn adopt(&mut self, id: PublicationId, owner: usize, generation: u64)
         -> (out: Result<(), PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).lease_records() == old(self).lease_records(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).lease_records() == old(self).lease_records(),
             final(self).lease_allocations() == old(self).lease_allocations(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> id.0 < old(self).publications().len()
@@ -283,23 +298,47 @@ impl PublicationRegistry {
         Ok(())
     }
 
-    /// Capture a publication for an admitted consumer episode. Each acquisition
-    /// has a fresh logical token, regardless of earlier physical record removal.
+    /// Unscoped leases cannot be consumed by managed episode cleanup.
     pub fn acquire(&mut self, id: PublicationId) -> (out: Result<LeaseId, PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).publications() == old(self).publications(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> out.unwrap().0 == old(self).lease_allocations()
                 && final(self).lease_allocations() == old(self).lease_allocations() + 1
                 && final(self).lease_records() == old(self).lease_records().push(LeaseRecord {
-                    id: out.unwrap(), lease: Lease { publication: id, live: true } }),
+                    id: out.unwrap(), lease: Lease { publication: id, live: true, consumer: None } }),
+    { self.acquire_tagged(id,None) }
+
+    /// Capture provenance when the real Driver acquires a consumer's leases.
+    pub fn acquire_for(&mut self, id: PublicationId, owner: usize, generation: u64)
+        -> (out: Result<LeaseId, PublicationError>)
+        requires old(self).wf(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
+            out.is_err() ==> final(self).unchanged(old(self)),
+            out.is_ok() ==> out.unwrap().0 == old(self).lease_allocations()
+                && final(self).lease_allocations() == old(self).lease_allocations() + 1
+                && final(self).lease_records() == old(self).lease_records().push(LeaseRecord {
+                    id: out.unwrap(), lease: Lease { publication: id, live: true,
+                        consumer: Some(LeaseOwner { owner, generation }) } }),
+    { self.acquire_tagged(id,Some(LeaseOwner { owner,generation })) }
+
+    /// Capture a publication for an admitted consumer episode. Each acquisition
+    /// has a fresh logical token, regardless of earlier physical record removal.
+    fn acquire_tagged(&mut self, id: PublicationId, consumer: Option<LeaseOwner>) -> (out: Result<LeaseId, PublicationError>)
+        requires old(self).wf(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
+            out.is_err() ==> final(self).unchanged(old(self)),
+            out.is_ok() ==> out.unwrap().0 == old(self).lease_allocations()
+                && final(self).lease_allocations() == old(self).lease_allocations() + 1
+                && final(self).lease_records() == old(self).lease_records().push(LeaseRecord {
+                    id: out.unwrap(), lease: Lease { publication: id, live: true, consumer } }),
     {
         if id.0 >= self.entries.len() { return Err(PublicationError::Unknown); }
         if !self.entries[id.0].visible { return Err(PublicationError::Revoked); }
         if self.next_lease == usize::MAX { return Err(PublicationError::Capacity); }
         let token = LeaseId(self.next_lease);
         self.next_lease += 1;
-        self.leases.push(LeaseRecord { id: token, lease: Lease { publication: id, live: true } });
+        self.leases.push(LeaseRecord { id: token, lease: Lease { publication: id, live: true, consumer } });
         Ok(token)
     }
 
@@ -324,7 +363,7 @@ impl PublicationRegistry {
     /// makes duplicate release unable to affect any later acquisition.
     pub fn release(&mut self, token: LeaseId) -> (out: Result<(), PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).publications() == old(self).publications(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
             final(self).lease_allocations() == old(self).lease_allocations(),
             out == if token.0 >= old(self).lease_allocations() { Err(PublicationError::Unknown) }
                 else if old(self).active_lease(token).is_none() { Err(PublicationError::Released) }
@@ -373,7 +412,7 @@ impl PublicationRegistry {
     /// Idempotently remove from new lookup, retaining identity and value slot.
     pub fn revoke(&mut self, id: PublicationId) -> (out: Result<(), PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).lease_records() == old(self).lease_records(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).lease_records() == old(self).lease_records(),
             final(self).lease_allocations() == old(self).lease_allocations(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> id.0 < old(self).publications().len()
@@ -389,8 +428,10 @@ impl PublicationRegistry {
     /// Permission to destroy a revoked slot. Cleanup leases must have drained.
     pub fn reclaim(&mut self, id: PublicationId) -> (out: Result<usize, PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).lease_records() == old(self).lease_records(),
+        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).lease_records() == old(self).lease_records(),
             final(self).lease_allocations() == old(self).lease_allocations(),
+            out.is_ok() == (id.0 < old(self).publications().len() && old(self).unleased(id)
+                && !old(self).publications()[id.0 as int].visible && old(self).publications()[id.0 as int].retained),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> id.0 < old(self).publications().len() && old(self).unleased(id)
                 && !old(self).publications()[id.0 as int].visible
@@ -422,6 +463,10 @@ impl PublicationRegistry {
 
 }
 
+#[path = "publication_cleanup.rs"]
+pub mod cleanup;
+pub use cleanup::ReleasedPublication;
+
 #[cfg(test)]
 mod lease_storage_tests {
     use super::*;
@@ -429,6 +474,7 @@ mod lease_storage_tests {
     #[test]
     fn allocation_exhaustion_never_reuses_a_released_identity() {
         let mut registry = PublicationRegistry {
+            domain: None,
             entries: Vec::new(),
             leases: Vec::new(),
             next_lease: usize::MAX - 1,

@@ -211,5 +211,10 @@ failure semantics are in [the typed guide](../../docs/typed-rust-plugins.md).
 
 The old API's `FnOnce` cleanup cannot be replayed. Failure stays failed across
 retry rather than consuming a callback and reporting empty cleanup as success.
+For retryable cleanup, use `on_cleanup_retryable` or `on_cleanup_retryable_async`.
+The typed bridge retains their `FnMut` factory after a reported error or contained
+panic and resumes it only on a new host cleanup attempt. Successful inverses are
+not replayed; authors must make retry safe after partial effects. See the
+[cleanup protocol](../../docs/cleanup-protocol.md).
 Legacy callback panics isolated by the static executor become setup/cleanup
 failures; adapter and other boundary panics still fault the domain.

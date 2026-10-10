@@ -9,6 +9,8 @@ pub mod canonical;
 pub mod causal_normalization;
 pub mod child_driver;
 pub mod child_history;
+pub mod cleanup_journal;
+pub mod cleanup_queue;
 pub mod coeffects;
 pub mod contexts;
 pub mod deletion;
@@ -30,6 +32,7 @@ pub mod iterator_independence;
 pub mod iterators;
 pub mod lifecycle_actions;
 pub mod lifecycle_ordering;
+pub mod lifecycle_state;
 pub mod mediated;
 pub mod mixed_driver;
 pub mod mixed_examples;
@@ -61,6 +64,7 @@ pub mod program_refinement;
 pub mod program_trace;
 pub mod progress;
 pub mod projection;
+pub mod provision_coverage;
 pub mod provision_history;
 pub mod publication;
 pub mod quotient;
@@ -70,8 +74,10 @@ pub mod refinement;
 pub mod resources;
 pub mod rule_frames;
 pub mod semantics;
+pub mod terminal_episode;
 pub mod termination;
 pub mod witnessed;
+pub mod xor_recovery_algebra;
 
 verus! {
 

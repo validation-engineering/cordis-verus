@@ -2960,6 +2960,108 @@
         }
       ],
       "selectionRationale": "The contract in cordis_negative::paper_trace_independence::child_payload_contract detects paper-trace-child-dependencies. The mutation remains the exact canonical change to paper_trace_independence.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
+    },
+    {
+      "name": "cleanup-batch-ignores-lease-owner",
+      "mutation": {
+        "file": "publication_cleanup.rs",
+        "old": "if entry.consumer!=Some(owner) {return Err(PublicationError::InvalidState);}",
+        "new": "if false {return Err(PublicationError::InvalidState);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "publication::cleanup",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::publication::PublicationRegistry::check_cleanup_batch",
+          "module": "publication::cleanup",
+          "file": "publication_cleanup.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "forall|k:int| 0<=k<i ==> self.active_lease(leases[k]).is_some()\n                    && self.active_lease(leases[k]).unwrap().consumer==Some(owner),"
+        }
+      ],
+      "selectionRationale": "The real managed cleanup path must reject foreign-episode leases and retain commitments when resource validation rejects a batch. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+    },
+    {
+      "name": "cleanup-commits-before-resource-validation",
+      "mutation": {
+        "file": "cleanup_release.rs",
+        "old": "        let released=match registry.cleanup_batch(LeaseOwner {owner:id,generation},leases,publications) {\n            Ok(released)=>released,Err(e)=>return Err(CleanupReleaseError::Publication(e)),\n        };\n        if reservation {self.finish_reservation_cleanup(kernel,id).unwrap();}\n        else {self.finish_cleanup(kernel,id).unwrap();}",
+        "new": "        if reservation {self.finish_reservation_cleanup(kernel,id).unwrap();}\n        else {self.finish_cleanup(kernel,id).unwrap();}\n        let released=match registry.cleanup_batch(LeaseOwner {owner:id,generation},leases,publications) {\n            Ok(released)=>released,Err(e)=>return Err(CleanupReleaseError::Publication(e)),\n        };"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_actions::resources",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_cleanup_resources",
+          "module": "lifecycle_actions::resources",
+          "file": "cleanup_release.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> final(self).same(old(self)) && final(kernel).unchanged(old(kernel))\n                && final(registry).unchanged(old(registry)),"
+        }
+      ],
+      "selectionRationale": "The real managed cleanup path must reject foreign-episode leases and retain commitments when resource validation rejects a batch. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+    },
+    {
+      "name": "cleanup-journal-discards-failed-inverse",
+      "mutation": {
+        "file": "cleanup_journal.rs",
+        "old": "if outcome==RestoreOutcome::Failed {self.failed=true;}",
+        "new": "if outcome==RestoreOutcome::Failed {self.current=None;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_journal",
+          "descendants": false,
+          "function": "cordis_negative::cleanup_journal::CleanupJournal::complete"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_journal::CleanupJournal::complete",
+          "module": "cleanup_journal",
+          "file": "cleanup_journal.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "accepted && outcome==RestoreOutcome::Failed ==> final(self).selected()==Some(ticket) && final(self).failed_spec(),"
+        }
+      ],
+      "selectionRationale": "The executable journal used by Rust Runtime and typed hosts must retain the selected inverse on Failed. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+    },
+    {
+      "name": "cleanup-queue-discards-retained-payload",
+      "mutation": {
+        "file": "cleanup_queue.rs",
+        "old": "self.payloads[ticket.token]=retained;",
+        "new": "self.payloads[ticket.token]=None;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue",
+          "descendants": false,
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete",
+          "module": "cleanup_queue",
+          "file": "cleanup_queue.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "&& final(self).slots()==old(self).slots().update(ticket.token as int,retained)"
+        }
+      ],
+      "selectionRationale": "The real payload container used by Rust Runtime and typed hosts must store the exact retained payload in its selected slot. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
     }
   ]
 }

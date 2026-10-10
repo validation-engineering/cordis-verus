@@ -98,7 +98,7 @@ impl Driver {
             configured: false,
             domain,
             kernel,
-            publications: PublicationRegistry::new(),
+            publications: PublicationRegistry::for_domain(domain),
             nodes: BTreeMap::new(),
             values: BTreeMap::new(),
             next_slot: 0,
@@ -714,6 +714,12 @@ impl Driver {
                     .kernel
                     .target(id)
                     .ok_or(KernelError::MissingDependency)?;
+                let generation = self
+                    .kernel
+                    .episode_generation(id)
+                    .unwrap()
+                    .checked_add(1)
+                    .ok_or(KernelError::Capacity)?;
                 let mut resources = Vec::new();
                 for binding in bindings {
                     let port = Port {
@@ -724,7 +730,7 @@ impl Driver {
                         .publications
                         .resolve(port)
                         .ok_or(PublicationError::Unknown)?;
-                    match self.publications.acquire(publication) {
+                    match self.publications.acquire_for(publication, id, generation) {
                         Ok(lease) => resources.push(ResourceBinding {
                             port,
                             publication,
@@ -839,25 +845,29 @@ impl Driver {
                     return Ok(());
                 }
                 let prepared_cleanup = self.nodes[&id].prepared_cleanup;
-                if prepared_cleanup {
-                    self.kernel.finish_reservation_cleanup(id)?;
-                } else {
-                    self.kernel.finish_cleanup(id)?;
-                }
+                let leases: Vec<_> = self.nodes[&id]
+                    .resources
+                    .iter()
+                    .map(|resource| resource.lease)
+                    .collect();
+                let released = self.kernel.finish_cleanup_resources(
+                    &mut self.publications,
+                    id,
+                    prepared_cleanup,
+                    &leases,
+                    &self.nodes[&id].publications,
+                )?;
                 let node = self.nodes.get_mut(&id).unwrap();
                 if prepared_cleanup {
                     node.failed = None;
                 }
                 node.prepared = false;
                 node.prepared_cleanup = false;
-                for resource in node.resources.drain(..) {
-                    self.publications.release(resource.lease)?;
-                }
-                for publication in node.publications.drain(..) {
-                    self.publications.revoke(publication)?;
-                    let slot = self.publications.reclaim(publication)?;
-                    self.checked.remove(&publication.0);
-                    if let Some(value) = self.values.remove(&slot) {
+                node.resources.clear();
+                node.publications.clear();
+                for resource in released {
+                    self.checked.remove(&resource.publication.0);
+                    if let Some(value) = self.values.remove(&resource.slot) {
                         self.released.push(value);
                     }
                 }

@@ -96,9 +96,25 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
 - [lifecycle_actions.rs](../crates/cordis-kernel/src/lifecycle_actions.rs)：
   `LifecycleActions` 将精确动作票据、清理结果和实际的
   `Kernel::finish_cleanup` 调用连接起来。失败结果保留阻塞凭据；显式重试获得新票据。
-  共享 Driver 与 Node 路径调用这一可执行协议。合同、reservation 扩展以及普通 Rust
-  宿主不同的 `Drained` 策略见[清理协议审查](cleanup-protocol.zh-CN.md)。
+  共享 Driver 与 Node 路径调用这一可执行协议。合同、reservation 扩展、可重试 Rust
+  inverse 以及普通 Rust 对已消耗 `FnOnce` 失败采用的 `Drained` 策略，见
+  [清理协议审查](cleanup-protocol.zh-CN.md)。
   宿主报告是否真实、外部 inverse 的效果仍在证明之外。
+- [lifecycle_state.rs](../crates/cordis-kernel/src/lifecycle_state.rs)、
+  [cleanup_release.rs](../crates/cordis-kernel/src/cleanup_release.rs) 与
+  [publication_cleanup.rs](../crates/cordis-kernel/src/publication_cleanup.rs)：
+  实际共享 owner 一起持有 Kernel/协议。受管 finish 检查 domain、凭据、资源来源和
+  清单完整性；原子注册表批次先于 commitment 释放。拒绝保持 finish 输入，成功则
+  清空该 episode 的受管资源并返回精确 slot。回调真实性、获取路由和值句柄删除仍在边界外。
+- [cleanup_journal.rs](../crates/cordis-kernel/src/cleanup_journal.rs)：实际 Rust
+  inverse 日志保留失败的选中 token，仅在显式重试时签发新凭据。更早的待处理操作和
+  晚到登记持续被记录；重复、旧尝试及外域报告不能清除选中操作。Runtime 和静态
+  typed 宿主在回调执行前后调用这些经过验证的函数。
+- [cleanup_queue.rs](../crates/cordis-kernel/src/cleanup_queue.rs)：日志同时拥有
+  宿主实际的载荷向量。`register`/`land` 将精确值关联到分配的 token；`pop` 只移出
+  一次；`complete` 原样保存传入的重试值，被拒绝时则原样返回。`retry` 要求值仍然
+  保留；`is_empty` 排除遗漏的已保存或已交付工作。执行器返回哪个工厂及工厂实际
+  做了什么，仍是宿主义务。
 - [runtime.rs](../crates/cordis/src/runtime.rs)：普通 Rust 中的
   `Runtime::poll_settle` 在执行宿主回调前后调用共享生命周期 Driver。
   这是实际的集成路径，不是对任意回调或 Future 行为的证明。
@@ -110,13 +126,25 @@ cargo test --offline -p cordis-kernel --test refinement strict_departure_preserv
 cargo test --offline -p cordis-kernel --test driver provider_resources_remain_live_until_consumer_recovery -- --exact
 cargo test --offline -p cordis --test runtime provider_waits_for_async_consumer_cleanup -- --exact
 cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources failed_report_retains_resources_until_fresh_retry_releases_only_its_batch -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources late_invalid_manifest_items_cannot_partially_release_an_accepted_cleanup -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources a_foreign_registry_with_identical_local_ids_cannot_use_this_cleanup_receipt -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources a_remaining_consumer_lease_blocks_the_entire_publication_batch -- --exact
+cargo test --offline -p cordis-driver --test cleanup_resources reservation_cleanup_releases_generation_zero_only_after_a_successful_retry -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_journal failure_retains_selected_token_and_retry_rejects_old_or_foreign_receipts -- --exact
+cargo test --offline -p cordis --test retry_cleanup failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success -- --exact
+cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanup_recovers_only_on_a_new_host_attempt -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_queue retained_payload_returns_from_the_same_slot_before_late_and_earlier_work -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_queue foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work -- --exact
+cargo test --offline -p cordis --test retry_cleanup distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success -- --exact
 ```
 
 第一个测试观察到：当前目标不可用时，consumer 原有的已提交绑定仍然保留，
 过早清理 provider 会被拒绝。第二个测试运行真实的资源恢复。第三个测试检查异步宿主，
 属于**测试证据**，不能证明每个宿主 Future 都会终止或保持其外部资源。
 第四个测试通过生产共享 Driver 检查失败后保留依赖，直到新的精确重试票据成功并显式完成卸载。
-类型化载荷存储和已逃逸的 `Arc` 值不在此控制投影之内。
+队列另行证明不透明清理载荷的移动；类型化服务存储、已逃逸的 `Arc` 值和回调执行
+仍不在此控制投影之内。
 
 **负控候选：** `provider-lifetime-guard` 移除实际的 provider 守卫。
 变异测试套件中存在该候选，不等于当前已经取得通过的负控结果；参见下文的证据边界。
@@ -181,7 +209,32 @@ cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_ret
   守卫：退休或 target 漂移不会替换 Xor 捕获的 provider。实际脚本返回及两份 bootstrap
   机器均带有更强性质；`journal_unload_domain` 不再需要 receipt 分类来化简清理域。
   脚本在 Unload 处失败意味着停止状态不允许清理。范围是具体的同步 `u64`/Xor 语言，
-  不包括任意 scalar 效果、宿主回调、一般 foreign replay 方程、owner 表空定理或全局终止。
+  不包括任意 scalar 效果、宿主回调、一般 foreign replay 方程或全局终止；owner 表空
+  结论由下述覆盖桥建立。
+- [`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs) 与
+  [`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+  将推论 69 的 owner 表空结论接到真实恢复。`provided_journals` 用保留的 Provision
+  逆记录覆盖每个当前 owner 槽，与保证每条已记录 Provision 的值仍存在形成反向对应。
+  `owner_table_recovery_from_source` 把覆盖接到实际 receipts：若整个恢复有定义，
+  其结果的 owner 表为空。`journal_recovery` 另外提供有定义性。两项性质均在实际
+  脚本及 bootstrap 返回处成立；调用前具备 `owner_table_recovery` 时，公共 Unload
+  及其 `apply` 分支成功后保证实际输出表为空。各个单独 mutator 未统一公开该性质的
+  保持合同。没有新增运行时清空操作或历史缓冲；Child inverse 仍只退休 child，不清空
+  其独立表。一般 foreign replay 方程、任意宿主效果及全局进展仍是独立义务，推论 69
+  继续保持 partial。
+- [`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) 将终态值
+  方程接到实际 **Mixed** `ScriptReport` 输出。`transitions` 中匹配的 Begin、末条
+  成功 owner Unload 及无中途 owner Unload 直接标识 episode。
+  `terminal_recovery(bank)` 自动提供真实源执行、空 owner 表以及
+  `value_observation() == foreign_replay(...)`，证明方法 `terminal_replay` 提取
+  见证，无须调用者提供源轨迹。
+  [`xor_recovery_algebra.rs`](../crates/cordis-kernel/src/xor_recovery_algebra.rs)
+  为真实 Xor library 证明 scalar 交换。重放从 Begin 紧后开始，排除 owner landings，
+  foreign Unload 使用实际捕获的 inverses。定义 51 的值投影包含 Loading 表，不是
+  只发布 Active 的投影。允许 owner Child，后续命令失败不排除成功前缀结论。值重放
+  中缺 key 的操作是恒等，因此**不**声称删除 owner 步骤后仍有合法生命周期执行，
+  也不声称 registry 身份恢复。Fresh 动态 choice 重放、任意宿主效果及整篇恢复仍是
+  独立义务；定理 68／推论 69 保持 partial。
 
 **执行检查：**
 
@@ -201,6 +254,10 @@ cargo test --offline -p cordis-kernel --test xor_recovery mixed_script_recovers_
 cargo test --offline -p cordis-kernel --test xor_recovery retired_provider_stays_available_to_the_consumers_captured_xor_inverses -- --exact
 cargo test --offline -p cordis-kernel --test xor_recovery interleaved_consumers_recover_only_their_xors_and_keep_the_provider_value -- --exact
 cargo test --offline -p cordis-kernel --test xor_recovery bootstrap_failure_recovers_its_self_and_foreign_xors_from_the_real_prefix -- --exact
+cargo test --offline -p cordis-kernel --test owner_table_recovery failed_bootstrap_clears_all_owner_values_before_reprovide_without_clearing_child -- --exact
+cargo test --offline -p cordis-kernel --test owner_table_recovery mixed_script_republishes_same_registration_after_dispatcher_unload -- --exact
+cargo test --offline -p cordis-kernel --test terminal_replay terminal_owner_unload_absorbs_consumers_of_its_new_service_but_keeps_child_values -- --exact
+cargo test --offline -p cordis-kernel --test terminal_replay failed_command_after_terminal_unload_keeps_foreign_replay_of_the_successful_prefix -- --exact
 ```
 
 第一个测试暴露了公开 Kernel 路径上因名称不存在而失败的情况。持有内部状态的
@@ -214,7 +271,12 @@ receipt 捕获的 child 不会因此退休。它们是行为回归；Unit 恒等
 观察出逆操作先后顺序，LIFO 与有定义性仍须审查证明合同。Xor 案例使顺序可观察：
 自身 Xor 必须先恢复，其 Provision 才能删值。另检查 provider 退休后的 consumer 恢复、
 保留另一 consumer 的交错效果，以及启动 publication 失败后的成功前缀恢复。测试都
-从公开历史构造状态，没有注入私有 journal。
+从公开历史构造状态，没有注入私有 journal。Owner 表案例进一步在恢复后的同一注册
+上开始下一轮 episode：成功 Provide 检查旧值无残留，另行检查 child 表和 foreign
+provider 的值。终态重放测试将最终值与明确的 foreign-only 计算对比：owner 新建 key
+的 consumer 在值重放中可变为缺 key 的恒等操作，但原 consumer 命令已未必可运行。
+另一案例包含中途 foreign 清理及终态 Unload 后失败的命令。这些是具体观察的测试，
+不是任意效果或合法生命周期删除的证明。
 
 **负控候选：** `child-removal-ignores-retained-token` 弱化对已退役子插件的保留条件。
 当前检出版本的验收证据仍需单独取得。

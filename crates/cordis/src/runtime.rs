@@ -9,7 +9,8 @@ pub mod static_host;
 use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, StorageStats};
 use crate::future_support::poll_catching_unwind;
 use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
-use cordis_kernel::episode::StageProtocol;
+use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
+use cordis_kernel::cleanup_queue::CleanupQueue;
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -79,6 +80,7 @@ fn typed_check<T: Any + Send + Sync>(
 }
 type CleanupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
 type Cleanup = Box<dyn FnOnce() -> CleanupFuture + Send>;
+type RetryCleanup = Box<dyn FnMut() -> CleanupFuture + Send>;
 type SetupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
 type SetupCallback = Box<dyn FnMut(&mut Setup<'_>) -> CallbackResult + Send>;
 type AsyncCallback = Box<dyn FnMut(AsyncSetup) -> SetupFuture + Send>;
@@ -99,8 +101,8 @@ fn panic_message(panic: Box<dyn Any + Send>) -> String {
     }
 }
 
-/// One landed effect's inverse. Its factory and future are both panic-isolated.
-pub struct Inverse(Cleanup);
+/// One landed effect's inverse. Factories and futures are panic-isolated.
+pub struct Inverse(CleanupCallback);
 impl Inverse {
     pub fn new(cleanup: impl FnOnce() -> CallbackResult + Send + 'static) -> Self {
         Self::new_async(move || async move { cleanup() })
@@ -110,50 +112,76 @@ impl Inverse {
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = CallbackResult> + Send + 'static,
     {
-        Self(Box::new(move || Box::pin(cleanup())))
+        Self(CleanupCallback::Once(Box::new(move || Box::pin(cleanup()))))
+    }
+    /// Retain this factory after an error/panic. The author must make another
+    /// attempt safe after partial work; retry does not imply idempotence.
+    pub fn retryable(mut cleanup: impl FnMut() -> CallbackResult + Send + 'static) -> Self {
+        Self::retryable_async(move || std::future::ready(cleanup()))
+    }
+    /// Each explicit retry creates a fresh future. A pending future remains
+    /// owned by Runtime even when its Settle/Join future is dropped.
+    pub fn retryable_async<F, Fut>(mut cleanup: F) -> Self
+    where
+        F: FnMut() -> Fut + Send + 'static,
+        Fut: Future<Output = CallbackResult> + Send + 'static,
+    {
+        Self(CleanupCallback::Retryable(Box::new(move || {
+            Box::pin(cleanup())
+        })))
     }
     pub fn empty() -> Self {
         Self::new(|| Ok(()))
     }
 }
 
+enum CleanupCallback {
+    Once(Cleanup),
+    Retryable(RetryCleanup),
+}
 enum CleanupAction {
-    Callback(Cleanup),
+    Callback(CleanupCallback),
     Child(ChildHandle),
 }
 struct Cleanups {
-    protocol: StageProtocol,
-    payloads: Vec<Option<CleanupAction>>,
+    protocol: CleanupQueue<CleanupAction>,
 }
 impl Cleanups {
     fn new() -> Self {
         Self {
-            protocol: StageProtocol::scope(),
-            payloads: Vec::new(),
+            protocol: CleanupQueue::scope(fresh(&NEXT_CLEANUP)),
         }
     }
     fn iterator(committed: Vec<Binding>) -> Self {
         Self {
-            protocol: StageProtocol::iterator(committed),
-            payloads: Vec::new(),
+            protocol: CleanupQueue::iterator(fresh(&NEXT_CLEANUP), committed),
         }
     }
     fn push(&mut self, cleanup: CleanupAction) {
-        let token = self.payloads.len();
-        self.payloads.push(Some(cleanup));
-        self.protocol.register(token);
+        self.protocol.register(cleanup);
     }
-    fn land(&mut self, inverse: Inverse) {
-        let token = self.payloads.len();
-        // Both the payload and its verified token become visible under the
-        // episode lock before the outstanding stage is marked settled.
-        self.payloads.push(Some(CleanupAction::Callback(inverse.0)));
-        assert!(self.protocol.land(token), "only admitted stages may land");
+    fn land(&mut self, inverse: Inverse) -> Result<usize, CleanupAction> {
+        self.protocol.land(CleanupAction::Callback(inverse.0))
     }
-    fn pop(&mut self) -> Option<CleanupAction> {
+    fn pop(&mut self) -> Option<(RestoreTicket, CleanupAction)> {
         self.protocol
             .pop()
-            .map(|token| self.payloads[token].take().expect("unique cleanup token"))
+            .expect("cleanup attempt identities exhausted")
+    }
+    fn complete(
+        &mut self,
+        ticket: RestoreTicket,
+        outcome: RestoreOutcome,
+        retry: Option<RetryCleanup>,
+    ) -> Result<(), Option<CleanupAction>> {
+        self.protocol.complete(
+            ticket,
+            outcome,
+            retry.map(|retry| CleanupAction::Callback(CleanupCallback::Retryable(retry))),
+        )
+    }
+    fn can_retry(&self) -> bool {
+        self.protocol.can_retry()
     }
     fn is_empty(&self) -> bool {
         self.protocol.is_empty()
@@ -367,6 +395,7 @@ impl ChildHandle {
 static NEXT_KEY: AtomicU64 = AtomicU64::new(1);
 static NEXT_REALM: AtomicU64 = AtomicU64::new(1);
 static NEXT_EPISODE: AtomicU64 = AtomicU64::new(1);
+static NEXT_CLEANUP: AtomicU64 = AtomicU64::new(1);
 fn fresh(counter: &AtomicU64) -> u64 {
     counter
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
@@ -792,15 +821,29 @@ impl AsyncSetup {
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = CallbackResult> + Send + 'static,
     {
+        self.register_inverse(Inverse::new_async(cleanup))
+    }
+    pub fn on_cleanup_retryable(
+        &self,
+        cleanup: impl FnMut() -> CallbackResult + Send + 'static,
+    ) -> CallbackResult {
+        self.register_inverse(Inverse::retryable(cleanup))
+    }
+    pub fn on_cleanup_retryable_async<F, Fut>(&self, cleanup: F) -> CallbackResult
+    where
+        F: FnMut() -> Fut + Send + 'static,
+        Fut: Future<Output = CallbackResult> + Send + 'static,
+    {
+        self.register_inverse(Inverse::retryable_async(cleanup))
+    }
+    fn register_inverse(&self, inverse: Inverse) -> CallbackResult {
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
         let group = state
             .cleanups
             .get_mut(&self.group)
             .ok_or("effect group has completed")?;
-        group.push(CleanupAction::Callback(Box::new(move || {
-            Box::pin(cleanup())
-        })));
+        group.push(CleanupAction::Callback(inverse.0));
         let waker = state.driver.take();
         drop(state);
         if let Some(waker) = waker {
@@ -1037,6 +1080,23 @@ impl Setup<'_> {
             .on_cleanup_async(cleanup)
             .expect("live synchronous setup");
     }
+    pub fn on_cleanup_retryable(
+        &mut self,
+        cleanup: impl FnMut() -> CallbackResult + Send + 'static,
+    ) {
+        self.inner
+            .on_cleanup_retryable(cleanup)
+            .expect("live synchronous setup");
+    }
+    pub fn on_cleanup_retryable_async<F, Fut>(&mut self, cleanup: F)
+    where
+        F: FnMut() -> Fut + Send + 'static,
+        Fut: Future<Output = CallbackResult> + Send + 'static,
+    {
+        self.inner
+            .on_cleanup_retryable_async(cleanup)
+            .expect("live synchronous setup");
+    }
     pub fn mount(&mut self, plugin: Plugin) -> Result<ChildHandle, String> {
         self.inner.mount(plugin)
     }
@@ -1051,7 +1111,7 @@ impl Setup<'_> {
 struct Group {
     id: usize,
     iterator: Option<Box<dyn EffectIterator>>,
-    running: Option<CleanupFuture>,
+    running: Option<RunningCleanup>,
     handle: EffectHandle,
 }
 
@@ -1104,8 +1164,39 @@ fn initialize_callback(callback: &mut Callback, episode: &AsyncSetup) -> Result<
     }))
     .unwrap_or_else(|panic| Err(panic_message(panic)))
 }
-fn initialize_cleanup(cleanup: Cleanup) -> Result<CleanupFuture, String> {
-    catch_unwind(AssertUnwindSafe(cleanup)).map_err(panic_message)
+struct RunningCleanup {
+    ticket: RestoreTicket,
+    future: CleanupFuture,
+    retry: Option<RetryCleanup>,
+}
+struct CleanupFailure {
+    ticket: RestoreTicket,
+    message: String,
+    retry: Option<RetryCleanup>,
+}
+fn initialize_cleanup(
+    ticket: RestoreTicket,
+    cleanup: CleanupCallback,
+) -> Result<RunningCleanup, CleanupFailure> {
+    let (result, retry) = match cleanup {
+        CleanupCallback::Once(cleanup) => (catch_unwind(AssertUnwindSafe(cleanup)), None),
+        CleanupCallback::Retryable(mut cleanup) => {
+            let result = catch_unwind(AssertUnwindSafe(&mut cleanup));
+            (result, Some(cleanup))
+        }
+    };
+    match result {
+        Ok(future) => Ok(RunningCleanup {
+            ticket,
+            future,
+            retry,
+        }),
+        Err(panic) => Err(CleanupFailure {
+            ticket,
+            retry,
+            message: panic_message(panic),
+        }),
+    }
 }
 fn poll_cleanup_callback(
     future: &mut CleanupFuture,
@@ -1116,6 +1207,7 @@ fn poll_cleanup_callback(
         Err(panic) => Poll::Ready(Err(panic_message(panic))),
     }
 }
+
 struct Mounted {
     next_config_update: Option<Option<ConfigUpdateCallback>>,
     anchor: Port,
@@ -1133,7 +1225,9 @@ struct Mounted {
     episode: Option<AsyncSetup>,
     root_setup: RootSetup,
     groups: BTreeMap<usize, Group>,
-    root_running: Option<CleanupFuture>,
+    root_running: Option<RunningCleanup>,
+    cleanup_failure: Option<String>,
+    cleanup_drained: bool,
     failed: Option<String>,
     restart: bool,
     // Children externally mounted while inactive become owner-bound on begin.
@@ -1286,6 +1380,9 @@ impl Runtime {
                     blockers.push(Blocker::CommittedConsumers(consumers));
                 }
             }
+            if let Some(message) = &owner.cleanup_failure {
+                blockers.push(Blocker::CleanupFailed(message.clone()));
+            }
             if self.cleanup_started(id)
                 || owner.root_running.is_some()
                 || owner.groups.values().any(|group| group.running.is_some())
@@ -1402,6 +1499,8 @@ impl Runtime {
                 root_setup: RootSetup::Dormant,
                 groups: BTreeMap::new(),
                 root_running: None,
+                cleanup_failure: None,
+                cleanup_drained: false,
                 failed: None,
                 restart: false,
                 owned: Vec::new(),
@@ -1449,6 +1548,68 @@ impl Runtime {
     }
     pub fn committed(&self, id: PluginId) -> Vec<Binding> {
         self.kernel.committed(id)
+    }
+    /// The retained failure that requires explicit cleanup retry. Historical
+    /// attempt errors remain available through take_cleanup_errors().
+    pub fn cleanup_failure(&self, id: PluginId) -> Option<&str> {
+        self.mounted.get(&id)?.cleanup_failure.as_deref()
+    }
+    /// Admit a fresh whole-episode attempt only after the previous callbacks
+    /// settle and its Failed receipt is recorded. No user callback runs here.
+    pub fn retry_cleanup(&mut self, id: PluginId) -> Result<(), RuntimeError> {
+        let owner = self
+            .mounted
+            .get(&id)
+            .ok_or(RuntimeError::UnknownPlugin(id))?;
+        if owner.cleanup_failure.is_none()
+            || !owner.root_setup.is_done()
+            || owner.root_running.is_some()
+            || owner
+                .groups
+                .values()
+                .any(|group| group.running.is_some() || group.iterator.is_some())
+        {
+            return Err(RuntimeError::Cleanup {
+                plugin: id,
+                message: "cleanup attempt is still running or has no retained failure".into(),
+            });
+        }
+        let episode = owner
+            .episode
+            .as_ref()
+            .ok_or(RuntimeError::InactiveOwner(id))?
+            .clone();
+        let mut state = lock(&episode.state);
+        if !state
+            .cleanups
+            .values()
+            .any(|group| group.protocol.has_failed())
+            || state
+                .cleanups
+                .values()
+                .any(|group| group.protocol.has_failed() && !group.can_retry())
+        {
+            return Err(RuntimeError::Cleanup {
+                plugin: id,
+                message: "retained cleanup cannot be retried".into(),
+            });
+        }
+        // Preflight every journal before the shared verified protocol changes.
+        self.kernel.retry_cleanup(id).map_err(kernel_error)?;
+        for group in state
+            .cleanups
+            .values_mut()
+            .filter(|group| group.protocol.has_failed())
+        {
+            group.protocol.retry().expect("preflighted retry capacity");
+        }
+        self.mounted.get_mut(&id).unwrap().cleanup_failure = None;
+        let wake = state.driver.take();
+        drop(state);
+        if let Some(wake) = wake {
+            wake.wake();
+        }
+        Ok(())
     }
     /// Identity of the current activation, for rejecting stale update plans.
     pub fn episode_generation(&self, id: PluginId) -> Option<u64> {
@@ -1506,6 +1667,34 @@ impl Runtime {
     {
         self.owner_context(id)?
             .on_cleanup_async(cleanup)
+            .map_err(|message| RuntimeError::Setup {
+                plugin: id,
+                message,
+            })
+    }
+    pub fn on_cleanup_retryable(
+        &mut self,
+        id: PluginId,
+        cleanup: impl FnMut() -> CallbackResult + Send + 'static,
+    ) -> Result<(), RuntimeError> {
+        self.owner_context(id)?
+            .on_cleanup_retryable(cleanup)
+            .map_err(|message| RuntimeError::Setup {
+                plugin: id,
+                message,
+            })
+    }
+    pub fn on_cleanup_retryable_async<F, Fut>(
+        &mut self,
+        id: PluginId,
+        cleanup: F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: FnMut() -> Fut + Send + 'static,
+        Fut: Future<Output = CallbackResult> + Send + 'static,
+    {
+        self.owner_context(id)?
+            .on_cleanup_retryable_async(cleanup)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
                 message,
@@ -1783,7 +1972,7 @@ impl Runtime {
             id,
             HostStatus {
                 available,
-                failed: plugin.failed.is_some(),
+                failed: plugin.failed.is_some() || plugin.cleanup_failure.is_some(),
                 restart: plugin.restart,
             },
         )
@@ -1890,6 +2079,8 @@ impl Runtime {
             state: Arc::new(Mutex::new(state)),
             group: 0,
         };
+        plugin.cleanup_failure = None;
+        plugin.cleanup_drained = false;
         plugin.episode = Some(episode.clone());
         plugin.root_setup = RootSetup::Done;
         match initialize_callback(&mut plugin.setup, &episode) {
@@ -1960,13 +2151,57 @@ impl Runtime {
             message,
         });
     }
-    // A single inverse is started/polled at a time in each group. Other groups
-    // still get polled when this one is Pending.
+    fn finish_callback(
+        &mut self,
+        id: PluginId,
+        group: usize,
+        handle: Option<&EffectHandle>,
+        ticket: RestoreTicket,
+        result: CallbackResult,
+        retry: Option<RetryCleanup>,
+    ) {
+        let outcome = match &result {
+            Ok(()) => RestoreOutcome::Succeeded,
+            Err(_) if retry.is_some() => RestoreOutcome::Failed,
+            Err(_) => RestoreOutcome::Drained,
+        };
+        // Never drop a callback factory (which may own arbitrary user values)
+        // under the episode mutex, including on a successful retry.
+        let retained = if outcome == RestoreOutcome::Failed {
+            retry
+        } else {
+            drop(retry);
+            None
+        };
+        let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
+        let completed = lock(&episode.state)
+            .cleanups
+            .get_mut(&group)
+            .unwrap()
+            .complete(ticket, outcome, retained);
+        // Rejected payloads, like successful factories, must be dropped only
+        // after releasing the episode lock; user Drop may reenter registration.
+        assert!(completed.is_ok(), "exact issued restoration receipt");
+        if let Err(message) = result {
+            if outcome == RestoreOutcome::Failed {
+                self.mounted
+                    .get_mut(&id)
+                    .unwrap()
+                    .cleanup_failure
+                    .get_or_insert_with(|| message.clone());
+            } else {
+                self.mounted.get_mut(&id).unwrap().cleanup_drained = true;
+            }
+            self.record_cleanup(id, handle, message);
+        }
+    }
+    // Independent groups can progress, but a failed retryable inverse blocks
+    // every earlier inverse in its own group until an explicit retry.
     fn poll_cleanup(
         &mut self,
         id: PluginId,
         group: usize,
-        running: &mut Option<CleanupFuture>,
+        running: &mut Option<RunningCleanup>,
         handle: Option<&EffectHandle>,
         cx: &mut TaskContext<'_>,
     ) -> (bool, bool) {
@@ -1977,37 +2212,42 @@ impl Runtime {
                 .cleanups
                 .get_mut(&group)
                 .and_then(Cleanups::pop);
-            if let Some(action) = action {
+            if let Some((ticket, action)) = action {
                 progress = true;
                 match action {
                     CleanupAction::Child(child) => {
-                        if let Some(child) = child.id() {
-                            if let Err(error) = self.dispose(child) {
-                                self.record_cleanup(id, handle, error.to_string());
-                            }
-                        }
+                        let result = child.id().map_or(Ok(()), |child| {
+                            self.dispose(child).map_err(|error| error.to_string())
+                        });
+                        self.finish_callback(id, group, handle, ticket, result, None);
                     }
-                    CleanupAction::Callback(cleanup) => match initialize_cleanup(cleanup) {
+                    CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
                         Ok(future) => *running = Some(future),
-                        Err(message) => self.record_cleanup(id, handle, message),
+                        Err(failure) => self.finish_callback(
+                            id,
+                            group,
+                            handle,
+                            failure.ticket,
+                            Err(failure.message),
+                            failure.retry,
+                        ),
                     },
                 }
             }
         }
-        if let Some(future) = running {
-            match poll_cleanup_callback(future, cx) {
+        if let Some(attempt) = running.as_mut() {
+            match poll_cleanup_callback(&mut attempt.future, cx) {
                 Poll::Pending => return (progress, true),
                 Poll::Ready(result) => {
-                    *running = None;
+                    let attempt = running.take().unwrap();
+                    self.finish_callback(id, group, handle, attempt.ticket, result, attempt.retry);
                     progress = true;
-                    if let Err(message) = result {
-                        self.record_cleanup(id, handle, message);
-                    }
                 }
             }
         }
         (progress, false)
     }
+
     fn poll_groups(
         &mut self,
         id: PluginId,
@@ -2024,7 +2264,8 @@ impl Runtime {
             let can_start = matches!(self.phase(id), Some(Phase::Active | Phase::Loading))
                 && self.coherent(id)
                 && self.services_available(id)
-                && self.mounted[&id].failed.is_none();
+                && self.mounted[&id].failed.is_none()
+                && self.mounted[&id].cleanup_failure.is_none();
             let mut group = self
                 .mounted
                 .get_mut(&id)
@@ -2075,11 +2316,12 @@ impl Runtime {
                             pending = true;
                         }
                         Ok(Poll::Ready(Some(Ok(inverse)))) => {
-                            lock(&setup.state)
+                            let landed = lock(&setup.state)
                                 .cleanups
                                 .get_mut(&group.id)
                                 .unwrap()
                                 .land(inverse);
+                            assert!(landed.is_ok(), "only admitted stages may land");
                             progress = true;
                             if cancelled {
                                 group.iterator = None;
@@ -2260,7 +2502,9 @@ impl Runtime {
                         }
                     }
                 }
-                let cleanup_allowed = unloading && self.kernel.cleanup_started(id);
+                let cleanup_allowed = unloading
+                    && self.kernel.cleanup_started(id)
+                    && self.kernel.pending_action(id).is_some();
                 let (did, waiting) = self.poll_groups(
                     id,
                     unloading || self.mounted[&id].failed.is_some(),
@@ -2281,7 +2525,26 @@ impl Runtime {
                     pending |= waiting;
                     let mut state = lock(&episode.state);
                     let root_empty = state.cleanups.get(&0).is_none_or(Cleanups::is_empty);
-                    if self.mounted[&id].root_running.is_none()
+                    let retained_failure = state
+                        .cleanups
+                        .values()
+                        .any(|group| group.protocol.has_failed());
+                    let callbacks_idle = self.mounted[&id].root_running.is_none()
+                        && self.mounted[&id]
+                            .groups
+                            .values()
+                            .all(|group| group.running.is_none() && group.iterator.is_none());
+                    if retained_failure && callbacks_idle {
+                        if let Some(ticket) = self.kernel.pending_action(id).cloned() {
+                            if let Err(error) = self
+                                .kernel
+                                .complete_cleanup(&ticket, CleanupOutcome::Failed)
+                            {
+                                return Poll::Ready(Err(kernel_error(error)));
+                            }
+                            progress = true;
+                        }
+                    } else if self.mounted[&id].root_running.is_none()
                         && root_empty
                         && self.mounted[&id].groups.is_empty()
                     {
@@ -2290,13 +2553,14 @@ impl Runtime {
                             .pending_action(id)
                             .cloned()
                             .expect("restoration owns its cleanup action");
-                        // FnOnce inverses are consumed even when they report an
-                        // error. Drained records that policy explicitly; it does
-                        // not assert successful recovery or retain a retryable inverse.
-                        if let Err(error) = self
-                            .kernel
-                            .complete_cleanup(&ticket, CleanupOutcome::Drained)
-                        {
+                        // Only consumed FnOnce failures use Drained. Retained
+                        // retryable failures cannot reach this empty-journal path.
+                        let outcome = if self.mounted[&id].cleanup_drained {
+                            CleanupOutcome::Drained
+                        } else {
+                            CleanupOutcome::Succeeded
+                        };
+                        if let Err(error) = self.kernel.complete_cleanup(&ticket, outcome) {
                             return Poll::Ready(Err(kernel_error(error)));
                         }
                         if let Err(error) = self.kernel.finish_cleanup(id) {
@@ -2420,6 +2684,16 @@ impl Runtime {
             }
             if progress {
                 continue;
+            }
+            if let Some((&id, owner)) = self
+                .mounted
+                .iter()
+                .find(|(_, owner)| owner.cleanup_failure.is_some())
+            {
+                return Poll::Ready(Err(RuntimeError::Cleanup {
+                    plugin: id,
+                    message: owner.cleanup_failure.clone().unwrap(),
+                }));
             }
             if pending {
                 return Poll::Pending;
