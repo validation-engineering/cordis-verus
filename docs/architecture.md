@@ -35,6 +35,11 @@ Node 兼容层由单独的 crate 和 JS 包组成，不是必须开启的 `cordi
 
 Rust Runtime 与 Node facade 共用 [`LifecycleDriver`](../crates/cordis-driver/src/shared.rs) 的内核控制和已验证 `LifecycleActions` 协议；值、Future/JS callback 与 backend journal 留在各自宿主。生命周期内核决定可接受的转换，宿主执行 setup、回调与真实资源清理。这种分层让兼容工作集中在语言和宿主边界，同时保留独立的 Rust 使用路径。
 
+共享 Driver 的真实清理入口为经过验证的 `LifecycleState::execute_cleanup`；受管资源 finish
+也满足同一个 `cleanup_step` 合同。实际有限命令循环构造可擦除历史，组合证明释放前必须
+存在匹配的确认、失败前缀保留依赖、旧票据不能复活。该历史从真实入口状态开始；回调
+效果、调用执行与最终排空仍有独立边界。
+
 `LifecycleActions` 在真实执行路径中检查清理结果和重试票据：失败结果阻止完成卸载，成功结果才允许 Node 路径释放 episode 的依赖。Rust Runtime 和静态 typed 宿主使用经过验证的 `CleanupJournal` 保留失败操作和重试凭据，实际回调载荷由 `CleanupQueue<T>` 与日志一起拥有，验证精确槽位移动与失败载荷保留；显式 `FnMut` 工厂支持新的清理尝试。普通 Rust Runtime 对已消耗的 `FnOnce` 失败使用 `Drained`，不代表所有回调成功；静态 typed 宿主的此类失败继续阻塞。合同和验证边界见[清理协议](cleanup-protocol.zh-CN.md)（[English](cleanup-protocol.md)）。
 
 ## 构建、运行与验证的依赖

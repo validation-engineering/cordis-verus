@@ -106,6 +106,14 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
   实际共享 owner 一起持有 Kernel/协议。受管 finish 检查 domain、凭据、资源来源和
   清单完整性；原子注册表批次先于 commitment 释放。拒绝保持 finish 输入，成功则
   清空该 episode 的受管资源并返回精确 slot。回调真实性、获取路由和值句柄删除仍在边界外。
+- [cleanup_protocol.rs](../crates/cordis-kernel/src/cleanup_protocol.rs)：生产
+  `execute_cleanup` 为这些真实调用提供统一转换合同；`run_cleanup` 从实际循环
+  构造可擦除历史。`consumed_ticket_never_returns` 拒绝之后所有重放；`binding_at`
+  保留实际 provider 直到释放；`permission_origin` 与 `release_has_accepted_report`
+  在入口没有释放许可的前提下定位匹配的已接受报告。从失败凭据出发，
+  `failed_prefix_retains_dependencies` 覆盖没有新接受授权报告时的任意有限次数重试
+  及其他 owner 操作。受管资源 finish 也满足相同转换关系。具体命令集合与真实入口
+  状态前提见清理指南；它们不涵盖任意回调，不证明应用启动或清理最终结束。
 - [cleanup_journal.rs](../crates/cordis-kernel/src/cleanup_journal.rs)：实际 Rust
   inverse 日志保留失败的选中 token，仅在显式重试时签发新凭据。更早的待处理操作和
   晚到登记持续被记录；重复、旧尝试及外域报告不能清除选中操作。Runtime 和静态
@@ -137,6 +145,10 @@ cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanu
 cargo test --offline -p cordis-kernel --test cleanup_queue retained_payload_returns_from_the_same_slot_before_late_and_earlier_work -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_queue foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work -- --exact
 cargo test --offline -p cordis --test retry_cleanup distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol repeated_failed_prefixes_pin_the_provider_while_another_consumer_finishes -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol setup_reply_and_wrong_ticket_fields_cannot_authorize_cleanup -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol generation_zero_reservation_uses_its_own_release_guard_after_retry -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts_stay_rejected_after_real_episode_reactivation -- --exact
 ```
 
 第一个测试观察到：当前目标不可用时，consumer 原有的已提交绑定仍然保留，

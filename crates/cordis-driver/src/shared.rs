@@ -10,6 +10,7 @@ use cordis_kernel::action_ledger::{
     ActionError, ActionKind as KernelActionKind, ActionTicket as KernelActionTicket,
 };
 pub use cordis_kernel::lifecycle_actions::CleanupOutcome;
+use cordis_kernel::lifecycle_state::cleanup::{CleanupCommand, CleanupError};
 use cordis_kernel::lifecycle_state::LifecycleState;
 use cordis_kernel::{Error, Kernel, Phase, Port};
 use std::collections::BTreeMap;
@@ -141,8 +142,10 @@ impl LifecycleDriver {
     /// Withdrawal never discards an outstanding setup ticket.
     pub fn complete_action(&mut self, ticket: &ActionTicket) -> Result<(), DriverError> {
         self.state
-            .complete_setup(kernel_ticket(ticket))
-            .map_err(completion_error)?;
+            .execute_cleanup(CleanupCommand::SettleSetup {
+                ticket: kernel_ticket(ticket),
+            })
+            .map_err(cleanup_completion_error)?;
         self.pending_views.remove(&ticket.id);
         Ok(())
     }
@@ -155,8 +158,11 @@ impl LifecycleDriver {
         outcome: CleanupOutcome,
     ) -> Result<(), DriverError> {
         self.state
-            .complete_cleanup(kernel_ticket(ticket), outcome)
-            .map_err(completion_error)?;
+            .execute_cleanup(CleanupCommand::Report {
+                ticket: kernel_ticket(ticket),
+                outcome,
+            })
+            .map_err(cleanup_completion_error)?;
         self.pending_views.remove(&ticket.id);
         Ok(())
     }
@@ -178,30 +184,61 @@ impl LifecycleDriver {
         self.state.finish(id)
     }
     pub fn leave(&mut self, id: usize) -> Result<(), Error> {
-        self.state.leave(id)
+        self.state
+            .execute_cleanup(CleanupCommand::Withdraw { id })
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     pub fn retire(&mut self, id: usize) -> Result<(), Error> {
-        self.state.retire(id)
+        self.state
+            .execute_cleanup(CleanupCommand::Retire { id })
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     pub fn begin_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self.state.begin_cleanup(id)?;
+        let ticket = self
+            .state
+            .execute_cleanup(CleanupCommand::Request {
+                id,
+                reservation: false,
+            })
+            .map_err(cleanup_control_error)?
+            .expect("cleanup request issues a ticket");
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     /// Restore host resources registered while a fiber was reserved, before
     /// its first kernel episode. This is a host extension, not a paper Step.
     pub fn begin_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self.state.begin_reservation_cleanup(id)?;
+        let ticket = self
+            .state
+            .execute_cleanup(CleanupCommand::Request {
+                id,
+                reservation: true,
+            })
+            .map_err(cleanup_control_error)?
+            .expect("reservation cleanup issues a ticket");
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
     }
     pub fn retry_cleanup(&mut self, id: usize) -> Result<ActionTicket, Error> {
-        let ticket = host_ticket(self.state.retry_cleanup(id)?);
+        let ticket = host_ticket(
+            self.state
+                .execute_cleanup(CleanupCommand::Retry { id })
+                .map_err(cleanup_control_error)?
+                .expect("cleanup retry issues a ticket"),
+        );
         self.pending_views.insert(id, ticket.clone());
         Ok(ticket)
     }
     pub fn finish_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        self.state.finish_cleanup(id)
+        self.state
+            .execute_cleanup(CleanupCommand::Release {
+                id,
+                reservation: false,
+            })
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     /// Finish a reported cleanup only after its checked resource batch succeeds.
     pub fn finish_cleanup_resources(
@@ -221,10 +258,19 @@ impl LifecycleDriver {
             })
     }
     pub fn finish_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        self.state.finish_reservation_cleanup(id)
+        self.state
+            .execute_cleanup(CleanupCommand::Release {
+                id,
+                reservation: true,
+            })
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     pub fn remove(&mut self, id: usize) -> Result<(), Error> {
-        self.state.remove(id)
+        self.state
+            .execute_cleanup(CleanupCommand::Remove { id })
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     pub fn compact_bindings(&mut self) -> usize {
         self.state.compact_bindings()
@@ -234,6 +280,18 @@ impl LifecycleDriver {
     }
 }
 
+fn cleanup_control_error(error: CleanupError) -> Error {
+    match error {
+        CleanupError::Control(error) => error,
+        CleanupError::Reply(error) => ledger_error(error),
+    }
+}
+fn cleanup_completion_error(error: CleanupError) -> DriverError {
+    match error {
+        CleanupError::Control(error) => error.into(),
+        CleanupError::Reply(error) => completion_error(error),
+    }
+}
 fn ledger_error(error: ActionError) -> Error {
     match error {
         ActionError::Capacity => Error::Capacity,

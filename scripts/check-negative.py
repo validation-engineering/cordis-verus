@@ -1288,6 +1288,18 @@ def mutation_manifest():
             'self.payloads[ticket.token]=retained;',
             'self.payloads[ticket.token]=None;',
         ),
+        (
+            'cleanup-dispatch-promotes-failure',
+            'cleanup_protocol.rs',
+            'CleanupCommand::Report {ticket,outcome}=>report_reply(self.complete_cleanup(ticket,outcome)),',
+            'CleanupCommand::Report {ticket,outcome:_}=>report_reply(self.complete_cleanup(ticket,CleanupOutcome::Succeeded)),',
+        ),
+        (
+            'cleanup-dispatch-bypasses-receipt',
+            'cleanup_protocol.rs',
+            '} else {self.finish_cleanup(id)}),',
+            '} else {proof {self.actions.same_reflexive(); reveal(Kernel::commitments_frame);} self.kernel.finish_cleanup(id)}),',
+        ),
     ]
 
 

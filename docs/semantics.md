@@ -183,7 +183,7 @@ Rust 外层把 callback 存为 `Vec<Option<CleanupAction>>`，每个效果组使
 独立性不只是两个 forward 操作交换：Definition 42 同时约束 forward、inverse 的交换，以及彼此不改变 yielded inverse 和 continuation（pp27–28，text:1174–1192）。仅有 LIFO 栈不能推出这个条件。LIFO 负责单个效果序列的恢复顺序；跨组件可交换性是另一个证明义务。
 
 cooperative async 表示外层可把清理推迟到未来的 poll/step 完成，内核在此期间保留绑定。它不自动意味着任意 Tokio future、并发执行、取消、panic 或永不完成的 callback 都已覆盖。Failure latch 对应 §4.4：初始化失败先恢复已有成功效果，失败状态抑制自动重试；显式 revision 用新 fiber 重试。带失败的执行不主张论文 confluence（p56，text:2647–2664）。
-实际 `Runtime::restart` 另提供同 ID 的显式重试扩展。Cleanup callback 返回 Err 时，外层记录错误并继续余下 cleanup，最终释放注册的服务；Err 不能作为逆操作成功恢复物理资源的证据。`Runtime::get` 返回的宿主 Arc 不会自动建立 committed link，其外部持有者不受依赖守卫保护。证明保护的是框架内已记录绑定，并非所有可能持有服务值的外部代码。
+实际 `Runtime::restart` 另提供同 ID 的显式重试扩展。已消耗的 `FnOnce` cleanup 返回 Err 时，普通 Runtime 记录错误并继续排空，最终采用 `Drained`；显式可重试工厂的失败则保留工作和依赖，等待新的清理尝试。Err 或 `Drained` 都不能作为逆操作成功恢复物理资源的证据。`Runtime::get` 返回的宿主 Arc 不会自动建立 committed link，其外部持有者不受依赖守卫保护。证明保护的是框架内已记录绑定，并非所有可能持有服务值的外部代码。
 
 基础 cleanup 注册构成一个 LIFO 组；每次 `ctx.effect` 创建独立的组，组间恢复允许并发。任意 callback 相互等待仍可能不终止。child 继承 parent 的 dependencies，并在内核中记录实际绑定；派生 realm 还增加相应的新端口绑定，不能只复制 payload 绕过 lifetime guard。可访问自身 provision 与显式/继承 dependency；Rust typed context 与 scope builder 不模拟 JS Proxy。
 
@@ -286,7 +286,17 @@ Definition 52 的 typed 原语在给定 registry/editor 解释下已编码：完
 撤销栈，并保留动态 Insert／Remove。真实目标执行及最终 owner recovery 被构造
 出来；owner 的 Table／私有提供项约束及原文 Component 表示缺口仍保留。
 
-### 真实宿主清理资源批次
+### 真实宿主清理协议与资源批次
+
+共享 Driver 的真实清理调用现经 `LifecycleState::execute_cleanup`，统一满足
+`cleanup_step`；受管资源 finish 也建立该合同。`run_cleanup` 从实际循环构造可擦除
+历史，拒绝保持该步入口状态，之前成功的步骤不回滚。有限序列定理把请求、结果确认、
+依赖保留、显式重试与旧票据拒绝组合起来：已消费票据永不复活；没有新的授权报告时，
+失败 episode 在任意有限次重试和其他 owner 操作中仍保留绑定，保护真实 provider；
+入口没有释放许可时，成功释放必须有同 owner、当前 generation 的已接受
+`Succeeded`／`Drained` 报告。定理从真实良构状态开始，命令集合和前提见
+[清理协议](cleanup-protocol.zh-CN.md)。回调调用、外部效果、整个应用的初始化与
+最终排空不在这些历史定理中；论文整体义务不因此关闭。
 
 实际共享 Driver 现在使用 `LifecycleState` 一起拥有 Kernel 与清理协议；公开变更保持
 二者不变式，宿主没有可替换或可变借出的 Kernel。Node Driver 的租约记录消费者与

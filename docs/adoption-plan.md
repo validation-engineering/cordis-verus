@@ -86,6 +86,14 @@ premises. The goal is an honest complete audit, not making refuted original
 statements true. The [paper review guide](paper-review-guide.md) shows how to
 inspect the connections already present.
 
+The scoped cleanup safety contract set within A07/F1 is implemented and proved:
+requests, success/failure reports, dependency retention, explicit retry and old
+ticket rejection compose over finite executions of the real shared API. Managed
+resource release satisfies the same transition relation. The
+[cleanup review](cleanup-protocol.md) records the exact command alphabet, input
+premises and host assumptions. Invocation/landing, arbitrary callback effects and
+the rest of F1 remain separate; this milestone does not close a paper-wide obligation.
+
 ## Milestones and exit criteria
 
 | Milestone | Product and research work | Required exit evidence |

@@ -60,6 +60,13 @@ impl ActionLedger {
         if j < i { assert(a.id != b.id); }
     }
 
+    pub proof fn recorded_bounds(&self,ticket:ActionTicket)
+        requires self.wf(),self.recorded(ticket),
+        ensures ticket.domain==self.domain_id(),0<ticket.action<self.next_id(),
+    {
+        let i=choose|i:int| 0<=i<self.entries.len() && self.entries[i]==ticket;
+    }
+
     pub fn new(domain: u64) -> (ledger: Self)
         ensures ledger.wf(), ledger.domain_id() == domain, ledger.next_id() == 1,
             ledger.records().len() == 0,

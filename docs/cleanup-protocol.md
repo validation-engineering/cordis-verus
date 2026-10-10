@@ -5,9 +5,11 @@ English · [简体中文](cleanup-protocol.zh-CN.md)
 This guide follows one contract: an executor must account for an admitted cleanup
 before the shared lifecycle API can release that episode's committed dependencies.
 It connects the production `LifecycleActions` protocol to the kernel guard and
-the actual Node and Rust completion paths. It is a bounded step in
-[A07 / F1](adoption-plan.md), not a complete proof of either host or a newly
-confirmed upstream/runtime defect. The [paper ledger](paper-obligations.json)
+the actual Node and Rust completion paths. The scoped protocol safety contracts
+now cover requests, outcome acknowledgements, dependency retention, explicit retry
+and old-ticket rejection, composed over finite executions of the real cleanup API.
+This completes that contract set within [A07 / F1](adoption-plan.md); invocation,
+external inverse effects and the unrestricted host refinement remain separate. The [paper ledger](paper-obligations.json)
 still has **18 partial items and four open integration obligations**.
 
 ## Paper clause to executable protocol
@@ -41,7 +43,9 @@ paper item or establish Corollary 69 for arbitrary callbacks.
    type constructs and retains its Kernel and action protocol together; its
    public mutations preserve both invariants. Hosts receive only an immutable
    Kernel view and cannot pass a replacement Kernel to its cleanup methods.
-   `pending_views` remains a serialization view, not transition authority.
+   The production Driver dispatches cleanup commands through this type's verified
+   `execute_cleanup`; managed resource release also satisfies its `cleanup_step`
+   contract. `pending_views` remains a serialization view, not transition authority.
 3. [Driver::complete](../crates/cordis-driver/src/lib.rs) records `Succeeded` or
    `Failed` for Node cleanup. Failure returns without releasing resources.
    Success calls the shared state's `finish_cleanup_resources`, implemented in
@@ -63,6 +67,40 @@ completion cannot stand in for cleanup completion. Tickets identify the
 exact domain, owner, generation, action and kind; a duplicate, wrong-kind or stale
 completion cannot authorize a new attempt. Cancellation does not silently discard
 an outstanding setup ticket: its result may still carry an inverse to collect.
+
+## Composed safety of the real cleanup API
+
+[`cleanup_protocol.rs`](../crates/cordis-kernel/src/cleanup_protocol.rs) gives the
+shared production dispatcher a `cleanup_step` contract. `run_cleanup` calls that
+same dispatcher for every command and constructs its state history from those
+actual calls. The history is `Ghost` data erased by compilation; runtime retains
+only command replies. A rejected command preserves its entry state; the runner
+continues, retaining earlier successful changes rather than rolling back the batch.
+
+| Obligation | Executable contract and composed result |
+| --- | --- |
+| Request admission | `begin_cleanup` exposes the exact action-capacity/owner and Kernel guards. Pending setup blocks cleanup; an admitted request retains bindings and issues the next action identity. Generation-zero reservation has its own admission rule. |
+| Success/failure acknowledgement | `complete_cleanup` accepts exactly the outstanding cleanup receipt, including domain, owner, generation, action and kind. `Succeeded` or policy-specific `Drained` can authorize finish; `Failed` cannot. `release_has_accepted_report` derives a prior accepted authorizing report for the releasing owner's current generation, provided no release permission existed at execution entry. |
+| Dependency retention | `binding_at` preserves a concrete binding through every command until that consumer's accepted release. The real Kernel ordering invariant keeps its provider registered, out of restoration and unavailable for cleanup. Other consumers may finish independently. |
+| Explicit retry | `retry_cleanup` requires a failed receipt, preserves the Kernel and issues a fresh action. `failed_prefix_retains_dependencies` protects bindings through any finite prefix without a new accepted authorizing report, including repeated failures, retries and operations on other owners. |
+| Old-ticket rejection | `consumed_ticket_never_returns` proves that a consumed cleanup ticket never becomes recorded again and every later report of it is rejected, regardless of the reported outcome. Rejections preserve the owned Kernel/protocol state. |
+
+These theorems cover arbitrary finite sequences of Request, Report, Retry,
+Release, SettleSetup, Withdraw, Retire and Remove, starting with the actual
+well-formed owned state. Managed `finish_cleanup_resources` also proves
+`cleanup_step` while retaining its stronger resource-batch contract and precise
+errors. It can therefore participate in the same control-history reasoning.
+Fresh activation is outside this command alphabet; its actual `begin` method
+separately preserves ticket history, and a regression exercises old replies
+across real episode reactivation.
+
+The history starts at that API boundary, not at application startup. Callback
+invocation and its external effects are not history steps; reports remain inputs.
+The result proves finite-prefix safety, not fair scheduling or eventual cleanup,
+and does not complete all of F1 or the paper's open integration obligations.
+The canonical mutations `cleanup-dispatch-promotes-failure` and
+`cleanup-dispatch-bypasses-receipt` target these contracts in the actual dispatcher.
+Selected-proof experiments remain distinct from the full release negative gate.
 
 ## The actual resource batch is checked before commitment release
 
@@ -219,7 +257,7 @@ they do not replace Verus verification or the full development/release gates.
 ```sh
 cargo test --offline -p cordis-driver --test shared_lifecycle --test cleanup_outcomes --test cleanup_resources
 cargo test --offline -p cordis-driver --test episode_failure --test reservation_effects
-cargo test --offline -p cordis-kernel --test cleanup_journal --test cleanup_queue
+cargo test --offline -p cordis-kernel --test cleanup_protocol --test cleanup_journal --test cleanup_queue
 cargo test --offline -p cordis --test retry_cleanup
 cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanup_recovers_only_on_a_new_host_attempt -- --exact
 ```

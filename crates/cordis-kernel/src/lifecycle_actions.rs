@@ -68,6 +68,44 @@ impl LifecycleActions {
     pub closed spec fn same(&self, prior: &Self) -> bool {
         self.ledger.unchanged(&prior.ledger) && self.cleanups@ == prior.cleanups@
     }
+    /// Once consumed, an allocated identity can never become live again.
+    pub open spec fn history_preserved(&self, prior:&Self)->bool {
+        self.domain_id()==prior.domain_id() && self.next_id()>=prior.next_id()
+            && forall|ticket:ActionTicket| ticket.action<prior.next_id() && !prior.recorded(ticket)
+                ==> !self.recorded(ticket)
+    }
+    pub open spec fn no_new_release(&self, prior:&Self)->bool {
+        forall|id:usize,g:u64| self.eligible(id,g) ==> prior.eligible(id,g)
+    }
+    pub proof fn same_reflexive(&self)
+        ensures self.same(self),
+    { }
+    pub proof fn same_observations(&self,prior:&Self)
+        requires self.same(prior),
+        ensures self.history_preserved(prior),self.no_new_release(prior),
+    { }
+    pub proof fn recorded_bounds(&self,ticket:ActionTicket)
+        requires self.wf(),self.recorded(ticket),
+        ensures ticket.domain==self.domain_id(),0<ticket.action<self.next_id(),
+    {
+        self.ledger.recorded_bounds(ticket);
+    }
+    pub proof fn failed_blocks_release(&self,id:usize,g:u64)
+        requires self.wf(),self.failed(id,g),
+        ensures forall|other:u64| !self.eligible(id,other),
+    {
+        let i=choose|i:int| 0<=i<self.cleanups.len() && self.cleanups[i].ticket.id==id
+            && self.cleanups[i].ticket.generation==g && self.cleanups[i].outcome==Some(CleanupOutcome::Failed);
+        assert forall|other:u64| !self.eligible(id,other) by {
+            if self.eligible(id,other) {
+                let j=choose|j:int| 0<=j<self.cleanups.len() && self.cleanups[j].ticket.id==id
+                    && self.cleanups[j].ticket.generation==other && self.cleanups[j].outcome.is_some()
+                    && self.cleanups[j].outcome.unwrap()!=CleanupOutcome::Failed;
+                if i<j {assert(self.cleanups[i].ticket.id!=self.cleanups[j].ticket.id);}
+                if j<i {assert(self.cleanups[j].ticket.id!=self.cleanups[i].ticket.id);}
+            }
+        }
+    }
     pub closed spec fn wf(&self) -> bool {
         &&& self.ledger.wf()
         &&& forall|i:int| 0 <= i < self.cleanups.len() ==> {
@@ -87,15 +125,15 @@ impl LifecycleActions {
         !self.blocked_spec(id) && self.next_id() < u64::MAX
             && self.ledger.records().len() < usize::MAX && self.cleanups.len() < usize::MAX
     }
-    pub closed spec fn reservation(kernel: &Kernel, id: usize) -> bool {
+    pub open spec fn reservation(kernel: &Kernel, id: usize) -> bool {
         kernel.phase_of(id) == Some(Phase::Inactive) && kernel.is_retired(id)
             && kernel.generation_of(id) == Some(0)
     }
-    pub closed spec fn finish_enabled(&self, kernel: &Kernel, id: usize) -> bool {
+    pub open spec fn finish_enabled(&self, kernel: &Kernel, id: usize) -> bool {
         kernel.is_restoring(id) && kernel.generation_of(id).is_some()
             && self.eligible(id, kernel.generation_of(id).unwrap())
     }
-    pub closed spec fn reservation_finish_enabled(&self, kernel: &Kernel, id: usize) -> bool {
+    pub open spec fn reservation_finish_enabled(&self, kernel: &Kernel, id: usize) -> bool {
         Self::reservation(kernel, id) && self.eligible(id, 0)
     }
     pub closed spec fn retry_enabled(&self, kernel: &Kernel, id: usize) -> bool {
@@ -175,6 +213,7 @@ impl LifecycleActions {
             final(self).outstanding(id),
             kind == ActionKind::Cleanup ==> final(self).has_cleanup(id)
                 && final(self).cleanup_reply_enabled(ticket),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
     {
         let ghost prior = *self;
         let ticket = self.ledger.issue(id, generation, kind).unwrap();
@@ -213,6 +252,7 @@ impl LifecycleActions {
                 && out.unwrap().id == id && out.unwrap().domain == old(self).domain_id()
                 && final(self).recorded(out.unwrap())
                 && final(kernel).generation_of(id) == Some(out.unwrap().generation),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
     {
         proof {
             reveal(Kernel::unchanged);
@@ -242,6 +282,8 @@ impl LifecycleActions {
                 && final(self).cleanup_reply_enabled(out.unwrap())
                 && final(kernel).is_restoring(id)
                 && final(kernel).generation_of(id) == Some(out.unwrap().generation),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
+            out.is_ok() ==> out.unwrap().domain==old(self).domain_id() && out.unwrap().action==old(self).next_id(),
     {
         proof {
             reveal(Kernel::unchanged);
@@ -267,6 +309,8 @@ impl LifecycleActions {
             out.is_ok() ==> out.unwrap().kind == ActionKind::Cleanup && out.unwrap().id == id
                 && out.unwrap().generation == 0 && final(self).recorded(out.unwrap())
                 && final(self).has_cleanup(id) && final(self).cleanup_reply_enabled(out.unwrap()),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
+            out.is_ok() ==> out.unwrap().domain==old(self).domain_id() && out.unwrap().action==old(self).next_id(),
     {
         proof {
             reveal(Kernel::unchanged);
@@ -291,6 +335,8 @@ impl LifecycleActions {
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> !final(self).outstanding(ticket.id),
             final(self).same_cleanup_records(old(self)),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
+            out.is_ok() ==> !final(self).recorded(ticket),
     {
         if ticket.kind != ActionKind::Setup { return Err(ActionError::Stale); }
         let ghost prior = *self;
@@ -319,6 +365,10 @@ impl LifecycleActions {
             out.is_ok() ==> final(self).eligible(ticket.id, ticket.generation) == (outcome != CleanupOutcome::Failed),
             out.is_ok() && outcome == CleanupOutcome::Failed
                 ==> !final(self).eligible(ticket.id, ticket.generation),
+            final(self).history_preserved(old(self)),
+            forall|id:usize,g:u64| final(self).eligible(id,g) ==> old(self).eligible(id,g)
+                || (out.is_ok() && id==ticket.id && g==ticket.generation && outcome!=CleanupOutcome::Failed),
+            out.is_ok() ==> !final(self).recorded(ticket),
     {
         if ticket.kind != ActionKind::Cleanup { return Err(ActionError::Stale); }
         let i = match self.cleanup_index(ticket.id) { Some(i) => i, None => return Err(ActionError::Stale) };
@@ -375,6 +425,8 @@ impl LifecycleActions {
                 && !final(self).eligible(id, out.unwrap().generation)
                 && final(self).cleanup_reply_enabled(out.unwrap())
                 && final(self).next_id() == old(self).next_id() + 1,
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
+            out.is_ok() ==> out.unwrap().domain==old(self).domain_id() && out.unwrap().action==old(self).next_id(),
     {
         proof {
             reveal(Kernel::unchanged);
@@ -427,6 +479,7 @@ impl LifecycleActions {
             old(self).cleanups[i as int].outcome.is_some(),
         ensures final(self).wf(), final(self).ledger.unchanged(&old(self).ledger),
             !final(self).has_cleanup(old(self).cleanups[i as int].ticket.id),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
     {
         let ghost prior = *self;
         self.cleanups.remove(i);
@@ -468,6 +521,8 @@ impl LifecycleActions {
             out.is_ok() ==> final(kernel).phase_of(id) == Some(Phase::Inactive)
                 && final(kernel).no_committed(id) && !final(self).blocked_spec(id)
                 && crate::refinement::step(old(kernel).paper(), final(kernel).paper(), id, crate::refinement::Rule::Unload),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
+            final(kernel).commitments_frame(old(kernel),id),
     {
         proof {
             reveal(Kernel::unchanged);
@@ -497,6 +552,7 @@ impl LifecycleActions {
             out.is_ok() == old(self).reservation_finish_enabled(kernel, id),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> !final(self).blocked_spec(id),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
     {
         proof {
             reveal(Kernel::unchanged);

@@ -13,7 +13,7 @@ verus! {
 pub enum CleanupReleaseError { Lifecycle(Error), Publication(PublicationError) }
 
 impl LifecycleActions {
-    pub closed spec fn resource_finish_enabled(&self,kernel:&Kernel,id:usize,reservation:bool)->bool {
+    pub open spec fn resource_finish_enabled(&self,kernel:&Kernel,id:usize,reservation:bool)->bool {
         if reservation {self.reservation_finish_enabled(kernel,id)} else {self.finish_enabled(kernel,id)}
     }
 
@@ -60,8 +60,10 @@ impl LifecycleActions {
                 && final(kernel).phase_of(id)==Some(Phase::Inactive)
                 && crate::refinement::step(old(kernel).paper(),final(kernel).paper(),id,crate::refinement::Rule::Unload),
             reservation ==> final(kernel).unchanged(old(kernel)),
+            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
+            final(kernel).commitments_frame(old(kernel),id),
     {
-        reveal(LifecycleActions::same);reveal(Kernel::unchanged);proof {registry.unchanged_reflexive();}
+        reveal(Kernel::commitments_frame);reveal(LifecycleActions::same);reveal(Kernel::unchanged);proof {registry.unchanged_reflexive();}
         if registry.domain()!=Some(self.domain()) {
             return Err(CleanupReleaseError::Publication(PublicationError::InvalidState));
         }

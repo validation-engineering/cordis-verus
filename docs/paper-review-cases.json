@@ -191,6 +191,41 @@
           "file": "crates/cordis-kernel/src/cleanup_queue.rs",
           "symbol": "is_empty",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "execute_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "run_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "consumed_ticket_never_returns",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "binding_at",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "permission_origin",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "release_has_accepted_report",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "failed_prefix_retains_dependencies",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -268,6 +303,26 @@
           "package": "cordis",
           "target": "retry_cleanup",
           "name": "distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_protocol",
+          "name": "repeated_failed_prefixes_pin_the_provider_while_another_consumer_finishes"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_protocol",
+          "name": "setup_reply_and_wrong_ticket_fields_cannot_authorize_cleanup"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_protocol",
+          "name": "generation_zero_reservation_uses_its_own_release_guard_after_retry"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "cleanup_protocol",
+          "name": "completed_receipts_stay_rejected_after_real_episode_reactivation"
         }
       ],
       "negativeControl": {

@@ -4,8 +4,10 @@
 
 本指南审查一条合同：执行器必须先对已接纳的清理给出明确结果，共享生命周期 API 才能
 释放该 episode 的 committed 依赖。它把实际使用的 `LifecycleActions` 协议接到内核
-守卫，以及 Node 和 Rust 的真实完成路径。这是 [A07 / F1](adoption-plan.zh-CN.md)
-中的一项有限进展，不是任一宿主的完整证明，也不是新确认的上游或运行时缺陷。
+守卫，以及 Node 和 Rust 的真实完成路径。限定范围的协议安全合同现已覆盖请求、
+结果确认、依赖保留、显式重试与旧票据拒绝，并组合到真实清理 API 的有限执行上。
+这组合同已在 [A07 / F1](adoption-plan.zh-CN.md) 范围内闭合；调用执行、外部 inverse
+效果及不受限的宿主 refinement 仍是独立工作。
 [论文清单](paper-obligations.json)仍有 **18 项 partial 和四项未完成集成义务**。
 
 ## 从论文条款到可执行协议
@@ -35,7 +37,8 @@
    [LifecycleState](../crates/cordis-kernel/src/lifecycle_state.rs)。这个经过验证的类型
    一起构造并拥有 Kernel 和 action 协议；所有公开变更保持两者的不变式。宿主只能取得
    只读 Kernel 视图，不能向其清理方法传入另一个 Kernel。`pending_views` 仍仅用于
-   序列化，不授予转换权限。
+   序列化，不授予转换权限。生产 Driver 通过此类型已验证的 `execute_cleanup`
+   分派清理命令；受管资源释放也满足同一个 `cleanup_step` 合同。
 3. [Driver::complete](../crates/cordis-driver/src/lib.rs) 对 Node 清理记录
    `Succeeded` 或 `Failed`；失败返回时保留资源。成功调用共享状态的
    `finish_cleanup_resources`，其实现位于
@@ -52,6 +55,33 @@
 新 receipt。setup 完成不能代替 cleanup 完成。票据标识确切的 domain、owner、generation、action
 和 kind；重复、类型错误或过期完成不能授权新的尝试。取消不会悄悄丢弃已有 setup
 票据，因为它的返回结果仍可能带有必须收集的 inverse。
+
+## 真实清理 API 的组合安全性
+
+[`cleanup_protocol.rs`](../crates/cordis-kernel/src/cleanup_protocol.rs) 为生产共享
+dispatcher 提供 `cleanup_step` 合同。`run_cleanup` 对每条命令调用这个同一入口，
+并从实际调用构造状态历史。历史是编译时擦除的 `Ghost` 数据；运行时只保留命令结果。
+被拒绝的命令保持其入口状态，循环继续执行，保留此前成功命令的变化，不回滚整个批次。
+
+| 义务 | 可执行合同与组合结论 |
+| --- | --- |
+| 请求接纳 | `begin_cleanup` 公开 action 容量／owner 与 Kernel 守卫的精确接受条件。未完成 setup 阻止清理；成功请求保留绑定并签发下一个 action 身份。generation-zero reservation 有自己的接纳规则。 |
+| 成功／失败确认 | `complete_cleanup` 精确匹配未完成清理凭据的 domain、owner、generation、action 与 kind。`Succeeded` 或策略特定的 `Drained` 可授权 finish，`Failed` 不可。`release_has_accepted_report` 在执行入口尚无释放许可的前提下，推出释放前存在同一 owner、当前 generation 的已接受授权报告。 |
+| 依赖保留 | `binding_at` 将具体绑定保持到该消费者成功释放之前。真实 Kernel 的顺序不变式保证 provider 仍注册、未恢复且不能开始清理；其他消费者可独立完成。 |
+| 显式重试 | `retry_cleanup` 要求失败凭据，保持 Kernel 并签发新 action。`failed_prefix_retains_dependencies` 覆盖没有新接受授权报告的任意有限前缀，包括反复失败、重试及其他 owner 的操作。 |
+| 旧票据拒绝 | `consumed_ticket_never_returns` 证明已消费清理票据不会重新出现，之后用它报告任何 outcome 都被拒绝。拒绝保持一起拥有的 Kernel／协议状态。 |
+
+定理覆盖从真实良构状态出发，由 Request、Report、Retry、Release、SettleSetup、
+Withdraw、Retire 和 Remove 构成的任意有限序列。受管 `finish_cleanup_resources`
+也证明 `cleanup_step`，同时保留更强的资源批次合同与精确错误，因此可以接入相同的
+控制历史推理。新 episode 激活不在此命令集合内；真实 `begin` 方法另外保持票据
+历史合同，回归测试覆盖跨真实 episode 重启的旧回执拒绝。
+
+历史从这个 API 边界开始，并非从整个应用启动开始。回调调用及其外部效果不是这些
+历史步骤，报告仍作为输入。结论是有限前缀安全，不是公平调度或最终排空，也不使
+整个 F1 或论文未完成的集成义务关闭。canonical 负控
+`cleanup-dispatch-promotes-failure` 与 `cleanup-dispatch-bypasses-receipt`
+直接变异真实 dispatcher 的这两项合同。局部选定证明实验与完整发布负控门槛仍分开。
 
 ## 真实资源批次在释放 commitment 之前接受检查
 
@@ -175,7 +205,7 @@ Inactive，接纳与 finish 分别跟踪；这是宿主扩展，不是论文的 
 ```sh
 cargo test --offline -p cordis-driver --test shared_lifecycle --test cleanup_outcomes --test cleanup_resources
 cargo test --offline -p cordis-driver --test episode_failure --test reservation_effects
-cargo test --offline -p cordis-kernel --test cleanup_journal --test cleanup_queue
+cargo test --offline -p cordis-kernel --test cleanup_protocol --test cleanup_journal --test cleanup_queue
 cargo test --offline -p cordis --test retry_cleanup
 cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanup_recovers_only_on_a_new_host_attempt -- --exact
 ```

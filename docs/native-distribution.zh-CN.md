@@ -165,7 +165,7 @@ SHA-256 提供字节完整性与源码绑定，不提供发布者身份认证。
 
 [完整发布工作流](../.github/workflows/release-validation.yml)默认选择 Linux x64 和
 macOS Apple Silicon；手动触发时设置 `include_macos_intel=true` 可加入 macOS Intel。
-每个选定平台先完成基线预检及全部 118 项[整 crate 负控](full-negative-validation.zh-CN.md)，
+每个选定平台先完成基线预检及全部 120 项[整 crate 负控](full-negative-validation.zh-CN.md)，
 严格汇总证据，再完成全部质量与软件包检查，然后将暂存的运行时安装到新项目中，
 执行一次离线 `npm ci` 并运行示例。
 当显式使用 `create_draft=true` 和新的 `release_tag` 触发时，

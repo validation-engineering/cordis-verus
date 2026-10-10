@@ -3,7 +3,7 @@
 English · [简体中文](full-negative-validation.zh-CN.md)
 
 Release validation deliberately changes kernel operations, guards or specifications
-and requires the proofs to reject each change. Every one of the 118 canonical mutations must first
+and requires the proofs to reject each change. Every one of the 120 canonical mutations must first
 compile and then produce a concrete contract failure while verifying the entire
 crate. The unchanged kernel must also pass. A timeout, resource limit, frontend
 error or partial result does not satisfy this requirement.
@@ -30,7 +30,7 @@ stop its Verus and solver descendants; by default, failed workers stop further
 dispatch and cancel active siblings. Standard output, diagnostics and `.meta.json` stage records
 are retained, including elapsed time, command, exit status, source fingerprint and
 cancellation state. The queue contains only the active worker budget, rather than
-all 118 already-submitted tasks.
+all 120 already-submitted tasks.
 
 Termination is requested once per process group. The supervisor observes leader
 exit without reaping it until group cleanup finishes, so the process-group identity
@@ -144,7 +144,7 @@ The final mutation list retains canonical order.
 Each platform's quality job collects its complete planned partition within the ordinary gate,
 alongside positive proof, tests, examples, package builds and installation checks.
 Only the complete collected report can enter `verification/v3`; a green preflight
-or one green shard cannot. Every selected platform must pass all 118 full-crate
+or one green shard cannot. Every selected platform must pass all 120 full-crate
 negative controls and the entire quality gate before runtime draft creation.
 The draft contains exactly the selected platforms' assets and evidence. Excluding
 Intel makes no claim about Intel validation or artifact availability.

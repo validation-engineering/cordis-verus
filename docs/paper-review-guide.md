@@ -127,6 +127,17 @@ consumer may temporarily disagree with its current target.
   registry batch precedes commitment release. Rejection preserves the finish
   input; success clears that episode's managed resources and returns exact slots.
   Host callback truth, acquisition routing and opaque value destruction remain external.
+- [cleanup_protocol.rs](../crates/cordis-kernel/src/cleanup_protocol.rs): production
+  `execute_cleanup` gives these actual calls one transition contract. `run_cleanup`
+  constructs an erased history from the real loop. `consumed_ticket_never_returns`
+  rejects all later replays; `binding_at` retains the actual provider until release;
+  `permission_origin` and `release_has_accepted_report` identify the matching
+  accepted report, assuming no initial release permission. From a failed receipt,
+  `failed_prefix_retains_dependencies` covers arbitrarily many retries and other
+  owners' operations without a new accepted authorizing report. Managed resource
+  finish satisfies the same transition relation. The finite command alphabet and
+  actual starting-state premise are detailed in the cleanup guide; they do not
+  include arbitrary callbacks or prove application startup or eventual cleanup.
 - [cleanup_journal.rs](../crates/cordis-kernel/src/cleanup_journal.rs): the actual
   Rust inverse journal retains a failed selected token and issues a fresh receipt
   only on explicit retry. Earlier waiting operations and late registrations remain
@@ -161,6 +172,10 @@ cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanu
 cargo test --offline -p cordis-kernel --test cleanup_queue retained_payload_returns_from_the_same_slot_before_late_and_earlier_work -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_queue foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work -- --exact
 cargo test --offline -p cordis --test retry_cleanup distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol repeated_failed_prefixes_pin_the_provider_while_another_consumer_finishes -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol setup_reply_and_wrong_ticket_fields_cannot_authorize_cleanup -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol generation_zero_reservation_uses_its_own_release_guard_after_retry -- --exact
+cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts_stay_rejected_after_real_episode_reactivation -- --exact
 ```
 
 The first test observes an unavailable current target while the consumer's old

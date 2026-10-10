@@ -172,7 +172,7 @@ impl Kernel {
         forall|n: usize, p: Port, provides: bool| n != id && self.registered(n)
             ==> Self::declares(self.declarations@, n, p, provides) == Self::declares(prior.declarations@, n, p, provides)
     }
-    spec fn commitments_frame(&self, prior: &Self, id: usize) -> bool {
+    pub closed spec fn commitments_frame(&self, prior: &Self, id: usize) -> bool {
         forall|n: usize, b: Binding| n != id ==> self.binding_recorded(n, b) == prior.binding_recorded(n, b)
     }
     proof fn paper_frame(&self, prior: &Self, id: usize)
@@ -2167,6 +2167,7 @@ impl Kernel {
             r.is_ok() ==> final(self).phase_of(id) == Some(Phase::Inactive) && final(self).no_committed(id)
                 && refinement::step(old(self).paper(), final(self).paper(), id, refinement::Rule::Unload),
             r.is_err() ==> final(self).unchanged(old(self)),
+            final(self).commitments_frame(old(self),id),
     {
         if !self.contains(id) { return Err(Error::Unknown); }
         let mut node = self.nodes[id];

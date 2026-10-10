@@ -1,4 +1,4 @@
-# Current status — 2026-10-08
+# Current status — 2026-10-10
 
 This is an experimental development checkpoint for the public
 [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus) repository.
@@ -172,6 +172,15 @@ Component premise. See the [paper audit](paper-audit.md).
 
 ## Latest proof additions
 
+- The scoped [host cleanup protocol](cleanup-protocol.md) now composes all five
+  requested safety obligations: request admission, outcome acknowledgement,
+  dependency retention, explicit retry and old-ticket rejection. The production
+  shared dispatcher and managed resource finish satisfy the same transition
+  contract. Finite histories built by the real command loop prove release-report
+  provenance, retained-provider protection and consumed-ticket nonrevival.
+  This closes that contract set at its documented API boundary; arbitrary
+  callbacks, eventual cleanup, the full F1 path and paper-wide obligations remain open.
+
 - Typed Component and instantiation interfaces preserve per-key fibers, actual
   fresh identity and the captured child's retirement inverse.
 - Restricted deletion composes foreign Unit/Operation/Provision/Child landings,
@@ -186,14 +195,14 @@ Component premise. See the [paper audit](paper-audit.md).
 
 ## Validation still open
 
-There are **118 canonical negative mutations**. A complete full-crate negative
+There are **120 canonical negative mutations**. A complete full-crate negative
 run for this source has not passed. The earlier 1,927-obligation snapshot's
 full quality run stopped on `mixed-removal-ignores-retention` after a timeout.
 Partial contract diagnostics were not accepted as a passed result.
 
 The opt-in scoped-negative checker and candidate selector manifest are
 experimental. Unit tests and selected probes do not establish a completed
-118-control calibration and do not replace the full release gate. The first
+120-control calibration and do not replace the full release gate. The first
 full candidate calibration accepted 11 controls, then rejected control 12
 (`begin-reuses-episode-generation`) because its real assertion failure was
 accompanied by an SMT resource-limit failure. The run is **failed**, not a

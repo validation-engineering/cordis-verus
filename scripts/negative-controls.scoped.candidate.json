@@ -3062,6 +3062,56 @@
         }
       ],
       "selectionRationale": "The real payload container used by Rust Runtime and typed hosts must store the exact retained payload in its selected slot. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+    },
+    {
+      "name": "cleanup-dispatch-promotes-failure",
+      "mutation": {
+        "file": "cleanup_protocol.rs",
+        "old": "CleanupCommand::Report {ticket,outcome}=>report_reply(self.complete_cleanup(ticket,outcome)),",
+        "new": "CleanupCommand::Report {ticket,outcome:_}=>report_reply(self.complete_cleanup(ticket,CleanupOutcome::Succeeded)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::cleanup",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::execute_cleanup",
+          "module": "lifecycle_state::cleanup",
+          "file": "cleanup_protocol.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).cleanup_step(old(self),command,reply),"
+        }
+      ],
+      "selectionRationale": "A failed host report must not introduce release permission in the actual shared dispatcher. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+    },
+    {
+      "name": "cleanup-dispatch-bypasses-receipt",
+      "mutation": {
+        "file": "cleanup_protocol.rs",
+        "old": "} else {self.finish_cleanup(id)}),",
+        "new": "} else {proof {self.actions.same_reflexive(); reveal(Kernel::commitments_frame);} self.kernel.finish_cleanup(id)}),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::cleanup",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::execute_cleanup",
+          "module": "lifecycle_state::cleanup",
+          "file": "cleanup_protocol.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).cleanup_step(old(self),command,reply),"
+        }
+      ],
+      "selectionRationale": "The actual shared dispatcher must require the acknowledged receipt before calling L-Unload. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
     }
   ]
 }

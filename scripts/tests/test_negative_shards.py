@@ -673,7 +673,7 @@ class PlatformPlanTests(unittest.TestCase):
                  patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
                  patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
                 plan = SHARDS.release_plan(include_macos_intel=include_intel)
-                self.assertEqual(plan['mutationCount'], 118)
+                self.assertEqual(plan['mutationCount'], 120)
                 self.assertEqual(len(plan['negative']['include']), 82 if include_intel else 42)
                 expected = [('ubuntu-24.04', 2400, 18, 55), ('macos-15', 3600, 24, 75)]
                 targets = ['linux-x64-gnu-napi8', 'darwin-arm64-napi8']
@@ -695,7 +695,7 @@ class PlatformPlanTests(unittest.TestCase):
 
     def test_growth_cannot_silently_exceed_job_budget(self):
         for include_intel in (False, True):
-            for manifest in [[], [('same',)] * 118, [(f'control-{index}',) for index in range(200)]]:
+            for manifest in [[], [('same',)] * 120, [(f'control-{index}',) for index in range(200)]]:
                 with self.subTest(count=len(manifest), intel=include_intel), self.assertRaises(RuntimeError):
                     SHARDS.release_plan(manifest, include_macos_intel=include_intel)
 
@@ -826,12 +826,12 @@ class SelectionTests(unittest.TestCase):
 
     def test_all_116_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
-        self.assertEqual(len(manifest), 118)
+        self.assertEqual(len(manifest), 120)
         for count, maximum in [(18, 7), (24, 5), (40, 3)]:
             with self.subTest(count=count):
                 pieces = [SHARDS.assigned(manifest, index, count) for index in range(count)]
                 flattened = [item for group in pieces for item in group]
-                self.assertEqual(len(flattened), 118)
+                self.assertEqual(len(flattened), 120)
                 self.assertEqual(set(flattened), set(manifest))
                 self.assertEqual(max(map(len, pieces)), maximum)
 
