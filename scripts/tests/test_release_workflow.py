@@ -147,6 +147,20 @@ class DiagnosticWorkflowTests(unittest.TestCase):
         upload = negative.split('      - name: Retain negative evidence, including failures', 1)[1]
         self.assertIn('if: always()', upload)
 
+    def test_failure_summaries_run_before_upload_without_changing_verification_status(self):
+        for job, following, kind, directory, upload in (
+                ('preflight', 'negative', 'baseline', 'negative-preflight', 'Retain baseline diagnostics, including failures'),
+                ('negative', 'quality', 'negative', 'negative-shard', 'Retain negative evidence, including failures')):
+            with self.subTest(job=job):
+                section = self.text.split('\n  ' + job + ':', 1)[1].split('\n  ' + following + ':', 1)[0]
+                expected = ('      - name: Summarize ' + kind + ' results before artifact upload\n'
+                            '        if: always()\n'
+                            '        run: python3 scripts/summarize-negative.py --input target/' + directory
+                            + ' --github-summary "$GITHUB_STEP_SUMMARY"\n')
+                self.assertIn(expected, section)
+                self.assertLess(section.index(expected), section.index('      - name: ' + upload))
+                self.assertNotIn('continue-on-error:', section)
+
     def test_conflicting_inputs_fail_before_any_release_work(self):
         script = self.step_script('Reject diagnostic runs that request a draft release')
         for diagnostic in ('false', 'true'):

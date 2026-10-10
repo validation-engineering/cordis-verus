@@ -120,6 +120,8 @@ pub proof fn swap_frame<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X
     },
 {
     hide(og::primitive_theory);hide(c::swap_states);
+    // Compose the checked swap/suffix contracts without reopening their interpreters.
+    hide(g::step);hide(g::well_formed);hide(tr::transport);hide(unload::crossing_guard);
     c::adjacent_swap(eq,lib,programs,a,labels,i);
     c::swap_construction(lib,programs,a,labels,i);
     c::swap_suffix(eq,lib,programs,a,labels,i);

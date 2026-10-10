@@ -604,6 +604,9 @@ pub proof fn example_execution()
         example_trace().first().state.control.fibers[1usize].provisions.is_empty(),example_trace().last().state.control.fibers[1usize].phase==Phase::Unloading,
         example_trace().first().history.len()==1,example_trace().last().history.len()==3,
         example_trace().last().state.tables[0usize][ex::key(0)]==22,
+        example_trace().last().state.accumulators[1usize]==seq![1nat],
+        example_trace().last().state.accumulators[2usize]==seq![2nat],
+        p::owns(example_trace().first().state,ex::key(0),0),p::owns(example_trace().last().state,ex::key(0),0),
 {
     reveal(example_trace);example_interface();let lib=ex::library();let programs=example_programs();
     syntax::constructor_member(lib,programs,0,ex::provided(0),ex::provided(0),false);
@@ -650,6 +653,37 @@ pub proof fn example_execution()
     }
 }
 
+// Compute the concrete forward construction separately from the general
+// deletion theorem and from the owner's inverse application.
+proof fn example_target_values()
+    ensures {
+        let source=example_trace();let target=delete(ex::library(),example_programs(),source,example_labels(),1);
+        &&& target.first().history.len()==1 && target.last().history.len()==2
+        &&& target.last().history[0]==source.first().history[0]
+        &&& target.last().state.accumulators[2usize]==seq![1nat]
+        &&& source.last().state.accumulators[2usize]==seq![2nat]
+        &&& p::owns(target.last().state,ex::key(0),0)
+        &&& target.last().state.tables[0usize][ex::key(0)]==17
+        &&& target.last().state.control.fibers[1usize].retired && target.last().state.control.fibers[1usize].phase==Phase::Inactive
+    },
+{
+    hide(g::step);hide(replay::fragment);
+    example_execution();
+    reveal(example_trace);reveal_with_fuel(delete,7);reveal_with_fuel(labels_without,7);
+    let source=example_trace();let target=delete(ex::library(),example_programs(),source,example_labels(),1);
+    let binding=Binding {key:0,realm:0,provider:0};
+    assert(lift::names_key(binding,ex::key(0)));
+    assert(target[1].state.control.fibers[2usize].committed.contains(binding));
+    assert(exists|b:Binding| target[1].state.control.fibers[2usize].committed.contains(b) && lift::names_key(b,ex::key(0)));
+    assert(lift::resolve(target[1].state,2,ex::key(0))==Some(0usize));
+    assert(g::run(ex::library(),example_programs()(2)(true),target[1].state,2).is_some());
+    assert(target.last().state.accumulators[2usize] =~= seq![1nat]);assert(source.last().state.accumulators[2usize] =~= seq![2nat]);
+    assert(target.first().history.len()==1 && target.last().history.len()==2);
+    assert(target.last().history[0]==source.first().history[0]);
+    assert(p::owns(target.last().state,ex::key(0),0));
+    assert(target.last().state.tables[0usize][ex::key(0)]==17);
+    assert(target.last().state.control.fibers[1usize].retired && target.last().state.control.fibers[1usize].phase==Phase::Inactive);
+}
 /// Both actors write the same committed provider cell. The initial Provision
 /// remains authentic history entry zero; the foreign call is re-executed on 10
 /// instead of 15, mints target token one and yields 17 at the closed endpoint.
@@ -667,10 +701,19 @@ pub proof fn actual_shared_terminal()
         &&& target.last().state.control.fibers[1usize].retired && target.last().state.control.fibers[1usize].phase==Phase::Inactive
     },
 {
-    example_execution();example_interface();terminal_deletion(ex::equality(),ex::library(),example_programs(),example_trace(),example_labels(),1);
-    reveal(example_trace);reveal_with_fuel(delete,7);reveal_with_fuel(labels_without,7);reveal_with_fuel(g::restore,2);
+    hide(g::step);hide(og::primitive_theory);
+    hide(delete);hide(labels_without);hide(g::unload);
+    example_execution();example_interface();
+    delete_execution(ex::equality(),ex::library(),example_programs(),example_trace(),example_labels(),1);
+    terminal_deletion(ex::equality(),ex::library(),example_programs(),example_trace(),example_labels(),1);
+    example_target_values();
+    // Recover the concrete terminal value from the proved projected equality.
     let source=example_trace();let target=delete(ex::library(),example_programs(),source,example_labels(),1);
-    assert(target.last().state.accumulators[2usize] =~= seq![1nat]);assert(source.last().state.accumulators[2usize] =~= seq![2nat]);
+    let terminal=g::unload(source.last(),1);let key=ex::key(0);
+    p::unique_owner(terminal.state);p::unique_owner(target.last().state);
+    assert(p::owns(terminal.state,key,0));
+    p::lookup(terminal.state,ISet::full(),key,0);
+    p::lookup(target.last().state,ISet::full(),key,0);
 }
 
 } // verus!

@@ -239,6 +239,13 @@ pub proof fn control_transport<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libr
     batch_state::own_words_push(actions,fu::Action::Identity);
 }
 
+// Check the concrete child inverse before composing its transport contracts.
+proof fn child_inverse_state<U>(a:s::State<U>,actor:usize,child:usize)
+    ensures g::undo(g::Receipt::<U>::Child {actor,child},a)==if s::registered(a,child) {
+        Some(s::with_control(a,crate::global::retire_fiber(a.control,child)))
+    } else {None},
+{ }
+
 /// One genuine captured-child retirement is transported through the common
 /// registry. Retirement may also affect the deleted owner's own retired bit.
 pub proof fn inverse_transport<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<A,X,U,B>,programs:g::Programs<A,X,U,B,I>,a:g::Configuration<U,I>,target:g::Configuration<U,I>,offset:nat,owner:usize,actor:usize,child:usize)
@@ -255,6 +262,8 @@ pub proof fn inverse_transport<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Libr
         &&& forall|n:usize|s::registered(a.state,n) ==> r::interface_same(a.state.control.fibers[n],left.state.control.fibers[n]) && a.state.control.fibers[n].committed==left.state.control.fibers[n].committed
     },
 {
+    hide(og::primitive_theory);hide(g::undo);
+    child_inverse_state(a.state,actor,child);child_inverse_state(target.state,actor,child);
     let left=with_state(a,g::undo(g::Receipt::<U>::Child {actor,child},a.state).unwrap());
     ch::concrete_child_retirement(a.state,child);assert(g::step(lib,programs,a,left,child,r::Rule::Retire));
     ol::configuration_preservation(eq,lib,programs,a,left,child,r::Rule::Retire);ol::frame(eq,lib,programs,a,left,child,r::Rule::Retire);

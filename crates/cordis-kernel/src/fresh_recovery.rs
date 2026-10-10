@@ -313,6 +313,8 @@ pub proof fn actual_terminal_recovery<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:
     ensures states[u+1].state.tables[owner].is_empty(),
         p::project(states[u+1].state,ISet::full())==e::foreign_state(events(lib,programs,states.subrange(b,u+1),labels.subrange(b,u),owner),p::project(states[b].state,ISet::full())),
 {
+    // Compose episode replay and terminal restoration without reopening their recursive semantics.
+    hide(events);hide(e::foreign_state);hide(d::primitive_theory);hide(independent_keys);
     og::exact_theory(eq,lib);
     actual_episode_recovery(eq,lib,programs,states,labels,owner,b,u);
     fs::empty_well_formed(lib,programs);fs::execution_preservation(eq,lib,programs,states,labels);

@@ -65,6 +65,14 @@ This is opt-in; ordinary release runs retain the default stop-on-failure behavio
 inside each shard. Diagnostic runs keep the same full-crate checks, resource limits
 and process cleanup. They retain raw artifacts even on failure and do not use
 `continue-on-error`. A shard still exits unsuccessfully if any control fails.
+Before artifact upload, both preflight and shard jobs print a compact JSON summary
+and append the same reported results to the Actions job summary. This includes the
+source commit, run/attempt, baseline result, per-control outcomes and diagnostic
+coverage. A failed upload therefore need not hide which controls ran. Missing,
+interrupted or malformed reports remain explicitly incomplete. This display does
+not reconstruct missing raw evidence and is never accepted by the release collector.
+Verification and upload failures retain their original job status.
+
 The quality and draft-release jobs are skipped for diagnostic runs, even if every
 control passes. Requesting both diagnostic mode and a draft release is rejected in
 the planning job before verification starts.
@@ -252,3 +260,21 @@ graph/binding preservation into private proved helpers. The loop consumes their
 contracts; the executable filter and its public postconditions remain unchanged.
 An inverted live-record condition must fail a checked premise, and any additional
 resource error still rejects the whole negative result.
+
+`mixed_grammar::restore_retires` consumes a separately checked single-child inverse
+contract while keeping `undo` opaque during journal induction. The orchestration
+swap frame composes the existing swap and suffix contracts without reopening the
+transition, transport or crossing-guard definitions. The concrete shared recovery
+example separates forward target facts from the general deletion theorem and
+uses its proved projection equality to obtain the terminal value. Existing public
+requirements and guarantees are preserved. The example trace additionally exposes
+its actual owner and foreign journal tokens and provider ownership, and the forward
+example checks the surviving call against its committed provider. Fresh
+terminal recovery keeps the episode replay predicates opaque when composing
+the checked episode and terminal contracts. No executable transition,
+mutation definition or solver resource limit is changed.
+
+Child-inverse transport checks its concrete retirement-state equation in
+`child_inverse_state` before composing the existing contracts. The active-child
+example uses `restore_retires` directly; the underlying child inverse remains
+responsible for the retirement bit in the same whole-crate verification.

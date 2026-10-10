@@ -642,6 +642,15 @@ pub proof fn execution_ordering<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:Librar
     }
 }
 
+// Isolate the actual child inverse from the recursive journal induction.
+proof fn child_inverse_retires<U>(receipt:Receipt<U>,a:s::State<U>,child:usize)
+    requires captured_child(receipt)==Some(child),undo(receipt,a).is_some(),
+    ensures s::registered(undo(receipt,a).unwrap(),child),
+        undo(receipt,a).unwrap().control.fibers[child].retired,
+{
+    match receipt {Receipt::Child {..}=>{},Receipt::Table {..}=>{}}
+}
+
 /// A completed mixed LIFO restore retires every captured child, including a
 /// child that is still Active. Other inverses cannot undo that retirement bit.
 pub proof fn restore_retires<A,X,U,B,I>(lib:Library<A,X,U,B>,programs:Programs<A,X,U,B,I>,history:Seq<Entry<U,I>>,tokens:Seq<nat>,a:s::State<U>,actor:usize)
@@ -652,6 +661,7 @@ pub proof fn restore_retires<A,X,U,B,I>(lib:Library<A,X,U,B>,programs:Programs<A
             && restore(history,tokens,a,actor).unwrap().control.fibers[child].retired,
     decreases tokens.len(),
 {
+    hide(undo);
     assert forall|token:nat,child:usize| tokens.contains(token) && kind(history)(token)==Some(child)
         implies s::registered(restore(history,tokens,a,actor).unwrap(),child)
             && restore(history,tokens,a,actor).unwrap().control.fibers[child].retired by {
@@ -665,7 +675,7 @@ pub proof fn restore_retires<A,X,U,B,I>(lib:Library<A,X,U,B>,programs:Programs<A
         assert(z==restore(history,tokens.drop_last(),next,actor).unwrap());
         assert(ch::recovery_frame(next,z));
         if token==last {
-            assert(captured_child(receipt)==Some(child));assert(s::registered(next,child));assert(next.control.fibers[child].retired);
+            assert(captured_child(receipt)==Some(child));child_inverse_retires(receipt,a,child);assert(s::registered(next,child));assert(next.control.fibers[child].retired);
             assert(s::registered(z,child));assert(z.control.fibers[child].retired);
         } else {
             assert(i<tokens.len()-1);assert(tokens.drop_last()[i]==token);assert(tokens.drop_last().contains(token));

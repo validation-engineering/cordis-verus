@@ -118,6 +118,9 @@ pub proof fn parent_recovers_with_active_child()
     reveal(trace);let states=trace();
     g::journal_child_domains(library(),programs(),states[8],0);
     assert(states[8].state.accumulators[0usize] =~= seq![0nat,2nat]);
+    g::restore_retires(library(),programs(),states[8].history,states[8].state.accumulators[0usize],states[8].state,0);
+    assert(states[8].state.accumulators[0usize].contains(0nat));
+    assert(g::kind(states[8].history)(0nat)==Some(1usize));
     reveal_with_fuel(g::restore,3);
 }
 /// In a second real prefix the child is retired before it starts. The original

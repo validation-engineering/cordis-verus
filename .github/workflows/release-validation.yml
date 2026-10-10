@@ -89,6 +89,9 @@ jobs:
         run: ./scripts/install-verus.sh
       - name: Diagnose unchanged full-crate baseline before fan-out
         run: exec python3 scripts/negative-shards.py preflight --output target/negative-preflight --threads ${{ matrix.threads }} --timeout ${{ matrix.timeout }}
+      - name: Summarize baseline results before artifact upload
+        if: always()
+        run: python3 scripts/summarize-negative.py --input target/negative-preflight --github-summary "$GITHUB_STEP_SUMMARY"
       - name: Retain baseline diagnostics, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -143,6 +146,9 @@ jobs:
             diagnostic_args+=(--keep-going)
           fi
           exec python3 scripts/negative-shards.py run --shard-index ${{ matrix.shard }} --shard-count ${{ matrix.shardCount }} --output target/negative-shard --jobs 1 --threads ${{ matrix.threads }} --timeout ${{ matrix.timeout }} --compile-timeout ${{ matrix.compileTimeout }} --preflight target/negative-preflight "${diagnostic_args[@]}"
+      - name: Summarize negative results before artifact upload
+        if: always()
+        run: python3 scripts/summarize-negative.py --input target/negative-shard --github-summary "$GITHUB_STEP_SUMMARY"
       - name: Retain negative evidence, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
