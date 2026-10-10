@@ -1300,6 +1300,12 @@ def mutation_manifest():
             '} else {self.finish_cleanup(id)}),',
             '} else {proof {self.actions.same_reflexive(); reveal(Kernel::commitments_frame);} self.kernel.finish_cleanup(id)}),',
         ),
+        (
+            'fresh-replay-omits-foreign-unload',
+            'fresh_recovery.rs',
+            'else if rule==r::Rule::Unload {own_word(a,actor).reverse()} else {Seq::empty()}',
+            'else if rule==r::Rule::Unload {Seq::empty()} else {Seq::empty()}',
+        ),
     ]
 
 

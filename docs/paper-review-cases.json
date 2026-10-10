@@ -670,6 +670,51 @@
           "file": "crates/cordis-kernel/src/terminal_replay.rs",
           "symbol": "terminal_replay",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_recovery.rs",
+          "symbol": "step_projection",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_recovery.rs",
+          "symbol": "actual_episode_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_recovery.rs",
+          "symbol": "actual_terminal_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/terminal_episode.rs",
+          "symbol": "fresh_installed_interval",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "foreign_replay",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "value_observation_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "terminal_recovery",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "terminal_replay_from_source",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "terminal_replay",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -767,6 +812,16 @@
           "package": "cordis-kernel",
           "target": "terminal_replay",
           "name": "failed_command_after_terminal_unload_keeps_foreign_replay_of_the_successful_prefix"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "fresh_terminal_replay",
+          "name": "fresh_terminal_recovery_keeps_allocated_child_values_and_foreign_cleanup"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "fresh_terminal_replay",
+          "name": "fresh_reactivated_episode_replays_new_choices_and_cross_provider_effects"
         }
       ],
       "negativeControl": {

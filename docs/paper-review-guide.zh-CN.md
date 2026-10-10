@@ -245,8 +245,18 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   foreign Unload 使用实际捕获的 inverses。定义 51 的值投影包含 Loading 表，不是
   只发布 Active 的投影。允许 owner Child，后续命令失败不排除成功前缀结论。值重放
   中缺 key 的操作是恒等，因此**不**声称删除 owner 步骤后仍有合法生命周期执行，
-  也不声称 registry 身份恢复。Fresh 动态 choice 重放、任意宿主效果及整篇恢复仍是
-  独立义务；定理 68／推论 69 保持 partial。
+  也不声称 registry 身份恢复。
+- [`fresh_recovery.rs`](../crates/cordis-kernel/src/fresh_recovery.rs) 沿每次 Fresh
+  源 landing 的实际分配 choice 使用同一套 receipt 和值代数。
+  [`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+  将该历史接到真实 Fresh `run_script` 的 `terminal_recovery(bank)` 后置条件。
+  Begin/Unload 区间由日志导出，无须假设；foreign 清理使用实际捕获的 inverse
+  journal，包括 Begin 前产生的记录。两项 Fresh 回归覆盖重复激活时不同 child
+  身份、child 值保留、两个 provider 及替换、foreign 清理和终态 Unload 后的失败
+  命令。负例候选 `fresh-replay-omits-foreign-unload` 删去逆操作序列后，源单步投影
+  证明会拒绝它；选定证明检查仍属实验。两种 driver 合同都针对终态值，不保证合法
+  删除 owner 后的生命周期执行。任意宿主效果与整篇恢复仍有独立义务，定理
+  68／推论 69 保持 partial。
 
 **执行检查：**
 
@@ -270,6 +280,8 @@ cargo test --offline -p cordis-kernel --test owner_table_recovery failed_bootstr
 cargo test --offline -p cordis-kernel --test owner_table_recovery mixed_script_republishes_same_registration_after_dispatcher_unload -- --exact
 cargo test --offline -p cordis-kernel --test terminal_replay terminal_owner_unload_absorbs_consumers_of_its_new_service_but_keeps_child_values -- --exact
 cargo test --offline -p cordis-kernel --test terminal_replay failed_command_after_terminal_unload_keeps_foreign_replay_of_the_successful_prefix -- --exact
+cargo test --offline -p cordis-kernel --test fresh_terminal_replay fresh_terminal_recovery_keeps_allocated_child_values_and_foreign_cleanup -- --exact
+cargo test --offline -p cordis-kernel --test fresh_terminal_replay fresh_reactivated_episode_replays_new_choices_and_cross_provider_effects -- --exact
 ```
 
 第一个测试暴露了公开 Kernel 路径上因名称不存在而失败的情况。持有内部状态的

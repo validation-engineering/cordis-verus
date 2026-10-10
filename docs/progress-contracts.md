@@ -23,7 +23,7 @@ is still **partial**; these contracts do not establish paper-wide progress.
 | Definitions 53–54 and Table 1 | Target/committed identities determine whether loading, iteration or guarded unloading may proceed. | `semantics.rs` and `refinement.rs` describe these guards. The executable `Kernel` and `StageProtocol` contracts below connect selected guards to actual calls. |
 | Theorem 73(1) | A nonquiet state has an applicable lifecycle rule under the theorem's hypotheses. | `draining_can_progress` proves the existence of an enabled cleanup in its all-Unloading profile. The new `begin_cleanup` success equivalence makes that guard sufficient for the real kernel call. Kernel iteration/finish now accept exactly under the paper Loading/coherent guard. Verified drivers connect captured bindings to this guard; complete host capture and general continuation domains remain separate obligations. |
 | Theorem 73(2) | Bound per-fiber steps and target changes, then conclude that maximal lifecycle sequences end quietly. | `termination.rs` contains finite-trace bounds and a construction of a quiet execution under its fixed-registry, footprint, provision and continuation-rank premises. The actual `ProgramEpisode` runner derives finite execution from checked forward instructions. `FreshDriver::run_until_blocked` now bounds repeated real steps of one actor, including child registration, until terminal publication or the first checked error. This is not the full dynamic-registry theorem. |
-| Corollary 69 | After terminal Unload, tables agree with the foreign-step replay modulo observation, and the owner table is empty. | `ProgramEpisode::execute_and_recover` restores supplied cells for its fixed program profile. Mixed/Fresh `unload` now accepts exactly when cleanup is permitted and its current LIFO inverse sequence is defined. Actual-history coverage now also proves that successful Unload empties the owner table under `owner_table_recovery`. Matching terminal Mixed script reports also establish the foreign-only value equation below. Fresh replay composition and arbitrary external resources remain separate. |
+| Corollary 69 | After terminal Unload, tables agree with the foreign-step replay modulo observation, and the owner table is empty. | `ProgramEpisode::execute_and_recover` restores supplied cells for its fixed program profile. Mixed/Fresh `unload` now accepts exactly when cleanup is permitted and its current LIFO inverse sequence is defined. Actual-history coverage now also proves that successful Unload empties the owner table under `owner_table_recovery`. Matching terminal Mixed/Fresh script reports also establish the foreign-only value equation below, using actual Fresh allocation choices. Arbitrary external resources and general lifecycle deletion remain separate. |
 | Theorem 71(2) | An episode diverted during loading closes. | The ledger records a counterexample to the unconditional claim about the sequences allowed by the paper. Proving an eventual closure under additional scheduling assumptions would be a corrected, conditional claim. |
 | Definition 74 / Theorem 80 | Describe support and establish canonical form/confluence. | Support is a state equation; confluence also needs representation, transport and commutation proofs. A temporal library does not supply those missing connections. |
 
@@ -734,15 +734,51 @@ though its original Begin/Step would fail without that owner. This boundary is
 part of the statement, not a relaxation of the real driver's checks.
 
 This gives a concrete Theorem 68/Corollary 69 terminal value equation for Mixed
-scripts. Fresh's dynamic-choice source bridge has not yet been connected to
-this report contract; Fresh retains the inverse-domain and empty-owner-table
-results above. Arbitrary plugin scalar operations, host effects, legal deletion
-of lifecycle executions and global progress remain separate; the paper-wide
-obligations stay **partial**. The two
+scripts. The Fresh counterpart is connected below. Arbitrary plugin scalar
+operations, host effects, legal deletion of lifecycle executions and global
+progress remain separate; the paper-wide obligations stay **partial**. The two
 [terminal replay regressions](../crates/cordis-kernel/tests/terminal_replay.rs)
 compare real final values with explicit foreign-only calculations, including
 owner-created service consumers and child values, an interior foreign Unload,
 and a checked error immediately after the terminal successful Unload.
+
+## Terminal Fresh scripts retain their actual allocation choices
+
+[`fresh_recovery.rs`](../crates/cordis-kernel/src/fresh_recovery.rs) connects
+Fresh source transitions to the same value-event algebra. Each landing
+instantiates its installed instruction with that transition's **actual child
+choice**; it does not rewrite a fixed program with an assumed child identity.
+`actual_episode_recovery` derives the event and receipt history from the real
+execution. `actual_terminal_recovery` composes it with the actual final Unload
+and the owner-slot coverage theorem. Foreign Unloads retain their captured
+inverse journals, including receipts produced before the selected episode.
+
+[`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs),
+exposed as `mixed_driver::fresh::terminal_replay`, connects that theorem to the
+real Fresh `ScriptReport`. Its `terminal_recovery(bank)` is an actual
+`run_script` postcondition. Matching Begin and final successful owner Unload
+events identify the episode; `fresh_installed_interval` derives its installed
+interval. `report.terminal_replay(bank, owner, begin)` extracts the source
+witness, **empty owner table** and **returned value projection equal to the
+foreign-only replay**. Scalar commutation is proved for the concrete Xor
+library, with no caller-supplied source trace or commutation assumption.
+
+The same boundaries as Mixed apply: replay starts immediately after Begin,
+includes Loading values, and is an identity-extended value calculation, not a
+legal owner-deleted lifecycle execution or equality of registry/allocator state.
+The report may contain a later error if the selected Unload remains its last
+successful transition. This terminal equation is not automatically supplied by
+bootstrap or every individual mutator. All added source histories and replay
+calculations are erased proof data; no runtime history buffer is added.
+
+Two [Fresh regressions](../crates/cordis-kernel/tests/fresh_terminal_replay.rs)
+exercise real allocation after interleaved insertion, child values surviving
+parent recovery, foreign cleanup, repeated activation with different child
+identities, two providers, provider replacement and a checked error immediately
+after terminal Unload. The canonical negative candidate
+`fresh-replay-omits-foreign-unload` removes the captured inverse word from value
+replay; its selected source-step projection proof rejects this omission. That
+selected check is experimental evidence, not full release-negative acceptance.
 
 ## From a new machine through setup and execution
 
@@ -851,8 +887,8 @@ for a whole-system progress result. Lemma 57 and Theorem 73 remain **partial**.
    need their own domain equivalences. Reachable histories now establish inverse
    definedness for the complete actual Unit/Child/Provision/Xor journal. This
    concrete inverse-domain result now composes with a terminal foreign-only value
-   equation for Mixed script reports. Fresh dynamic-choice replay and host-effect
-   contracts remain separate.
+   equation for Mixed/Fresh script reports, retaining actual dynamic child
+   choices. General lifecycle deletion and host-effect contracts remain separate.
    Individual error variants are not characterized by the preparation predicates.
    Compose execution across multiple actors, dynamic children and recovery with
    the paper's global count/rank argument. These entry points do not instantiate

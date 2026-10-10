@@ -301,9 +301,21 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   the Active-only publication. Owner Child is allowed, and a subsequent failed
   command does not exclude the successful-prefix result. Missing-key operations
   are identity in the value replay, so it does **not** assert a legal lifecycle
-  execution after deleting owner steps or restored registry identities. Fresh
-  dynamic-choice replay, arbitrary host effects and full-paper recovery remain
-  separate; Theorem 68/Corollary 69 retain their partial status.
+  execution after deleting owner steps or restored registry identities.
+- [`fresh_recovery.rs`](../crates/cordis-kernel/src/fresh_recovery.rs) follows
+  actual allocation choices in each Fresh source landing, using the same receipt
+  and value algebra. [`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+  connects that history to the actual Fresh `run_script` postcondition
+  `terminal_recovery(bank)`. The matching Begin/Unload interval is derived from
+  the log, not assumed; foreign cleanup uses the actual captured inverse
+  journals, even when a receipt predates Begin. The two Fresh regressions cover
+  repeated activation with different child identities, surviving child values,
+  two providers and replacement, foreign cleanup and a failed command after
+  terminal Unload. The negative candidate `fresh-replay-omits-foreign-unload`
+  makes the source-step projection proof reject an omitted inverse word; selected
+  proof checks remain experimental. Both driver contracts concern terminal
+  values, not legal owner-deleted lifecycle execution. Arbitrary host effects
+  and full-paper recovery remain separate; Theorem 68/Corollary 69 stay partial.
 
 **Executable review:**
 
@@ -327,6 +339,8 @@ cargo test --offline -p cordis-kernel --test owner_table_recovery failed_bootstr
 cargo test --offline -p cordis-kernel --test owner_table_recovery mixed_script_republishes_same_registration_after_dispatcher_unload -- --exact
 cargo test --offline -p cordis-kernel --test terminal_replay terminal_owner_unload_absorbs_consumers_of_its_new_service_but_keeps_child_values -- --exact
 cargo test --offline -p cordis-kernel --test terminal_replay failed_command_after_terminal_unload_keeps_foreign_replay_of_the_successful_prefix -- --exact
+cargo test --offline -p cordis-kernel --test fresh_terminal_replay fresh_terminal_recovery_keeps_allocated_child_values_and_foreign_cleanup -- --exact
+cargo test --offline -p cordis-kernel --test fresh_terminal_replay fresh_reactivated_episode_replays_new_choices_and_cross_provider_effects -- --exact
 ```
 
 The first test exposes the missing-name failure on the public Kernel path.

@@ -5,8 +5,8 @@
 //! may retire the owner, but never removes it or ends the installed episode.
 #[cfg(verus_keep_ghost)]
 use crate::{
-    dependent_grammar as d, grammar_recovery as gr, mixed_grammar as mx, refinement as r,
-    semantics as s, Phase, Port,
+    dependent_grammar as d, fresh_semantics as fs, grammar_recovery as gr, mixed_grammar as mx,
+    observational_grammar as og, refinement as r, semantics as s, Phase, Port,
 };
 use vstd::prelude::*;
 
@@ -76,6 +76,74 @@ pub proof fn mixed_installed_interval<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:
     assert(gr::installed(states[begin+1].state,owner));
     assert forall|i:int| begin<i<=end implies gr::installed(states[i].state,owner) by {
         mixed_installed_at(eq,lib,programs,states,labels,owner,begin+1,i);
+    }
+}
+
+pub proof fn fresh_installed_step<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:fs::Programs<A,X,U,B,I>,a:mx::Configuration<U,I>,z:mx::Configuration<U,I>,actor:usize,rule:r::Rule,choice:Option<usize>,owner:usize)
+    requires d::primitive_theory(eq,lib),fs::well_formed(lib,programs,a),
+        fs::step(lib,programs,a,z,actor,rule,choice),gr::installed(a.state,owner),
+        actor!=owner || rule!=r::Rule::Unload,
+    ensures gr::installed(z.state,owner),
+{
+    og::exact_theory(eq,lib);
+    fs::frame(eq,lib,programs,a,z,actor,rule,choice);
+    if mx::landing(a,z,rule) {
+        let id=a.current[actor].unwrap();
+        fs::run_members(eq,lib,programs,a.state,actor,id,choice);
+        fs::run_admissible(eq,lib,programs(actor)(id),a.state,actor,choice);
+    }
+    if rule==r::Rule::Unload {
+        fs::restore_preservation(lib,programs,a.history,a.state.accumulators[actor],a.state,actor);
+    }
+    if actor==owner {
+        assert(rule!=r::Rule::Insert && rule!=r::Rule::Remove && rule!=r::Rule::Begin);
+        match rule {
+            r::Rule::Retire=>{},
+            r::Rule::Iter | r::Rule::Finish | r::Rule::Divert | r::Rule::Leave=>{},
+            _=>{assert(false);},
+        }
+    } else {
+        assert(s::registered(z.state,owner));
+        assert(z.state.control.fibers[owner].phase==a.state.control.fibers[owner].phase);
+    }
+}
+
+proof fn fresh_installed_at<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:fs::Programs<A,X,U,B,I>,states:Seq<mx::Configuration<U,I>>,labels:Seq<fs::Label>,owner:usize,start:int,index:int)
+    requires d::primitive_theory(eq,lib),fs::execution(lib,programs,states,labels),
+        forall|i:int| 0<=i<states.len() ==> fs::well_formed(lib,programs,states[i]),
+        0<=start<=index<states.len(),gr::installed(states[start].state,owner),
+        forall|i:int| start<=i<index ==> (labels[i].0,labels[i].1)!=(owner,r::Rule::Unload),
+    ensures gr::installed(states[index].state,owner),
+    decreases index-start,
+{
+    og::exact_theory(eq,lib);
+    if index>start {
+        fresh_installed_at(eq,lib,programs,states,labels,owner,start,index-1);
+        let label=labels[index-1];
+        assert(fs::step(lib,programs,states[index-1],states[index],label.0,label.1,label.2));
+        assert((label.0,label.1)!=(owner,r::Rule::Unload));
+        fresh_installed_step(eq,lib,programs,states[index-1],states[index],label.0,label.1,label.2,owner);
+    }
+}
+
+/// The observable Begin/Unload cut identifies one continuous installed
+/// episode. Installation of intermediate states is a conclusion, not a
+/// condition supplied by a caller of the terminal-recovery theorem.
+pub proof fn fresh_installed_interval<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:fs::Programs<A,X,U,B,I>,states:Seq<mx::Configuration<U,I>>,labels:Seq<fs::Label>,owner:usize,begin:int,end:int)
+    requires d::primitive_theory(eq,lib),fs::execution(lib,programs,states,labels),
+        states.first()==mx::empty::<U,I>(),0<=begin<end<labels.len(),
+        (labels[begin].0,labels[begin].1)==(owner,r::Rule::Begin),(labels[end].0,labels[end].1)==(owner,r::Rule::Unload),
+        forall|i:int| begin<i<end ==> (labels[i].0,labels[i].1)!=(owner,r::Rule::Unload),
+    ensures forall|i:int| begin<i<=end ==> gr::installed(states[i].state,owner),
+{
+    og::exact_theory(eq,lib);
+    fs::empty_well_formed(lib,programs);
+    fs::execution_preservation(eq,lib,programs,states,labels);
+    assert(fs::step(lib,programs,states[begin],states[begin+1],owner,r::Rule::Begin,None));
+    assert(states[begin+1].state.control.fibers[owner].phase==Phase::Loading);
+    assert(gr::installed(states[begin+1].state,owner));
+    assert forall|i:int| begin<i<=end implies gr::installed(states[i].state,owner) by {
+        fresh_installed_at(eq,lib,programs,states,labels,owner,begin+1,i);
     }
 }
 

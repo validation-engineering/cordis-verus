@@ -172,6 +172,15 @@ Component premise. See the [paper audit](paper-audit.md).
 
 ## Latest proof additions
 
+- Actual Fresh script returns now establish the terminal foreign-only value
+  equation alongside Mixed. The proof follows real dynamic child allocation
+  choices, retained inverse journals and cross-provider values through the same
+  executable interpreter. Matching terminal Unload empties the owner table and
+  preserves the foreign value replay, including a later checked error. See the
+  [source-to-result contract](progress-contracts.md#terminal-fresh-scripts-retain-their-actual-allocation-choices).
+  This covers the concrete Unit/Child/Provision/Xor language; general lifecycle
+  deletion, arbitrary host effects and global progress remain separate.
+
 - The scoped [host cleanup protocol](cleanup-protocol.md) now composes all five
   requested safety obligations: request admission, outcome acknowledgement,
   dependency retention, explicit retry and old-ticket rejection. The production
@@ -195,14 +204,14 @@ Component premise. See the [paper audit](paper-audit.md).
 
 ## Validation still open
 
-There are **120 canonical negative mutations**. A complete full-crate negative
+There are **121 canonical negative mutations**. A complete full-crate negative
 run for this source has not passed. The earlier 1,927-obligation snapshot's
 full quality run stopped on `mixed-removal-ignores-retention` after a timeout.
 Partial contract diagnostics were not accepted as a passed result.
 
 The opt-in scoped-negative checker and candidate selector manifest are
 experimental. Unit tests and selected probes do not establish a completed
-120-control calibration and do not replace the full release gate. The first
+121-control calibration and do not replace the full release gate. The first
 full candidate calibration accepted 11 controls, then rejected control 12
 (`begin-reuses-episode-generation`) because its real assertion failure was
 accompanied by an SMT resource-limit failure. The run is **failed**, not a

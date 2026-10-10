@@ -21,6 +21,7 @@ pub mod effects;
 pub mod entangled;
 pub mod episode;
 pub mod foundations;
+pub mod fresh_recovery;
 pub mod global;
 pub mod grammar_lift;
 pub mod grammar_ordering;

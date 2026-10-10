@@ -20,7 +20,7 @@
 | 定义 53–54、表 1 | 当前目标与已提交身份决定能否开始加载、迭代或受保护地卸载。 | `semantics.rs`、`refinement.rs` 描述这些守卫。下文的 `Kernel`、`StageProtocol` 合同把部分守卫接到真实调用。 |
 | 定理 73(1) | 在定理前提下，非静止状态至少有一条生命周期规则可应用。 | `draining_can_progress` 在全部已安装节点都处于待恢复 Unloading 的范围内证明存在可清理节点。新的 `begin_cleanup` 成功等价合同使这一守卫足以保证真实内核调用成功。内核 iteration/finish 现在恰好在论文的 Loading/coherent 守卫下成功；已验证 driver 将捕获的绑定接到该守卫；完整宿主捕获和一般 continuation 定义域仍有独立义务。 |
 | 定理 73(2) | 限制各节点步数、目标变化次数，进而说明极大生命周期序列以静止状态结束。 | `termination.rs` 已有有限轨迹计数和到达静止状态的构造，要求固定注册表、局部表修改范围、最终完整发布和 continuation 的递减秩。实际 `ProgramEpisode` 执行器从经过检查的前向指令推出有限执行；`FreshDriver::run_until_blocked` 还对单个 actor 的真实重复 step（含 child 注册）给出有限界，直到终态发布或首个实际错误。这不是完整的动态注册表结论。 |
-| 推论 69 | 终态 Unload 后，表与其他 actor 步骤的重放观察等价，owner 表为空。 | `ProgramEpisode::execute_and_recover` 在固定程序范围内恢复传入的资源单元。Mixed/Fresh `unload` 现恰好在允许清理且当前 LIFO 逆序列有定义时成功；真实历史覆盖还证明：在 `owner_table_recovery` 下，成功 Unload 清空 owner 表。匹配的 Mixed 脚本终态报告还建立下述 foreign-only 值方程；Fresh 重放组合和任意外部资源仍是独立义务。 |
+| 推论 69 | 终态 Unload 后，表与其他 actor 步骤的重放观察等价，owner 表为空。 | `ProgramEpisode::execute_and_recover` 在固定程序范围内恢复传入的资源单元。Mixed/Fresh `unload` 现恰好在允许清理且当前 LIFO 逆序列有定义时成功；真实历史覆盖还证明：在 `owner_table_recovery` 下，成功 Unload 清空 owner 表。匹配的 Mixed/Fresh 脚本终态报告还建立下述 foreign-only 值方程，保留 Fresh 的真实分配 choice；任意外部资源与一般生命周期删除仍是独立义务。 |
 | 定理 71(2) | 加载中发生 Divert 的 episode 会闭合。 | 清单记录了原文允许的序列对无条件结论的反例。若加入调度条件证明最终闭合，得到的是修正后的条件性结论。 |
 | 定义 74、定理 80 | 描述支持关系，并建立规范形、合流性。 | 支持关系是状态方程；合流还需要表示、轨迹传递和交换证明。时序库不会自动提供这些缺失连接。 |
 
@@ -565,12 +565,41 @@ Xor mask，且这些变换可交换，不要求调用者额外给出交换假设
 consumer，在反事实值计算中仍可有定义，但若没有该 owner，其原 Begin/Step 可能
 失败。这是命题明确的边界，不是放宽真实 driver 的检查。
 
-这为 Mixed 脚本建立定理 68／推论 69 的具体终态值方程。Fresh 的动态 choice 源桥
-尚未接入此报告合同；Fresh 保留上文的逆域和空 owner 表结论。任意插件 scalar、
+这为 Mixed 脚本建立定理 68／推论 69 的具体终态值方程；Fresh 对应桥见下节。任意插件 scalar、
 宿主效果、合法的生命周期删除执行及全局进展仍有独立义务，论文相关条目保持
 **partial**。两项[终态重放回归](../crates/cordis-kernel/tests/terminal_replay.rs)
 将真实最终值与明确的 foreign-only 计算比较，覆盖 owner 新服务的 consumer 与 child
 值、区间中的 foreign Unload，以及成功终态 Unload 后紧接检查失败的命令。
+
+## Fresh 脚本终态保留真实分配 choice
+
+[`fresh_recovery.rs`](../crates/cordis-kernel/src/fresh_recovery.rs) 将 Fresh
+源转换接到同一套值事件代数。每次 landing 使用该次转换**实际选择的 child 身份**
+实例化当时安装的指令，无须把固定程序改写成假定的 child ID。
+`actual_episode_recovery` 从真实执行导出事件和 receipt 历史；
+`actual_terminal_recovery` 将它与实际最终 Unload、owner 槽覆盖定理组合。
+foreign Unload 保留实际捕获的 inverse journal，包括所选 episode 开始前产生的记录。
+
+[`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+作为 `mixed_driver::fresh::terminal_replay` 导出，将定理接到真实 Fresh
+`ScriptReport`。`terminal_recovery(bank)` 是 `run_script` 的实际后置条件。
+匹配的 Begin 和末条成功 owner Unload 标识 episode，`fresh_installed_interval`
+据此导出 installed 区间。`report.terminal_replay(bank, owner, begin)` 提取源见证、
+**空 owner 表**以及**返回值投影等于 foreign-only 重放**的等式。具体 Xor library
+的 scalar 交换由证明建立，调用者不另给源轨迹或交换假设。
+
+边界与 Mixed 相同：重放从 Begin 紧后开始，包含 Loading 值，是缺 key 操作为恒等
+的值计算，不是合法删除 owner 后的生命周期执行，也不是 registry／allocator 状态
+相等。只要所选 Unload 仍是最后成功转换，报告允许带有后续错误。bootstrap 与各个
+单独 mutator 不自动提供此终态方程。新增源历史和重放计算均为擦除的证明数据，没有
+增加运行时历史缓冲。
+
+两项 [Fresh 回归](../crates/cordis-kernel/tests/fresh_terminal_replay.rs) 覆盖交错
+插入后的实际分配、parent 恢复后 child 值仍在、foreign 清理、重复激活时不同 child
+身份、两个 provider、provider 替换，以及终态 Unload 后紧接检查失败。
+规范负例候选 `fresh-replay-omits-foreign-unload` 从值重放中删掉捕获的逆操作序列，
+对应的源单步投影证明会拒绝这一缺失。这个选定证明检查属于实验性证据，不等于
+完整 release 负例验收。
 
 ## 从新机器经过真实准备与执行
 
@@ -652,8 +681,8 @@ Begin/Step 失败时的前缀保留。新 child 仍保持 Inactive。这个真�
    Insert/Begin/Step 准备范围已有精确接纳域，直接 Mixed/Fresh Unload 也已有守卫加
    inverse 的精确域。Retire/Depart/Remove、更广的 dispatcher 与其他恢复路径仍需
    定义域等价；可达历史现已推出完整的真实 Unit/Child/Provision/Xor 日志有定义。
-   这一具体 inverse 定义域结论现已组合 Mixed 脚本报告的终态 foreign-only 值方程，
-   Fresh 动态 choice 重放与宿主效果合同仍是独立义务。
+   这一具体 inverse 定义域结论现已组合 Mixed/Fresh 脚本报告的终态 foreign-only
+   值方程，并保留实际动态 child choice；一般生命周期删除与宿主效果合同仍是独立义务。
    准备谓词也未刻画具体错误枚举值。还须组合多个 actor、
    动态 child 与恢复，接到论文的全局计数／递减量论证。这些入口没有为整个宿主实例化 `termination.rs`。若目标命题
    包含可能延迟已使能生命周期工作的宿主执行，还须明确调度合同。

@@ -177,11 +177,18 @@ Unload／其 `apply` 分支成功后保证实际 `table(actor)` 为空。单独 
 
 `report.error` 可以为 Some，只要最后一条成功转换仍是匹配的 Unload；后续失败命令
 保持返回机器不变。它是缺 key 操作为恒等的值代数，不是删除 owner 后原生命周期
-命令仍合法，也不声明 registry 或 allocator 回退。Fresh 暂无该终态报告保证，仍有
-上文逆域和空 owner 表结果。任意 scalar、宿主效果及全局进展仍未由此证明，定理
+命令仍合法，也不声明 registry 或 allocator 回退。任意 scalar、宿主效果及全局进展仍未由此证明，定理
 68／推论 69 保持 partial。详见[Mixed 终态值重放](progress-contracts.zh-CN.md#mixed-脚本终态等于其-foreign-only-值重放)。
 
-当前蓝图明确使用固定的 `expected` child 名称。一次成功创建后，重新激活
+**Fresh** 的 [`ScriptReport::terminal_recovery`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+现提供对应的终态报告保证。`fresh_recovery` 对每次实际 landing 使用真实 child
+choice，不把动态蓝图改写为固定 child 程序；同一蓝图重复激活产生不同身份也在
+合同内。Fresh `run_script` 直接建立该后置条件，保留 foreign cleanup 的捕获日志，
+包括 Begin 前产生的 inverse。值观察、匹配终态和失败前缀条件与 Mixed 相同。
+bootstrap 和各单独 mutator 尚未自动提供此方程；源历史与重放只是擦除的证明数据。
+详见 [Fresh 终态合同](progress-contracts.zh-CN.md#fresh-脚本终态保留真实分配-choice)。
+
+当前 Mixed 蓝图明确使用固定的 `expected` child 名称。一次成功创建后，重新激活
 同一个蓝图可能因单调分配器返回新 ID 而得到 `UnexpectedChild`；错误本身
 经过原子性证明，尚未等同于论文的动态 fresh-name binder。测试覆盖这一
 限制。发布也采用声明的全部 provision slot 已有值的同步策略。

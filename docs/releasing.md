@@ -90,7 +90,7 @@ From a clean, reviewed commit, run the `Full release validation` workflow with
 platforms are Linux x64 and macOS Apple Silicon; set `include_macos_intel=true` to
 include macOS Intel. [Full-crate negative shards](full-negative-validation.md) use a
 platform-specific partition; every selected platform's quality job must collect all
-120 controls and pass `record-verification.py` before its packages can be staged.
+121 controls and pass `record-verification.py` before its packages can be staged.
 Evidence binds the source, tools, platform and run attempt; rerun the whole workflow
 after a failure. The workflow then tests installation, native loading and offline
 reinstallation on that same platform. The collector requires exactly the selected

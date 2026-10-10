@@ -111,9 +111,9 @@ def release_plan(manifest=None, *, include_macos_intel=False):
     # Wall-clock budgets, not SMT resource limits. Intel's 90-minute allowance is
     # engineering headroom after a 40-minute timeout, not a measured proof time.
     configuration = [('ubuntu-24.04', 2400, 18, 'linux-x64-gnu-napi8'),
-                     ('macos-15', 3600, 24, 'darwin-arm64-napi8')]
+                     ('macos-15', 3600, 25, 'darwin-arm64-napi8')]
     if include_macos_intel:
-        configuration.append(('macos-15-intel', 5400, 40, 'darwin-x64-napi8'))
+        configuration.append(('macos-15-intel', 5400, 41, 'darwin-x64-napi8'))
     platforms, shards = [], []
     for os_name, timeout, count, target in configuration:
         row = {'os': os_name, 'target': target, 'timeout': timeout, 'compileTimeout': 300, 'threads': 2,

@@ -3,7 +3,7 @@
 English · [简体中文](full-negative-validation.zh-CN.md)
 
 Release validation deliberately changes kernel operations, guards or specifications
-and requires the proofs to reject each change. Every one of the 120 canonical mutations must first
+and requires the proofs to reject each change. Every one of the 121 canonical mutations must first
 compile and then produce a concrete contract failure while verifying the entire
 crate. The unchanged kernel must also pass. A timeout, resource limit, frontend
 error or partial result does not satisfy this requirement.
@@ -30,7 +30,7 @@ stop its Verus and solver descendants; by default, failed workers stop further
 dispatch and cancel active siblings. Standard output, diagnostics and `.meta.json` stage records
 are retained, including elapsed time, command, exit status, source fingerprint and
 cancellation state. The queue contains only the active worker budget, rather than
-all 120 already-submitted tasks.
+all 121 already-submitted tasks.
 
 Termination is requested once per process group. The supervisor observes leader
 exit without reaping it until group cleanup finishes, so the process-group identity
@@ -117,8 +117,8 @@ plan supplies both the preflight and shard proof deadlines:
 | Platform | Proof deadline | Shards | Maximum controls per shard | Compile + proof budget | Job headroom |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Linux x64 | 40 min | 18 | 7 | 315 min | 45 min |
-| macOS ARM64 | 60 min | 24 | 5 | 325 min | 35 min |
-| macOS Intel (opt-in) | 90 min | 40 | 3 | 285 min | 75 min |
+| macOS ARM64 | 60 min | 25 | 5 | 325 min | 35 min |
+| macOS Intel (opt-in) | 90 min | 41 | 3 | 285 min | 75 min |
 
 The planner checks complete mutation coverage and reserves at least 30 minutes
 within each six-hour shard job for installation, evidence checks,
@@ -144,7 +144,7 @@ The final mutation list retains canonical order.
 Each platform's quality job collects its complete planned partition within the ordinary gate,
 alongside positive proof, tests, examples, package builds and installation checks.
 Only the complete collected report can enter `verification/v3`; a green preflight
-or one green shard cannot. Every selected platform must pass all 120 full-crate
+or one green shard cannot. Every selected platform must pass all 121 full-crate
 negative controls and the entire quality gate before runtime draft creation.
 The draft contains exactly the selected platforms' assets and evidence. Excluding
 Intel makes no claim about Intel validation or artifact availability.

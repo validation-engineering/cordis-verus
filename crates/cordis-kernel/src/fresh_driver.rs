@@ -860,7 +860,7 @@ impl ScriptReport {
         requires self.machine.wf(),fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
         ensures self.refines(bank),self.machine.unit_child_recovery(),self.machine.provision_recovery(),self.machine.journal_recovery(),
-            self.machine.owner_table_recovery(),
+            self.machine.owner_table_recovery(),self.terminal_recovery(bank),
     {
         weak_theory();fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
         self.machine.unit_child_recovery_from_source(bank,states.last());
@@ -870,6 +870,7 @@ impl ScriptReport {
         self.machine.journal_recovery_from_source(bank,states.last());
         pc::fresh_from_empty(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
         self.machine.owner_table_recovery_from_source(bank,states.last());
+        self.establish_terminal_recovery(bank,states);
     }
 }
 
@@ -883,7 +884,7 @@ impl ScriptReport {
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
     ensures out.machine.wf(),out.machine.unit_child_recovery(),out.machine.provision_recovery(),out.machine.journal_recovery(),
-        out.machine.owner_table_recovery(),
+        out.machine.owner_table_recovery(),out.terminal_recovery(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
         out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
@@ -976,3 +977,6 @@ pub use bootstrap::{run_from_empty, FromEmptyReport, FromEmptyStatus};
 
 #[path = "fresh_preparation.rs"]
 pub mod preparation;
+
+#[path = "fresh_terminal_replay.rs"]
+pub mod terminal_replay;

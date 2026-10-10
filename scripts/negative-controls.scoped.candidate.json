@@ -3112,6 +3112,32 @@
         }
       ],
       "selectionRationale": "The actual shared dispatcher must require the acknowledged receipt before calling L-Unload. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+    },
+    {
+      "name": "fresh-replay-omits-foreign-unload",
+      "mutation": {
+        "file": "fresh_recovery.rs",
+        "old": "else if rule==r::Rule::Unload {own_word(a,actor).reverse()} else {Seq::empty()}",
+        "new": "else if rule==r::Rule::Unload {Seq::empty()} else {Seq::empty()}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "fresh_recovery",
+          "descendants": false,
+          "function": "cordis_negative::fresh_recovery::step_projection"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::fresh_recovery::step_projection",
+          "module": "fresh_recovery",
+          "file": "fresh_recovery.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures p::project(z.state,ISet::full())==e::run(step_word(lib,programs,a,z,actor,rule,choice),p::project(a.state,ISet::full())),"
+        }
+      ],
+      "selectionRationale": "Fresh value replay must account for the actual captured inverse journal of every foreign Unload. Omitting it must fail the source-step projection contract. Selected-proof checks are experimental and do not replace whole-crate release verification."
     }
   ]
 }
