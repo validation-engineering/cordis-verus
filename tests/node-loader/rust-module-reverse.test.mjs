@@ -226,6 +226,27 @@ for (const profile of ['cordis', 'harness']) {
       zeroResources(ctx);
     } finally { await ctx.dispose(); }
   });
+  test(`nested Rust reverse calls admit concurrent roots (${profile})`, async () => {
+    const ctx = new Context({ profile }), entered = [], returned = [];
+    const recurse = (tag, depth) => invoke(ctx, 'recurse', tag, depth);
+    try {
+      ctx.provide('jsHost', { record: () => null, recurse: async (tag, depth) => {
+        entered.push([tag, depth]);
+        await turn();
+        const value = depth ? await recurse(tag, depth - 1) : tag;
+        returned.push([tag, depth]);
+        return value;
+      } });
+      const controller = await loadRustModule(ctx, options());
+      assert.deepEqual(await Promise.all([recurse('A', 3), recurse('B', 3)]), ['A', 'B']);
+      for (const tag of ['A', 'B']) {
+        assert.deepEqual(entered.filter(item => item[0] === tag).map(item => item[1]), [3, 2, 1, 0]);
+        assert.deepEqual(returned.filter(item => item[0] === tag).map(item => item[1]), [0, 1, 2, 3]);
+      }
+      await controller.dispose();
+      zeroResources(ctx);
+    } finally { await ctx.dispose(); }
+  });
 }
 
 test('dynamic reverse replies at the size/depth boundary finish as releasable jobs', async () => {

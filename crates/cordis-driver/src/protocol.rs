@@ -150,6 +150,15 @@ pub enum Command {
         #[serde(with = "decimal")]
         publication: usize,
     },
+    CheckWait {
+        #[serde(with = "decimal")]
+        from: usize,
+        #[serde(with = "decimal")]
+        generation: u64,
+        #[serde(with = "decimal")]
+        target: usize,
+        holding: bool,
+    },
     CommittedReaches {
         #[serde(with = "decimal")]
         from: usize,

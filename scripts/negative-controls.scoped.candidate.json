@@ -3138,6 +3138,81 @@
         }
       ],
       "selectionRationale": "Fresh value replay must account for the actual captured inverse journal of every foreign Unload. Omitting it must fail the source-step projection contract. Selected-proof checks are experimental and do not replace whole-crate release verification."
+    },
+    {
+      "name": "wait-guard-admits-retained-provider",
+      "mutation": {
+        "file": "wait_guard.rs",
+        "old": "if bits[i] && self.is_owned_by(i,target) {return WaitDecision::Blocked {retained:i};}",
+        "new": "if bits[i] && self.is_owned_by(i,target) {return WaitDecision::Allowed;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "wait_guard",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::check_wait",
+          "module": "wait_guard",
+          "file": "wait_guard.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "(out==WaitDecision::Allowed)==(self.generation_of(from)==Some(generation)\n                && (!holding || !self.wait_conflict(from,target))),"
+        }
+      ],
+      "selectionRationale": "The actual host wait admission must reject stale and conflicting waits and admit unrelated targets. Fresh matching positive proofs and compiled mutants are required; this is scoped evidence, not the full negative regression."
+    },
+    {
+      "name": "wait-guard-admits-stale-episode",
+      "mutation": {
+        "file": "wait_guard.rs",
+        "old": "if self.episode_generation(from)!=Some(generation) {return WaitDecision::StaleEpisode;}",
+        "new": "if self.episode_generation(from)!=Some(generation) {return WaitDecision::Allowed;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "wait_guard",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::check_wait",
+          "module": "wait_guard",
+          "file": "wait_guard.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "(out==WaitDecision::StaleEpisode)==(self.generation_of(from)!=Some(generation)),"
+        }
+      ],
+      "selectionRationale": "The actual host wait admission must reject stale and conflicting waits and admit unrelated targets. Fresh matching positive proofs and compiled mutants are required; this is scoped evidence, not the full negative regression."
+    },
+    {
+      "name": "wait-guard-rejects-unrelated-target",
+      "mutation": {
+        "file": "wait_guard.rs",
+        "old": "        WaitDecision::Allowed\n    }\n\n    /// A non-reflexive dependency path",
+        "new": "        WaitDecision::Blocked {retained:from}\n    }\n\n    /// A non-reflexive dependency path"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "wait_guard",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::check_wait",
+          "module": "wait_guard",
+          "file": "wait_guard.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "(out==WaitDecision::Allowed)==(self.generation_of(from)==Some(generation)\n                && (!holding || !self.wait_conflict(from,target))),"
+        }
+      ],
+      "selectionRationale": "The actual host wait admission must reject stale and conflicting waits and admit unrelated targets. Fresh matching positive proofs and compiled mutants are required; this is scoped evidence, not the full negative regression."
     }
   ]
 }

@@ -213,14 +213,14 @@ or positive proof obligation. The new workflow must still be exercised remotely
 on its committed source before claiming cross-platform release acceptance.
 
 
-There are **121 canonical negative mutations**. A complete full-crate negative
+There are **124 canonical negative mutations**. A complete full-crate negative
 run for this source has not passed. The earlier 1,927-obligation snapshot's
 full quality run stopped on `mixed-removal-ignores-retention` after a timeout.
 Partial contract diagnostics were not accepted as a passed result.
 
 The opt-in scoped-negative checker and candidate selector manifest are
 experimental. Unit tests and selected probes do not establish a completed
-121-control calibration or a complete independent full regression. The first
+124-control calibration or a complete independent full regression. The first
 full candidate calibration accepted 11 controls, then rejected control 12
 (`begin-reuses-episode-generation`) because its real assertion failure was
 accompanied by an SMT resource-limit failure. The run is **failed**, not a

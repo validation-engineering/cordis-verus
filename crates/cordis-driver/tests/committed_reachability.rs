@@ -46,6 +46,8 @@ fn authority_follows_committed_edges_including_transitive_cleanup_not_new_target
     assert!(driver.committed_reaches(leaf, 1, old).unwrap());
     let (replacement, _) = provider(&mut driver, port(1, 0), 30);
     assert!(driver.committed_reaches(leaf, 1, old).unwrap());
+    assert_eq!(driver.check_wait(leaf, 1, old, true).unwrap(), Some(old));
+    assert_eq!(driver.check_wait(leaf, 1, replacement, true).unwrap(), None);
     assert!(!driver.committed_reaches(leaf, 1, replacement).unwrap());
     assert_eq!(
         driver.committed_reaches(leaf, 2, old).unwrap_err().code,
@@ -105,4 +107,64 @@ fn ownership_and_unknown_nodes_never_create_service_authority() {
         driver.committed_reaches(child, 1, child).unwrap_err().code,
         "StaleEpisode"
     );
+}
+
+#[test]
+fn wait_admission_checks_subtree_identity_live_scope_and_exact_episode() {
+    let mut driver = Driver::new().unwrap();
+    let owner = driver.mount(None, vec![], vec![]).unwrap();
+    let ticket = setup(&mut driver, owner);
+    driver.complete(ticket, true, None).unwrap();
+    let provider = driver.mount(Some(owner), vec![], vec![]).unwrap();
+    let ticket = setup(&mut driver, provider);
+    driver
+        .publish(provider, ticket.generation, port(7, 0), 70)
+        .unwrap();
+    driver.complete(ticket, true, None).unwrap();
+    let middle = driver.mount(None, vec![port(7, 0)], vec![]).unwrap();
+    let ticket = setup(&mut driver, middle);
+    driver
+        .publish(middle, ticket.generation, port(8, 0), 80)
+        .unwrap();
+    driver.complete(ticket, true, None).unwrap();
+    let leaf = driver.mount(None, vec![port(8, 0)], vec![]).unwrap();
+    let ticket = setup(&mut driver, leaf);
+    driver.complete(ticket, true, None).unwrap();
+
+    assert_eq!(driver.check_wait(leaf, 1, leaf, true).unwrap(), Some(leaf));
+    assert_eq!(
+        driver.check_wait(leaf, 1, owner, true).unwrap(),
+        Some(provider)
+    );
+    assert_eq!(
+        driver.check_wait(provider, 1, owner, true).unwrap(),
+        Some(provider)
+    );
+    assert_eq!(driver.check_wait(owner, 1, provider, true).unwrap(), None);
+    assert_eq!(driver.check_wait(leaf, 1, owner, false).unwrap(), None);
+    assert_eq!(driver.check_wait(leaf, 1, usize::MAX, true).unwrap(), None);
+    assert_eq!(
+        driver.check_wait(leaf, 0, owner, false).unwrap_err().code,
+        "StaleEpisode"
+    );
+    assert_eq!(
+        driver
+            .check_wait(usize::MAX, 0, owner, true)
+            .unwrap_err()
+            .code,
+        "StaleEpisode"
+    );
+    let reply = driver
+        .command(
+            &json!({"op":"check_wait","from":leaf.to_string(),"generation":"1",
+        "target":owner.to_string(),"holding":true})
+            .to_string(),
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&reply).unwrap(),
+        json!({"blocked":true,"retained":provider.to_string()})
+    );
+    // Observation does not withdraw providers or consume the caller's episode.
+    assert!(driver.committed_reaches(leaf, 1, provider).unwrap());
 }

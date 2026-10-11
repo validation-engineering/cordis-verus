@@ -77,6 +77,7 @@ pub mod rule_frames;
 pub mod semantics;
 pub mod terminal_episode;
 pub mod termination;
+pub mod wait_guard;
 pub mod witnessed;
 pub mod xor_recovery_algebra;
 

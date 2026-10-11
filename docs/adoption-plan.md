@@ -94,6 +94,21 @@ resource release satisfies the same transition relation. The
 premises and host assumptions. Invocation/landing, arbitrary callback effects and
 the rest of F1 remain separate; this milestone does not close a paper-wide obligation.
 
+## Current stage: auditable lifecycle wait admission
+
+Under A07/A08/A13 and F1, implement a checked decision for a live callback waiting
+on its own lifecycle or a retained provider subtree. The current delivery places
+committed reachability, generation checks and exact wait admission in the executable
+Verus kernel, with real Driver/JS callers, rejection witnesses and failure/retry
+regressions. The [case study](cases/reentrant-wait.md) provides reproduction and
+paper-to-code navigation; current acceptance is recorded in the development report.
+
+The stage's guarantee is the exact decision relative to the host's invocation
+facts. Invocation ancestry and transport completeness, general RPC cycles and
+scheduler progress remain separate integration work. Next, connect checked request
+ownership to those facts and include the case in the standalone Harness report.
+This stage does not close the complete F1 or paper-wide obligations.
+
 ## Milestones and exit criteria
 
 | Milestone | Product and research work | Required exit evidence |

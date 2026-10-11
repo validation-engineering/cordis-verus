@@ -1166,29 +1166,33 @@ impl Driver {
         generation: u64,
         target: usize,
     ) -> Result<bool, DriverError> {
-        if self.kernel.episode_generation(from) != Some(generation) {
-            return Err(DriverError::new(
+        self.kernel
+            .committed_reaches(from, generation, target)
+            .ok_or_else(|| {
+                DriverError::new(
+                    "StaleEpisode",
+                    "dependency lookup belongs to an earlier episode",
+                )
+            })
+    }
+
+    /// Checked read-only admission; `holding` is the host's live invocation fact.
+    pub fn check_wait(
+        &self,
+        from: usize,
+        generation: u64,
+        target: usize,
+        holding: bool,
+    ) -> Result<Option<usize>, DriverError> {
+        use cordis_kernel::wait_guard::WaitDecision;
+        match self.kernel.check_wait(from, generation, target, holding) {
+            WaitDecision::Allowed => Ok(None),
+            WaitDecision::Blocked { retained } => Ok(Some(retained)),
+            WaitDecision::StaleEpisode => Err(DriverError::new(
                 "StaleEpisode",
-                "dependency lookup belongs to an earlier episode",
-            ));
+                "wait admission belongs to an earlier episode",
+            )),
         }
-        let mut pending = vec![from];
-        let mut visited = std::collections::BTreeSet::new();
-        while let Some(id) = pending.pop() {
-            if !visited.insert(id) {
-                continue;
-            }
-            if id == target {
-                return Ok(true);
-            }
-            pending.extend(
-                self.kernel
-                    .committed(id)
-                    .into_iter()
-                    .map(|binding| binding.provider),
-            );
-        }
-        Ok(false)
     }
 
     /// Parse and execute the JSON ABI. Successful replies include no callbacks
@@ -1209,6 +1213,17 @@ impl Driver {
 
     pub fn execute(&mut self, command: Command) -> Result<Value, DriverError> {
         match command {
+            Command::CheckWait {
+                from,
+                generation,
+                target,
+                holding,
+            } => {
+                let retained = self.check_wait(from, generation, target, holding)?;
+                Ok(
+                    json!({"blocked":retained.is_some(), "retained":retained.map(|id| id.to_string())}),
+                )
+            }
             Command::CommittedReaches {
                 from,
                 generation,

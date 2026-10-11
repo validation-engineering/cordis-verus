@@ -102,29 +102,16 @@ function invocationBlocksWait(token) {
 
 function assertNotWaitingForAncestor(target, operation) {
   target = target.ctx.fiber;
-  assertCurrentInvocation(target._domain, operation);
+  const domain = target._domain;
+  assertCurrentInvocation(domain, operation);
   for (const token of invocationScopes()) {
-    let invoking=invocationBlocksWait(token) ? token.fiber : undefined;
-    while (invoking) {
-      if (invoking === target) throw new CordisError('REENTRANT_MUTATION',`Cannot await ${operation} from the current fiber action or its ancestor`);
-      const parent=invoking.parent.fiber;
-      invoking=parent===invoking?undefined:parent;
-    }
-    // An active callback cannot wait for a provider whose committed lease it
-    // keeps alive, including through intermediate JS services.
-    if (invocationBlocksWait(token)) {
-      const domain = token.fiber._domain;
-      for (const provider of domain.fibers.values()) {
-        let affected = false;
-        for (let owner=provider; owner;) {
-          if (owner === target) { affected=true; break; }
-          const parent=owner.parent.fiber;
-          owner=parent===owner?undefined:parent;
-        }
-        if (affected && domain.command({op:'committed_reaches',from:token.fiber.id,generation:token.generation,target:provider.id}).reachable) {
-          throw new CordisError('REENTRANT_MUTATION',`Cannot await ${operation} of a provider retained by the current action`);
-        }
-      }
+    if (token.fiber._domain !== domain) continue;
+    const reply = domain.command({op:'check_wait',from:token.fiber.id,
+      generation:token.generation ?? 0,target:target.id,holding:invocationBlocksWait(token)});
+    if (reply.blocked) {
+      throw new CordisError('REENTRANT_MUTATION',
+        `Cannot await ${operation} from the current fiber action or its ancestor, or a provider retained by that action`,
+        {operation,owner:token.fiber.id,generation:token.generation ?? 0,target:target.id,retained:reply.retained});
     }
   }
 }
@@ -557,13 +544,13 @@ class Domain {
     // Checks/reclamation can change admission even when their public result looks
     // like a read. Unknown commands are writers by default. Drive is accounted
     // for by pump(), except the explicit constructor/root drive.
-    if (!['snapshot','snapshot_state','resolve','validate','validate_check','committed_reaches'].includes(command.op)
+    if (!['snapshot','snapshot_state','resolve','validate','validate_check','committed_reaches','check_wait'].includes(command.op)
       && !(command.op === 'drive' && this.pumping)) this.driverDirty = true;
     try {
       const result = this.driver.command(JSON.stringify(command));
       const reply = typeof result === 'string' ? JSON.parse(result) : result;
       if (reply?.error) throw new CordisError(reply.code ?? 'NATIVE_DRIVER', typeof reply.error === 'string' ? reply.error : JSON.stringify(reply.error));
-      if (!['snapshot','snapshot_state','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches'].includes(command.op)) this.wake();
+      if (!['snapshot','snapshot_state','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches','check_wait'].includes(command.op)) this.wake();
       return reply;
     } catch (error) {
       // Even a rejected read may report a faulted native domain. Never let a

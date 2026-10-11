@@ -171,6 +171,19 @@ Rust 外层把 callback 存为 `Vec<Option<CleanupAction>>`，每个效果组使
 
 前提是接口要求，不是对 arbitrary Rust callback 使用 `assume`。这些定理验证恢复与交换的代数核心；它们没有自动把外部效果、iterator continuation、服务发布与整个异步 runtime 映射到论文历史。`iterator_independence` 已完整形式化 Definition 42 的 quotient continuation 与 inverse 稳定性，并证明 generator 判据；每个具体效果实现仍须提供满足这些条件的 witness。
 
+## 真实宿主的等待准入
+
+`Kernel::committed_reaches` 在有效 generation 下精确计算存活 committed 边的自反
+传递闭包。`Kernel::check_wait` 用该闭包与 target 所有权子树的交集决定是否拒绝
+活跃 invocation 的等待，并返回真实被保留节点；旧 generation 无论是否 holding
+都会被拒绝。所有权自身不产生服务依赖。生产 Driver 的同名命令及 Node
+`assertNotWaitingForAncestor` 调用这些经过验证的只读方法。
+`retained_dependency_blocks_cleanup` 将非自反依赖路径接到实际 cleanup guard。
+
+宿主仍提供 invocation 活跃事实及祖先链，并负责执行域选择、JSON/FFI 和实际错误
+传播。该合同不是一般调用等待图或异步终止证明，不改变第 73 条状态。
+[案例说明](cases/reentrant-wait.zh-CN.md)给出失败重试及合法嵌套调用复现。
+
 ## 当前没有声称的证明
 
 | 结论 | 仍需建立的内容 |

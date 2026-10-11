@@ -1306,6 +1306,24 @@ def mutation_manifest():
             'else if rule==r::Rule::Unload {own_word(a,actor).reverse()} else {Seq::empty()}',
             'else if rule==r::Rule::Unload {Seq::empty()} else {Seq::empty()}',
         ),
+        (
+            'wait-guard-admits-retained-provider',
+            'wait_guard.rs',
+            'if bits[i] && self.is_owned_by(i,target) {return WaitDecision::Blocked {retained:i};}',
+            'if bits[i] && self.is_owned_by(i,target) {return WaitDecision::Allowed;}',
+        ),
+        (
+            'wait-guard-admits-stale-episode',
+            'wait_guard.rs',
+            'if self.episode_generation(from)!=Some(generation) {return WaitDecision::StaleEpisode;}',
+            'if self.episode_generation(from)!=Some(generation) {return WaitDecision::Allowed;}',
+        ),
+        (
+            'wait-guard-rejects-unrelated-target',
+            'wait_guard.rs',
+            '        WaitDecision::Allowed\n    }\n\n    /// A non-reflexive dependency path',
+            '        WaitDecision::Blocked {retained:from}\n    }\n\n    /// A non-reflexive dependency path',
+        ),
     ]
 
 
