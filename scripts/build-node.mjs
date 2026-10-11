@@ -45,7 +45,17 @@ const buildEnv = { ...process.env, RUSTUP_TOOLCHAIN: toolchain.rust.channel };
 const pathKey = Object.keys(buildEnv).find(key => key.toUpperCase() === 'PATH') ?? 'PATH';
 buildEnv[pathKey] = join(process.env.CARGO_HOME ?? join(homedir(), '.cargo'), 'bin') + delimiter + (buildEnv[pathKey] ?? '');
 if (args.includes('--offline')) buildEnv.CARGO_NET_OFFLINE = 'true';
-const result = spawnSync('cargo', ['build', '--release', '--locked', '-p', 'cordis-node', '-p', 'cordis-plugin-api', '--lib', '--examples', '--message-format=json-render-diagnostics'], { cwd: root, env: buildEnv, stdio: ['inherit', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+const cargoArgs = ['build', '--release', '--locked', '-p', 'cordis-node', '-p', 'cordis-plugin-api', '--lib', '--examples', '--message-format=json-render-diagnostics'];
+if (process.platform === 'win32') {
+  if (process.arch !== 'x64') throw new Error('Windows native distribution currently requires x64');
+  for (const key of ['RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS']) {
+    if (buildEnv[key]) throw new Error(`Custom ${key} would override the Windows release linkage`);
+  }
+  // An explicit target keeps crt-static away from host build scripts/proc macros.
+  // Users need Node/npm, not a separately installed Visual C++ runtime.
+  cargoArgs.push('--target', 'x86_64-pc-windows-msvc', '--config', 'target.x86_64-pc-windows-msvc.rustflags=["-C","target-feature=+crt-static"]');
+}
+const result = spawnSync('cargo', cargoArgs, { cwd: root, env: buildEnv, stdio: ['inherit', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 const filenames = { darwin: 'libcordis_node.dylib', linux: 'libcordis_node.so', win32: 'cordis_node.dll' };
@@ -91,7 +101,7 @@ for (const version of ['v1','v2','fail']) {
   dynamicFixtures[version] = {path,sha256:sha256(join(root,path))};
 }
 if (JSON.stringify(sourceHashes()) !== JSON.stringify(before)) throw new Error('Native sources changed during build; rerun');
-const evidence = { schema: 'cordis-verus.node-build/v1', sourceHashes: before, dynamicFixtures, interopFixture:{path:'target/node-compat/interop-fixture.node',sha256:sha256(fixture)}, compilerArtifact: source, compilerProfile: artifacts[0].profile, platform: process.platform, architecture: process.arch, node: process.version, artifactSha256: sha256(output), cargoLockSha256: sha256(join(root, 'Cargo.lock')), toolchainLockSha256: sha256(join(root, 'toolchain.lock.json')) };
+const evidence = { schema: 'cordis-verus.node-build/v1', command: ['cargo', ...cargoArgs], sourceHashes: before, dynamicFixtures, interopFixture:{path:'target/node-compat/interop-fixture.node',sha256:sha256(fixture)}, compilerArtifact: source, compilerProfile: artifacts[0].profile, platform: process.platform, architecture: process.arch, node: process.version, artifactSha256: sha256(output), cargoLockSha256: sha256(join(root, 'Cargo.lock')), toolchainLockSha256: sha256(join(root, 'toolchain.lock.json')) };
 mkdirSync(join(root, 'target/node-compat'), { recursive: true });
 writeFileSync(report, JSON.stringify(evidence, null, 2) + '\n');
 try { writeNativeManifest(root,report); }

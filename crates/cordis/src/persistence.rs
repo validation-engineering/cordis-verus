@@ -107,7 +107,8 @@ impl PlannedFile {
     pub fn will_write(&self) -> bool {
         self.output != self.observed
     }
-    /// True for a replacement or a retry after an earlier directory sync failure.
+    /// True for a replacement or a retry after an earlier durability barrier failure.
+    /// Windows uses a write-through replacement and file flush, rather than directory fsync.
     pub fn requires_directory_sync(&self) -> bool {
         self.will_write() || self.retry_directory_sync
     }
@@ -288,7 +289,7 @@ impl SavePlan {
                         SaveErrorKind::SourceChanged,
                     ));
                 }
-                fs::rename(&temporary.path, &file.path)
+                replace_file(&temporary.path, &file.path)
                     .map_err(|error| SaveError::io(&file.path, error))?;
                 temporary.renamed = true;
                 report.written.push(file.path.clone());
@@ -330,11 +331,28 @@ fn read_regular(path: &Path) -> Result<(String, Permissions), SaveError> {
             .permissions(),
     ))
 }
+#[cfg(windows)]
+fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
+    // Temporary::new keeps both files in the same directory. The safe wrapper
+    // uses MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH), without COPY_ALLOWED.
+    atomicwrites::replace_atomic(source, destination)
+}
+#[cfg(not(windows))]
+fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
+    fs::rename(source, destination)
+}
 #[cfg(unix)]
 fn sync_parent(path: &Path) -> std::io::Result<()> {
     File::open(path.parent().unwrap_or(Path::new(".")))?.sync_all()
 }
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn sync_parent(path: &Path) -> std::io::Result<()> {
+    // Replacement already used the Windows write-through metadata barrier.
+    // Flush the committed file too; a failed flush remains retryable without
+    // rewriting that file or replaying a successful replacement.
+    OpenOptions::new().write(true).open(path)?.sync_all()
+}
+#[cfg(not(any(unix, windows)))]
 fn sync_parent(_: &Path) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,

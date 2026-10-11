@@ -81,6 +81,51 @@ fn saving_requires_file_source_and_memory_apply_never_writes() {
 }
 
 #[test]
+fn unicode_and_space_paths_round_trip_without_leaking_temporary_files() {
+    let files = Files::new();
+    let name = "配置 with spaces 🦀.json";
+    files.write(name, json!([{"id":"a","config":{"n":1}}]));
+    let mut loader = files.loader(name);
+    edit(&mut loader, "a", "n", json!(2));
+    let report = loader.save().unwrap();
+    assert_eq!(report.written, vec![files.path(name)]);
+    assert!(report.durability_uncertain.is_empty());
+    assert_eq!(files.read(name)[0]["config"]["n"], 2);
+    assert_eq!(files.loader(name).tree(), loader.tree());
+    files.no_temporary_files();
+}
+
+#[cfg(windows)]
+#[test]
+fn locked_destination_preserves_old_bytes_and_can_be_retried() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let files = Files::new();
+    files.write("root.json", json!([{"id":"a","config":{"n":1}}]));
+    let mut loader = files.loader("root.json");
+    edit(&mut loader, "a", "n", json!(2));
+    // Allow reads for conflict checks, but deny replacement/deletion and writes.
+    let blocker = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(files.path("root.json"))
+        .unwrap();
+    let error = loader.save().unwrap_err();
+    assert!(matches!(error.kind, SaveErrorKind::Io(_)));
+    assert!(error.report.written.is_empty());
+    assert!(error.report.durability_uncertain.is_empty());
+    assert_eq!(error.report.remaining, vec![files.path("root.json")]);
+    assert_eq!(files.read("root.json")[0]["config"]["n"], 1);
+    files.no_temporary_files();
+    drop(blocker);
+    assert_eq!(
+        loader.save().unwrap().written,
+        vec![files.path("root.json")]
+    );
+    assert_eq!(files.read("root.json")[0]["config"]["n"], 2);
+    files.no_temporary_files();
+}
+
+#[test]
 fn unchanged_save_preserves_bytes_and_modified_save_preserves_permissions() {
     let files = Files::new();
     let original = "[ {\"id\": \"a\"} ]\n";

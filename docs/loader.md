@@ -109,13 +109,13 @@ plugin.on_config_update(move |setup, previous, next| {
 - `written`：已完成原子替换的文件；`unchanged`：确认无需写入的文件。
 - `remaining`：commit 阶段尚未完成的文件，成功时为空；planning 失败还没有可提交计划，因此该列表为空。
 - `merged_external`：保存结果包含内存配置以外的磁盘编辑。
-- `durability_uncertain`：替换已发生，但目录同步失败，无法确认断电后的持久性。
+- `durability_uncertain`：替换已发生，但平台持久性屏障失败，无法确认断电后的持久性。
 
 保存**不会更新 runtime**。`merged_external` 非空时，文件与运行时可能不同；显式 `poll_reload().await` 才会尝试应用磁盘版本，setup 失败仍遵循普通 loader 回滚契约。每个成功文件单独推进本地保存 checkpoint，checkpoint 保存本地版本而非包含外部编辑的合并版本。因此即使尚未 reload，后续保存也不会把先前保留的外部字段误当作本地删除；发生部分失败后可以修复原因，再调用 `save()`。
 
-文件按 canonical 路径排序逐个提交。每个文件使用同目录 `create_new` 临时文件（Unix 初始权限 0600），写入后复制原文件 mode、`sync_all`，再次检查磁盘内容/权限，然后 `rename` 替换并同步目录。无变化的文件保留原始字节与格式。源文件必须仍是普通文件且保持原 canonical 路径；删除、改成目录/symlink、父目录被 symlink 重定向、不可读或非法 JSON 都报错，不会被重新创建或覆盖。成功替换保留 mode，但不承诺保留 inode、owner、ACL、扩展属性和 hard link 关系；临时文件通过 RAII 尽力清理。
+文件按 canonical 路径排序逐个提交。每个文件使用同目录 `create_new` 临时文件（Unix 初始权限 0600），写入后复制原文件 mode、`sync_all`，再次检查磁盘内容/权限，然后提交原子替换。Unix 使用 `rename` 并同步父目录；Windows 使用 `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`，再以可写句柄同步已提交文件。Windows 调用通过固定版本的 `atomicwrites` 安全接口完成，Rust 宿主仍禁止手写 `unsafe`。无变化的文件保留原始字节与格式。源文件必须仍是普通文件且保持原 canonical 路径；删除、改成目录/symlink、父目录被 symlink 重定向、不可读或非法 JSON 都报错，不会被重新创建或覆盖。成功替换保留 mode，但不承诺保留 inode、owner、ACL、扩展属性和 hard link 关系；临时文件通过 RAII 尽力清理。
 
-这是**每文件原子替换，不是多文件事务**。错误中的 `report` 是实际进度，已经替换的文件不会偷偷回滚。目录同步失败也返回错误，其文件同时列在 `written` 和 `durability_uncertain`。同一个 loader 会记录未确认持久性的文件；再次 `save()` 即使内容没有变化也会重试目录同步，成功后才清除状态。目前 Unix 支持目录持久性同步；其他平台若完成替换但不能确认目录持久性，会如实返回错误。进程崩溃可能留下 `.cordis-save-*.tmp`，启动时不会把它当作源文件，也不擅自删除其他进程的临时文件。
+这是**每文件原子替换，不是多文件事务**。错误中的 `report` 是实际进度，已经替换的文件不会偷偷回滚。替换后的持久性屏障失败也返回错误，其文件同时列在 `written` 和 `durability_uncertain`。同一个 loader 会记录未确认持久性的文件；再次 `save()` 即使内容没有变化也会重试 Unix 目录同步或 Windows 文件同步，成功后才清除状态。`requires_directory_sync()` 的历史名称在 Windows 表示这个平台持久性屏障。Windows 文件被不允许删除的句柄占用时，替换会失败并保留原文件；释放句柄后可以重试。其他平台若完成替换但不能确认持久性，会如实返回错误。进程崩溃可能留下 `.cordis-save-*.tmp`，启动时不会把它当作源文件，也不擅自删除其他进程的临时文件。
 
 计划与提交时的重读可以发现已发生的编辑，但标准文件系统没有跨普通编辑器的 compare-and-swap；最后一次检查与 rename 之间仍有竞争窗口。需要多个写入者同时编辑时，由应用提供独占的编辑/保存协调；不要把这个接口视为对不合作外部进程的锁。网络文件系统还取决于其 rename/fsync 语义。文件 I/O、JSON merge 和任意 plugin callback 均属于测试覆盖的宿主层，不在 Verus 证明内。
 

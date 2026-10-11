@@ -11,6 +11,11 @@ Changes are recorded before release. Runtime previews are distributed through Gi
   every release target. Require actual four-platform installation and offline
   reinstallation before creating a release draft. Runtime-only evidence cannot
   replace the full proof or another platform's test results.
+- Support Windows configuration persistence with a write-through replacement and
+  an explicit, retryable flush. Keep locked destinations intact and test Unicode
+  paths. Statically link the Windows C runtime into native release modules.
+- Collect independent runtime diagnostics after failures, while keeping every
+  failed or skipped acceptance step release-blocking.
 - Simplify English and Chinese Quick starts around the precompiled runtime while
   retaining the optional Node architecture and pure Rust development path.
 

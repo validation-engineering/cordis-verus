@@ -1,6 +1,9 @@
 """A native build on one platform cannot inherit another platform's runtime pass."""
 from copy import deepcopy
 import importlib.util
+import io
+import os
+import sys
 from pathlib import Path
 import unittest
 
@@ -47,6 +50,28 @@ class RuntimeAcceptanceTests(unittest.TestCase):
             record = deepcopy(self.record()); mutate(record)
             with self.assertRaises(ValueError):
                 self.validate(record)
+
+    def test_failures_collect_later_checks_but_never_become_acceptance(self):
+        checks = {name: [[sys.executable, '-c', 'print("ran")']] for name in MODULE.STEPS}
+        checks['rust-tests'] = [[sys.executable, '-c', 'raise SystemExit(7)']]
+        observed = []
+        steps = MODULE.run_checks(checks, os.environ.copy(), io.StringIO(), lambda name, output: observed.append(name))
+        self.assertIn('npm-packages', observed)
+        self.assertEqual(next(step for step in steps if step['name'] == 'rust-tests')['status'], 'failed')
+        record = self.record(); record['steps'] = steps
+        with self.assertRaises(ValueError):
+            self.validate(record)
+
+        checks['native-build'] = [[sys.executable, '-c', 'raise SystemExit(8)']]
+        observed.clear()
+        steps = MODULE.run_checks(checks, os.environ.copy(), io.StringIO(), lambda name, output: observed.append(name))
+        self.assertIn('crate-packages', observed)
+        for name in ('node-tests', 'npm-packages'):
+            self.assertNotIn(name, observed)
+            self.assertEqual(next(step for step in steps if step['name'] == name)['status'], 'not_run')
+        record['steps'] = steps
+        with self.assertRaises(ValueError):
+            self.validate(record)
 
     def test_windows_and_unix_rust_logs_have_identical_counts(self):
         verifier = MODULE.helpers()

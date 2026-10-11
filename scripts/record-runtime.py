@@ -60,6 +60,39 @@ def validate(record, *, sources, commit):
         raise ValueError('Runtime log hash is missing')
 
 
+def run_checks(checks, environment, log, on_success):
+    """Collect independent failures; dependent steps require a fresh native build."""
+    steps = []
+    for name in STEPS:
+        if name in ('node-tests', 'npm-packages') and not any(
+                step == {'name': 'native-build', 'status': 'passed'} for step in steps):
+            steps.append({'name': name, 'status': 'not_run'})
+            message = f'{name}: not run because the native build failed\n'
+            print(message, end='', flush=True); log.write(message); log.flush()
+            continue
+        passed = True
+        for command in checks[name]:
+            message = '+ ' + ' '.join(command) + '\n'
+            print(message, end='', flush=True); log.write(message); log.flush()
+            try:
+                # CI owns the job process tree. No proof is executed here.
+                result = subprocess.run(command, cwd=ROOT, env=environment, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', timeout=1800)
+                log.write(result.stdout); log.flush()
+                print(result.stdout, end='', flush=True)
+                result.check_returncode()
+                on_success(name, result.stdout)
+            except (OSError, subprocess.SubprocessError, ValueError, RuntimeError) as error:
+                passed = False
+                if isinstance(error, subprocess.TimeoutExpired) and error.stdout:
+                    captured = error.stdout.decode('utf-8', errors='replace') if isinstance(error.stdout, bytes) else error.stdout
+                    log.write(captured)
+                message = f'FAILED {name}: {error}\n'
+                print(message, end='', flush=True); log.write(message); log.flush()
+        steps.append({'name': name, 'status': 'passed' if passed else 'failed'})
+    return steps
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--offline', action='store_true')
@@ -72,6 +105,8 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / 'report.json'
     report_path.unlink(missing_ok=True)
+    diagnostic_path = output / 'diagnostic.json'
+    diagnostic_path.unlink(missing_ok=True)
     environment = verifier.environment_for(args.offline)
     environment['RUSTUP_TOOLCHAIN'] = json.loads((ROOT / 'toolchain.lock.json').read_text())['rust']['channel']
     environment['PATH'] = str(Path(environment.get('CARGO_HOME', Path.home() / '.cargo')) / 'bin') + os.pathsep + environment.get('PATH', '')
@@ -81,7 +116,7 @@ def main():
                         for path in (ROOT / 'tests' / folder).glob('*.test.mjs'))
     checks = {
         'clippy': [['cargo', 'clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings']],
-        'rust-tests': [['cargo', 'test', '--workspace', '--locked']],
+        'rust-tests': [['cargo', 'test', '--workspace', '--locked', '--no-fail-fast']],
         'examples': [['cargo', 'run', '--locked', '-p', 'cordis', '--example', path.stem]
                      for path in sorted((ROOT / 'crates/cordis/examples').glob('*.rs'))],
         'native-build': [['node', 'scripts/build-node.mjs', *network]],
@@ -89,27 +124,26 @@ def main():
         'crate-packages': [[sys.executable, 'scripts/package-check.py', *network]],
         'npm-packages': [['node', 'scripts/check-npm-package.mjs']],
     }
-    tests, steps = {}, []
+    tests = {}
+    def on_success(name, output):
+        if name == 'rust-tests':
+            tests.update(verifier.test_counts(output))
+            tests.pop('deterministicTraces', None)
+        elif name == 'node-tests':
+            lines = ['workspace ended', runtime.NODE_BEGIN, *output.splitlines(), runtime.NODE_END, 'done']
+            tests['nodeCompatibility'] = runtime.parse_node_tests(lines, 0)
+
     log_path = output / 'runtime.log'
     with log_path.open('w', encoding='utf-8') as log:
-        for name in STEPS:
-            for command in checks[name]:
-                print('+ ' + ' '.join(command), flush=True)
-                log.write('+ ' + ' '.join(command) + '\n'); log.flush()
-                # Keep the full log even when a command fails. CI owns the job
-                # process tree; no positive or negative proof is executed here.
-                result = subprocess.run(command, cwd=ROOT, env=environment, stdout=subprocess.PIPE,
-                                        stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', timeout=1800)
-                log.write(result.stdout); log.flush()
-                print(result.stdout, end='', flush=True)
-                result.check_returncode()
-                if name == 'rust-tests':
-                    tests = verifier.test_counts(result.stdout)
-                    tests.pop('deterministicTraces', None)
-                elif name == 'node-tests':
-                    lines = ['workspace ended', runtime.NODE_BEGIN, *result.stdout.splitlines(), runtime.NODE_END, 'done']
-                    tests['nodeCompatibility'] = runtime.parse_node_tests(lines, 0)
-            steps.append({'name': name, 'status': 'passed'})
+        steps = run_checks(checks, environment, log, on_success)
+    if any(step['status'] != 'passed' for step in steps):
+        diagnostic_path.write_text(json.dumps({
+            'schema': 'cordis-verus.runtime-diagnostic/v1', 'status': 'failed',
+            'proofExecuted': False, 'releaseAcceptance': False,
+            'sourceCommit': commit, 'steps': steps, 'logSha256': runtime.file_sha256(log_path),
+        }, indent=2) + '\n', encoding='utf-8')
+        raise RuntimeError('Runtime acceptance failed: ' + ', '.join(
+            f"{step['name']}={step['status']}" for step in steps if step['status'] != 'passed'))
     build_path = ROOT / 'target/node-compat/build.json'
     build = runtime.node_build_evidence(build_path)
     npm = runtime.npm_distribution_evidence(ROOT / 'target/release-artifacts/npm/package-report.json', build_path, build)
