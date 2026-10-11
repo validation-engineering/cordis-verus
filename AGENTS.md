@@ -6,10 +6,15 @@
 - Run `./scripts/check-development.sh --offline` for a development change with cached
   dependencies. It checks formatting/lints/docs, whole-kernel proofs, tests,
   examples and extracted crate builds. Use `scripts/record-development.py` to
-  record this evidence; it does not claim release readiness.
-- A release requires `./scripts/quality.sh --offline`, including every full-crate
-  negative control. Do not label development checks or experimental scoped
-  negatives as a passed full release gate.
+  record this evidence; it does not claim release readiness. The release recorder
+  also runs these shared checks and can record a release-quality change.
+- A release requires `./scripts/quality.sh --offline`, with complete positive
+  proof, runtime tests and packaging checks, followed by actual asset installation
+  on every selected release platform. Full negative controls run independently
+  through `negative-regression.yml` or `scripts/check-negative.py`; they are not
+  prerequisites for a normal release. Preserve their strict rejection criteria.
+  Release evidence must label them `not_run`, never passed or silently omitted.
+  Do not label development/scoped checks as release or paper-wide acceptance.
 - Refresh evidence with `python3 scripts/record-verification.py --offline`.
   Its `--check` mode detects stale records; it is not a new verification run.
 - `crates/cordis/src/` is the ordinary Rust host adapter. Tests do not constitute

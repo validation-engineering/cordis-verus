@@ -517,18 +517,18 @@ is not proof that the mutation suite has passed.
 ## Evidence boundary and review contributions
 
 All five named mutation candidates are defined in
-[scripts/check-negative.py](../scripts/check-negative.py). Current accepted
-release evidence must come from [verification-report.json](verification-report.json),
-not from the presence of a candidate. At the introduction of this guide, that
-report records **no successful complete release run**. A timeout, solver resource
-failure, compiler error or a failed experimental scoped run is not a passed
-negative control. Development verification is reported separately in
-[development-report.json](development-report.json).
+[scripts/check-negative.py](../scripts/check-negative.py). A candidate declaration
+is not a successful negative check: consult the independent regression's raw
+artifacts and `target/proof-negative/report.json`. A timeout, solver resource
+failure, compiler error or failed scoped run is not a passed control.
 
-The release command is `./scripts/quality.sh --offline`; it includes the
-full-crate negative controls. It is intentionally a broader and more expensive
-check than the selected regressions above. A development pass does not substitute
-for release acceptance or paper completion.
+Release quality uses `./scripts/quality.sh --offline` and is recorded separately
+in [verification-report.json](verification-report.json) with schema `verification/v4`.
+It requires the complete unchanged kernel proof and runtime/package checks;
+full mutation regression is independent and explicitly `not_run` in this record.
+Development evidence remains in [development-report.json](development-report.json).
+A local quality pass does not establish cross-platform release acceptance or
+paper completion. See [validation](validation.md) for the current policy.
 
 A useful review report identifies the case ID, commit and exact function,
 then states whether the concern is an incorrect encoding, missing premise,

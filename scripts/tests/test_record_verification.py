@@ -1,4 +1,4 @@
-"""Release evidence must match the complete, current mutation manifest."""
+"""Release quality is independent of full negative regression evidence."""
 import copy
 from contextlib import contextmanager, nullcontext, redirect_stdout, redirect_stderr
 import io
@@ -15,11 +15,14 @@ from types import SimpleNamespace
 import unittest
 import tempfile
 from unittest.mock import patch
+from evidence_fixtures import LOCK, positive, quality_log, release
 
 SCRIPT = Path(__file__).resolve().parents[1] / "record-verification.py"
 SPEC = importlib.util.spec_from_file_location("verification_record", SCRIPT)
 RECORD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RECORD)
+RUNTIME = RECORD.execution_helpers()
+POSITIVE = RECORD.positive_helpers()
 
 
 def report(names):
@@ -81,7 +84,8 @@ class NativeEvidenceInputTests(unittest.TestCase):
                         "packages/compat-cordis/node_modules/vendor/index.js",
                         "packages/compat-cordis/native/cordis.node", "target/node-compat/build.json",
                         "packages/compat-cordis/native/manifest.json",
-                        "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json"]
+                        "packages/compat-cordis/native/provenance/darwin-arm64-napi8.json",
+                        "docs/development-report.json", "docs/verification-report.json"]
             for name in fixtures:
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,7 +113,7 @@ class ReleaseRecordingTests(unittest.TestCase):
         self.record = self.root / "docs/verification-report.json"
         self.record.parent.mkdir()
         self.record.write_text(json.dumps({"schema": RECORD.SCHEMA, "status": "passed", "sha256": {}}))
-        self.proof = self.root / "target/proof-negative/report.json"
+        self.proof = self.root / "target/positive-proof/report.json"
         self.proof.parent.mkdir(parents=True)
         self.proof.write_text(json.dumps(report(["old"])))
         self.packages = self.root / "target/release-artifacts/package-report.json"
@@ -123,9 +127,15 @@ class ReleaseRecordingTests(unittest.TestCase):
         self.addCleanup(patch.stopall)
         patch.object(RECORD, "ROOT", self.root).start()
         patch.object(RECORD, "RECORD", self.record).start()
-        patch.object(RECORD, "required_negative_names", return_value=["one"]).start()
+        (self.root / "toolchain.lock.json").write_text(json.dumps(LOCK))
+        self.node = release()["nodeBuild"]
+        self.npm = release()["npmDistribution"]
+        patch.object(RECORD, "positive_helpers", return_value=SimpleNamespace(
+            validate=POSITIVE.validate, read_evidence=lambda **_: json.loads(self.proof.read_text()))).start()
         patch.object(RECORD, "execution_helpers", return_value=SimpleNamespace(
-            verifier_lease=self.lease, termination_signals=nullcontext)).start()
+            verifier_lease=self.lease, termination_signals=nullcontext, parse_results=RUNTIME.parse_results,
+            node_build_evidence=lambda _: self.node, npm_distribution_evidence=lambda *_: self.npm,
+            file_sha256=lambda _: "a" * 64)).start()
         patch.dict(os.environ, {}, clear=True).start()
 
     @contextmanager
@@ -139,18 +149,14 @@ class ReleaseRecordingTests(unittest.TestCase):
     def successful_checks(self, command, environment, log):
         self.assertEqual(self.events, ["lock"])
         self.assertEqual(json.loads(self.record.read_text())["status"], "running")
-        self.assertFalse(self.proof.exists(), "old negative evidence must be removed")
+        self.assertFalse(self.proof.exists(), "old positive evidence must be removed")
         self.assertFalse(self.packages.exists(), "old package evidence must be removed")
         self.assertEqual(environment["CORDIS_VERUS_THREADS"], "2")
-        evidence = report(["one"])
-        evidence["verus"] = {"version": "test"}
-        evidence["execution"] = {"mode": "full-crate-shards"} if RECORD.SHARDS_ENV in environment else {"jobs": 1}
+        self.assertNotIn("CORDIS_FULL_NEGATIVE_SHARDS", environment)
+        evidence = positive(RECORD.source_hashes())
         self.proof.write_text(json.dumps(evidence))
         self.packages.write_text('{"fresh": true}')
-        log.write_text("Running tests/lifecycle.rs (target/lifecycle)\n"
-                       "test result: ok. 4 passed; 0 failed;\n"
-                       "Doc-tests cordis\ntest result: ok. 2 passed; 0 failed;\n"
-                       "OK unmodified kernel: 40 verified, 0 errors\n")
+        log.write_text(quality_log(RECORD.QUALITY_MARKER))
         return 0
 
     def run_record(self, **options):
@@ -158,13 +164,13 @@ class ReleaseRecordingTests(unittest.TestCase):
             return RECORD.record_release(**options)
 
     def test_default_gate_ignores_inherited_shard_selection_and_records_fresh_proof(self):
-        with patch.dict(os.environ, {RECORD.SHARDS_ENV: "/stale/artifacts", "CORDIS_VERUS_THREADS": "99"}):
+        with patch.dict(os.environ, {"CORDIS_FULL_NEGATIVE_SHARDS": "/stale/artifacts", "CORDIS_VERUS_THREADS": "99"}):
             with patch.object(RECORD, "run_checks", side_effect=self.successful_checks) as checks:
                 recorded = self.run_record(offline=True)
         self.assertEqual(recorded["status"], "passed")
         self.assertEqual(recorded["commands"], [["./scripts/quality.sh", "--offline"]])
-        self.assertEqual(recorded["negativeControls"][0]["name"], "one")
-        self.assertNotIn(RECORD.SHARDS_ENV, checks.call_args.args[1])
+        self.assertEqual(recorded["negativeControls"], RECORD.NEGATIVE_POLICY)
+        self.assertNotIn("CORDIS_FULL_NEGATIVE_SHARDS", checks.call_args.args[1])
         self.assertEqual(checks.call_args.args[1]["CARGO_NET_OFFLINE"], "true")
         self.assertEqual(self.events, ["lock", "unlock"])
         self.assertEqual(recorded["tests"]["total"], 4)
@@ -176,17 +182,7 @@ class ReleaseRecordingTests(unittest.TestCase):
             recorded = self.run_record()
         self.assertEqual(recorded["ci"], "GitHub Actions; this report describes the current workflow run")
 
-    def test_explicit_shards_selects_fixed_environment_path_and_preserves_negative_results(self):
-        shards = self.root / "full shards"
-        shards.mkdir()
-        with patch.object(RECORD, "run_checks", side_effect=self.successful_checks) as checks:
-            recorded = self.run_record(negative_shards=shards)
-        self.assertEqual(checks.call_args.args[1][RECORD.SHARDS_ENV], str(shards.resolve()))
-        self.assertEqual(recorded["negativeExecution"]["mode"], "full-crate-shards")
-        self.assertEqual(recorded["commands"], [["./scripts/quality.sh"]])
-        self.assertEqual(recorded["negativeControls"], report(["one"])["mutations"])
-
-    def test_zero_exit_without_new_negatives_cannot_reuse_the_previous_report(self):
+    def test_zero_exit_without_new_positive_proof_cannot_reuse_the_previous_report(self):
         def incomplete(_command, _environment, log):
             self.assertFalse(self.proof.exists())
             log.write_text("quality omitted proof output")
@@ -198,7 +194,7 @@ class ReleaseRecordingTests(unittest.TestCase):
         self.assertFalse(self.proof.exists())
         self.assertEqual(self.events, ["lock", "unlock"])
 
-    def test_failed_command_invalidates_old_success_and_does_not_reuse_negative_report(self):
+    def test_failed_command_invalidates_old_success_and_does_not_reuse_positive_report(self):
         with patch.object(RECORD, "run_checks", return_value=17), self.assertRaisesRegex(RuntimeError, "17"):
             self.run_record()
         failed = json.loads(self.record.read_text())
@@ -224,25 +220,25 @@ class ReleaseRecordingTests(unittest.TestCase):
             self.run_record()
         self.assertEqual(json.loads(self.record.read_text())["status"], "failed")
 
-    def test_collected_shards_still_require_the_exact_full_manifest(self):
-        shards = self.root / "shards"
-        shards.mkdir()
-        def incomplete(*args):
+    def test_partial_positive_proof_is_rejected(self):
+        def partial(*args):
             result = self.successful_checks(*args)
             evidence = json.loads(self.proof.read_text())
-            evidence["mutations"] = []
+            evidence["proof"]["is-verifying-entire-crate"] = False
             self.proof.write_text(json.dumps(evidence))
             return result
-        with patch.object(RECORD, "run_checks", side_effect=incomplete), self.assertRaisesRegex(RuntimeError, "manifest"):
-            self.run_record(negative_shards=shards)
+        with patch.object(RECORD, "run_checks", side_effect=partial), self.assertRaisesRegex(RuntimeError, "positive"):
+            self.run_record()
         self.assertEqual(json.loads(self.record.read_text())["status"], "failed")
 
-    def test_missing_shards_are_rejected_before_any_checks(self):
-        with patch.object(RECORD, "run_checks") as checks, self.assertRaises(FileNotFoundError):
-            self.run_record(negative_shards=self.root / "missing")
-        checks.assert_not_called()
+    def test_missing_runtime_sections_fail_despite_successful_proof(self):
+        def incomplete(*args):
+            result = self.successful_checks(*args)
+            args[2].write_text("verification results:: 40 verified, 0 errors\n" + RECORD.QUALITY_MARKER + "\n")
+            return result
+        with patch.object(RECORD, "run_checks", side_effect=incomplete), self.assertRaisesRegex(RuntimeError, "workspace"):
+            self.run_record()
         self.assertEqual(json.loads(self.record.read_text())["status"], "failed")
-        self.assertFalse(self.proof.exists())
 
     def test_custom_verifier_environment_is_rejected(self):
         with patch.dict(os.environ, {"VERUS_EXTRA_ARGS": "--no-verify"}), \
@@ -251,13 +247,11 @@ class ReleaseRecordingTests(unittest.TestCase):
         checks.assert_not_called()
         self.assertEqual(json.loads(self.record.read_text())["status"], "failed")
 
-    def test_cli_explicitly_passes_shards_and_refuses_check_only_selection(self):
-        shards = self.root / "input"
-        with patch.object(sys, "argv", ["record-verification.py", "--offline", "--negative-shards", str(shards)]), \
-                patch.object(RECORD, "record_release") as run:
+    def test_cli_rejects_legacy_shard_selection_instead_of_silently_ignoring_it(self):
+        with patch.object(sys, "argv", ["record-verification.py", "--offline"]), patch.object(RECORD, "record_release") as run:
             RECORD.main()
-        run.assert_called_once_with(True, False, shards)
-        with patch.object(sys, "argv", ["record-verification.py", "--check", "--negative-shards", str(shards)]), \
+        run.assert_called_once_with(True, False)
+        with patch.object(sys, "argv", ["record-verification.py", "--negative-shards", "input"]), \
                 patch.object(RECORD, "record_release") as run, redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
             RECORD.main()
         self.assertEqual(error.exception.code, 2)
@@ -265,7 +259,7 @@ class ReleaseRecordingTests(unittest.TestCase):
 
 
 class CheckScriptRoutingTests(unittest.TestCase):
-    def test_default_and_shard_paths_both_run_the_whole_verifier_workspace_and_examples(self):
+    def test_ambient_shard_selection_cannot_add_negatives_or_skip_positive_tests(self):
         with tempfile.TemporaryDirectory(prefix="cordis-check-routing-") as temporary:
             root = Path(temporary)
             scripts = root / "scripts"
@@ -278,7 +272,7 @@ class CheckScriptRoutingTests(unittest.TestCase):
             binary.mkdir()
             (binary / "cargo").write_text('#!/usr/bin/env bash\nprintf "cargo %s\\n" "$*" >> "$TRACE"\n')
             (binary / "cargo").chmod(0o755)
-            for name in ("check-negative.py", "negative-shards.py"):
+            for name in ("check-positive.py", "check-negative.py", "negative-shards.py"):
                 (scripts / name).write_text("import json,os,sys\nwith open(os.environ['TRACE'],'a') as output:\n"
                                           "    output.write(json.dumps(sys.argv)+'\\n')\n")
             examples = root / "crates/cordis/examples"
@@ -289,21 +283,16 @@ class CheckScriptRoutingTests(unittest.TestCase):
                     trace = root / "trace"
                     trace.unlink(missing_ok=True)
                     environment = {**os.environ, "PATH": str(binary) + os.pathsep + os.environ["PATH"], "TRACE": str(trace)}
-                    environment.pop(RECORD.SHARDS_ENV, None)
+                    environment.pop("CORDIS_FULL_NEGATIVE_SHARDS", None)
                     environment.pop("CORDIS_VERUS_THREADS", None)
                     if shards:
-                        environment[RECORD.SHARDS_ENV] = str(shards)
+                        environment["CORDIS_FULL_NEGATIVE_SHARDS"] = str(shards)
                     subprocess.run(["bash", str(scripts / "check.sh")], env=environment, check=True, capture_output=True, text=True)
                     lines = trace.read_text().splitlines()
-                    self.assertEqual(lines[:3], ["verify --num-threads 2 --triggers-mode silent",
-                                                "cargo test --workspace --locked",
+                    self.assertEqual(len(lines), 3)
+                    self.assertEqual(json.loads(lines[0]), ["scripts/check-positive.py"])
+                    self.assertEqual(lines[1:], ["cargo test --workspace --locked",
                                                 "cargo run --locked -p cordis --example demo"])
-                    final = json.loads(lines[3])
-                    if shards:
-                        self.assertEqual(final, ["scripts/negative-shards.py", "collect", "--input", str(shards),
-                                                 "--output", "target/proof-negative"])
-                    else:
-                        self.assertEqual(final, ["scripts/check-negative.py"])
 
 
 @unittest.skipUnless(os.name == "posix", "supported Verus platforms are POSIX")

@@ -63,6 +63,6 @@
 | [Security](../SECURITY.md) | 安全问题报告 |
 
 日常开发使用 `./scripts/check-development.sh --offline`；默认 CI 不含全量负控。
-完整 `quality.sh` 的发布门槛仍独立保留，当前尚未通过。scoped-negative 是实验工具，结果不能冒充全库负控或 v3 发布证据。新增或调整论文范围后，编辑 ledger 并运行 `python3 scripts/check-paper-coverage.py --write`；不要直接手改生成表来提升状态。
+`quality.sh` 复用完整正向证明、运行与软件包检查，发布还要求所选平台的实际产物安装。全量负控独立运行，在 `verification/v4` 发布记录中明确标为 `not_run`。scoped-negative 仍是实验工具，不能冒充全库负控或发布证据。新增或调整论文范围后，编辑 ledger 并运行 `python3 scripts/check-paper-coverage.py --write`；不要直接手改生成表来提升状态。
 
-Complete release-negative execution: [English](full-negative-validation.md) · [简体中文](full-negative-validation.zh-CN.md).
+Independent full negative regression: [English](full-negative-validation.md) · [简体中文](full-negative-validation.zh-CN.md).

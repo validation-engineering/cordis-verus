@@ -429,15 +429,15 @@ cargo test --offline -p cordis --test loader paper_leaf_projection_requires_reso
 ## 证据边界与审查贡献
 
 上述五个具名变异候选均定义于
-[scripts/check-negative.py](../scripts/check-negative.py)。当前被接受的发布证据
-必须来自 [verification-report.json](verification-report.json)，不能以存在候选为据。
-本指南引入时，该报告记录的是**尚无成功的完整发布验收运行**。超时、求解器资源失败、
-编译错误或失败的实验性局部运行，都不是通过的负控结果。开发验证单独记录在
-[development-report.json](development-report.json) 中。
+[scripts/check-negative.py](../scripts/check-negative.py)。存在候选不代表负控通过；
+应查看独立回归的原始工件及 `target/proof-negative/report.json`。
+超时、求解器资源失败、编译错误或失败的局部运行，都不是通过的负控结果。
 
-发布验收命令为 `./scripts/quality.sh --offline`，其中包含针对完整 crate 的负控。
-它的检查范围和成本都高于上述选定回归测试。开发检查通过，不能替代发布验收或整篇论文
-完成的证据。
+发布质量命令为 `./scripts/quality.sh --offline`，以 `verification/v4` 格式单独记录在
+[verification-report.json](verification-report.json)，要求完整未修改内核的正向证明与运行、
+软件包检查。全量变异回归独立运行，在发布记录中明确标为 `not_run`。
+开发证据仍在 [development-report.json](development-report.json) 中。
+本地质量检查通过，不能确立跨平台发布验收或整篇论文完成。当前政策见[验证说明](validation.md)。
 
 有帮助的审查报告应指出案例 ID、提交号和确切函数，并说明问题属于：编码有误、
 前提缺失、实际执行路径未连接、证据无效，还是应用行为存在差距。尽可能附上简短轨迹或

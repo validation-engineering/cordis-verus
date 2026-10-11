@@ -85,12 +85,13 @@ private downloads also need an authenticated GitHub CLI. See
 [installation and architecture boundaries](native-distribution.md#install-a-published-runtime-without-compiling).
 No runtime release is available yet.
 
-From a clean, reviewed commit, run the `Full release validation` workflow with
+From a clean, reviewed commit, run the `Release validation` workflow with
 `create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. The default
 platforms are Linux x64 and macOS Apple Silicon; set `include_macos_intel=true` to
-include macOS Intel. [Full-crate negative shards](full-negative-validation.md) use a
-platform-specific partition; every selected platform's quality job must collect all
-121 controls and pass `record-verification.py` before its packages can be staged.
+include macOS Intel. Every selected platform must pass `record-verification.py`
+with complete positive proof, runtime/compatibility tests and package checks
+before its packages can be staged. [Full negative regressions](full-negative-validation.md)
+run independently; release evidence explicitly records them as `not_run`.
 Evidence binds the source, tools, platform and run attempt; rerun the whole workflow
 after a failure. The workflow then tests installation, native loading and offline
 reinstallation on that same platform. The collector requires exactly the selected

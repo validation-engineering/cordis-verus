@@ -102,16 +102,17 @@ def assigned(manifest, index, count):
     return [item for position, item in enumerate(manifest) if position % count == index]
 
 
-def release_plan(manifest=None, *, include_macos_intel=False):
+def regression_plan(manifest=None, *, include_macos=False, include_macos_intel=False):
     """Plan bounded platform jobs without installing or invoking the verifier."""
-    require(type(include_macos_intel) is bool, 'Intel platform selection must be boolean')
+    require(type(include_macos) is bool and type(include_macos_intel) is bool, 'Platform selection must be boolean')
     manifest = checker().mutation_manifest() if manifest is None else manifest
     require(manifest and len({item[0] for item in manifest}) == len(manifest),
             'Negative-control manifest is empty or has duplicate names')
     # Wall-clock budgets, not SMT resource limits. Intel's 90-minute allowance is
     # engineering headroom after a 40-minute timeout, not a measured proof time.
-    configuration = [('ubuntu-24.04', 2400, 18, 'linux-x64-gnu-napi8'),
-                     ('macos-15', 3600, 25, 'darwin-arm64-napi8')]
+    configuration = [('ubuntu-24.04', 2400, 18, 'linux-x64-gnu-napi8')]
+    if include_macos:
+        configuration.append(('macos-15', 3600, 25, 'darwin-arm64-napi8'))
     if include_macos_intel:
         configuration.append(('macos-15-intel', 5400, 41, 'darwin-x64-napi8'))
     platforms, shards = [], []
@@ -126,17 +127,16 @@ def release_plan(manifest=None, *, include_macos_intel=False):
         platforms.append(row)
         shards.extend({**row, 'shard': index} for index in range(count))
     return {'mutationCount': len(manifest), 'preflight': {'include': platforms},
-            'negative': {'include': shards}, 'quality': {'os': [row['os'] for row in platforms]},
-            'targets': [row['target'] for row in platforms]}
+            'negative': {'include': shards}}
 
 
-def write_plan(output=None, *, include_macos_intel=False):
-    plan = release_plan(include_macos_intel=include_macos_intel)
+def write_plan(output=None, *, include_macos=False, include_macos_intel=False):
+    plan = regression_plan(include_macos=include_macos, include_macos_intel=include_macos_intel)
     if output is None:
         print(json.dumps(plan, indent=2))
     else:
         with output.open('a') as stream:
-            for key in ['preflight', 'negative', 'quality', 'targets']:
+            for key in ['preflight', 'negative']:
                 stream.write(key + '=' + json.dumps(plan[key], separators=(',', ':')) + '\n')
         print(f"Planned {len(plan['negative']['include'])} shards across "
               f"{len(plan['preflight']['include'])} platforms; {plan['mutationCount']} controls per platform.")
@@ -409,7 +409,7 @@ def run_shard(index, count, output, *, jobs=1, threads=None, cpu_budget=None, ti
         if keep_going:
             print(f'Diagnostic shard {index + 1}/{count} completed: {len(selected)} controls. Not release evidence.')
         else:
-            print(f'Full-crate shard {index + 1}/{count} passed: {len(selected)} controls. Not complete release evidence.')
+            print(f'Full-crate shard {index + 1}/{count} passed: {len(selected)} controls. Not complete regression evidence.')
     except BaseException as error:
         if diagnostic is not None:
             try:
@@ -517,7 +517,7 @@ def collect(input_directory, output):
     for path, record in zip(paths, reports):
         require(record.get('execution', {}).get('keepGoing', False) is False
                 and 'diagnosticReport' not in record and not (path.parent / 'diagnostic.json').exists(),
-                'Diagnostic keep-going reports cannot be collected as release evidence')
+                'Diagnostic keep-going reports cannot be collected as accepted regression evidence')
     for path in paths:
         parts = path.relative_to(input_directory).parts
         require(not input_directory.is_symlink()
@@ -592,13 +592,13 @@ def collect(input_directory, output):
             inputs.append({'index': record['shard']['index'], 'reportSha256': digest(path),
                            'execution': execution, 'files': record['files']})
     require(binding(checks, binary) == expected_binding, 'Sources/toolchain changed during collection')
-    summary = {'verus': version, 'baseline': baseline,
+    summary = {'releaseAcceptance': False, 'verus': version, 'baseline': baseline,
                'execution': {'mode': 'full-crate-shards', 'shardCount': count,
                              'binding': expected_binding, 'baselineMode': baseline_mode,
                              'preflightSha256': preflight_hash, 'shards': inputs},
                'mutations': [rows[item[0]] for item in manifest]}
     recorder().validate_negative_report(summary, [item[0] for item in manifest])
-    # The recorder removes an earlier report before invoking the quality gate.
+    # Preserve earlier regression evidence; callers must select a fresh output.
     output.mkdir(parents=True, exist_ok=True)
     require(not (output / 'report.json').exists(), 'Refusing to overwrite a negative report')
     save(output / 'report.json', summary)
@@ -612,7 +612,8 @@ def main():
     commands = parser.add_subparsers(dest='action', required=True)
     plan = commands.add_parser('plan')
     plan.add_argument('--github-output', type=Path, help='Append matrix JSON to a GitHub job output file')
-    plan.add_argument('--include-macos-intel', action='store_true', help='Also validate and package Intel macOS')
+    plan.add_argument('--include-macos', action='store_true', help='Also run full regressions on Apple Silicon macOS')
+    plan.add_argument('--include-macos-intel', action='store_true', help='Also run full regressions on Intel macOS')
     preflight = commands.add_parser('preflight')
     preflight.add_argument('--output', type=Path, required=True)
     preflight.add_argument('--threads', type=int)
@@ -635,7 +636,7 @@ def main():
     gather.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if args.action == 'plan':
-        write_plan(args.github_output, include_macos_intel=args.include_macos_intel)
+        write_plan(args.github_output, include_macos=args.include_macos, include_macos_intel=args.include_macos_intel)
     elif args.action == 'preflight':
         run_preflight(args.output, threads=args.threads, cpu_budget=args.cpu_budget, timeout=args.timeout)
     elif args.action == 'run':

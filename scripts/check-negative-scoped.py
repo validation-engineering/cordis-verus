@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Opt-in selected-proof mutation evidence. Never accepted as v3 release evidence.
+"""Opt-in selected-proof mutation evidence. Never accepted as release evidence.
 
-This separate v2 entrypoint leaves full-mode and v3 release validation intact.
+This separate v2 entrypoint does not change the independent full regression or
+the positive proof required by release validation.
 All verifier invocations use fresh temporary source trees; the project is read-only.
 """
 

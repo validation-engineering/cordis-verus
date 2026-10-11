@@ -264,6 +264,10 @@ pub proof fn adjacent_swap<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:g::Library<
     },
 {
     hide(og::primitive_theory);hide(swap_states);
+    // This proof composes checked steps and transports sequence positions.
+    // Their interpreters and crossing guards belong to swap_suffix's proof.
+    hide(g::step);hide(g::well_formed);hide(transport::transport);hide(swapped_endpoint);
+    hide(o::crossing_guard);hide(unload::crossing_guard);hide(admin::crossing_guard);
     swap_construction(lib,programs,states,labels,i);
     swap_suffix(eq,lib,programs,states,labels,i);
     let suffix=states.subrange(i+2,states.len() as int);let tail=labels.subrange(i+2,labels.len() as int);

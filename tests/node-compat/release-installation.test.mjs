@@ -17,13 +17,19 @@ async function fixture() {
   for (const item of packages) await writeFile(join(assets, item.file), 'invalid');
   const evidence = {
     sourceCommit: 'a'.repeat(40),
-    verification: { schema: 'cordis-verus.verification/v3', status: 'passed', sha256: { 'fixture.rs': 'd'.repeat(64) }, proof: { success: true, errors: 0, 'is-verifying-entire-crate': true },
-      negativeControls: [{ compiles: true, 'verification-results': { success: false, errors: 1, 'is-verifying-entire-crate': true } }] },
+    verification: { schema: 'cordis-verus.verification/v4', status: 'passed', releaseAcceptance: true, paperCoverage: { completionClaimed: false }, sha256: { 'fixture.rs': 'd'.repeat(64) }, proof: { success: true, errors: 0, verified: 40, 'encountered-error': false, 'encountered-vir-error': false, 'is-verifying-entire-crate': true },
+      negativeControls: { status: 'not_run', requiredForRelease: false, workflow: '.github/workflows/negative-regression.yml' } },
     npm: { status: 'passed', nativeSourceHashes: { 'fixture.rs': 'd'.repeat(64) }, nativeTarget: target, nativeManifestSha256: 'b'.repeat(64), nativeArtifactSha256: 'c'.repeat(64), packages },
   };
+  evidence.verification.proofExecution = {
+    schema: 'cordis-verus.positive-proof/v1', status: 'passed', returncode: 0, compiled: true, noCheating: true,
+    proof: evidence.verification.proof, sourceHashes: evidence.verification.sha256,
+    artifact: { path: 'target/verus/libcordis_kernel.rlib', bytes: 8, sha256: 'a'.repeat(64) },
+  };
+  evidence.verification.npmDistribution = evidence.npm;
   const bytes = JSON.stringify(evidence); await writeFile(join(assets, 'evidence.json'), bytes);
-  const manifest = { schema: 'cordis-verus.runtime-release/v1', target, sourceCommit: evidence.sourceCommit,
-    acceptance: { fullQuality: true, paperCompletion: false, negativeControls: 1 },
+  const manifest = { schema: 'cordis-verus.runtime-release/v2', target, sourceCommit: evidence.sourceCommit,
+    acceptance: { releaseQuality: true, paperCompletion: false, negativeControls: 'not_run' },
     nativeManifestSha256: evidence.npm.nativeManifestSha256, nativeArtifactSha256: evidence.npm.nativeArtifactSha256,
     packages, evidence: { file: 'evidence.json', bytes: Buffer.byteLength(bytes), sha256: hash(bytes) } };
   const save = () => writeFile(join(assets, `cordis-runtime-${target}.json`), JSON.stringify(manifest));
@@ -45,7 +51,7 @@ test('release manifest rejects development evidence, wrong target, missing and u
   const f = await fixture();
   try {
     validateManifest(f.manifest, target);
-    for (const mutate of [r => { r.acceptance.fullQuality = false; }, r => { r.target = 'other'; },
+    for (const mutate of [r => { r.acceptance.releaseQuality = false; }, r => { r.target = 'other'; },
       r => { r.packages.pop(); }, r => { r.packages[0].file = '../escape.tgz'; },
       r => { r.packages[1].file = r.packages[0].file; }, r => { r.evidence.sha256 = 'invalid'; }]) {
       const record = structuredClone(f.manifest); mutate(record);
@@ -88,7 +94,7 @@ test('local symlink assets are rejected', async () => {
 test('invalid evidence is rejected before npm runs', async () => {
   const f = await fixture();
   try {
-    f.manifest.acceptance.negativeControls = 2; await f.save();
+    f.manifest.acceptance.negativeControls = 'passed'; await f.save();
     await assert.rejects(installRelease({ project: f.project, fromDirectory: f.assets }));
     await noProject(f);
   } finally { await f.dispose(); }
@@ -115,6 +121,7 @@ test('native source provenance must be covered by the full-quality record', asyn
     const path = join(f.assets, f.manifest.evidence.file);
     const evidence = JSON.parse(await readFile(path, 'utf8'));
     evidence.verification.sha256['fixture.rs'] = 'e'.repeat(64);
+    evidence.verification.proofExecution.sourceHashes['fixture.rs'] = 'e'.repeat(64);
     const bytes = JSON.stringify(evidence); await writeFile(path, bytes);
     f.manifest.evidence.bytes = Buffer.byteLength(bytes); f.manifest.evidence.sha256 = hash(bytes); await f.save();
     await assert.rejects(installRelease({ project: f.project, fromDirectory: f.assets }), /matching full-quality evidence/);
@@ -132,4 +139,23 @@ test('GitHub download failure does not create a destination', async () => {
     await assert.rejects(lstat(f.project), { code: 'ENOENT' });
     assert.deepEqual((await readdir(f.root)).sort(), ['assets', 'bin']);
   } finally { process.env.PATH = oldPath; await f.dispose(); }
+});
+
+
+test('release evidence rejects legacy, partial or uncompiled proof and misleading negatives before npm', async () => {
+  for (const mutate of [v => { v.schema = 'cordis-verus.verification/v3'; },
+    v => { v.releaseAcceptance = false; }, v => { v.proof.verified = 0; },
+    v => { v.proof['is-verifying-entire-crate'] = false; }, v => { v.proofExecution.compiled = false; },
+    v => { v.proofExecution.noCheating = false; }, v => { v.negativeControls.status = 'passed'; },
+    v => { v.npmDistribution = {}; }]) {
+    const f = await fixture();
+    try {
+      const path = join(f.assets, f.manifest.evidence.file);
+      const evidence = JSON.parse(await readFile(path, 'utf8')); mutate(evidence.verification);
+      const bytes = JSON.stringify(evidence); await writeFile(path, bytes);
+      f.manifest.evidence.bytes = Buffer.byteLength(bytes); f.manifest.evidence.sha256 = hash(bytes); await f.save();
+      await assert.rejects(installRelease({ project: f.project, fromDirectory: f.assets }), { code: 'ERR_ASSERTION' });
+      await noProject(f);
+    } finally { await f.dispose(); }
+  }
 });

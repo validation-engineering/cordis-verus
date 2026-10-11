@@ -1,20 +1,15 @@
-name: Full release validation
+name: Release validation
 
 on:
   workflow_dispatch:
     inputs:
       include_macos_intel:
-        description: Also require full validation and runtime assets for Intel macOS
-        required: true
-        default: false
-        type: boolean
-      diagnostic_keep_going:
-        description: Collect all mutant outcomes after individual failures (diagnostic only; no release acceptance)
+        description: Also require release validation and runtime assets for Intel macOS
         required: true
         default: false
         type: boolean
       create_draft:
-        description: Create a private/draft runtime prerelease only after all full quality jobs pass
+        description: Create a draft runtime prerelease after proof, tests and asset installation pass
         required: true
         default: false
         type: boolean
@@ -32,141 +27,28 @@ concurrency:
 
 jobs:
   plan:
-    name: Plan platform proof budgets
+    name: Select release platforms
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      preflight: ${{ steps.matrix.outputs.preflight }}
-      negative: ${{ steps.matrix.outputs.negative }}
       quality: ${{ steps.matrix.outputs.quality }}
       targets: ${{ steps.matrix.outputs.targets }}
     steps:
-      - name: Reject diagnostic runs that request a draft release
-        shell: bash
-        env:
-          DIAGNOSTIC_KEEP_GOING: ${{ inputs.diagnostic_keep_going }}
-          CREATE_DRAFT: ${{ inputs.create_draft }}
-        run: |
-          if [[ "$DIAGNOSTIC_KEEP_GOING" == "true" && "$CREATE_DRAFT" == "true" ]]; then
-            echo "::error::diagnostic_keep_going=true cannot be combined with create_draft=true"
-            exit 1
-          fi
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - name: Generate matching preflight and negative matrices
+      - name: Select matching quality and runtime asset platforms
         id: matrix
-        run: python3 scripts/negative-shards.py plan --github-output "$GITHUB_OUTPUT" ${{ inputs.include_macos_intel && '--include-macos-intel' || '' }}
-
-  preflight:
-    name: Negative baseline preflight (${{ matrix.os }})
-    needs: plan
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.preflight) }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.preflightMinutes }}
-    env:
-      CARGO_TERM_COLOR: never
-      RUST_BACKTRACE: "1"
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-      - name: Check requested draft tag before running the full gate
-        if: ${{ inputs.create_draft }}
-        env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          python3 - <<'PYCODE'
-          import os, re
-          if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', os.environ['RELEASE_TAG']):
-              raise SystemExit('A new, simple release tag is required for create_draft=true')
-          PYCODE
-      - name: Install checksum-locked Verus and Rust
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ./scripts/install-verus.sh
-      - name: Diagnose unchanged full-crate baseline before fan-out
-        run: exec python3 scripts/negative-shards.py preflight --output target/negative-preflight --threads ${{ matrix.threads }} --timeout ${{ matrix.timeout }}
-      - name: Summarize baseline results before artifact upload
-        if: always()
-        run: python3 scripts/summarize-negative.py --input target/negative-preflight --github-summary "$GITHUB_STEP_SUMMARY"
-      - name: Retain baseline diagnostics, including failures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: preflight-${{ github.run_attempt }}-${{ matrix.os }}
-          path: target/negative-preflight/
-          if-no-files-found: warn
-          retention-days: 14
-
-  negative:
-    name: Full negatives (${{ matrix.os }}, shard ${{ matrix.shard }})
-    needs: [plan, preflight]
-    strategy:
-      fail-fast: false
-      max-parallel: 12
-      matrix: ${{ fromJSON(needs.plan.outputs.negative) }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.shardMinutes }}
-    env:
-      CARGO_TERM_COLOR: never
-      RUST_BACKTRACE: "1"
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-      - name: Check requested draft tag before running the full gate
-        if: ${{ inputs.create_draft }}
-        env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          python3 - <<'PYCODE'
-          import os, re
-          if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', os.environ['RELEASE_TAG']):
-              raise SystemExit('A new, simple release tag is required for create_draft=true')
-          PYCODE
-      - name: Install checksum-locked Verus and Rust
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ./scripts/install-verus.sh
-      - name: Download this platform's positive baseline from this attempt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: preflight-${{ github.run_attempt }}-${{ matrix.os }}
-          path: target/negative-preflight
-      - name: Verify this shard as complete crates
-        shell: bash
-        env:
-          DIAGNOSTIC_KEEP_GOING: ${{ inputs.diagnostic_keep_going }}
-        run: |
-          diagnostic_args=()
-          if [[ "$DIAGNOSTIC_KEEP_GOING" == "true" ]]; then
-            diagnostic_args+=(--keep-going)
-          fi
-          exec python3 scripts/negative-shards.py run --shard-index ${{ matrix.shard }} --shard-count ${{ matrix.shardCount }} --output target/negative-shard --jobs 1 --threads ${{ matrix.threads }} --timeout ${{ matrix.timeout }} --compile-timeout ${{ matrix.compileTimeout }} --preflight target/negative-preflight "${diagnostic_args[@]}"
-      - name: Summarize negative results before artifact upload
-        if: always()
-        run: python3 scripts/summarize-negative.py --input target/negative-shard --github-summary "$GITHUB_STEP_SUMMARY"
-      - name: Retain negative evidence, including failures
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: negative-${{ github.run_attempt }}-${{ matrix.os }}-shard-${{ matrix.shard }}
-          path: target/negative-shard/
-          if-no-files-found: warn
-          retention-days: 14
+        run: python3 scripts/package-runtime-release.py plan --github-output "$GITHUB_OUTPUT" ${{ inputs.include_macos_intel && '--include-macos-intel' || '' }}
 
   quality:
-    name: Full quality (${{ matrix.os }})
-    needs: [plan, negative]
-    if: ${{ !inputs.diagnostic_keep_going }}
+    name: Release quality (${{ matrix.os }})
+    needs: plan
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.quality) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 360
+    timeout-minutes: 120
     env:
       CARGO_TERM_COLOR: never
       RUST_BACKTRACE: "1"
@@ -195,13 +77,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./scripts/install-verus.sh
-      - name: Download this platform's complete negative shards from this attempt
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          pattern: negative-${{ github.run_attempt }}-${{ matrix.os }}-shard-*
-          path: target/full-negative-shards
-      - name: Complete full-crate negative and release-quality gate
-        run: exec python3 scripts/record-verification.py --negative-shards target/full-negative-shards
+      - name: Verify the complete kernel and run release-quality checks
+        run: exec python3 scripts/record-verification.py
       - name: Assemble this host's audited native bundle
         run: node scripts/package-native.mjs --output target/release-artifacts/native packages/compat-cordis/native
       - name: Stage runtime release assets from the full gate
@@ -221,9 +98,7 @@ jobs:
           path: |
             docs/verification-report.json
             target/validation/quality.log
-            target/proof-negative/*.json
-            target/proof-negative/*.txt
-            target/full-negative-shards/
+            target/positive-proof/
             target/release-artifacts/*.crate
             target/release-artifacts/package-report.json
             target/node-compat/build.json
@@ -236,7 +111,7 @@ jobs:
   draft-release:
     name: Collect and upload a draft runtime prerelease
     needs: [plan, quality]
-    if: ${{ inputs.create_draft && !inputs.diagnostic_keep_going }}
+    if: ${{ inputs.create_draft }}
     runs-on: ubuntu-24.04
     env:
       RELEASE_TARGETS_JSON: ${{ needs.plan.outputs.targets }}
@@ -274,7 +149,7 @@ jobs:
           labels = {'linux-x64-gnu-napi8': 'Linux x64 GNU', 'darwin-arm64-napi8': 'macOS Apple Silicon', 'darwin-x64-napi8': 'macOS Intel'}
           platforms = ', '.join(labels[target] for target in json.loads(os.environ['RELEASE_TARGETS_JSON']))
           notes.write_text('Precompiled Node compatibility runtime for ' + platforms + '.\n\n'
-                           'All selected platforms passed the full release quality gate, including every required full-crate negative control, package installation and native smoke checks.\n\n'
+                           'All selected platforms passed whole-kernel verification, runtime and compatibility tests, package installation and native smoke checks. Full negative regressions run independently and are recorded as not_run in these release assets.\n\n'
                            'This is an experimental runtime prerelease, not the complete Harness application. The kernel proof scope has not expanded; paper-wide completion is not claimed. Node.js 22.22+ is required; the exact accepted runtime is recorded in each asset manifest. See docs/native-distribution.md for installation and platform limits.\n\n'
                            'Assets bind to commit ' + os.environ['GITHUB_SHA'] + '. Review this draft before publishing.\n')
           assets = [str(path) for path in sorted((Path(os.environ['RUNNER_TEMP']) / 'release-assets').iterdir())]

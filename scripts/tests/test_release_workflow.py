@@ -1,4 +1,4 @@
-"""Release matrices preserve full coverage, budgets and current-attempt provenance."""
+"""Release quality is independent; mutation regressions keep complete provenance."""
 import fnmatch
 import importlib.util
 import json
@@ -12,19 +12,25 @@ import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / '.github/workflows/release-validation.yml'
+RELEASE_WORKFLOW = ROOT / '.github/workflows/release-validation.yml'
+WORKFLOW = ROOT / '.github/workflows/negative-regression.yml'
 SCRIPT = ROOT / 'scripts/negative-shards.py'
 SPEC = importlib.util.spec_from_file_location('release_workflow_shards', SCRIPT)
 SHARDS = importlib.util.module_from_spec(SPEC)
 exec(compile(SCRIPT.read_bytes(), str(SCRIPT), 'exec'), SHARDS.__dict__)
 
+PACKAGE_SPEC = importlib.util.spec_from_file_location('workflow_package', ROOT / 'scripts/package-runtime-release.py')
+PACKAGE = importlib.util.module_from_spec(PACKAGE_SPEC)
+PACKAGE_SPEC.loader.exec_module(PACKAGE)
 
-class ReleaseWorkflowTests(unittest.TestCase):
+
+class NegativeWorkflowTests(unittest.TestCase):
+    include_macos = False
     include_macos_intel = False
 
     def setUp(self):
         self.text = WORKFLOW.read_text()
-        self.plan = SHARDS.release_plan(include_macos_intel=self.include_macos_intel)
+        self.plan = SHARDS.regression_plan(include_macos=self.include_macos, include_macos_intel=self.include_macos_intel)
         self.platforms = self.plan['preflight']['include']
         self.rows = self.plan['negative']['include']
 
@@ -39,7 +45,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_one_plan_drives_both_matrices_without_invoking_verus(self):
         plan = self.section('plan', 'preflight')
         preflight = self.section('preflight', 'negative')
-        negative = self.section('negative', 'quality')
+        negative = self.section('negative', 'collect')
         self.assertIn('python3 scripts/negative-shards.py plan --github-output "$GITHUB_OUTPUT"', plan)
         self.assertIn('preflight: ${{ steps.matrix.outputs.preflight }}', plan)
         self.assertIn('negative: ${{ steps.matrix.outputs.negative }}', plan)
@@ -49,16 +55,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn('matrix: ${{ fromJSON(needs.plan.outputs.negative) }}', negative)
         self.assertRegex(preflight, r'(?m)^    needs: plan$')
         self.assertRegex(negative, r'(?m)^    needs: \[plan, preflight\]$')
-        quality = self.section('quality', 'draft-release')
-        self.assertIn('quality: ${{ steps.matrix.outputs.quality }}', plan)
-        self.assertIn('targets: ${{ steps.matrix.outputs.targets }}', plan)
-        self.assertIn('matrix: ${{ fromJSON(needs.plan.outputs.quality) }}', quality)
-        self.assertEqual(set(self.plan['quality']['os']), {row['os'] for row in self.platforms})
         self.assertIn("${{ inputs.include_macos_intel && '--include-macos-intel' || '' }}", plan)
         self.assertRegex(self.text, r'include_macos_intel:\n(?:        .+\n)*?        default: false\n        type: boolean')
 
     def test_each_platform_downloads_only_its_own_complete_current_attempt_shards(self):
-        upload = re.findall(r'^          name: (negative-.+)$', self.text, re.M)
+        upload = re.findall(r'^          name: (negative-.+)$', self.section('negative', 'collect'), re.M)
         download = re.findall(r'^          pattern: (negative-.+)$', self.text, re.M)
         self.assertEqual(len(upload), 1)
         self.assertEqual(len(download), 1)
@@ -73,7 +74,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_each_platform_reuses_only_its_current_attempt_preflight(self):
         preflight = self.section('preflight', 'negative')
-        negative = self.section('negative', 'quality')
+        negative = self.section('negative', 'collect')
         upload = re.search(r'^          name: (preflight-.+)$', preflight, re.M)[1]
         download = re.search(r'^          name: (preflight-.+)$', negative, re.M)[1]
         self.assertEqual(upload, download)
@@ -90,7 +91,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_platform_command_parameters_match_and_leave_budget_for_cleanup(self):
         preflight = self.section('preflight', 'negative')
-        negative = self.section('negative', 'quality')
+        negative = self.section('negative', 'collect')
         preflight_command = re.search(r'^        run: (exec python3 scripts/negative-shards.py preflight .+)$', preflight, re.M)[1]
         negative_command = re.search(r'^          (exec python3 scripts/negative-shards.py run .+)$', negative, re.M)[1]
         self.assertTrue(negative_command.endswith(' "${diagnostic_args[@]}"'))
@@ -115,15 +116,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
             budget = maximum * (int(options['--timeout']) + int(options['--compile-timeout']))
             self.assertGreaterEqual(row['shardMinutes'] * 60 - budget, 30 * 60)
             self.assertGreaterEqual(row['preflightMinutes'] * 60 - int(p_options['--timeout']), 15 * 60)
-        quality = self.section('quality', 'draft-release')
-        self.assertRegex(quality, r'(?m)^    needs: \[plan, negative\]$')
-        self.assertIn('record-verification.py --negative-shards target/full-negative-shards', quality)
-        draft = self.text.split('\n  draft-release:', 1)[1]
-        self.assertRegex(draft, r'(?m)^    needs: \[plan, quality\]$')
-        self.assertIn('pattern: full-validation-${{ github.run_attempt }}-*', draft)
-        self.assertIn('RELEASE_TARGETS_JSON: ${{ needs.plan.outputs.targets }}', draft)
-        self.assertIn('--targets-json \"$RELEASE_TARGETS_JSON\"', draft)
-        self.assertNotIn('All three platforms passed', draft)
+        collector = self.text.split('\n  collect:', 1)[1]
+        self.assertRegex(collector, r'(?m)^    needs: \[plan, negative\]$')
+        self.assertIn('negative-shards.py collect --input target/full-negative-shards --output target/proof-negative', collector)
+        self.assertNotIn('record-verification.py', self.text)
+        self.assertNotIn('contents: write', self.text)
+        self.assertNotIn('gh release', self.text)
 
 
 class DiagnosticWorkflowTests(unittest.TestCase):
@@ -135,14 +133,13 @@ class DiagnosticWorkflowTests(unittest.TestCase):
         body = re.search(r'        run: \|\n((?:          .*\n|\n)+)', section)[1]
         return textwrap.dedent(body)
 
-    def test_diagnostic_is_opt_in_and_skips_quality_and_release(self):
+    def test_diagnostic_is_opt_in_and_skips_accepted_regression_collection(self):
         self.assertRegex(self.text, r'diagnostic_keep_going:\n(?:        .+\n)*?        default: false\n        type: boolean')
-        quality = self.text.split('\n  quality:', 1)[1].split('\n  draft-release:', 1)[0]
-        draft = self.text.split('\n  draft-release:', 1)[1]
-        self.assertIn('if: ${{ !inputs.diagnostic_keep_going }}', quality)
-        self.assertIn('if: ${{ inputs.create_draft && !inputs.diagnostic_keep_going }}', draft)
+        collector = self.text.split('\n  collect:', 1)[1]
+        self.assertIn('if: ${{ !inputs.diagnostic_keep_going }}', collector)
+        self.assertNotIn('draft-release:', self.text)
         self.assertNotIn('continue-on-error:', self.text)
-        negative = self.text.split('\n  negative:', 1)[1].split('\n  quality:', 1)[0]
+        negative = self.text.split('\n  negative:', 1)[1].split('\n  collect:', 1)[0]
         self.assertIn('fail-fast: false', negative)
         upload = negative.split('      - name: Retain negative evidence, including failures', 1)[1]
         self.assertIn('if: always()', upload)
@@ -150,7 +147,7 @@ class DiagnosticWorkflowTests(unittest.TestCase):
     def test_failure_summaries_run_before_upload_without_changing_verification_status(self):
         for job, following, kind, directory, upload in (
                 ('preflight', 'negative', 'baseline', 'negative-preflight', 'Retain baseline diagnostics, including failures'),
-                ('negative', 'quality', 'negative', 'negative-shard', 'Retain negative evidence, including failures')):
+                ('negative', 'collect', 'negative', 'negative-shard', 'Retain negative evidence, including failures')):
             with self.subTest(job=job):
                 section = self.text.split('\n  ' + job + ':', 1)[1].split('\n  ' + following + ':', 1)[0]
                 expected = ('      - name: Summarize ' + kind + ' results before artifact upload\n'
@@ -161,18 +158,9 @@ class DiagnosticWorkflowTests(unittest.TestCase):
                 self.assertLess(section.index(expected), section.index('      - name: ' + upload))
                 self.assertNotIn('continue-on-error:', section)
 
-    def test_conflicting_inputs_fail_before_any_release_work(self):
-        script = self.step_script('Reject diagnostic runs that request a draft release')
-        for diagnostic in ('false', 'true'):
-            for draft in ('false', 'true'):
-                with self.subTest(diagnostic=diagnostic, draft=draft):
-                    run = subprocess.run(['bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script], capture_output=True, text=True,
-                                         env={**os.environ, 'DIAGNOSTIC_KEEP_GOING': diagnostic, 'CREATE_DRAFT': draft})
-                    self.assertEqual(run.returncode, 1 if diagnostic == draft == 'true' else 0)
-
     def test_dispatch_passes_keep_going_only_when_enabled(self):
-        row = SHARDS.release_plan()['negative']['include'][0]
-        script = ReleaseWorkflowTests.render(self.step_script('Verify this shard as complete crates'), 1, row)
+        row = SHARDS.regression_plan()['negative']['include'][0]
+        script = NegativeWorkflowTests.render(self.step_script('Verify this shard as complete crates'), 1, row)
         with tempfile.TemporaryDirectory(prefix='cordis-workflow-test-') as temporary:
             executable = Path(temporary) / 'python3'
             executable.write_text("#!/bin/bash\nprintf '%s\\n' \"$@\"\n")
@@ -189,8 +177,45 @@ class DiagnosticWorkflowTests(unittest.TestCase):
                     self.assertNotIn('', arguments)
 
 
-class IntelReleaseWorkflowTests(ReleaseWorkflowTests):
+class AllPlatformNegativeWorkflowTests(NegativeWorkflowTests):
+    include_macos = True
     include_macos_intel = True
+
+
+class ReleaseWorkflowTests(unittest.TestCase):
+    def test_release_has_no_negative_dependency_and_draft_requires_all_quality_jobs(self):
+        text = RELEASE_WORKFLOW.read_text()
+        self.assertNotIn('negative-shards.py', text)
+        self.assertNotIn('diagnostic_keep_going', text)
+        self.assertNotIn('target/proof-negative', text)
+        self.assertNotIn('  preflight:', text)
+        self.assertNotIn('  negative:', text)
+        quality = text.split('\n  quality:', 1)[1].split('\n  draft-release:', 1)[0]
+        self.assertRegex(quality, r'(?m)^    needs: plan$')
+        self.assertIn('run: exec python3 scripts/record-verification.py', quality)
+        self.assertIn('target/positive-proof/', quality)
+        self.assertIn('package-runtime-release.py package', quality)
+        self.assertIn('install-cordis.mjs --from-directory', quality)
+        self.assertIn('npm ci --offline --ignore-scripts', quality)
+        draft = text.split('\n  draft-release:', 1)[1]
+        self.assertRegex(draft, r'(?m)^    needs: \[plan, quality\]$')
+        self.assertIn('if: ${{ inputs.create_draft }}', draft)
+        self.assertIn('pattern: full-validation-${{ github.run_attempt }}-*', draft)
+        self.assertIn('--targets-json "$RELEASE_TARGETS_JSON"', draft)
+        self.assertIn('recorded as not_run', draft)
+        self.assertNotIn('continue-on-error:', text)
+
+    def test_release_plan_cli_selects_matching_jobs_and_assets_without_a_mutation_manifest(self):
+        for intel in (False, True):
+            with self.subTest(intel=intel), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'outputs'
+                command = ['python3', str(ROOT / 'scripts/package-runtime-release.py'), 'plan', '--github-output', str(output)]
+                if intel: command.append('--include-macos-intel')
+                subprocess.run(command, check=True, capture_output=True)
+                plan = {key: json.loads(value) for key, value in (line.split('=', 1) for line in output.read_text().splitlines())}
+                self.assertEqual(plan, PACKAGE.release_plan(intel))
+                self.assertEqual(set(plan['targets']), PACKAGE.TARGETS if intel else PACKAGE.DEFAULT_TARGETS)
+                self.assertEqual(len(plan['quality']['os']), len(plan['targets']))
 
 
 class DevelopmentWorkflowTests(unittest.TestCase):
@@ -203,8 +228,8 @@ class DevelopmentWorkflowTests(unittest.TestCase):
         choices = re.findall(r"'(\[.+?\])'", expression)
         self.assertEqual(len(choices), 2)
         manual, default = map(json.loads, choices)
-        self.assertEqual(default, SHARDS.release_plan()['quality']['os'])
-        self.assertEqual(manual, SHARDS.release_plan(include_macos_intel=True)['quality']['os'])
+        self.assertEqual(default, PACKAGE.release_plan()['quality']['os'])
+        self.assertEqual(manual, PACKAGE.release_plan(include_macos_intel=True)['quality']['os'])
         self.assertIn('exec python3 scripts/record-development.py', text)
 
 

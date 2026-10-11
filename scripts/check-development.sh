@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Daily development checks. Full mutation testing remains in quality.sh.
+# Shared proof, runtime and packaging checks; mutation testing is independent.
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/toolchain-env.sh"
 cd "$CORDIS_ROOT"
@@ -16,13 +16,7 @@ python3 -m unittest discover -s scripts/tests
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 RUSTDOCFLAGS="${RUSTDOCFLAGS:-} -D warnings" cargo doc --workspace --no-deps --locked
-./scripts/verify.sh --num-threads "${CORDIS_VERUS_THREADS:-2}" --triggers-mode silent
-echo 'BEGIN WORKSPACE TESTS'
-cargo test --workspace --locked
-echo 'END WORKSPACE TESTS'
-for source in crates/cordis/examples/*.rs; do
-    cargo run --locked -p cordis --example "$(basename "$source" .rs)"
-done
+./scripts/check.sh
 node scripts/build-node.mjs "$@"
 echo 'BEGIN NODE COMPATIBILITY TESTS'
 node --test --test-concurrency=4 --test-timeout=30000 --test-reporter=tap tests/node-compat/*.test.mjs tests/node-loader/*.test.mjs tests/benchmarks/*.test.mjs

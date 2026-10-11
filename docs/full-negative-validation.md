@@ -1,12 +1,19 @@
-# Complete negative validation
+# Independent full negative regression
 
 English · [简体中文](full-negative-validation.zh-CN.md)
 
-Release validation deliberately changes kernel operations, guards or specifications
+This independent specification regression deliberately changes kernel operations, guards or specifications
 and requires the proofs to reject each change. Every one of the 121 canonical mutations must first
 compile and then produce a concrete contract failure while verifying the entire
 crate. The unchanged kernel must also pass. A timeout, resource limit, frontend
 error or partial result does not satisfy this requirement.
+
+Full mutation regression is not a prerequisite for normal releases. Release quality
+still verifies and compiles the complete unchanged kernel, runs runtime and package
+checks, and records full negatives as `not_run` in `verification/v4`. This page
+describes how to audit the mutation suite without weakening its own acceptance
+rules. Run it when reviewing contracts, mutation selectors, verifier tooling or
+toolchain changes, or for a periodic audit. No automatic schedule is configured.
 
 ## Execution and cleanup
 
@@ -17,13 +24,13 @@ threads. Explicit settings are recorded with the actual effective budget:
 
 ```sh
 CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=2400 \
-  python3 scripts/record-verification.py --offline
+  python3 scripts/check-negative.py
 ```
 
 `CORDIS_NEGATIVE_CPU_BUDGET` can raise the default budget within the detected CPU
 limit. More concurrency is not automatically faster: each Verus thread can own an
 SMT solver. Timeout changes affect wall time, not solver resource limits or proof
-contracts. Ordinary local release validation still executes all controls afresh.
+contracts. A normal full regression still executes all controls afresh.
 
 Each verifier invocation owns a process group. Timeout, cancellation and termination
 stop its Verus and solver descendants; by default, failed workers stop further
@@ -51,17 +58,17 @@ The unchanged baseline must still pass first. Cancellation, cleanup failures and
 infrastructure errors still stop execution; this mode does not promise complete
 results after an interrupted run.
 
-In GitHub Actions, choose **Full release validation → Run workflow** and enable
-`diagnostic_keep_going`. Leave `create_draft` disabled. The equivalent CLI request is:
+In GitHub Actions, choose **Full negative regression → Run workflow** and enable
+`diagnostic_keep_going`. The equivalent CLI request is:
 
 ```sh
-gh workflow run release-validation.yml \
+gh workflow run negative-regression.yml \
   --repo validation-engineering/cordis-verus --ref main \
-  -f diagnostic_keep_going=true -f create_draft=false \
+  -f diagnostic_keep_going=true -f include_macos=false \
   -f include_macos_intel=false
 ```
 
-This is opt-in; ordinary release runs retain the default stop-on-failure behavior
+This is opt-in; ordinary regression runs retain the default stop-on-failure behavior
 inside each shard. Diagnostic runs keep the same full-crate checks, resource limits
 and process cleanup. They retain raw artifacts even on failure and do not use
 `continue-on-error`. A shard still exits unsuccessfully if any control fails.
@@ -70,12 +77,12 @@ and append the same reported results to the Actions job summary. This includes t
 source commit, run/attempt, baseline result, per-control outcomes and diagnostic
 coverage. A failed upload therefore need not hide which controls ran. Missing,
 interrupted or malformed reports remain explicitly incomplete. This display does
-not reconstruct missing raw evidence and is never accepted by the release collector.
+not reconstruct missing raw evidence and is never accepted by the regression collector.
 Verification and upload failures retain their original job status.
 
-The quality and draft-release jobs are skipped for diagnostic runs, even if every
-control passes. Requesting both diagnostic mode and a draft release is rejected in
-the planning job before verification starts.
+The accepted-regression collection job is skipped for diagnostic runs, even if
+every control passes. This independent workflow has no release job and no
+publication permission.
 
 For a local diagnostic run of all controls:
 
@@ -102,17 +109,17 @@ stage metadata. A completed diagnostic shard has `shard.json` status
 `releaseAcceptance: false`. Check the report for unexecuted controls before
 calling collection complete.
 
-Diagnostic evidence cannot enter release validation: the collector explicitly
-rejects it, including an all-passing diagnostic run. After fixing the reported
-problems, run the ordinary full gate again on one final source snapshot, with
+Diagnostic evidence is not an accepted full regression: the collector rejects
+it, including an all-passing diagnostic run. After fixing the reported problems,
+run the ordinary full regression on one final source snapshot with
 `diagnostic_keep_going=false` (or without `--keep-going` locally). Complete diagnostic
-coverage helps plan the fixes; release acceptance still requires fresh ordinary
-validation of every selected platform.
+coverage helps plan fixes; it does not turn failed checks into passed checks.
 
 ## Parallel CI without reducing proof scope
 
-The release workflow defaults to Linux x64 and macOS Apple Silicon (ARM64).
-Set `include_macos_intel=true` when dispatching it to include macOS Intel. It first
+The independent regression workflow defaults to Linux x64 only. Set
+`include_macos=true` for Apple Silicon or `include_macos_intel=true` for Intel.
+The two options are independent. It first
 verifies the unchanged whole crate once on each selected platform. Preflight retains
 `--trace --time` diagnostics and must pass on all selected platforms before any
 negative shards start. This prevents one failing baseline from being repeated across
@@ -149,13 +156,10 @@ attempt. Scoped flags, changed sources, missing/duplicate controls, altered
 summaries, cancellation, cleanup failures and resource errors fail collection.
 The final mutation list retains canonical order.
 
-Each platform's quality job collects its complete planned partition within the ordinary gate,
-alongside positive proof, tests, examples, package builds and installation checks.
-Only the complete collected report can enter `verification/v3`; a green preflight
-or one green shard cannot. Every selected platform must pass all 121 full-crate
-negative controls and the entire quality gate before runtime draft creation.
-The draft contains exactly the selected platforms' assets and evidence. Excluding
-Intel makes no claim about Intel validation or artifact availability.
+Each platform's collection job checks its complete planned partition and writes
+`target/proof-negative/report.json`, explicitly marked `releaseAcceptance: false`.
+A green preflight or one green shard cannot establish the complete regression.
+The separate release workflow does not download or consume these artifacts.
 
 Artifacts have platform, attempt and shard identifiers in their names. Rerun the
 **whole workflow** after a failure: rerunning only failed jobs would mix attempts
@@ -165,8 +169,8 @@ then checks internal consistency and exact input binding.
 
 For local distributed execution, run all indices against the same unchanged source
 snapshot and platform into new directories, then pass their parent directory with
-`record-verification.py --negative-shards <directory>`. A single shard is useful for
-diagnosis but is not accepted as a release result. CI records bind their run/attempt
+`negative-shards.py collect --input <directory> --output <new-output-directory>`. A single shard is useful for
+diagnosis but is not accepted as a complete regression. CI records bind their run/attempt
 and are not interchangeable with locally generated records.
 
 ## Proof stability
@@ -190,9 +194,9 @@ summary and the complete error log.
 `Kernel::release_provision` uses `#[verifier::spinoff_prover]` to give its proof an
 independent solver context. This avoids interference from earlier failed queries
 in a mutated crate. Its executable body, preconditions, postconditions and resource
-limits are unchanged. The complete positive and negative checks remain responsible
-for validating this proof organization; an isolated diagnostic check alone is not
-release evidence.
+limits are unchanged. The complete positive proof validates this proof organization; the independent
+negative suite checks mutation detection. An isolated diagnostic check is neither
+a full positive proof nor a full negative regression.
 
 The composition proofs `causal_normalization::adjacent_swap`,
 `fresh_semantics::configuration_preservation`, and `rewrite_confluence::swap_frame`
@@ -208,7 +212,8 @@ terminal transport, and target execution into proved helper lemmas. Composition
 uses their contracts instead of unfolding all states and quantified theories in
 one query. The existing public postconditions, executable code and mutation list
 remain unchanged. Scoped timing guides this organization; the complete positive
-proof and full-crate negative controls still determine acceptance.
+proof determines positive acceptance and full-crate controls determine negative
+regression acceptance independently.
 
 The deletion induction obtains each landing guard through the proved
 `fragment_landing_guard` lemma. A removed dependency exclusion therefore exposes

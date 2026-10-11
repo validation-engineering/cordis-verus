@@ -1,4 +1,4 @@
-# Current status — 2026-10-10
+# Current status — 2026-10-11
 
 This is an experimental development checkpoint for the public
 [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus) repository.
@@ -7,16 +7,17 @@ refinement of the entire paper.
 
 ## Verified checkpoint
 
-The [development report](development-report.json) records the current whole-kernel
-verification count and workspace test counts, bound to their exact source hashes.
+The [release-quality report](verification-report.json) and separate
+[development report](development-report.json) record counts for their exact source
+snapshots. Use the respective recorder's `--check` to confirm freshness.
 The workflow uses `--no-cheating --compile` on the official Verus rolling release
 `0.2026.10.04.1687598` and Rust `1.98.1`, and checks formatting and Clippy.
 These are verification obligations and tests, not a count of paper theorems.
 The behavior tests include 8,232 bounded lifecycle traces.
 
-The source-bound [development report](development-report.json) records the fresh
-checks for the prepared repository, including isolated package tests and builds.
-Its schema differs from the [full release report](verification-report.json).
+The source-bound reports include isolated package tests and builds. A local
+`verification/v4` quality pass does not establish remote platform installation
+acceptance. Its schema differs from the development report.
 `python3 scripts/record-development.py --check` checks freshness, not new proofs.
 Raw development logs and crate artifacts stay in `target/`.
 
@@ -202,7 +203,15 @@ Component premise. See the [paper audit](paper-audit.md).
 - Historical independence includes internal children, removed entries and
   reused names. The total interpretation/strict implementation bridge remains open.
 
-## Validation still open
+## Validation policy and remaining evidence
+
+Release quality requires the complete positive proof, runtime/compatibility tests,
+package checks and actual installation on every selected release platform.
+The independent mutation workflow defaults to Linux; full negatives are explicitly
+`not_run` in release evidence. This scheduling change removes no kernel contract
+or positive proof obligation. The new workflow must still be exercised remotely
+on its committed source before claiming cross-platform release acceptance.
+
 
 There are **121 canonical negative mutations**. A complete full-crate negative
 run for this source has not passed. The earlier 1,927-obligation snapshot's
@@ -211,7 +220,7 @@ Partial contract diagnostics were not accepted as a passed result.
 
 The opt-in scoped-negative checker and candidate selector manifest are
 experimental. Unit tests and selected probes do not establish a completed
-121-control calibration and do not replace the full release gate. The first
+121-control calibration or a complete independent full regression. The first
 full candidate calibration accepted 11 controls, then rejected control 12
 (`begin-reuses-episode-generation`) because its real assertion failure was
 accompanied by an SMT resource-limit failure. The run is **failed**, not a

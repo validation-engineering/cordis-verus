@@ -100,7 +100,7 @@ The result proves finite-prefix safety, not fair scheduling or eventual cleanup,
 and does not complete all of F1 or the paper's open integration obligations.
 The canonical mutations `cleanup-dispatch-promotes-failure` and
 `cleanup-dispatch-bypasses-receipt` target these contracts in the actual dispatcher.
-Selected-proof experiments remain distinct from the full release negative gate.
+Selected-proof experiments remain distinct from the independent full negative regression.
 
 ## The actual resource batch is checked before commitment release
 
@@ -133,7 +133,7 @@ failure/retry, stale replies, omitted/duplicate/foreign resources, a foreign
 registry with matching local IDs, remaining external holders and reservation
 cleanup. The canonical negative controls additionally remove the lease-owner
 check and move commitment release before batch validation. Local selected-proof
-experiments do not substitute for the full release negative-control gate.
+experiments do not substitute for the independent full negative regression.
 
 This closes a concrete release-orchestration gap. Global domain allocation,
 lease-acquisition routing, serialization views, opaque value-handle removal,

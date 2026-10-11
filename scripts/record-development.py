@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record fresh development checks; never substitute for release verification/v3."""
+"""Record fresh development checks; never substitute for release verification/v4."""
 
 import argparse
 from contextlib import contextmanager
@@ -28,6 +28,7 @@ NODE_END = "END NODE COMPATIBILITY TESTS"
 VERIFIER_LOCK = Path("/tmp/cordis-local-verifier.lock")
 FIXED_SCRIPTS = (
     "scripts/record-development.py", "scripts/check-development.sh",
+    "scripts/check.sh", "scripts/check-positive.py", "scripts/quality.sh",
     "scripts/record-verification.py", "scripts/check-paper-coverage.py",
     "scripts/check-paper-review.py",
     "scripts/verify.sh", "scripts/toolchain-env.sh", "scripts/install-verus.py",
@@ -65,11 +66,11 @@ def workflow_binding(hashes):
     return {name: hashes[name] for name in FIXED_SCRIPTS}
 
 
-def parse_results(log):
+def parse_results(log, marker=MARKER):
     lines = log.splitlines()
     proofs = re.findall(r"^verification results:: (\d+) verified, (\d+) errors$", log, re.M)
     if (len(proofs) != 1 or int(proofs[0][0]) <= 0 or int(proofs[0][1]) != 0
-            or lines.count(MARKER) != 1 or not lines or lines[-1] != MARKER):
+            or lines.count(marker) != 1 or not lines or lines[-1] != marker):
         raise RuntimeError("Incomplete development checks or failed whole-crate proof")
     if lines.count(WORKSPACE_BEGIN) != 1 or lines.count(WORKSPACE_END) != 1:
         raise RuntimeError("Missing or ambiguous workspace test section")

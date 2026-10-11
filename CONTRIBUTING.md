@@ -20,8 +20,9 @@ crate archive tests/release builds, a source-bound Node addon and self-contained
 Node behavior tests. Optional upstream differential tests use `npm run test:compat`;
 see [Node compatibility](docs/node-compatibility.md) for the locked-source prerequisite. After dependencies are cached,
 `python3 scripts/package-check.py --offline` checks packaging without network.
-Full release acceptance additionally requires `./scripts/quality.sh`, including
-all full-crate negative mutations. See [validation](docs/validation.md) for the
+Release acceptance requires a fresh `./scripts/quality.sh` record plus actual
+asset installation on every selected platform. Full negative mutations run
+independently through `negative-regression.yml` or `scripts/check-negative.py`. See [validation](docs/validation.md) for the
 separate gates and the experimental scoped checker.
 The primary CI targets are Linux x86_64 and macOS arm64/x86_64. Other platforms
 are currently unvalidated. CI configuration is not evidence of a completed run.

@@ -1,11 +1,16 @@
-# 完整负控验证
+# 独立的完整负控回归
 
 [English](full-negative-validation.md) · 简体中文
 
-发布验证会有意修改内核操作、守卫或规格，要求证明拒绝这些修改。
+这项独立的规格回归会有意修改内核操作、守卫或规格，要求证明拒绝这些修改。
 全部 121 项 canonical mutation 都必须先编译成功，再在验证**整个 crate** 时产生明确的
 合同失败；未修改的内核也必须验证通过。超时、资源上限、前端错误或不完整结果均不能
 满足这项要求。
+
+全量变异回归不再是普通发布的前置门槛。发布质量仍要求完整未修改内核的正向证明与
+编译、运行和软件包检查；`verification/v4` 明确将全量负控记为 `not_run`。本页保留
+变异套件自身的严格验收规则。审查合同、变异选择器、验证工具或工具链变更时，以及
+维护者定期审计时，可以独立运行。此次调整不配置自动定时任务。
 
 ## 执行与回收
 
@@ -15,12 +20,12 @@ Linux cgroup 配额。未修改内核的基线使用与 mutation worker 相同�
 
 ```sh
 CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=2400 \
-  python3 scripts/record-verification.py --offline
+  python3 scripts/check-negative.py
 ```
 
 `CORDIS_NEGATIVE_CPU_BUDGET` 可以在检测到的 CPU 上限内提高默认预算。增加并发不保证
 更快，因为每个 Verus 线程都可能占用一个 SMT solver。调整 timeout 只影响墙钟时间，
-不改变求解资源上限或证明合同。普通本地发布验证仍会重新执行全部负控。
+不改变求解资源上限或证明合同。普通完整回归仍会重新执行全部负控。
 
 每次 verifier 调用拥有独立进程组。超时、取消和终止会清理 Verus 及其 solver 后代；
 默认情况下，一个 worker 失败后，执行器停止派发，并取消正在执行的其他 worker。标准输出、诊断及
@@ -40,26 +45,25 @@ CORDIS_NEGATIVE_JOBS=1 CORDIS_NEGATIVE_THREADS=2 CORDIS_NEGATIVE_TIMEOUT=2400 \
 意外验证通过，仍算失败，但不会再遮挡后续负控。未修改内核的基线必须先通过。
 取消、清理失败和基础设施错误仍会停止执行；运行被中断时，该模式不保证得到完整结果。
 
-在 GitHub Actions 中选择 **Full release validation → Run workflow**，启用
-`diagnostic_keep_going`，保持 `create_draft` 关闭。对应的命令为：
+在 GitHub Actions 中选择 **Full negative regression → Run workflow**，启用
+`diagnostic_keep_going`。对应的命令为：
 
 ```sh
-gh workflow run release-validation.yml \
+gh workflow run negative-regression.yml \
   --repo validation-engineering/cordis-verus --ref main \
-  -f diagnostic_keep_going=true -f create_draft=false \
+  -f diagnostic_keep_going=true -f include_macos=false \
   -f include_macos_intel=false
 ```
 
-该模式须显式开启；普通发布运行仍在分片内遇到失败后停止。诊断运行保持同样的整 crate
+该模式须显式开启；普通回归运行仍在分片内遇到失败后停止。诊断运行保持同样的整 crate
 检查、资源上限和进程清理，失败后也保留原始工件，不使用 `continue-on-error`。
 基线和分片任务会在上传工件前，将简明 JSON 摘要写入控制台，并将相同的报告结果写入
 Actions 任务摘要，包括来源提交、运行与尝试编号、基线结果、逐项结果和诊断覆盖数量。
 因此，上传失败后仍能看到哪些负控已经执行。缺失、中断或损坏的报告会明确标记为不完整。
-该展示不能恢复缺失的原始证据，也不会被发布汇总器接受；验证和上传的失败状态保持不变。
+该展示不能恢复缺失的原始证据，也不会被回归汇总器接受；验证和上传的失败状态保持不变。
 
-只要有负控失败，分片最终仍以失败退出。诊断运行会跳过 quality 与 draft-release 任务，
-即使全部负控通过也不会进入这两个任务。同时请求诊断模式和创建草稿时，工作流会在
-计划任务中直接拒绝，在验证开始前报错。
+只要有负控失败，分片最终仍以失败退出。诊断运行会跳过正式回归汇总，
+即使全部负控通过也不会进入该任务。这个独立工作流没有发布任务，也没有发布写权限。
 
 在本地诊断全部负控：
 
@@ -83,15 +87,15 @@ python3 scripts/negative-shards.py run \
 `diagnostic-passed`，否则为 `failed`，且始终为 `releaseAcceptance: false`。
 宣称收集完整之前，应检查报告中是否仍有未执行的负控。
 
-诊断证据不能用于发布验收：汇总器会明确拒绝，包括全部通过的诊断运行。修复问题后，
-应在同一份最终源码快照上重新运行普通完整门禁，将 `diagnostic_keep_going` 设为
-`false`，或在本地去掉 `--keep-going`。完整收集诊断用于规划修复；发布验收仍要求
-每个选定平台完成新一轮普通验证。
+诊断证据不能作为通过的完整回归：汇总器会明确拒绝，包括全部通过的诊断运行。
+修复问题后，在同一份最终源码快照上重新运行普通完整回归，将 `diagnostic_keep_going`
+设为 `false`，或在本地去掉 `--keep-going`。完整收集诊断用于规划修复，不会将失败
+结果变为通过。
 
 ## CI 并行执行与证明范围
 
-发布工作流默认选择 Linux x64 和 macOS Apple Silicon（ARM64）；手动触发时设置
-`include_macos_intel=true` 可加入 macOS Intel。工作流先在每个选定平台分别验证一次
+独立负控工作流默认仅选择 Linux x64；手动触发时设置 `include_macos=true` 可加入
+macOS Apple Silicon，`include_macos_intel=true` 可加入 Intel；两个选项互相独立。工作流先在每个选定平台分别验证一次
 未修改的整 crate。预检保留 `--trace --time` 诊断，所有选定平台全部通过后才启动负控
 分片，避免相同的基线失败在整个矩阵中重复发生。
 
@@ -118,19 +122,17 @@ stderr 和调用元数据，包括共享基线。证据绑定完整源码输入�
 验证范围的 flags、源码变化、缺项或重复、摘要篡改、取消、清理失败及资源错误都会使
 汇总失败。最终 mutation 列表保持 canonical 顺序。
 
-每个平台的 quality 任务收集本平台计划中的全部分片结果，并完成正向证明、测试、示例、软件包
-构建与安装检查。只有完整汇总报告可以进入 `verification/v3`；预检或单片绿色不能
-代替发布验收。每个选定平台都必须通过全部 121 项整 crate 负控及完整 quality 门禁，
-才能创建运行时草稿。草稿的产物与证据必须准确对应本次选定的平台；未选择 Intel 时，
-不宣称本次已验证 Intel，也不提供 Intel 产物。
+每个平台的汇总任务检查本平台的完整分区，将结果写入 `target/proof-negative/report.json`，
+明确标记 `releaseAcceptance: false`。基线预检或单个分片通过，不能代替完整回归。
+单独的发布工作流不下载、不消费这些负控工件。
 
 工件名称带平台、attempt 和分片标识。失败后应重跑**整个 workflow**；只重跑失败任务会
 混用不同 attempt，汇总器会明确拒绝。汇总器不能认证任意本地 JSON，它信任受检查的执行
 环境与 GitHub 工件传输，再校验内容一致性与精确输入绑定。
 
 在本地分布执行时，使用相同且不变的源码快照与平台，将全部索引分别写入新目录，然后用
-`record-verification.py --negative-shards <directory>` 传入这些目录的父目录。
-单个分片可以用于诊断，但不能作为发布结果。CI 记录绑定其 run／attempt，不能与本地
+`negative-shards.py collect --input <directory> --output <new-output-directory>` 传入这些目录的父目录。
+单个分片可以用于诊断，但不能作为完整回归结果。CI 记录绑定其 run／attempt，不能与本地
 生成的记录互换。
 
 ## 证明稳定性
@@ -148,7 +150,7 @@ reported”提示。此提示本身不表示跳过证明，仍以验证统计与
 
 `Kernel::release_provision` 使用 `#[verifier::spinoff_prover]` 获得独立求解上下文，避免
 变异 crate 中此前失败查询的影响。它的可执行函数体、前置条件、后置条件和资源上限
-均未改变。完整正向及负控检查仍负责验证这种证明组织方式；单独的诊断检查不是发布证据。
+均未改变。完整正向证明检查这种证明组织方式；独立负控套件检查变异检测能力。局部诊断不能代替两者。
 
 组合证明 `causal_normalization::adjacent_swap`、
 `fresh_semantics::configuration_preservation` 和 `rewrite_confluence::swap_frame`

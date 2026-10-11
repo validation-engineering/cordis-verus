@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Stage GitHub Release assets from a fresh full quality gate; never upload.
+"""Stage GitHub Release assets from fresh release quality checks; never upload.
 
 `collect` requires every selected platform from the same commit. Linux x64 and
 macOS ARM64 are required; macOS Intel is optional. Development records cannot
-substitute for the full ordered mutation manifest.
+substitute for release proof and runtime acceptance. Negative regressions are
+independent and are recorded as not_run by the release gate.
 """
 import argparse
 import hashlib
@@ -62,9 +63,9 @@ def verification_module():
 
 
 def validate_quality(record, verifier):
-    if record.get('schema') != 'cordis-verus.verification/v3' or record.get('status') != 'passed':
+    if record.get('schema') != 'cordis-verus.verification/v4' or record.get('status') != 'passed':
         raise ValueError('A fresh full release verification report is required')
-    verifier.validate_negative_report({'baseline': record.get('proof'), 'mutations': record.get('negativeControls')}, verifier.required_negative_names())
+    verifier.validate_release_report(record)
     if record.get('sha256') != verifier.source_hashes():
         raise ValueError('Release verification source hashes are stale')
     if record.get('paperCoverage', {}).get('completionClaimed') is not False:
@@ -107,6 +108,8 @@ def package(output):
     npm_directory = ROOT / 'target/release-artifacts/npm'
     npm = read(npm_directory / 'package-report.json')
     build = read(ROOT / 'target/node-compat/build.json')
+    if verification.get('npmDistribution') != npm or verification.get('nodeBuild') != build:
+        raise ValueError('Runtime packages differ from their release-quality evidence')
     if npm.get('schema') != 'cordis-verus.npm-package/v1' or npm.get('status') != 'passed':
         raise ValueError('A successful independent npm installation is required')
     bound_files(ROOT, npm['sourceHashes'])
@@ -136,9 +139,9 @@ def package(output):
             packages.append({**asset(destination), 'name': item['name'], 'version': item['version']})
         evidence = stage / f'cordis-evidence-{target}.json'
         write(evidence, {'sourceCommit': commit, 'verification': verification, 'npm': npm, 'build': build})
-        manifest = {'schema': 'cordis-verus.runtime-release/v1', 'sourceCommit': commit, 'target': target,
+        manifest = {'schema': 'cordis-verus.runtime-release/v2', 'sourceCommit': commit, 'target': target,
                     'nativeManifestSha256': npm['nativeManifestSha256'], 'nativeArtifactSha256': npm['nativeArtifactSha256'],
-                    'acceptance': {'fullQuality': True, 'negativeControls': len(verification['negativeControls']), 'paperCompletion': False},
+                    'acceptance': {'releaseQuality': True, 'negativeControls': 'not_run', 'paperCompletion': False},
                     'packages': packages, 'evidence': asset(evidence)}
         write(stage / f'cordis-runtime-{target}.json', manifest)
         shutil.copyfile(ROOT / 'scripts/install-cordis.mjs', stage / 'install-cordis.mjs')
@@ -179,9 +182,9 @@ def collect(inputs, output, commit, targets=None):
     for path in manifests:
         record = read(path)
         target = record.get('target')
-        if record.get('schema') != 'cordis-verus.runtime-release/v1' or not isinstance(target, str) or target not in required or target in seen or record.get('sourceCommit') != commit:
+        if record.get('schema') != 'cordis-verus.runtime-release/v2' or not isinstance(target, str) or target not in required or target in seen or record.get('sourceCommit') != commit:
             raise ValueError('Duplicate, unselected, unsupported or mixed-commit platform evidence')
-        if record.get('acceptance', {}).get('fullQuality') is not True or record['acceptance'].get('paperCompletion') is not False:
+        if record.get('acceptance', {}).get('releaseQuality') is not True or record['acceptance'].get('paperCompletion') is not False:
             raise ValueError('A development artifact is not a release artifact')
         if len(record.get('packages', [])) != 3 or {item['name'] for item in record['packages']} != NAMES:
             raise ValueError('Incomplete npm package inventory')
@@ -196,9 +199,11 @@ def collect(inputs, output, commit, targets=None):
         if evidence.get('sourceCommit') != commit:
             raise ValueError('Evidence commit differs')
         validate_quality(evidence['verification'], verifier)
-        if record['acceptance'].get('negativeControls') != len(evidence['verification']['negativeControls']):
-            raise ValueError('Negative control count differs')
+        if record['acceptance'].get('negativeControls') != evidence['verification']['negativeControls']['status']:
+            raise ValueError('Independent negative-control status differs')
         npm = evidence.get('npm', {})
+        if evidence['verification'].get('npmDistribution') != npm or evidence['verification'].get('nodeBuild') != evidence.get('build'):
+            raise ValueError('Runtime packages differ from their release-quality evidence')
         if (npm.get('status') != 'passed' or npm.get('nativeTarget') != target
                 or npm.get('nativeManifestSha256') != record.get('nativeManifestSha256')
                 or npm.get('nativeArtifactSha256') != record.get('nativeArtifactSha256')
@@ -228,9 +233,20 @@ def collect(inputs, output, commit, targets=None):
     print(f'Collected {len(required)} selected platforms: {", ".join(sorted(required))}. No upload performed.')
 
 
+def release_plan(include_macos_intel=False):
+    platforms = [('ubuntu-24.04', 'linux-x64-gnu-napi8'), ('macos-15', 'darwin-arm64-napi8')]
+    if include_macos_intel:
+        platforms.append(('macos-15-intel', 'darwin-x64-napi8'))
+    return {'quality': {'os': [os_name for os_name, _ in platforms]},
+            'targets': [target for _, target in platforms]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
+    planning = commands.add_parser('plan')
+    planning.add_argument('--include-macos-intel', action='store_true')
+    planning.add_argument('--github-output', type=Path, required=True)
     staging = commands.add_parser('package')
     staging.add_argument('--output', type=Path, default=ROOT / 'target/github-release')
     collecting = commands.add_parser('collect')
@@ -240,7 +256,11 @@ def main():
     collecting.add_argument('--targets-json', type=parse_targets_json,
                             help='JSON array of release targets; defaults to Linux x64 and macOS ARM64')
     args = parser.parse_args()
-    if args.command == 'package':
+    if args.command == 'plan':
+        with args.github_output.open('a') as stream:
+            for key, value in release_plan(args.include_macos_intel).items():
+                stream.write(key + '=' + json.dumps(value, separators=(',', ':')) + '\n')
+    elif args.command == 'package':
         package(args.output)
     else:
         collect(args.input, args.output, args.commit, args.targets_json)

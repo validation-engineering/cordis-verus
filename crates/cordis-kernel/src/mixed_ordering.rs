@@ -206,6 +206,9 @@ proof fn retained_invocation_prior_landing<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool
         && states[t].history[token as int]==mix::entry(lib,programs,states[i],actor)
         && operation(lib,programs(actor)(states[i].current[actor].unwrap()),states[i].state,actor,provider,key),
 {
+    // Provenance uses the proved frame and retained-record contracts; it does
+    // not need to re-evaluate primitive recovery laws or the node interpreter.
+    hide(og::primitive_theory);hide(mix::step);hide(mix::run);hide(operation);
     ol::execution_preservation(eq,lib,programs,states,labels);
     let prefix=states.take(t+1);let steps=labels.take(t);
     assert(mix::execution(lib,programs,prefix,steps)) by {

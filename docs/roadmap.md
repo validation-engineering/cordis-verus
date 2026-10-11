@@ -16,9 +16,9 @@
 | 远程 CI | 实际 Linux／macOS 开发检查矩阵及失败排查 | 默认检查包含全库正向证明、测试、示例和打包，不包含全量负控；以实际 job 结果为准，开发通过不替代发布门槛 |
 | API 与维护入口 | 双语 README、文档导航、贡献／安全／发布流程 | 所有本地链接有效，最小示例可运行，版本与实际公开 API 一致 |
 
-日常检查入口为 `./scripts/check-development.sh --offline`；严格 `quality.sh` 与规范全库负控仍独立保留，不因建立私有开发仓库而放宽验收。
+日常检查入口为 `./scripts/check-development.sh --offline`；`quality.sh` 复用完整正向证明与运行、打包检查；全库负控改为独立回归，发布记录明确标记 `not_run`，不改变内核合同与负控自身的严格判定。
 
-`check-negative-scoped.py` 目前仅为实验工具。校准完成也只说明所选函数的负控有效，不能自动替代规范全库负控，更不能生成或冒充 v3 发布证据。采用新的发布判定方式必须是独立、可审查的流程变更。
+`check-negative-scoped.py` 目前仅为实验工具。校准完成也只说明所选函数的负控有效，不能替代规范全库负控，也不是 `verification/v4` 发布证据。发布依据完整正向证明与实际运行验收；负控独立执行，见[验证政策](validation.md)。
 
 ## 2. 补齐原文 Component 与严格 Child 的表示桥
 
@@ -86,7 +86,7 @@ owned child、独立 owner anchor、ready/retire/join 与 cleanup retry；定义
 | 模块依赖图精化 | 当前图只记录已执行的 Node 解析，执行器保守替换整个 Worker | 完整安装图、未执行动态导入、可保留 identity 的模块边界；不能用观测图冒充静态完备图 |
 | 剩余 typed Rust 接口 | 已接入新建/撤销 publication 与子插件；继续处理 effect group、每 Fiber 动态 injection config、更新 hook 与反向 typed JS 服务 | 同图 Rust/JS 生命周期与权限一致，真实子图及失败路径验收；保留现有槽位和 cleanup 合同 |
 
-跨平台制品实际安装、完整发布负控及宿主到论文的整体 refinement 继续按各自门槛执行。
+跨平台制品实际安装、独立完整负控及宿主到论文的整体 refinement 继续按各自门槛执行。
 
 ## 7. 可审查的开源证据与兼容缺口
 
@@ -100,4 +100,4 @@ A03 下一步仍需真实插件迁移及回退记录；A04 的四类诊断已有
 
 A01/A02 已加入 GitHub Release 预编译运行库的打包、校验和独立安装路径；默认选择 Linux x64 和 macOS Apple Silicon，设置 `include_macos_intel=true` 可加入 macOS Intel。所有选定平台的全量质量检查通过后才能创建发行草稿，产物与验证声明仅覆盖这些平台。当前尚未发布 runtime release。完整 Harness 应用打包仍是后续交付，见[分发指南](native-distribution.zh-CN.md)。
 
-运营验收关注外部独立复现、实际插件接入与一次相关修改后的重新验证；当前没有声称已有外部采用。完整发布负控、跨平台实际运行和公开前安全报告渠道见[证据指南](evidence-guide.md)。
+运营验收关注外部独立复现、实际插件接入与一次相关修改后的重新验证；当前没有声称已有外部采用。独立完整负控、跨平台实际运行和公开前安全报告渠道见[证据指南](evidence-guide.md)。

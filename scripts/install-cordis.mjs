@@ -19,13 +19,13 @@ export function hostTarget(platform = process.platform, architecture = process.a
   return target;
 }
 export function validateManifest(record, target) {
-  assert.equal(record?.schema, 'cordis-verus.runtime-release/v1');
+  assert.equal(record?.schema, 'cordis-verus.runtime-release/v2');
   assert.equal(record.target, target, 'Release belongs to another platform');
   assert(targets.includes(target));
   assert.match(record.sourceCommit, /^[a-f0-9]{40}$/);
-  assert.equal(record.acceptance?.fullQuality, true, 'A development report is not a runtime release');
+  assert.equal(record.acceptance?.releaseQuality, true, 'A development report is not a runtime release');
   assert.equal(record.acceptance?.paperCompletion, false);
-  assert(Number.isSafeInteger(record.acceptance?.negativeControls) && record.acceptance.negativeControls > 0);
+  assert.equal(record.acceptance?.negativeControls, 'not_run');
   assert(sha(record.nativeManifestSha256) && sha(record.nativeArtifactSha256));
   assert(Array.isArray(record.packages) && record.packages.length === 3);
   assert.deepEqual(record.packages.map(item => item.name).sort(), names);
@@ -121,20 +121,34 @@ export async function installRelease({ project, fromDirectory, release, reposito
     }
     const evidence = JSON.parse(await readFile(join(assets, manifest.evidence.file), 'utf8'));
     assert.equal(evidence.sourceCommit, manifest.sourceCommit);
-    assert.equal(evidence.verification?.schema, 'cordis-verus.verification/v3');
+    assert.equal(evidence.verification?.schema, 'cordis-verus.verification/v4');
     assert.equal(evidence.verification.status, 'passed');
     assert.equal(evidence.verification.proof?.success, true);
     assert.equal(evidence.verification.proof?.errors, 0);
     assert.equal(evidence.verification.proof?.['is-verifying-entire-crate'], true);
-    assert.equal(evidence.verification.negativeControls?.length, manifest.acceptance.negativeControls);
-    for (const control of evidence.verification.negativeControls) {
-      assert.equal(control.compiles, true);
-      assert.equal(control['verification-results']?.success, false);
-      assert.equal(control['verification-results']?.['is-verifying-entire-crate'], true);
-      assert(control['verification-results']?.errors > 0);
-    }
+    assert.equal(evidence.verification.releaseAcceptance, true);
+    assert.equal(evidence.verification.proof?.['encountered-vir-error'], false);
+    assert.equal(evidence.verification.proof?.['encountered-error'], false);
+    assert(Number.isSafeInteger(evidence.verification.proof?.verified) && evidence.verification.proof.verified > 0);
+    const proofExecution = evidence.verification.proofExecution;
+    assert.equal(proofExecution?.schema, 'cordis-verus.positive-proof/v1');
+    assert.equal(proofExecution.status, 'passed');
+    assert.equal(proofExecution.returncode, 0);
+    assert.equal(proofExecution.compiled, true);
+    assert.equal(proofExecution.noCheating, true);
+    assert.deepEqual(proofExecution.proof, evidence.verification.proof);
+    assert.deepEqual(proofExecution.sourceHashes, evidence.verification.sha256);
+    assert.equal(proofExecution.artifact?.path, 'target/verus/libcordis_kernel.rlib');
+    assert(sha(proofExecution.artifact.sha256) && Number.isSafeInteger(proofExecution.artifact.bytes) && proofExecution.artifact.bytes > 0);
+    assert.equal(evidence.verification.paperCoverage?.completionClaimed, false);
+    assert.deepEqual(evidence.verification.negativeControls, {
+      status: manifest.acceptance.negativeControls, requiredForRelease: false,
+      workflow: '.github/workflows/negative-regression.yml',
+    });
     const packages = evidence.npm;
     assert.equal(packages?.status, 'passed');
+    assert.deepEqual(evidence.verification.npmDistribution, packages);
+    assert.deepEqual(evidence.verification.nodeBuild, evidence.build);
     assert.equal(packages.nativeTarget, target);
     assert.equal(packages.nativeManifestSha256, manifest.nativeManifestSha256);
     assert.equal(packages.nativeArtifactSha256, manifest.nativeArtifactSha256);
@@ -161,7 +175,7 @@ export async function installRelease({ project, fromDirectory, release, reposito
     await writeFile(join(staged, 'app.mjs'), example);
     await writeFile(join(vendor, manifestName), manifestBytes);
     await copyFile(join(assets, manifest.evidence.file), join(vendor, manifest.evidence.file));
-    await writeFile(join(staged, 'cordis-release.json'), JSON.stringify({ sourceCommit: manifest.sourceCommit, target, repository, release: release ?? null, manifestSha256: hash(manifestBytes), fullQuality: true, paperCompletion: false }, null, 2) + '\n');
+    await writeFile(join(staged, 'cordis-release.json'), JSON.stringify({ sourceCommit: manifest.sourceCommit, target, repository, release: release ?? null, manifestSha256: hash(manifestBytes), releaseQuality: true, negativeControls: 'not_run', paperCompletion: false }, null, 2) + '\n');
     // Exclusive reservation detects a path created while installation ran.
     await mkdir(destination); reserved = true;
     await rename(staged, destination); staged = undefined; reserved = false;

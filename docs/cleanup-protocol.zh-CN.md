@@ -81,7 +81,7 @@ Withdraw、Retire 和 Remove 构成的任意有限序列。受管 `finish_cleanu
 历史步骤，报告仍作为输入。结论是有限前缀安全，不是公平调度或最终排空，也不使
 整个 F1 或论文未完成的集成义务关闭。canonical 负控
 `cleanup-dispatch-promotes-failure` 与 `cleanup-dispatch-bypasses-receipt`
-直接变异真实 dispatcher 的这两项合同。局部选定证明实验与完整发布负控门槛仍分开。
+直接变异真实 dispatcher 的这两项合同。局部选定证明实验与独立完整负控回归仍分开。
 
 ## 真实资源批次在释放 commitment 之前接受检查
 
@@ -105,7 +105,7 @@ Kernel、协议凭据和注册表都保持**进入 finish 时**的状态。此�
 [回归案例](../crates/cordis-driver/tests/cleanup_resources.rs) 覆盖失败／重试、旧确认、
 遗漏／重复／外来资源、具有相同本地 ID 的外域注册表、其他消费者仍持有租约，以及
 reservation 清理。标准负控目录也新增了“去掉租约归属检查”和“批次校验前释放
-commitment”两种源码变异。局部选定证明实验不替代完整发布负控验收。
+commitment”两种源码变异。局部选定证明实验不替代独立完整负控验收。
 
 这一轮补齐了一个具体的资源释放组合环节。全局 domain 分配、租约获取路由、序列化
 视图、不透明值句柄删除、JS/FFI 和回调报告真实性仍是宿主边界。下面的 Rust

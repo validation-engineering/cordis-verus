@@ -278,6 +278,9 @@ pub proof fn retained_remove_blocks()
         &&& g::restore(a.history,a.state.accumulators[0usize],o::remove(a,1).state,0).is_none()
     },
 {
+    // Reuse the execution/preservation contracts without reopening primitive
+    // inverse laws while checking the concrete retained-token counterexample.
+    hide(og::primitive_theory);hide(g::well_formed);
     crate::mixed_examples::actual_execution();crate::mixed_examples::primitive_theory();
     let eq=crate::mixed_examples::equality();let lib=crate::mixed_examples::library();let programs=crate::mixed_examples::programs();
     og::exact_theory(eq,lib);ol::from_empty_safe(eq,lib,programs,crate::mixed_examples::trace(),crate::mixed_examples::labels());

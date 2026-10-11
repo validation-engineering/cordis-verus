@@ -5,83 +5,96 @@ mutation checks and paper coverage answer different questions.
 
 | Gate | Command | Establishes |
 | --- | --- | --- |
-| Development | `./scripts/check-development.sh` | Ledger/Python checks, fmt/Clippy/rustdoc, full positive kernel proof and compilation, tests, examples, isolated package tests/builds |
-| Development record | `python3 scripts/record-development.py --offline` | Fresh development checks and source hashes |
-| Full release | `./scripts/quality.sh` | Development checks plus all canonical full-crate negative controls |
-| Release record | `python3 scripts/record-verification.py --offline` | Fresh full gate and verification/v3 evidence |
+| Development | `./scripts/check-development.sh` | Ledger/Python checks, fmt/Clippy/rustdoc, full positive kernel proof and compilation, Rust/Node tests, examples, isolated crate and npm package checks |
+| Development record | `python3 scripts/record-development.py --offline` | Fresh development checks and source hashes; not release acceptance |
+| Release quality | `./scripts/quality.sh` | The same complete proof and runtime checks, executed once, with release recording handled separately |
+| Release record | `python3 scripts/record-verification.py --offline` | Fresh release-quality checks and `verification/v4` evidence; full negatives explicitly `not_run` |
+| Full negative regression | `python3 scripts/check-negative.py` | The unchanged baseline passes; all 121 compilable mutations produce concrete whole-crate contract rejections |
 | Whole paper | `python3 scripts/check-paper-coverage.py --require-complete` | Whole-paper ledger conditions; currently fails because obligations remain open and original claims are refuted |
 
-Default push/PR CI runs **development** checks on Linux x86_64 and macOS
-Apple Silicon (ARM64). A manual development run can add macOS Intel with
-`include_macos_intel=true`.
+## Release policy
 
-The separate **Full release validation** workflow is manually dispatched and uses
-the same two default platforms; `include_macos_intel=true` adds Intel to that run.
-It first runs one baseline preflight per selected platform, then all 121 complete-crate
-negative controls on each platform in a platform-specific partition using strictly
-bound shared baseline evidence. The [execution plan](full-negative-validation.md)
-keeps preflight and shard deadlines consistent and reserves time for cleanup within
-each job. Each selected platform collects its results within `quality.sh`.
-Green development CI does not mean full release acceptance. The release workflow
-can create a draft runtime prerelease after every selected platform passes the
-complete gate; its assets and evidence must match that selection exactly. A default
-run neither validates Intel nor produces Intel assets. It does not publish the draft
-automatically. Both workflows retain logs and artifacts; full validation also retains
-negative reports.
+The project's primary evidence is the connection from paper constraints to
+contracts on executable Rust, checked by Verus. Every release still verifies and
+compiles the **complete unchanged kernel** with `--no-cheating --compile`.
+No proof obligation, contract or solver resource limit is removed by this policy.
 
-The development/release Node suites and `npm run test:node` use four concurrent
-test files, with the same 30-second timeout and complete test set. This bounds
-competition between independent native-library fixtures on machines with many
-logical CPUs; it does not skip tests or increase their timeout.
-Native checkpoint and child tests use separate Cordis/Harness profile entrypoints
-with shared test bodies. Each profile has its own file deadline; all original
-cases, assertions and individual timeouts remain in the suite.
+Mutation tests ask a different question: whether the selected deliberate changes
+are detected by the contracts. They help maintain specifications and review
+regressions, but repeatedly verifying 121 modified copies is not an additional
+proof of the released program. Full mutation regression is therefore independent
+of the normal release path. Run it when reviewing changes to contracts, mutation
+selectors, proof tooling or the toolchain, or as a periodic maintainer audit.
+It is not automatically scheduled by this change.
 
-## Reproduce locally
+Default push/PR CI runs development checks on Linux x86_64 and macOS Apple Silicon.
+A manual development run can add Intel with `include_macos_intel=true`.
 
-Install Rustup, Python 3.9+, Git and curl:
+The manual **Release validation** workflow uses the same two default platforms;
+`include_macos_intel=true` adds Intel. Each platform directly runs the complete
+positive proof, runtime/compatibility tests and crate/npm package checks, then
+stages and installs its runtime assets in a fresh project. It also exercises
+native loading and offline reinstallation. These checks share the development
+implementation and do not repeat the positive proof or invoke mutation shards.
+
+A draft runtime prerelease can be created only after **all selected platforms**
+pass, using assets from the same commit and workflow attempt. Source hashes,
+toolchain fingerprints, native provenance and package bytes must agree. A clean
+source commit is required for packaging. Drafts are never published automatically.
+Green development CI or a local quality record alone is not a completed
+cross-platform release.
+
+The manual **Full negative regression** workflow defaults to **Linux only**;
+`include_macos=true` and `include_macos_intel=true` independently add platforms.
+It retains baseline preflight, complete mutation coverage, process cleanup,
+current-attempt artifact binding and optional `diagnostic_keep_going`. It has no
+release job or publication permission. Its failures remain failures; they do not
+block an independent release workflow. See [negative execution and collection](full-negative-validation.md)
+([简体中文](full-negative-validation.zh-CN.md)).
+
+## Evidence and reproduction
+
+Install Rustup, Python 3.9+, Git, curl and the documented Node/npm prerequisites:
 
 ```sh
 ./scripts/install-verus.sh
+npm ci --ignore-scripts
 python3 scripts/record-development.py
 # After dependencies are cached:
-python3 scripts/record-development.py --offline
-python3 scripts/record-development.py --check
-```
-
-The recorder serializes local proof work with a Unix advisory lock and two
-Verus threads. A hash-only `--check` confirms freshness, not new verification.
-Failed runs invalidate the relevant record. Changed sources prevent a passed
-record. Raw logs and package artifacts are generated under ignored `target/`.
-
-For release verification:
-
-```sh
 python3 scripts/record-verification.py --offline
-# Add --upstream only when immutable research inputs are available.
+python3 scripts/record-verification.py --check
+# Independent, expensive specification regression:
+python3 scripts/check-negative.py --jobs 1 --threads 2 --timeout 2400
 ```
 
-Full negative runs can take hours. Each mutation must compile, then produce a
-concrete contract rejection during whole-crate verification. Timeouts, solver
-resource limits, frontend errors and crashes fail the gate. The full release
-gate has not passed for this checkpoint; [status](status.md) records this
-without weakening the acceptance criteria. See [complete negative execution and
-collection](full-negative-validation.md) ([简体中文](full-negative-validation.zh-CN.md))
-for process cleanup, CPU budgets and the unchanged whole-crate acceptance rule.
+Recorders serialize local proof work with a Unix advisory lock and two Verus
+threads. `--check` checks freshness, not new verification. Failed runs invalidate
+the relevant record; changed sources prevent success. Generated development and
+release reports are excluded from source fingerprints so refreshing one does not
+invalidate the other. Both reports still bind their check scripts and source inputs.
+
+`target/positive-proof/` contains raw Verus JSON, stderr and a compiled-artifact
+fingerprint. The release recorder checks the fixed whole-crate invocation,
+successful statistics, pinned Verus identity, actual compiled artifact and unchanged
+source/tool fingerprints. It also validates runtime test sections and fresh native
+build/npm installation evidence. `verification/v4` records full negatives as
+`{ "status": "not_run", "requiredForRelease": false, ... }`; it never copies an old
+negative pass into a new release. The runtime manifest is `runtime-release/v2`.
+The packager and installer reject legacy or incomplete evidence rather than
+interpreting an old schema under the new policy.
+
+The Node suites use four concurrent test files, a 30-second timeout and the
+complete test set. Native checkpoint and child tests have separate Cordis/Harness
+profile files with shared test bodies. No cases or assertions are skipped.
 
 ## Experimental scoped-negative calibration
 
-`scripts/check-negative-scoped.py` is a separate opt-in experiment.
-`scripts/negative-controls.scoped.candidate.json` is a **candidate mapping**,
-not a passed report. Its `scoped-negative-report/v2` schema is not accepted by
-the existing release recorder.
-
-Calibration requires a fresh whole positive, then for every canonical mutation:
-a positive proof at the selected function, a complete mutant compilation, and
-a rejected proof at the reviewed function/anchor. Source, tool and harness
-hashes bind the result. All canonical controls must appear in order.
-Unexpected diagnostics, empty selections and resource/frontend failures reject
-the evidence.
+`scripts/check-negative-scoped.py` and
+`scripts/negative-controls.scoped.candidate.json` remain an opt-in experiment.
+The candidate map is not a passed report. Calibration requires a fresh whole
+positive proof, then each selected positive proof, complete mutant compilation
+and a rejection at the reviewed function/anchor. Unexpected diagnostics, empty
+selections and resource/frontend failures reject the evidence.
 
 ```sh
 python3 scripts/check-negative-scoped.py \
@@ -92,7 +105,7 @@ python3 scripts/check-negative-scoped.py \
   --threads 2 --timeout 1200
 ```
 
-Use a new directory outside the project. A successful calibration establishes
-detection by the designated proofs, not full verification of every mutated
-crate. Accepting this different evidence for release needs an explicit reviewed
-schema/policy change and completed calibration. Neither is claimed here.
+Use a new directory outside the project. Calibration would establish detection
+by the designated proofs, not full verification of every mutated crate. The
+independent full regression retains its complete-crate acceptance rule. Neither
+kind of mutation evidence establishes paper-wide completion.

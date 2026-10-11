@@ -87,8 +87,9 @@ The next review and release deliverables are:
   paths, including one reviewer-made change that is detected by the relevant check.
 - Target-specific build and application evidence for each platform advertised;
   the recorded local development environment currently establishes macOS ARM64.
-- The complete release gate, including full-crate negative controls, before a
-  release acceptance claim. An experimental public source checkpoint can state
+- Complete positive proof, runtime/package checks and actual installation on
+  every selected platform before a release acceptance claim. Full mutation
+  regressions are independent specification audits, with their own results. An experimental public source checkpoint can state
   its unfinished gates; a private vulnerability-reporting channel must be ready
   before changing visibility.
 - A short application walkthrough using the official UI: tool execution, session

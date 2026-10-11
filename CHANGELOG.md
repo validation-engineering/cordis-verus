@@ -4,6 +4,15 @@ Changes are recorded before release. There is no published release yet.
 
 ## Unreleased — 0.1.0
 
+- Separate the 121 full-crate negative regressions from normal release validation.
+  Releases retain whole-kernel proof and compilation, runtime/compatibility tests,
+  package checks and actual installation on each selected platform. The independent
+  mutation workflow defaults to Linux, with optional macOS and failure diagnostics.
+- Record fresh positive proof output and compiled-artifact/source/tool fingerprints.
+  `verification/v4` and `runtime-release/v2` explicitly record full negatives as
+  `not_run`; packagers and installers reject old or incomplete evidence. No kernel
+  contract or proof scope changes are part of this release-policy change.
+
 - Coordinate official Harness ConfigEditor file locks, reconciliation and rollback,
   Include refresh and the HMR operation queue with native domain admission. The
   companion application installs the bridge during default boot. Refuse official

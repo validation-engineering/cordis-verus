@@ -50,7 +50,7 @@ Rust Runtime 与 Node facade 共用 [`LifecycleDriver`](../crates/cordis-driver/
 | 在本仓库构建或修改 Rust 源码 | 使用锁定 Rust 工具链及 Cargo 依赖；内核依赖锁定的 `vstd`。仓库的 `toolchain-env.sh` 还检查已安装的 Verus，详见 [README 快速开始](../README.zh-CN.md#快速开始) |
 | 重新检查内核证明 | 使用锁定的 Verus 工具链；`scripts/verify.sh` 对同一内核源码运行 `--no-cheating --compile`，不调用 Node |
 | 使用原版插件、官方 Harness 或当前 cdylib 加载器 | 需要 Node、兼容包及 `cordis-node` 原生产物；本地构建该产物还需要 Rust 工具链，详见 [Node 指南](node-compatibility.md) |
-| 完整仓库开发与发布验收 | `check-development.sh`、`quality.sh` 包含 Node 构建和兼容测试，因此需要 Node/npm 依赖；发布门槛还包括完整负控，不能用纯 Rust 检查代替 |
+| 完整仓库开发与发布验收 | `check-development.sh`、`quality.sh` 包含 Node 构建和兼容测试，因此需要 Node/npm 依赖；发布还要求所选平台的实际产物安装，不能用纯 Rust 检查代替；完整负控独立运行 |
 
 锁定 TypeScript 上游是差分测试和官方工作流的参考输入，不是纯 Rust 应用的运行依赖。已有离线缓存时可按 [验证说明](validation.md)运行相应检查；离线参数不负责安装缺失的工具或依赖。
 
@@ -137,7 +137,7 @@ flowchart TD
 1. 在[覆盖清单](paper-coverage.md)找到条目、状态与证据符号。
 2. 阅读该符号的 `requires`／`ensures`，确认对象是具体程序、条件模型还是原文接口。
 3. 跟随示例的真实 setup、landing、receipt 和 cleanup；有示例不表示任意宿主都满足前提。
-4. 查看[验证说明](validation.md)中的冻结哈希、正向验证、测试及负控状态。开发检查与默认 CI 不含全量负控，不能替代完整 `quality.sh` 的发布门槛。
+4. 查看[验证说明](validation.md)中的冻结哈希、正向验证、测试及负控状态。开发和发布质量检查复用完整正向证明与运行测试；全量负控独立运行。发布还需通过所选平台的实际产物安装验收。
 
 Verus 的 `--no-cheating` 禁止用 `assume`、`admit`、`external_body` 等绕过证明。求解器接受的合同仍以类型、数学模型和显式前提为边界；它不会自动证明第三方 callback、无限调度公平性、外部副作用或任意 Rust 内存别名。
 

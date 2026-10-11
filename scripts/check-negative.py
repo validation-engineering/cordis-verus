@@ -636,7 +636,7 @@ def positive(value):
 
 
 def mutation_manifest():
-    """The canonical ordered set of source mutations required by release evidence."""
+    """The canonical ordered set of source mutations for independent full regressions."""
     return [
         (
             "provider-lifetime-guard", "lib.rs",
@@ -1371,7 +1371,7 @@ def run_checks(binary, environment, reports, mutations, supervisor, budget, time
                 or not baseline_stats["is-verifying-entire-crate"]):
             sys.exit("Unmodified kernel did not produce a successful, nonempty verification report")
         print(f"OK unmodified kernel: {baseline_stats['verified']} verified, 0 errors", flush=True)
-        summary = {"verus": baseline_json["verus"], "baseline": baseline_stats,
+        summary = {"releaseAcceptance": False, "verus": baseline_json["verus"], "baseline": baseline_stats,
                    "execution": {**budget, "timeoutSeconds": timeout},
                    "mutations": []}
         print(f"Checking {len(mutations)} mutations with {jobs} worker(s), {threads} Verus threads per worker", flush=True)

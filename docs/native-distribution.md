@@ -176,16 +176,17 @@ by the lifecycle kernel's Verus proofs.
 
 [`package-runtime-release.py`](../scripts/package-runtime-release.py) reuses the
 existing three independently installed tarballs and native provenance. It accepts
-only a fresh full release record, checks the exact ordered negative-control manifest,
+only a fresh `verification/v4` release record, checks complete positive proof and runtime evidence,
 binds all package/build inputs, and requires a clean source commit (the newly generated
 verification report is the only permitted tracked difference). It preserves the
 actual native build profile rather than silently calling a development build optimized.
 
 The [full release workflow](../.github/workflows/release-validation.yml) defaults to
 Linux x64 and macOS Apple Silicon; dispatch it with `include_macos_intel=true` to add
-macOS Intel. Each selected platform first completes a baseline preflight and all
-121 strictly collected [whole-crate negative controls](full-negative-validation.md),
-then the complete quality/package gate. It installs each staged runtime in a new
+macOS Intel. Each selected platform directly completes the positive proof and
+quality/package gate. [Whole-crate negative controls](full-negative-validation.md)
+run independently and are explicitly `not_run` in release evidence. The
+`runtime-release/v2` manifest and installer enforce this distinction. It installs each staged runtime in a new
 project and checks a second offline `npm ci` followed by the example. When explicitly
 dispatched with `create_draft=true` and a new `release_tag`, it collects exactly the
 selected platforms' matching-commit asset sets, adds `SHA256SUMS`, and creates a

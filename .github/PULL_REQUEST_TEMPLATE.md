@@ -3,8 +3,10 @@ Describe the problem and resulting behavior. Link the issue or upstream referenc
 Validation performed (paste exact commands and outcomes):
 
 - [ ] `./scripts/check-development.sh` passes (whole proof, tests and packaging).
-- Full release gate (`./scripts/quality.sh`): state **passed / failed / not run** and attach evidence.
-  Development checks alone do not imply release acceptance.
+- Release quality (`./scripts/quality.sh`): state **passed / failed / not run** and attach evidence.
+  Asset installation on every selected platform is also required for release.
+- Independent full negative regression: state **passed / failed / not run**.
+  It is not a normal release prerequisite; never imply unrun controls passed.
 - [ ] Behavioral or proof regressions are covered where relevant.
 - [ ] Public API or semantic changes are documented in `CHANGELOG.md` and the relevant guide.
 - [ ] Proof claims and trusted assumptions still match the implementation.

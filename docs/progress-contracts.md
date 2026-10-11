@@ -778,7 +778,7 @@ identities, two providers, provider replacement and a checked error immediately
 after terminal Unload. The canonical negative candidate
 `fresh-replay-omits-foreign-unload` removes the captured inverse word from value
 replay; its selected source-step projection proof rejects this omission. That
-selected check is experimental evidence, not full release-negative acceptance.
+selected check is experimental evidence, not complete negative-regression acceptance.
 
 ## From a new machine through setup and execution
 
@@ -947,4 +947,4 @@ python3 scripts/record-development.py --offline
 The development recorder runs whole-kernel verification with `--no-cheating`,
 compilation, Rust tests, Node compatibility tests and packaging checks. Its
 [record](development-report.json) binds results to source hashes. It is separate
-from the full release gate and all canonical negative controls.
+from release quality and the independent canonical negative regression.

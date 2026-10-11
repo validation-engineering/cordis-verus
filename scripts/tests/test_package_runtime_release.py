@@ -14,19 +14,19 @@ SPEC.loader.exec_module(MODULE)
 
 class RuntimeReleaseTests(unittest.TestCase):
     def verifier(self):
-        return SimpleNamespace(validate_negative_report=Mock(), required_negative_names=lambda: ['one', 'two'], source_hashes=lambda: {'file': 'hash'})
+        return SimpleNamespace(validate_release_report=Mock(), source_hashes=lambda: {'file': 'hash'})
 
     def report(self):
-        return {'schema': 'cordis-verus.verification/v3', 'status': 'passed', 'proof': {}, 'negativeControls': [],
+        return {'schema': 'cordis-verus.verification/v4', 'status': 'passed', 'proof': {}, 'negativeControls': {'status': 'not_run'},
                 'sha256': {'file': 'hash'}, 'paperCoverage': {'completionClaimed': False}}
 
-    def test_full_quality_uses_the_canonical_negative_validator(self):
+    def test_quality_uses_the_canonical_release_validator(self):
         verifier = self.verifier()
         record = self.report()
         MODULE.validate_quality(record, verifier)
-        verifier.validate_negative_report.assert_called_once_with({'baseline': {}, 'mutations': []}, ['one', 'two'])
-        verifier.validate_negative_report.side_effect = RuntimeError('missing negative control')
-        with self.assertRaisesRegex(RuntimeError, 'missing negative'):
+        verifier.validate_release_report.assert_called_once_with(record)
+        verifier.validate_release_report.side_effect = RuntimeError('missing positive proof')
+        with self.assertRaisesRegex(RuntimeError, 'missing positive'):
             MODULE.validate_quality(record, verifier)
 
     def test_development_stale_and_broadened_proof_claims_are_rejected(self):
@@ -58,7 +58,7 @@ class RuntimeReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(MODULE, 'run', return_value='a' * 40):
             root = Path(directory)
             (root / 'cordis-runtime-darwin-arm64-napi8.json').write_text(json.dumps({
-                'schema': 'cordis-verus.runtime-release/v1', 'target': 'darwin-arm64-napi8', 'sourceCommit': 'b' * 40}))
+                'schema': 'cordis-verus.runtime-release/v2', 'target': 'darwin-arm64-napi8', 'sourceCommit': 'b' * 40}))
             with self.assertRaisesRegex(ValueError, 'mixed-commit'):
                 MODULE.collect(root, root / 'output', 'a' * 40)
             self.assertFalse((root / 'output').exists())
@@ -75,10 +75,10 @@ class RuntimeReleaseTests(unittest.TestCase):
         npm = {'status': 'passed', 'nativeTarget': target, 'nativeManifestSha256': 'manifest',
                'nativeArtifactSha256': 'binary', 'packages': packages}
         evidence = directory / f'cordis-evidence-{target}.json'
-        MODULE.write(evidence, {'sourceCommit': commit, 'verification': self.report(), 'npm': npm})
-        record = {'schema': 'cordis-verus.runtime-release/v1', 'sourceCommit': commit, 'target': target,
+        MODULE.write(evidence, {'sourceCommit': commit, 'verification': {**self.report(), 'npmDistribution': npm}, 'npm': npm})
+        record = {'schema': 'cordis-verus.runtime-release/v2', 'sourceCommit': commit, 'target': target,
                   'nativeManifestSha256': 'manifest', 'nativeArtifactSha256': 'binary',
-                  'acceptance': {'fullQuality': True, 'negativeControls': 0, 'paperCompletion': False},
+                  'acceptance': {'releaseQuality': True, 'negativeControls': 'not_run', 'paperCompletion': False},
                   'packages': packages, 'evidence': MODULE.asset(evidence)}
         manifest = directory / f'cordis-runtime-{target}.json'
         MODULE.write(manifest, record)
@@ -102,7 +102,7 @@ class RuntimeReleaseTests(unittest.TestCase):
                 with patch.object(MODULE, 'ROOT', self.checkout(root)), patch.object(MODULE, 'run', return_value='a' * 40), \
                         patch.object(MODULE, 'verification_module', return_value=verifier):
                     MODULE.collect(inputs, output, 'a' * 40, selection)
-                self.assertEqual(verifier.validate_negative_report.call_count, len(targets))
+                self.assertEqual(verifier.validate_release_report.call_count, len(targets))
                 self.assertEqual({path.name for path in output.glob('cordis-runtime-*.json')},
                                  {f'cordis-runtime-{target}.json' for target in targets})
                 checksums = (output / 'SHA256SUMS').read_text().splitlines()
@@ -143,7 +143,7 @@ class RuntimeReleaseTests(unittest.TestCase):
                 self.assertFalse(output.exists())
 
     def test_selected_platform_cannot_reuse_old_or_incomplete_quality_evidence(self):
-        for failure in ['commit', 'source', 'negative', 'duplicate']:
+        for failure in ['commit', 'source', 'proof', 'npm', 'negative-status', 'duplicate']:
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 inputs, output = root / 'inputs', root / 'output'
@@ -158,8 +158,12 @@ class RuntimeReleaseTests(unittest.TestCase):
                     evidence['sourceCommit'] = 'b' * 40
                 elif failure == 'source':
                     evidence['verification']['sha256'] = {'stale': 'hash'}
-                elif failure == 'negative':
-                    verifier.validate_negative_report.side_effect = ValueError('missing full-crate negative control')
+                elif failure == 'proof':
+                    verifier.validate_release_report.side_effect = ValueError('missing whole-kernel proof')
+                elif failure == 'npm':
+                    evidence['npm']['nativeArtifactSha256'] = 'changed'
+                elif failure == 'negative-status':
+                    record['acceptance']['negativeControls'] = 'passed'
                 else:
                     duplicate = inputs / 'duplicate'; duplicate.mkdir()
                     MODULE.write(duplicate / manifest.name, record)
