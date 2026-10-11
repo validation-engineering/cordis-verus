@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Progress remains available on failure; `written` includes a replacement whose
-/// directory sync failed. No successful replacement is silently rolled back.
+/// durability barrier failed. No successful replacement is silently rolled back.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SaveReport {
     pub written: Vec<PathBuf>,

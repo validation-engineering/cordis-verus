@@ -11,7 +11,7 @@ export class ModuleHost {
     this.loadModule = options.loadModule;
   }
   async resolve(specifier, baseURL) {
-    if (!specifier.startsWith('.') && !specifier.startsWith('/') && !specifier.startsWith('file:')) {
+    if (!specifier.startsWith('.') && !isAbsolute(specifier) && !specifier.startsWith('file:')) {
       throw new LoaderError('MODULE_SPECIFIER', `Use an explicit relative, absolute or file: module path: ${specifier}`);
     }
     const url = fileURL(specifier, baseURL);

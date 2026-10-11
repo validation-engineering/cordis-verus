@@ -86,13 +86,21 @@ test('manifest writer cannot certify changed bytes through an old require-cache 
   t.after(()=>rm(root,{recursive:true,force:true}));
   const directory=join(root,'packages/compat-cordis/native'); await mkdir(directory,{recursive:true});
   const addon=join(directory,'cordis.node');
-  await copyFile(new URL('../../packages/compat-cordis/native/cordis.node',import.meta.url),addon);
-  const loaded=createRequire(import.meta.url)(addon);
+  const require=createRequire(import.meta.url);
+  // Windows locks a loaded DLL against replacement. Keep that real binding in
+  // a separate file, then seed its cached Module under the candidate filename.
+  // Unix can exercise the same stale-cache condition through an actual rename.
+  const loadedPath=process.platform==='win32'?join(directory,'cached.node'):addon;
+  await copyFile(new URL('../../packages/compat-cordis/native/cordis.node',import.meta.url),loadedPath);
+  const loaded=require(loadedPath);
   assert.equal(JSON.parse(loaded.bindingInfo()).abi,1);
-  // Rename prevents altering the image already memory-mapped by the loader.
+  t.after(()=>{delete require.cache[addon];delete require.cache[loadedPath];});
+  // Never modify the bytes of an image already memory-mapped by the loader.
   const corrupt=Buffer.from('this is not a native binary');
   await writeFile(join(directory,'replacement.node'),corrupt);
   await rename(join(directory,'replacement.node'),addon);
+  if(loadedPath!==addon) require.cache[addon]=require.cache[loadedPath];
+  assert.equal(require(addon),loaded, 'The stale cache would accept these corrupt bytes');
   const sources={'Cargo.lock':hash('lock'),'toolchain.lock.json':hash('toolchain')};
   const build={schema:'cordis-verus.node-build/v1',platform:process.platform,architecture:process.arch,node:process.version,
     sourceHashes:sources,artifactSha256:hash(corrupt),cargoLockSha256:sources['Cargo.lock'],toolchainLockSha256:sources['toolchain.lock.json']};

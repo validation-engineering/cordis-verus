@@ -129,12 +129,12 @@ export class ProcessDomain extends WorkerDomain {
     if (options.stdio !== undefined && !['inherit', 'ignore'].includes(options.stdio)) throw new TypeError('stdio must be inherit or ignore');
     if (options.onOutput !== undefined && typeof options.onOutput !== 'function') throw new TypeError('onOutput must be a function');
     if (options.cwd !== undefined) {
-      this.options.cwd = realpathSync(options.cwd);
+      this.options.cwd = realpathSync.native(options.cwd);
       if (!statSync(this.options.cwd).isDirectory()) throw new TypeError('cwd must be a directory');
     }
     if (options.hostModule !== undefined) {
       const filename = options.hostModule instanceof URL ? fileURLToPath(options.hostModule) : String(options.hostModule).startsWith('file:') ? fileURLToPath(options.hostModule) : resolve(options.hostModule);
-      const url = pathToFileURL(realpathSync(filename)).href;
+      const url = pathToFileURL(realpathSync.native(filename)).href;
       this._hostModule = Object.freeze({ url, sha256: digest(url) });
     }
   }

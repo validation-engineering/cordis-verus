@@ -20,7 +20,10 @@ try {
 export class ModuleGraph {
   constructor(directory, options = {}) {
     this.allowNativeAddons = options.allowNativeAddons === true;
-    this.root = realpathSync(directory);
+    // Native realpath expands Windows 8.3 aliases, matching fs/promises and
+    // Node's ESM loader. The JS realpath variant can retain RUNNER~1 aliases,
+    // making every real import appear to be outside the captured root.
+    this.root = realpathSync.native(directory);
     this.modules = new Map();
     this.edges = new Map();
     this.roots = new Set();

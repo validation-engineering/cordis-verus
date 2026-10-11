@@ -14,6 +14,9 @@ Changes are recorded before release. Runtime previews are distributed through Gi
 - Support Windows configuration persistence with a write-through replacement and
   an explicit, retryable flush. Keep locked destinations intact and test Unicode
   paths. Statically link the Windows C runtime into native release modules.
+- Normalize Windows module roots and process paths through native realpath, so
+  short directory aliases cannot hide dependency edges or bypass captured-artifact
+  import checks. Accept native absolute plugin paths on both Windows and Unix.
 - Collect independent runtime diagnostics after failures, while keeping every
   failed or skipped acceptance step release-blocking.
 - Simplify English and Chinese Quick starts around the precompiled runtime while

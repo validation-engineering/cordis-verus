@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const register = fileURLToPath(new URL('../../packages/compat-cordis/register.js', import.meta.url));
+const register = new URL('../../packages/compat-cordis/register.js', import.meta.url).href;
 const entry = new URL('../../packages/compat-cordis/index.js', import.meta.url).href;
 
 function run(source, { commonJS = false, cwd } = {}) {

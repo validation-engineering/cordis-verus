@@ -823,9 +823,11 @@ mod tests {
                 .unwrap_err()
                 .contains("Absolute")
         );
-        assert!(snapshot(Path::new("/missing"), "abc", "test")
-            .unwrap_err()
-            .contains("Sha256"));
+        assert!(
+            snapshot(&std::env::temp_dir().join("missing"), "abc", "test")
+                .unwrap_err()
+                .contains("Sha256")
+        );
     }
     #[test]
     fn rejects_unsupported_capabilities_and_duplicate_factories() {

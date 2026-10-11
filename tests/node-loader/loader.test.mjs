@@ -100,6 +100,19 @@ test('validation and failed imports leave the old graph untouched', async () => 
   } finally { await ctx.dispose(); }
 });
 
+test('native absolute paths and file URLs load the same module with spaces and Unicode', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cordis-absolute-'));
+  const filename = join(directory, '插件 with spaces.mjs');
+  try {
+    await writeFile(filename, 'export default function plugin() {}');
+    const host = new ModuleHost({ rootDirectory: directory });
+    const absolute = await host.load(filename);
+    const url = await host.load(pathToFileURL(filename).href);
+    assert.equal(absolute.plugin, url.plugin);
+    assert.equal(absolute.url, url.url);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test('include cycles and unsupported ESM reset fail explicitly', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'cordis-cycle-'));
   try {
