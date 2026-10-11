@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {Context as CordisContext, FiberState} from '../../packages/compat-cordis/index.js';
-import {Context as HarnessContext} from '../../packages/compat-harness/index.js';
+import {Context as HarnessContext} from '../../packages/compat-deepseek/index.js';
 
 for (const [profile,Context] of [['cordis',CordisContext],['harness',HarnessContext]]) {
   test(`${profile} has an immutable native profile and a matching update return contract`,async()=>{
@@ -57,7 +57,7 @@ test('Harness bootstrap routes scoped ESM/CJS/dynamic imports and rejects mixed 
     await assert.rejects(import('cordis'),{code:'ERR_CORDIS_UNSUPPORTED_IMPORT'});
     await assert.rejects(import('@deepseek-ai/cordis/internal'),{code:'ERR_CORDIS_UNSUPPORTED_IMPORT'});
   `;
-  const result=spawnSync(process.execPath,['--import','./packages/compat-harness/register.js','--input-type=module','--eval',script],{encoding:'utf8',timeout:10000});
+  const result=spawnSync(process.execPath,['--import','./packages/compat-deepseek/register.js','--input-type=module','--eval',script],{encoding:'utf8',timeout:10000});
   assert.ifError(result.error);assert.equal(result.status,0,result.stderr);
 });
 

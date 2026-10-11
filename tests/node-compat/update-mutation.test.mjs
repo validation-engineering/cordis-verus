@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { Context as CordisContext, domainMutation, FiberState } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 const reentrant = error => error.code === 'REENTRANT_MUTATION';
 
@@ -219,7 +219,7 @@ for (const [profile, Context] of [['cordis', CordisContext], ['harness', Harness
   });
 
   test(`${profile} every update frame rejects self, ancestor, and committed-provider waits`, { timeout: 7000 }, () => {
-    const moduleURL = new URL(`../../packages/compat-${profile === 'harness' ? 'harness' : 'cordis'}/index.js`, import.meta.url).href;
+    const moduleURL = new URL(`../../packages/compat-${profile === 'harness' ? 'deepseek' : 'cordis'}/index.js`, import.meta.url).href;
     // Missing one of these guards can withdraw a currently executing frame or
     // create a cycle. Bound the process as well as the node:test timeout.
     const source = `

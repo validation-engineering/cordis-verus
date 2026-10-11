@@ -12,8 +12,8 @@ const facadeURLs = new Set([
 ]);
 const harnessURLs = new Set();
 try {
-  harnessURLs.add(import.meta.resolve('@validation-engineering/cordis-harness'));
-  harnessURLs.add(pathToFileURL(require.resolve('@validation-engineering/cordis-harness')).href);
+  harnessURLs.add(import.meta.resolve('@validation-engineering/cordis-compat-deepseek'));
+  harnessURLs.add(pathToFileURL(require.resolve('@validation-engineering/cordis-compat-deepseek')).href);
 } catch { /* Harness is optional for the default Cordis host. */ }
 
 /** Observed Node module edges in one Worker, not a static parser or cache reset. */

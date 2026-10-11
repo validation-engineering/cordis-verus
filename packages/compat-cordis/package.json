@@ -1,6 +1,6 @@
 {
   "name": "@validation-engineering/cordis",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Experimental Cordis language facade over the Rust lifecycle driver",
   "engines": {

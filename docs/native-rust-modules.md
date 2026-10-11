@@ -505,7 +505,7 @@ consumers must keep a transaction open through their acceptance:
 
 ```js
 import { beginRustModuleMigration } from '@validation-engineering/cordis-loader/rust-module-plugin';
-import { officialTransaction } from '@validation-engineering/cordis-loader/harness';
+import { officialTransaction } from '@validation-engineering/harness-verus/official-loader-api';
 
 await officialTransaction(ctx, async () => {
   const entry = ctx.loader.resolve('native-analysis');

@@ -12,7 +12,7 @@
         "../../../packages/compat-cordis/index.d.ts"
       ],
       "@deepseek-ai/cordis": [
-        "../../../packages/compat-harness/index.d.ts"
+        "../../../packages/compat-deepseek/index.d.ts"
       ]
     }
   },

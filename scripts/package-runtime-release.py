@@ -18,7 +18,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = {'darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8', 'win32-x64-napi8'}
 DEFAULT_TARGETS = TARGETS.copy()
-NAMES = {'@validation-engineering/cordis', '@validation-engineering/cordis-harness', '@validation-engineering/cordis-loader'}
+NAMES = {'@validation-engineering/cordis', '@validation-engineering/cordis-compat-deepseek', '@validation-engineering/cordis-loader'}
 
 
 def digest(path):

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { Context as CordisContext, FiberState } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 const addon=fileURLToPath(new URL('../../target/node-compat/interop-fixture.node',import.meta.url));
 
 for (const [profile,Context] of [['cordis',CordisContext],['harness',HarnessContext]]) {

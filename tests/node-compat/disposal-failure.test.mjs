@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Context as CordisContext } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 const messages = error => [error.message, ...(error instanceof AggregateError ? error.errors.flatMap(messages) : []), ...(error.cause instanceof Error ? [messages(error.cause)] : [])].join(' | ');
 const inverseFailure = error => /inverse must retry/.test(messages(error));

@@ -60,96 +60,18 @@ The Loader imports modules and validates candidate JSON inputs before disturbing
 
 `loader.reload()` re-reads its last file and included JSON files, then reconciles the changed subtrees. With unchanged configuration and factory identities, it does not remount the graph. After a programmatic `update()` the source is an in-memory recipe; subsequent `reload()` uses that recipe and asks the ModuleHost to prepare its factories again. There is no implicit write-back to the original configuration files and no background file watcher.
 
-## Explicit transactions for the official Harness Loader
+## DeepSeek Harness application integration
 
-The separate `@validation-engineering/cordis-loader/harness` entry adapts the **installed,
-unchanged** official Harness `Loader` and `Include` classes. It does not replace
-this package's JSON API. `LoaderTransactions` offers explicit host operations;
-`installOfficialTransactions` additionally connects the official configuration UI
-and refresh/HMR queues when installed by the application before boot.
-The tested contract is Harness Cordis 4.0.4, Loader 1.0.5 and Include 1.0.9.
-Use the native Harness profile and a live, fully initialized tree:
+The pinned official Loader/Include, ConfigEditor and in-process HMR bridges are
+maintained and tested by the companion Harness application. Starting with Loader
+0.2.0, import those APIs from `@validation-engineering/harness-verus/official-loader-api`.
+The former `@validation-engineering/cordis-loader/harness` entry belongs to the
+published 0.1.0 release and is no longer exported by this package.
 
-```js
-import { LoaderTransactions } from '@validation-engineering/cordis-loader/harness';
-
-// ctx and ctx.loader already belong to the booted official application.
-// Select an Include file owned by this host, not an unrelated profile overlay.
-const edits = new LoaderTransactions(ctx, ctx.loader.resolve('custom').subtree);
-await edits.update('greeting', { config: { prefix: 'Welcome' } });
-const id = await edits.create({ name: './another-plugin.mjs', config: {} });
-// create preserves the official fully qualified id; resolve it from the root.
-const rootEdits = new LoaderTransactions(ctx, ctx.loader);
-await rootEdits.remove(id);
-await edits.close(); // closes this adapter's admission; does not dispose the tree
-```
-
-`create`, `update` and `remove` enter the same domain FIFO as Fiber revisions,
-JSON Loader updates and Context shutdown **before** changing options or files.
-Cloneable options are snapshotted at admission, including `undefined` deletion
-values; functions and other non-cloneable values reject before admission.
-The adapter retains old and new Fibers, waits for official Loader and native
-lifecycle work, and observes the actual Include write queues, including writes
-scheduled by timers or teardown. This is conservatively a **whole Loader graph
-barrier**: sibling Includes and existing work may delay it or report failure.
-Use it from an external host operation, outside plugin setup/cleanup actions.
-
-Success means that the observed lifecycle and persistence work completed. It is
-not an atomic rollback mechanism or a guarantee of physical-disk durability after
-power loss. An `OFFICIAL_PERSISTENCE_FAILED` error names affected files and retains
-causes; running plugin changes may already have happened. A subsequent explicit
-revision can retry the official write queue. Cleanup failures still block new
-revisions until actual cleanup recovery succeeds. Pending dependencies retain
-upstream Pending semantics; completion does not certify every plugin Active.
-`revision` counts successful operations, `requestedRevision` counts admitted
-requests, and `lastFailure` retains the last failed request's operation and error.
-
-A cached adapter belongs to its tree owner's current episode. If that Include
-is removed or restarted, `STALE_LOADER` rejects old requests before mutation;
-obtain a new adapter for the new tree. Foreign domains, incompatible class shapes
-and methods replaced after construction are rejected. Nested removal selects the
-entry's owning tree and local id before invoking the unchanged official method.
-
-The bridge uses `MutationSteps.capture(callback)`, whose authority lasts only
-through the callback's synchronous call stack in that domain. A returned Promise
-does not extend that authority; plugin lifecycle callbacks and async update
-continuations cannot borrow it. Ignored lifecycle Promises are still joined.
-
-The explicit adapter does not intercept arbitrary direct object or file mutations.
-Applications can additionally call `installOfficialTransactions` with the pinned
-`Entry`, `EntryGroup`, `EntryTree`, `Hmr` and `ConfigEditor` classes **before boot**.
-The companion Harness application already installs it in its default preload.
-That host bridge admits ConfigEditor edits before acquiring the profile file lock,
-then keeps write/reconcile/rollback and Include refresh in the same domain slot.
-It also orders `hmr.runExclusive` with configuration and shutdown work. The original
-methods still implement the configuration semantics; no upstream source files
-are rewritten. See [official configuration transactions](../../docs/official-config-transactions.md)
-for setup, failure and callback contracts.
-
-A failed inverse is not automatically retried by rollback. Readiness and restart
-report the retained native barrier even when a transient JavaScript error has
-already been observed; explicit cleanup recovery is required. Event and edit
-callbacks cannot borrow transaction steps. `steps.observe(fiber, callback)` retains
-the callback's episode identity, and `steps.isCurrent()` lets a trusted bridge
-check its exact coordinator origin before capturing a synchronous continuation.
-These are host APIs, not a sandbox for arbitrary application code.
-
-Official main-thread `partialReload()` now performs dependency-closed ESM/CJS
-replacement in the existing Context. It waits for old cleanup before changing
-caches, preserves unrelated identities and retains a recovery journal when
-candidate cleanup or old restoration fails. The official watcher includes pure
-CJS leaves. See [in-place HMR](../../docs/official-in-place-hmr.md) for observed
-graph coverage, concurrency, failure and native-addon boundaries.
-[Worker module graphs](../../docs/module-graph-reloads.md) replace a complete
-captured environment; application native addons use `ProcessDomain` below.
-Runtime shape checks do not certify a different upstream version or arbitrary
-EntryTree subclass.
-
-The core gate checks admission contracts, callback isolation and type declarations;
-the companion `cordis-harness` gate executes installed official classes, default
-boot, real JSON/YAML edits, write/rollback failures, cleanup barriers and stale
-owner rejection. These are behavioral checks, not proofs of filesystem durability
-or arbitrary callback effects.
+The runtime still provides the shared domain transaction, callback isolation,
+cleanup and JSON Loader primitives. Application-specific method interception,
+module-cache recovery and official version checks live with the application.
+See [package boundaries](../../docs/package-boundaries.md) for the migration.
 
 ## Replace code in a fresh Worker
 

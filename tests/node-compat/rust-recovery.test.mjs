@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { Context as CordisContext, domainMutation } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 const addon=fileURLToPath(new URL('../../target/node-compat/interop-fixture.node',import.meta.url));
 const messages = error => [error?.message, ...(error instanceof AggregateError ? error.errors.flatMap(messages) : [])].join(' | ');
 

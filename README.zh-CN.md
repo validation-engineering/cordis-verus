@@ -1,5 +1,7 @@
 # cordis-verus
 
+可选的 DeepSeek Cordis 接口与配套应用职责见[包边界说明](docs/package-boundaries.zh-CN.md)。
+
 **以 Verus 验证生命周期内核的 Cordis Rust 实现。**
 
 [English](README.md) · [文档](docs/README.md) · [示例](crates/cordis/examples) · [路线图](docs/roadmap.md) · [参与贡献](CONTRIBUTING.md)

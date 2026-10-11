@@ -1,6 +1,6 @@
 {
   "name": "@validation-engineering/cordis-loader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Experimental JSON module loader over the native Cordis facade",
   "engines": {
@@ -14,10 +14,6 @@
     "./worker": {
       "types": "./worker.d.ts",
       "import": "./worker.js"
-    },
-    "./harness": {
-      "types": "./harness.d.ts",
-      "import": "./harness.js"
     },
     "./process": {
       "types": "./process.d.ts",
@@ -33,7 +29,7 @@
     }
   },
   "peerDependencies": {
-    "@validation-engineering/cordis": "0.1.0"
+    "@validation-engineering/cordis": "0.1.1"
   },
   "license": "MIT",
   "publishConfig": {

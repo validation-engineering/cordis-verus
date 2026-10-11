@@ -6,7 +6,7 @@
   "workspaces": [
     "packages/compat-cordis",
     "packages/compat-loader",
-    "packages/compat-harness"
+    "packages/compat-deepseek"
   ],
   "engines": {
     "node": ">=22.22.0"

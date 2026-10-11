@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {Context as CordisContext, symbols} from '../../packages/compat-cordis/index.js';
-import {Context as HarnessContext} from '../../packages/compat-harness/index.js';
+import {Context as HarnessContext} from '../../packages/compat-deepseek/index.js';
 
 const observedAddon = fileURLToPath(new URL('./fixtures/observed-driver.cjs', import.meta.url));
 const observedDriver = createRequire(import.meta.url)(observedAddon);

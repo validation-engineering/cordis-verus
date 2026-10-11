@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import {Context as CordisContext, FiberState} from '../../packages/compat-cordis/index.js';
-import {Context as HarnessContext} from '../../packages/compat-harness/index.js';
+import {Context as HarnessContext} from '../../packages/compat-deepseek/index.js';
 
 const reentrant = error => error.code === 'REENTRANT_MUTATION';
 const stale = error => error.code === 'STALE_EPISODE';

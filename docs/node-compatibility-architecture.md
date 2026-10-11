@@ -53,7 +53,7 @@ flowchart TB
 | `crates/cordis-node` | Node-API 类型转换、environment 校验、driver 调用和唤醒 | 独立解析 provider、决定失败重试、直接绕过内核删除节点 |
 | `packages/compat-core` | 可共享的 JS 对象、proxy、callback 和 executor 机制 | 第二套 Fiber 状态机 |
 | `packages/compat-cordis` | 独立 Cordis profile 的运行时导出和类型声明 | 默认为其它 profile 提供兼容承诺 |
-| `packages/compat-harness` | Harness profile 的导出和可观察行为 | 偷换独立 Cordis 的策略 |
+| `packages/compat-deepseek` | Harness profile 的导出和可观察行为 | 偷换独立 Cordis 的策略 |
 | `packages/compat-loader` | 按 profile 分入口的 Loader、Include、配置持久化适配 | 绕过事务协调器直接更新 native fiber |
 | `packages/module-host` | 模块解析、制品代次、HMR 和 provenance | 将清除缓存等同于卸载资源 |
 | `packages/launcher` | 受控安装树、引导解析、profile 和 ABI 检查 | 修改用户全局 Node/npm 配置 |
@@ -254,7 +254,7 @@ listener 注册和注销的 effect 所有权接入 Driver。普通事件遵循�
 
 ## npm 模块和类型兼容
 
-拟发布 facade 使用项目自己的包名，例如 `@validation-engineering/cordis` 和 `@validation-engineering/cordis-harness`。引导器在应用的受控安装树中生成 alias/override 和必要的解析映射，使原插件的 `import 'cordis'` 或 scoped import 指向匹配 facade。不能占用上游 npm 包名，也不能仅修改应用入口而遗漏传递依赖。
+拟发布 facade 使用项目自己的包名，例如 `@validation-engineering/cordis` 和 `@validation-engineering/cordis-compat-deepseek`。引导器在应用的受控安装树中生成 alias/override 和必要的解析映射，使原插件的 `import 'cordis'` 或 scoped import 指向匹配 facade。不能占用上游 npm 包名，也不能仅修改应用入口而遗漏传递依赖。
 
 解析必须覆盖 ESM、dynamic import、CommonJS、createRequire、conditional exports、项目相对路径、pnpm 嵌套与 symlink，以及被 profile 列出的 deep imports。Node customization hooks 是可用机制之一，具体 API 与最低 Node 版本在 M0 锁定并测试，不能据当前文档推断所有旧 Node 版本都支持。[Node 模块定制文档](https://nodejs.org/api/module.html#customization-hooks)
 

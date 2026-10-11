@@ -53,7 +53,7 @@ async function addInput(name) {
 for(const name of ['upstream.lock.json','package.json','package-lock.json','scripts/check-harness-compat.mjs',
   'tests/compat/harness/fixture.mjs','tests/upstream-core/evidence.mjs','tests/compat/profiles/deepseek-harness.json'])await addInput(name);
 if(backends.includes('native')) {
-  for(const directory of ['packages/compat-cordis','packages/compat-harness']) {
+  for(const directory of ['packages/compat-cordis','packages/compat-deepseek']) {
     for(const file of await readdir(path.join(root,directory)))if(/\.(js|cjs|json)$/.test(file))await addInput(`${directory}/${file}`);
   }
   await addInput('packages/compat-cordis/native/cordis.node');
@@ -104,7 +104,7 @@ for(const backend of backends) {
     plugins:[{name:'locked-harness-workspace',setup(builder) {
       builder.onResolve({filter:/^@deepseek-ai\//},async args=>{
         if(args.path==='@deepseek-ai/cordis' && backend==='native') {
-          return {path:path.join(root,'packages/compat-harness/index.js'),external:true};
+          return {path:path.join(root,'packages/compat-deepseek/index.js'),external:true};
         }
         const [,name,suffix]=args.path.match(/^(@deepseek-ai\/[^/]+)(?:\/(.*))?$/)??[];
         const entry=packages.get(name);

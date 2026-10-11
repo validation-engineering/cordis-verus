@@ -67,7 +67,7 @@ dependencies = [
 
 [[package]]
 name = "cordis-node"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cordis-driver",
  "cordis-plugin-api",

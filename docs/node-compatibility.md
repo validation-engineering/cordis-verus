@@ -20,7 +20,7 @@ npm run test:node
 # 独立 Cordis 原插件
 node --import @validation-engineering/cordis/register app.mjs
 # Harness Cordis 原插件
-node --import @validation-engineering/cordis-harness/register app.mjs
+node --import @validation-engineering/cordis-compat-deepseek/register app.mjs
 ```
 
 引导器覆盖所选 bare 包名的 ESM、dynamic import、CommonJS、createRequire。两个入口不能在同一 environment 混用；不支持的 deep imports 会拒绝，不会回退到原版调度器。直接开发也可导入项目自己的包名。TS 应显式构建为 JS；注册入口不是 TS 编译器。
@@ -220,7 +220,7 @@ npm run test:upstream-core   # 12 个原文件、87 项核心行为测试
 
 ## 官方 Loader 的显式事务适配
 
-`@validation-engineering/cordis-loader/harness` 提供 `LoaderTransactions(ctx, tree)`，
+`@validation-engineering/harness-verus/official-loader-api` 提供 `LoaderTransactions(ctx, tree)`，
 复用实际官方 Loader/Include 的 create/update/remove，并等待同一 Loader 图中
 旧/新 Fiber 和真实 Include 写队列。请求在修改 options 或文件前进入域级队列，
 因此后续 revision 和 Context 关闭等待已经接纳的操作。错误不会冒充原子回滚。

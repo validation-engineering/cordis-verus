@@ -1,5 +1,7 @@
 # cordis-verus
 
+See [package boundaries](docs/package-boundaries.md) for the optional DeepSeek Cordis interface and the companion application.
+
 **A Rust implementation of Cordis with a Verus-verified lifecycle kernel.**
 
 [简体中文](README.zh-CN.md) · [Documentation](docs/README.md) · [Examples](crates/cordis/examples) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)

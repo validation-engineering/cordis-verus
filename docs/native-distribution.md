@@ -9,11 +9,11 @@ The Node facade uses the same manifest selector in a source checkout and an extr
 ```sh
 npm install @validation-engineering/cordis
 # Add the Loader or Harness profile when needed:
-npm install @validation-engineering/cordis-loader @validation-engineering/cordis-harness
+npm install @validation-engineering/cordis-loader @validation-engineering/cordis-compat-deepseek
 ```
 
 Use Node.js 22.22+. The package already contains all four native libraries and selects the current platform at runtime. No install scripts or local compilation are required. Pure Rust applications do not need Node.
-For original Cordis imports, run `node --import @validation-engineering/cordis/register app.mjs`; use `@validation-engineering/cordis-harness/register` for Harness plugins.
+For original Cordis imports, run `node --import @validation-engineering/cordis/register app.mjs`; use `@validation-engineering/cordis-compat-deepseek/register` for Harness plugins.
 Both profiles use the same native kernel. The `cordis-harness` package is the profile adapter; the complete application lives in the separate Cordis Harness repository.
 
 Historical `v0.1.0-preview.1` assets retain the `@cordis-verus/compat-*` names. Do not mix the old and new release families within one application.

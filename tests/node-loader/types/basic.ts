@@ -30,22 +30,3 @@ const preparedPlugin = (_ctx: Context) => {};
 new ModuleHost({loadModule: async canonicalURL => ({plugin:preparedPlugin, revision:canonicalURL})});
 // @ts-expect-error Revision comparison tokens cannot be mutable objects.
 new ModuleHost({loadModule: async () => ({plugin:preparedPlugin, revision:{version:1}})});
-
-import { LoaderTransactions, installOfficialTransactions, type OfficialEntryTree } from '../../../packages/compat-loader/harness.js';
-declare const officialTree: OfficialEntryTree;
-const transactions = new LoaderTransactions(context, officialTree);
-const officialId: string = await transactions.create({ name: 'cordis:probe', config: { enabled: true } });
-await transactions.update(officialId, { disabled: undefined });
-await transactions.remove(officialId);
-await transactions.close();
-const revision: number = transactions.revision;
-void revision;
-// @ts-expect-error New official entries require a module name.
-transactions.create({ config: {} });
-// @ts-expect-error Revision metadata cannot be assigned by callers.
-transactions.revision = 3;
-
-declare const officialClasses: Parameters<typeof installOfficialTransactions>[0];
-installOfficialTransactions(officialClasses);
-// @ts-expect-error Every pinned official class is required for transparent installation.
-installOfficialTransactions({ Entry: class {} });

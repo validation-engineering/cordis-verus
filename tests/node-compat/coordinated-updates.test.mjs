@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { Context as CordisContext, domainMutation } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 async function fixture(t, options = {}) {
   const ctx = new (options.Context ?? CordisContext)();

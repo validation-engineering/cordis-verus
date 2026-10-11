@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const names = ['@validation-engineering/cordis', '@validation-engineering/cordis-harness', '@validation-engineering/cordis-loader'];
+const names = ['@validation-engineering/cordis', '@validation-engineering/cordis-compat-deepseek', '@validation-engineering/cordis-loader'];
 const targets = ['darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8', 'win32-x64-napi8'];
 const safeName = name => typeof name === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name);
 const sha = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -76,7 +76,7 @@ async function regular(path) {
 }
 const smoke = `import assert from 'node:assert/strict';
 import { Context } from '@validation-engineering/cordis';
-import { Context as HarnessContext } from '@validation-engineering/cordis-harness';
+import { Context as HarnessContext } from '@validation-engineering/cordis-compat-deepseek';
 import { Loader } from '@validation-engineering/cordis-loader';
 import { selectNativeArtifact } from '@validation-engineering/cordis/native-artifacts';
 const selected = selectNativeArtifact();

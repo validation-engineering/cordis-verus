@@ -159,7 +159,7 @@ def node_build_evidence(path):
 NPM_PACKAGES = {
     "compat-cordis": "@validation-engineering/cordis",
     "compat-loader": "@validation-engineering/cordis-loader",
-    "compat-harness": "@validation-engineering/cordis-harness",
+    "compat-deepseek": "@validation-engineering/cordis-compat-deepseek",
 }
 
 
@@ -266,7 +266,7 @@ def npm_distribution_evidence(path, build_path, node_build):
                 or not isinstance(files, list) or any(not isinstance(name, str) for name in files)
                 or not required.issubset(files)
                 or (item["name"] == NPM_PACKAGES["compat-loader"]
-                    and not {"harness.js", "harness.d.ts", "module-graph.js", "process.js", "process.d.ts", "process-entry.js", "domain-entry.js"}.issubset(files))
+                    and not {"module-graph.js", "process.js", "process.d.ts", "process-entry.js", "domain-entry.js"}.issubset(files))
                 or (item["name"] == NPM_PACKAGES["compat-cordis"] and (not native_files.issubset(files)
                     or {name for name in files if name.endswith(".node")} != native_binaries))
                 or item.get("sha256") != file_sha256(path.parent / filename)):
@@ -280,7 +280,7 @@ def npm_distribution_evidence(path, build_path, node_build):
                 "native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity", "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load", "Rust-module-in-place-reload", "Rust-module-reverse-JS", "Rust-module-resources", "Rust-module-JS-resources", "Rust-module-children", "Rust-module-checkpoint"}
             or harness.get("profile") != "harness"
             or set(harness.get("tests", [])) != {
-                "scoped-original-import", "ESM-CJS-profile-identity", "native-harness-domain", "Service-class", "official-loader-adapter-export"}):
+                "scoped-original-import", "ESM-CJS-profile-identity", "native-harness-domain", "Service-class", "profile-update-contract"}):
         raise RuntimeError("npm distribution smoke evidence is incomplete")
     return report
 

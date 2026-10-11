@@ -141,7 +141,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
             archive.write_bytes(("test archive: " + name).encode())
             packages.append({"name": name, "version": "0.1.0", "filename": filename,
                              "sha256": module.file_sha256(archive),
-                             "files": ["package.json", "index.js", "index.d.ts", "README.md", "LICENSE", "NOTICE", "native/cordis.node", "native/manifest.json", "native/" + native_provenance] + (["harness.js", "harness.d.ts", "module-graph.js", "process.js", "process.d.ts", "process-entry.js", "domain-entry.js"] if directory == "compat-loader" else [])})
+                             "files": ["package.json", "index.js", "index.d.ts", "README.md", "LICENSE", "NOTICE", "native/cordis.node", "native/manifest.json", "native/" + native_provenance] + (["module-graph.js", "process.js", "process.d.ts", "process-entry.js", "domain-entry.js"] if directory == "compat-loader" else [])})
         self.npm_report.write_text(json.dumps({
             "schema": "cordis-verus.npm-package/v1", "status": "passed", "offline": True, "uploaded": False,
             "registryPublishChecked": False, "otherTargets": "not validated", "packages": packages,
@@ -154,7 +154,7 @@ class DevelopmentEvidenceTests(unittest.TestCase):
                             "tests": ["native-manifest-selection", "default-core-only", "packed-native-load", "ESM-CJS-identity",
                 "original-cordis-import", "JSON-loader-update", "Worker-artifact-load", "Process-native-artifact-load", "Rust-module-in-place-reload", "Rust-module-reverse-JS", "Rust-module-resources", "Rust-module-JS-resources", "Rust-module-children", "Rust-module-checkpoint"]},
             "harnessObservation": {"profile": "harness", "tests": ["scoped-original-import", "ESM-CJS-profile-identity",
-                "native-harness-domain", "Service-class", "official-loader-adapter-export"]},
+                "native-harness-domain", "Service-class", "profile-update-contract"]},
         }))
         return 0
 
@@ -377,8 +377,8 @@ class DevelopmentEvidenceTests(unittest.TestCase):
             "wrong Node": lambda report: report["testedTarget"].update(node="v0.0.0"),
             "wrong ABI": lambda report: report["testedTarget"].update(driverAbi=2),
             "missing smoke": lambda report: report["harnessObservation"].update(tests=[]),
-            "missing adapter smoke": lambda report: report["harnessObservation"]["tests"].remove("official-loader-adapter-export"),
-            "missing adapter file": lambda report: next(item for item in report["packages"] if item["name"] == "@validation-engineering/cordis-loader")["files"].remove("harness.js"),
+            "missing profile smoke": lambda report: report["harnessObservation"]["tests"].remove("profile-update-contract"),
+            "missing domain entry": lambda report: next(item for item in report["packages"] if item["name"] == "@validation-engineering/cordis-loader")["files"].remove("domain-entry.js"),
             "missing process smoke": lambda report: report["observation"]["tests"].remove("Process-native-artifact-load"),
             "missing Rust module smoke": lambda report: report["observation"]["tests"].remove("Rust-module-in-place-reload"),
             "missing reverse JS module smoke": lambda report: report["observation"]["tests"].remove("Rust-module-reverse-JS"),

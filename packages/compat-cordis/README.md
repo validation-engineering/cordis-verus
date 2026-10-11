@@ -62,7 +62,7 @@ The implemented surface includes function/object/class plugins, initialization,
 service injection, dynamic publications and checks, isolation, callable services,
 mixins/accessors, method/class decorators, LoggerService, events, effects and
 explicit owned tasks. Rust and Node use the same lifecycle control driver.
-`@validation-engineering/cordis-harness` selects a separate configuration/retry policy;
+`@validation-engineering/cordis-compat-deepseek` selects a separate configuration/retry policy;
 `@validation-engineering/cordis-loader` adds JSON loading and fresh-Worker artifact recovery.
 
 This is not complete Cordis/Harness compatibility. The full upstream suite is

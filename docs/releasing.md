@@ -79,7 +79,7 @@ token; only the explicitly requested draft-release job has `contents: write`, fo
 ## Precompiled Node runtime on GitHub Releases
 
 The runtime distribution does not require publishing to npm or crates.io. It
-contains the existing `compat-cordis`, `compat-harness` and `compat-loader` tarballs,
+contains the existing `compat-cordis`, `compat-deepseek` and `compat-loader` tarballs,
 with the native addon already inside the core package. Consumers need Node/npm;
 private mirrors can be downloaded with an authenticated client before offline installation. See
 [installation and architecture boundaries](native-distribution.md#install-a-published-runtime-without-compiling).
@@ -136,7 +136,7 @@ Public npm packages use the `@validation-engineering` organization:
 | --- | --- |
 | `@validation-engineering/cordis` | Node compatibility host, with all four native prebuilds |
 | `@validation-engineering/cordis-loader` | Module/configuration loader and host adapters |
-| `@validation-engineering/cordis-harness` | Harness Cordis profile; not the complete Harness application |
+| `@validation-engineering/cordis-compat-deepseek` | Harness Cordis profile; not the complete Harness application |
 
 Create the npm organization using the free public-package plan, then authenticate
 with `npm login`. `npm org ls validation-engineering` must show the publishing

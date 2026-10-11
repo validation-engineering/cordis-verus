@@ -1,5 +1,7 @@
 # Official in-place module reload
 
+The implementation and its acceptance tests are maintained by the companion Harness application. See [package boundaries](package-boundaries.md) for imports and migration.
+
 The native preload installs `installOfficialTransactions()` before booting the pinned official Harness classes. `Hmr.partialReload()` now replaces JavaScript plugin generations inside the existing main-thread Context. The official watcher, debounce, configuration paths and `runExclusive()` queue remain in use; the adapter replaces the unsafe cache/disposal part of the pinned implementation. No upstream source files are edited.
 
 ## Operation

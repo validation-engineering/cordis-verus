@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { Context as CordisContext, domainMutation, FiberState } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 const reentrant = error => error.code === 'REENTRANT_MUTATION';
 const stale = error => error.code === 'STALE_EPISODE';
@@ -110,7 +110,7 @@ for (const [profile, Context] of [['cordis', CordisContext], ['harness', Harness
   });
 
   test(`${profile} JS consumers cannot wait for their committed provider from setup or cleanup`, { timeout: 7000 }, () => {
-    const moduleURL = new URL(`../../packages/compat-${profile === 'harness' ? 'harness' : 'cordis'}/index.js`, import.meta.url).href;
+    const moduleURL = new URL(`../../packages/compat-${profile === 'harness' ? 'deepseek' : 'cordis'}/index.js`, import.meta.url).href;
     // Run the actual waits in a disposable process: a missing guard otherwise
     // makes the native lease and the callback wait for each other indefinitely.
     const source = `

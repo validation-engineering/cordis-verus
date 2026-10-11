@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Context as CordisContext, domainMutation } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 const messages = error => [error?.message, ...(error instanceof AggregateError ? error.errors.flatMap(messages) : [])].join(' | ');
 const cleanupFailure = error => /inverse must retry|Native cleanup failed/.test(messages(error));

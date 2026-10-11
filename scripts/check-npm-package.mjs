@@ -11,7 +11,7 @@ import { npmCommand } from './install-cordis.mjs';
 import { selectNativeArtifact, verifyNativeManifest } from '../packages/compat-cordis/native-artifacts.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const packageDirectories = ['packages/compat-cordis', 'packages/compat-loader', 'packages/compat-harness'];
+const packageDirectories = ['packages/compat-cordis', 'packages/compat-loader', 'packages/compat-deepseek'];
 const output = join(root, 'target/release-artifacts/npm');
 const reportPath = join(output, 'package-report.json');
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -227,20 +227,22 @@ const harnessSmoke = `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Context, Service } from '@deepseek-ai/cordis';
-import { Context as PackageContext } from '@validation-engineering/cordis-harness';
-import { LoaderTransactions, installOfficialTransactions } from '@validation-engineering/cordis-loader/harness';
-assert.equal(typeof LoaderTransactions, 'function');
-assert.equal(typeof installOfficialTransactions, 'function');
+import { Context as PackageContext } from '@validation-engineering/cordis-compat-deepseek';
 const require = createRequire(import.meta.url);
 assert.equal(Context, PackageContext);
-assert.equal(require('@validation-engineering/cordis-harness').Context, Context);
+assert.equal(require('@validation-engineering/cordis-compat-deepseek').Context, Context);
 const context = new Context();
 assert.equal(context.snapshot().profile, 'harness');
 class Message extends Service { constructor(ctx) { super(ctx, 'packedHarness'); this.value = 'packed'; } }
 await context.plugin(Message);
 assert.equal(context.get('packedHarness').value, 'packed');
+const configurations = [];
+const child = await context.plugin((_ctx, config) => { configurations.push(config); }, 1);
+assert.equal(child.update(2), undefined);
+await child.await();
+assert.deepEqual(configurations, [1, 2]);
 await context.dispose();
-console.log(JSON.stringify({ profile: 'harness', tests: ['scoped-original-import', 'ESM-CJS-profile-identity', 'native-harness-domain', 'Service-class', 'official-loader-adapter-export'] }));
+console.log(JSON.stringify({ profile: 'harness', tests: ['scoped-original-import', 'ESM-CJS-profile-identity', 'native-harness-domain', 'Service-class', 'profile-update-contract'] }));
 `;
 
 async function main() {
@@ -337,7 +339,7 @@ async function main() {
     assert.equal(observation.nativeManifestSha256, selected.manifestSha256, 'Installed native manifest differs from checkout');
     assert.equal(observation.nativeTarget, selected.entry.target);
     await writeFile(join(consumer, 'harness-smoke.mjs'), harnessSmoke);
-    const harnessObservation = JSON.parse(run(process.execPath, ['--import', '@validation-engineering/cordis-harness/register', 'harness-smoke.mjs'], consumer, env));
+    const harnessObservation = JSON.parse(run(process.execPath, ['--import', '@validation-engineering/cordis-compat-deepseek/register', 'harness-smoke.mjs'], consumer, env));
     for (const [version, source] of Object.entries(dynamicSources)) {
       assert.equal(await fileDigest(source), build.dynamicFixtures[version].sha256, 'Dynamic plugin fixture changed during distribution check');
     }

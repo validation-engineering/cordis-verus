@@ -52,7 +52,7 @@ const recordInput = async filename => {
   if (report.inputs[relative]) assert.equal(report.inputs[relative], actual);
   report.inputs[relative] = actual;
 };
-for (const filename of ['package-lock.json', 'upstream.lock.json', 'tests/upstream-core/evidence.mjs', 'packages/compat-cordis/native/cordis.node', 'packages/compat-harness/index.js', 'packages/compat-harness/package.json']) await recordInput(path.join(root, filename));
+for (const filename of ['package-lock.json', 'upstream.lock.json', 'tests/upstream-core/evidence.mjs', 'packages/compat-cordis/native/cordis.node', 'packages/compat-deepseek/index.js', 'packages/compat-deepseek/package.json']) await recordInput(path.join(root, filename));
 for (const filename of await readdir(path.join(root, 'packages/compat-cordis'))) if (/\.(js|cjs|json)$/.test(filename)) await recordInput(path.join(root, 'packages/compat-cordis', filename));
 for (const filename of [fileURLToPath(import.meta.url), fixture]) report.runnerInputs[path.relative(here, filename)] = await hash(filename);
 const nativeBuild = JSON.parse(await readFile(path.join(root, 'target/node-compat/build.json'), 'utf8'));
@@ -67,7 +67,7 @@ report.nativeBuild = nativeBuild;
 // its entry uses instead of trusting a workspace symlink label alone.
 const resolution = spawnSync(process.execPath, ['--input-type=module', '--eval',
   "process.stdout.write(import.meta.resolve('@validation-engineering/cordis'))"], {
-  cwd: path.join(root, 'packages/compat-harness'), encoding: 'utf8', timeout: 10000,
+  cwd: path.join(root, 'packages/compat-deepseek'), encoding: 'utf8', timeout: 10000,
   env: { ...process.env, NODE_OPTIONS: '' },
 });
 assert.equal(resolution.status, 0, resolution.stderr);
@@ -83,7 +83,7 @@ for (const profile of ['cordis', 'harness']) {
     const directory = path.join(output, label);
     await mkdir(directory, { recursive: true });
     const entry = backend === 'native'
-      ? `packages/compat-${profile}/index.js`
+      ? `packages/compat-${profile === 'harness' ? 'deepseek' : 'cordis'}/index.js`
       : profile === 'cordis' ? 'upstream/cordis/packages/core/src/index.ts' : 'upstream/deepseek-harness/vendor/cordis/src/index.ts';
     const packageFile = path.join(path.dirname(entry), backend === 'upstream' ? '../package.json' : 'package.json');
     const packageInfo = JSON.parse(await readFile(path.join(root, packageFile), 'utf8'));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { Context as CordisContext, FiberState } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 const addon = fileURLToPath(new URL('../../target/node-compat/interop-fixture.node', import.meta.url));
 const turn = () => new Promise(resolve => setImmediate(resolve));
 const errorMessages = error => [error?.message, ...(error?.errors ?? []).map(errorMessages), error?.cause ? errorMessages(error.cause) : ""].join(" | ");

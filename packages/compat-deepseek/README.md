@@ -1,9 +1,11 @@
-# Harness Cordis profile
+# DeepSeek Cordis compatibility
 
-`@validation-engineering/cordis-harness` selects the pinned `@deepseek-ai/cordis` 4.0.4 policy in the shared Rust driver. It is experimental; it does not run the upstream JavaScript scheduler.
+`@validation-engineering/cordis-compat-deepseek` provides compatibility with the pinned **`@deepseek-ai/cordis` 4.0.4** interface over the shared Rust driver. It is a Cordis runtime interface, not the complete DeepSeek Harness application. Use the companion Harness application for the official CLI, Web UI and agent workflows.
+
+The name identifies the compatible runtime distribution: **Cordis**, **compatibility**, **DeepSeek**. This replaces the ambiguous `@validation-engineering/cordis-harness` package name. The internal `harness` policy and lifecycle behavior remain unchanged. See [package boundaries and migration](../../docs/package-boundaries.md).
 
 ```js
-import { Context } from '@validation-engineering/cordis-harness';
+import { Context } from '@validation-engineering/cordis-compat-deepseek';
 const app = new Context();
 const instance = await app.plugin((ctx, config) => {
   ctx.logger.info('started', config);
@@ -13,7 +15,7 @@ await instance.await();
 await app.dispose();
 ```
 
-For unchanged plugins importing the upstream name, start Node 22.22 or newer with `--import @validation-engineering/cordis-harness/register`. ESM, dynamic import, CommonJS and createRequire route bare `@deepseek-ai/cordis` to this package. Mixed Cordis profiles and upstream deep imports are rejected by the bootstrap. The core npm package includes the matching precompiled native addon for all four supported platforms; compiling is only needed for source development or custom native code.
+For unchanged plugins importing the upstream name, start Node 22.22 or newer with `--import @validation-engineering/cordis-compat-deepseek/register`. ESM, dynamic import, CommonJS and createRequire route bare `@deepseek-ai/cordis` to this package. Mixed Cordis profiles and upstream deep imports are rejected by the bootstrap. The core npm package includes the matching precompiled native addon for all four supported platforms; compiling is only needed for source development or custom native code.
 
 Raw configuration is resolved through `internal/config` and Standard Schema on every activation, after required services are available. Pending updates defer resolution. Active updates resolve synchronously and emit `internal/update`; their return value is void. Related dependency notifications may retry failed setup. Cleanup failures remain blocked until an explicit retry succeeds.
 

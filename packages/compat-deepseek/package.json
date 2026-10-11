@@ -1,8 +1,8 @@
 {
-  "name": "@validation-engineering/cordis-harness",
+  "name": "@validation-engineering/cordis-compat-deepseek",
   "version": "0.1.0",
   "type": "module",
-  "description": "Harness Cordis profile over the shared native lifecycle driver",
+  "description": "Compatibility with @deepseek-ai/cordis over the Rust/Verus Cordis runtime; not the DeepSeek Harness application",
   "engines": {
     "node": ">=22.22.0"
   },
@@ -15,7 +15,7 @@
     "./register": "./register.js"
   },
   "peerDependencies": {
-    "@validation-engineering/cordis": "0.1.0"
+    "@validation-engineering/cordis": "0.1.1"
   },
   "license": "MIT",
   "publishConfig": {
@@ -25,7 +25,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/validation-engineering/cordis-verus.git",
-    "directory": "packages/compat-harness"
+    "directory": "packages/compat-deepseek"
   },
   "homepage": "https://github.com/validation-engineering/cordis-verus#readme",
   "bugs": {

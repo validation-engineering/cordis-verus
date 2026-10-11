@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Context as CordisContext } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 for (const [profile, Context] of [['cordis', CordisContext], ['harness', HarnessContext]]) {
   test(`${profile}: verified wait admission names the retained provider during setup and failed cleanup`, async () => {

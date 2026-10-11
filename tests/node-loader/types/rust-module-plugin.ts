@@ -11,11 +11,6 @@ if ('value' in validated) await ctx.plugin(ordinaryPlugin, validated.value);
 ctx.plugin(plugin, { path: '/plugin.dylib', plugins: [] });
 // @ts-expect-error Plugins do not acquire the host controller's reload authority.
 plugin.reload(raw);
-import { officialTransaction } from '@validation-engineering/cordis-loader/harness';
-const result: number = await officialTransaction(ctx, async () => 42);
-void result;
-// @ts-expect-error Only a host operation callback can form an official transaction.
-officialTransaction(ctx, 42);
 
 const stateful: RustModuleRevision = { ...raw, plugins: [{ id: 'counter', factory: 'counter', state: 'migrate' }] };
 void stateful;

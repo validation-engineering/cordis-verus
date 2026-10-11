@@ -1,5 +1,7 @@
 # 文档导航 / Documentation
 
+[Runtime packages and application boundaries](package-boundaries.md) · [中文](package-boundaries.zh-CN.md)
+
 从[英文 README](../README.md)或[中文 README](../README.zh-CN.md)开始。本文按用途导航；完整研究推导保留在专题文档中。
 
 ## Evidence and independent review

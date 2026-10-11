@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Context, FiberState } from '../../packages/compat-harness/index.js';
+import { Context, FiberState } from '../../packages/compat-deepseek/index.js';
 
 test('observer-owned resources drain before a never-started reservation is removed',async()=>{
   const ctx=new Context();const gate=Promise.withResolvers(),entered=Promise.withResolvers();let disposal;

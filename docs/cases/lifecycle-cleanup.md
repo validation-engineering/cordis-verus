@@ -65,7 +65,7 @@ and the resulting file contains both lines.
 | Cordis `4.0.0-rc.10` | `f8ea3cd50f1a5724e8e715995bcde131c9c12b2c` | `ERR_STREAM_WRITE_AFTER_END` | `start` only | Fulfills |
 | Harness `@deepseek-ai/cordis` `4.0.4` | `da00f7f5358f2949383b35c14f548bc20187d80c` | `ERR_STREAM_WRITE_AFTER_END` | `start` only | Fulfills |
 | `@validation-engineering/cordis` `0.1.0` | Exact source/artifact hashes in report | Succeeds | `start`, `end` | Fulfills |
-| `@validation-engineering/cordis-harness` `0.1.0` | Exact source/artifact hashes in report | Succeeds | `start`, `end` | Fulfills |
+| `@validation-engineering/cordis-compat-deepseek` `0.1.0` | Exact source/artifact hashes in report | Succeeds | `start`, `end` | Fulfills |
 
 The important observed event order is:
 

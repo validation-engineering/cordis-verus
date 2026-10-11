@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { hostTarget, npmCommand } from './install-cordis.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const names = ['@validation-engineering/cordis', '@validation-engineering/cordis-harness', '@validation-engineering/cordis-loader'];
+const names = ['@validation-engineering/cordis', '@validation-engineering/cordis-compat-deepseek', '@validation-engineering/cordis-loader'];
 const targets = ['darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8', 'win32-x64-napi8'];
 export function validateRegistry(record) {
   assert.equal(record?.schema, 'cordis-verus.npm-registry/v1');
@@ -18,7 +18,6 @@ export function validateRegistry(record) {
   assert.deepEqual(Object.keys(record.targets).sort(), targets);
   assert.deepEqual(record.packages.map(item => item.name).sort(), names);
   assert.equal(new Set(record.packages.map(item => item.file)).size, 3);
-  assert.equal(new Set(record.packages.map(item => item.version)).size, 1);
   assert.match(record.nativeManifestSha256, /^[a-f0-9]{64}$/);
   for (const item of record.packages) {
     assert.match(item.file, /^[A-Za-z0-9][A-Za-z0-9_.-]*\.tgz$/);
@@ -35,7 +34,7 @@ import { createRequire } from 'node:module';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Context } from '@validation-engineering/cordis';
-import { Context as HarnessContext } from '@validation-engineering/cordis-harness';
+import { Context as HarnessContext } from '@validation-engineering/cordis-compat-deepseek';
 import { Loader } from '@validation-engineering/cordis-loader';
 import { selectNativeArtifact, verifyNativeManifest } from '@validation-engineering/cordis/native-artifacts';
 const require = createRequire(import.meta.url);

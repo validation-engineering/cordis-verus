@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Context as CordisContext, FiberState } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 const require = createRequire(import.meta.url);
 const coreAddon = fileURLToPath(new URL('../../packages/compat-cordis/native/cordis.node', import.meta.url));

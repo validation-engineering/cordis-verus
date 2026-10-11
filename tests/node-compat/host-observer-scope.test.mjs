@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Context as CordisContext, domainMutation } from '../../packages/compat-cordis/index.js';
-import { Context as HarnessContext } from '../../packages/compat-harness/index.js';
+import { Context as HarnessContext } from '../../packages/compat-deepseek/index.js';
 
 for (const [profile, Context] of [['cordis', CordisContext], ['harness', HarnessContext]]) {
   test(`${profile} host pumping masks a retired observer origin across multiple status listeners`, async () => {
