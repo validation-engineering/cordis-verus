@@ -117,7 +117,7 @@ def main():
     checks = {
         'clippy': [['cargo', 'clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings']],
         'rust-tests': [['cargo', 'test', '--workspace', '--locked', '--no-fail-fast']],
-        'examples': [['cargo', 'run', '--locked', '-p', 'cordis', '--example', path.stem]
+        'examples': [['cargo', 'run', '--locked', '--manifest-path', 'crates/cordis/Cargo.toml', '--example', path.stem]
                      for path in sorted((ROOT / 'crates/cordis/examples').glob('*.rs'))],
         'native-build': [['node', 'scripts/build-node.mjs', *network]],
         'node-tests': [['node', '--test', '--test-concurrency=4', '--test-timeout=30000', '--test-reporter=tap', *node_tests]],
