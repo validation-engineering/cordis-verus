@@ -14,7 +14,7 @@ include = ["src/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 publish = false
 
 [dependencies]
-vstd = "=0.0.0-2026-09-20-0158"
+vstd = "=0.0.0-2026-10-04-0306"
 
 [package.metadata.verus]
 verify = true

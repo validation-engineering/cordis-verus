@@ -544,9 +544,9 @@ dependencies = [
 
 [[package]]
 name = "vstd"
-version = "0.0.0-2026-09-20-0158"
+version = "0.0.0-2026-10-04-0306"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb7a36bbc0193492141eef73272853a5a8d73288bed1ea5344563b0382cdf7c9"
+checksum = "f22e1cad7b5f35642a5a020b25e9b49915066d836bab77f8431bbc80228290a7"
 dependencies = [
  "verus_builtin",
  "verus_builtin_macros",
