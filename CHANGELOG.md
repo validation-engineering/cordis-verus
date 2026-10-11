@@ -4,6 +4,10 @@ Changes are recorded before release. There is no published release yet.
 
 ## Unreleased — 0.1.0
 
+- Retry transient executable-busy errors when launching process plugins, within
+  the same startup deadline used for initialization. Keep other launch failures
+  immediate, and never replay plugin initialization. Add Linux regressions for
+  released and persistent writable-executable contention.
 - Separate the 121 full-crate negative regressions from normal release validation.
   Releases retain whole-kernel proof and compilation, runtime/compatibility tests,
   package checks and actual installation on each selected platform. The independent

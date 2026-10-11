@@ -114,9 +114,15 @@ response deadlines close the transport. There are no notifications, batches,
 streaming responses, reverse RPC, or concurrent in-flight requests. Concurrent
 callers are serialized through a bounded rendezvous channel.
 
-Defaults are 10 seconds for initialization, 30 seconds per request, 2 seconds
+Defaults are 10 seconds for startup, 30 seconds per request, 2 seconds
 for cleanup, and 1 MiB per frame including the newline. Builder methods change
-these limits. An outgoing oversized frame is rejected without touching the
+these limits. Startup shares one deadline between process launch and `initialize`.
+A busy executable (`ETXTBSY`) is retried until that deadline, with a short wait
+between attempts; persistent contention returns `Timeout { phase: "spawn" }`.
+Other launch errors return immediately. Only failed OS launches are retried;
+initialization requests and plugin code are never replayed by this retry loop.
+
+An outgoing oversized frame is rejected without touching the
 child. Queue timeout also leaves the active request intact. Once a sent request
 times out, the whole transport is closed so a late response cannot be consumed
 as the next request's response.

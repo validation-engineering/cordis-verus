@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{self, Permissions};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -124,6 +124,8 @@ impl ProcessPlugin {
         self.initialize = params;
         self
     }
+    /// Shared deadline for retrying a busy executable and completing `initialize`.
+    /// Other process creation errors are returned immediately.
     pub fn startup_timeout(mut self, timeout: Duration) -> Self {
         self.startup_timeout = timeout;
         self
@@ -194,7 +196,8 @@ impl ProcessPlugin {
         if let Some(directory) = &self.working_directory {
             command.current_dir(directory);
         }
-        let mut child = command.spawn().map_err(|error| io_error("spawn", error))?;
+        let startup_deadline = Instant::now() + self.startup_timeout;
+        let mut child = spawn_child(&mut command, startup_deadline)?;
         // Piped handles are guaranteed by the Command setup above.
         let mut stdin = child.stdin.take().expect("piped child stdin");
         let stdout = child.stdout.take().expect("piped child stdout");
@@ -247,13 +250,31 @@ impl ProcessPlugin {
                 _artifact: self.artifact.clone(),
             }),
         };
-        client.call_with_timeout(
+        client.call_with_deadline(
             "initialize",
             self.initialize.clone(),
-            self.startup_timeout,
+            startup_deadline,
             "initialization",
         )?;
         Ok(client)
+    }
+}
+fn spawn_child(command: &mut Command, deadline: Instant) -> Result<Child, ProcessError> {
+    loop {
+        if Instant::now() >= deadline {
+            return Err(ProcessError::Timeout { phase: "spawn" });
+        }
+        match command.spawn() {
+            Ok(child) => return Ok(child),
+            Err(error) if error.kind() == ErrorKind::ExecutableFileBusy => {
+                // A concurrent fork can briefly retain a just-written file's
+                // writable descriptor even after this process closes it.
+                // See https://github.com/rust-lang/rust/issues/114554.
+                // exec has not started the plugin, so this cannot replay setup.
+                std::thread::sleep(TICK.min(deadline.saturating_duration_since(Instant::now())));
+            }
+            Err(error) => return Err(io_error("spawn", error)),
+        }
     }
 }
 struct Request {
@@ -301,13 +322,18 @@ impl ProcessClient {
     /// A response timeout invalidates the transport to prevent late responses
     /// being confused with another request. Remote application errors do not.
     pub fn call(&self, method: &str, params: Value) -> Result<Value, ProcessError> {
-        self.call_with_timeout(method, params, self.inner.request_timeout, "request")
+        self.call_with_deadline(
+            method,
+            params,
+            Instant::now() + self.inner.request_timeout,
+            "request",
+        )
     }
-    fn call_with_timeout(
+    fn call_with_deadline(
         &self,
         method: &str,
         params: Value,
-        timeout: Duration,
+        deadline: Instant,
         phase: &'static str,
     ) -> Result<Value, ProcessError> {
         if self.is_closed() {
@@ -328,7 +354,6 @@ impl ProcessClient {
                 limit: self.inner.max_frame_bytes,
             });
         }
-        let deadline = Instant::now() + timeout;
         let (sender, receiver) = mpsc::sync_channel(1);
         let transport = lock(&self.inner.sender)
             .clone()

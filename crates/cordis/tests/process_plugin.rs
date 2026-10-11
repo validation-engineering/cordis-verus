@@ -128,6 +128,82 @@ fn remote_application_errors_do_not_poison_transport() {
     assert!(!client.is_closed());
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn busy_executable_is_retried_until_writer_closes() {
+    let fixture = Fixture::new(&version(7));
+    let writer = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&fixture.executable)
+        .unwrap();
+    // Reproduce the OS error directly, without depending on a fork race.
+    let error = std::process::Command::new(&fixture.executable)
+        .spawn()
+        .unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::ExecutableFileBusy);
+    let recipe = fixture.recipe().startup_timeout(Duration::from_secs(5));
+    std::thread::scope(|scope| {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        scope.spawn(move || sender.send(recipe.spawn()).unwrap());
+        let early = receiver.recv_timeout(Duration::from_millis(100));
+        drop(writer);
+        assert!(
+            matches!(early, Err(std::sync::mpsc::RecvTimeoutError::Timeout)),
+            "spawn must wait for the writable executable to become available"
+        );
+        let client = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            .unwrap();
+        assert_eq!(client.call("version", Value::Null).unwrap(), json!(7));
+        client.shutdown().unwrap();
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn busy_executable_retries_stop_at_startup_deadline() {
+    let fixture = Fixture::new(&version(1));
+    let writer = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&fixture.executable)
+        .unwrap();
+    let timeout = Duration::from_millis(100);
+    let start = Instant::now();
+    assert!(matches!(
+        fixture.recipe().startup_timeout(timeout).spawn(),
+        Err(ProcessError::Timeout { phase: "spawn" })
+    ));
+    assert!(start.elapsed() >= timeout);
+    assert!(start.elapsed() < Duration::from_secs(2));
+    drop(writer);
+    let client = fixture.recipe().spawn().unwrap();
+    assert_eq!(client.call("version", Value::Null).unwrap(), json!(1));
+    client.shutdown().unwrap();
+}
+
+#[test]
+fn non_busy_spawn_errors_are_returned_without_retry() {
+    let fixture = Fixture::new(&version(1));
+    std::fs::set_permissions(&fixture.executable, std::fs::Permissions::from_mode(0o600)).unwrap();
+    for executable in [&fixture.executable, &fixture.directory.join("missing")] {
+        let start = Instant::now();
+        assert!(matches!(
+            ProcessPlugin::new(executable)
+                .startup_timeout(Duration::from_secs(5))
+                .spawn(),
+            Err(ProcessError::Io {
+                operation: "spawn",
+                ..
+            })
+        ));
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "missing files and permission errors must not consume the retry budget"
+        );
+    }
+}
+
 #[test]
 fn owner_cleanup_closes_retained_handles_and_reaps_direct_child() {
     let fixture =
