@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { createRequire } from 'node:module';
-import { copyFile, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -84,30 +85,13 @@ test('local bundle rejects mixed source snapshots, duplicate targets and overlap
 test('manifest writer cannot certify changed bytes through an old require-cache binding',async t=>{
   const root=await realpath(await mkdtemp(join(tmpdir(),'cordis-native-cache-test-')));
   t.after(()=>rm(root,{recursive:true,force:true}));
-  const directory=join(root,'packages/compat-cordis/native'); await mkdir(directory,{recursive:true});
-  const addon=join(directory,'cordis.node');
-  const require=createRequire(import.meta.url);
-  // Windows locks a loaded DLL against replacement. Keep that real binding in
-  // a separate file, then seed its cached Module under the candidate filename.
-  // Unix can exercise the same stale-cache condition through an actual rename.
-  const loadedPath=process.platform==='win32'?join(directory,'cached.node'):addon;
-  await copyFile(new URL('../../packages/compat-cordis/native/cordis.node',import.meta.url),loadedPath);
-  const loaded=require(loadedPath);
-  assert.equal(JSON.parse(loaded.bindingInfo()).abi,1);
-  t.after(()=>{delete require.cache[addon];delete require.cache[loadedPath];});
-  // Never modify the bytes of an image already memory-mapped by the loader.
-  const corrupt=Buffer.from('this is not a native binary');
-  await writeFile(join(directory,'replacement.node'),corrupt);
-  await rename(join(directory,'replacement.node'),addon);
-  if(loadedPath!==addon) require.cache[addon]=require.cache[loadedPath];
-  assert.equal(require(addon),loaded, 'The stale cache would accept these corrupt bytes');
-  const sources={'Cargo.lock':hash('lock'),'toolchain.lock.json':hash('toolchain')};
-  const build={schema:'cordis-verus.node-build/v1',platform:process.platform,architecture:process.arch,node:process.version,
-    sourceHashes:sources,artifactSha256:hash(corrupt),cargoLockSha256:sources['Cargo.lock'],toolchainLockSha256:sources['toolchain.lock.json']};
-  const buildPath=join(root,'build.json'); await writeFile(buildPath,json(build));
-  await writeFile(join(directory,'manifest.json'),'stale success');
-  assert.throws(()=>writeNativeManifest(root,buildPath),/Fresh native artifact load failed/);
-  await assert.rejects(readFile(join(directory,'manifest.json')),error=>error.code==='ENOENT');
+  // All mapped images belong to this child. Cleanup runs only after it exits,
+  // so Windows can release its DLL locks without weakening the cache check.
+  const result=spawnSync(process.execPath,[fileURLToPath(new URL('./fixtures/native-cache.mjs',import.meta.url)),root],
+    {encoding:'utf8',timeout:15000});
+  assert.ifError(result.error);
+  assert.equal(result.status,0,result.stderr || result.stdout);
+  await assert.rejects(readFile(join(root,'packages/compat-cordis/native/manifest.json')),error=>error.code==='ENOENT');
 });
 test('manifest writer rejects metadata symlinks before touching outside canaries',async t=>{
   for(const kind of ['directory','file','manifest']) {
