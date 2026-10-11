@@ -3,7 +3,7 @@ import { createRequire, registerHooks } from 'node:module';
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { FiberState, Service } from '@cordis-verus/compat-cordis';
+import { FiberState, Service } from '@validation-engineering/cordis';
 import { LoaderError } from './config.js';
 
 const require = createRequire(import.meta.url);

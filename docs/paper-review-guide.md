@@ -159,7 +159,7 @@ consumer may temporarily disagree with its current target.
 ```sh
 cargo test --offline -p cordis-kernel --test refinement strict_departure_preserves_committed_views_until_guarded_unload -- --exact
 cargo test --offline -p cordis-kernel --test driver provider_resources_remain_live_until_consumer_recovery -- --exact
-cargo test --offline -p cordis --test runtime provider_waits_for_async_consumer_cleanup -- --exact
+cargo test --offline -p cordis-verus --test runtime provider_waits_for_async_consumer_cleanup -- --exact
 cargo test --offline -p cordis-driver --test cleanup_outcomes failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds -- --exact
 cargo test --offline -p cordis-driver --test cleanup_resources failed_report_retains_resources_until_fresh_retry_releases_only_its_batch -- --exact
 cargo test --offline -p cordis-driver --test cleanup_resources late_invalid_manifest_items_cannot_partially_release_an_accepted_cleanup -- --exact
@@ -167,11 +167,11 @@ cargo test --offline -p cordis-driver --test cleanup_resources a_foreign_registr
 cargo test --offline -p cordis-driver --test cleanup_resources a_remaining_consumer_lease_blocks_the_entire_publication_batch -- --exact
 cargo test --offline -p cordis-driver --test cleanup_resources reservation_cleanup_releases_generation_zero_only_after_a_successful_retry -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_journal failure_retains_selected_token_and_retry_rejects_old_or_foreign_receipts -- --exact
-cargo test --offline -p cordis --test retry_cleanup failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success -- --exact
+cargo test --offline -p cordis-verus --test retry_cleanup failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success -- --exact
 cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanup_recovers_only_on_a_new_host_attempt -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_queue retained_payload_returns_from_the_same_slot_before_late_and_earlier_work -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_queue foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work -- --exact
-cargo test --offline -p cordis --test retry_cleanup distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success -- --exact
+cargo test --offline -p cordis-verus --test retry_cleanup distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol repeated_failed_prefixes_pin_the_provider_while_another_consumer_finishes -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol setup_reply_and_wrong_ticket_fields_cannot_authorize_cleanup -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol generation_zero_reservation_uses_its_own_release_guard_after_retry -- --exact
@@ -501,7 +501,7 @@ paragraphs, which also rely on broader metatheory.
 **Executable review:**
 
 ```sh
-cargo test --offline -p cordis --test loader paper_leaf_projection_requires_resolution_and_preserves_raw_configuration -- --exact
+cargo test --offline -p cordis-verus --test loader paper_leaf_projection_requires_resolution_and_preserves_raw_configuration -- --exact
 ```
 
 The test parses a disabled parent with an enabled child, verifies the child's

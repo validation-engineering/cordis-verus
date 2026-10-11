@@ -1,5 +1,5 @@
 import { isAbsolute } from 'node:path';
-import { FiberState, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
+import { FiberState, assertDomainMutation, domainMutation } from '@validation-engineering/cordis';
 import { LoaderError, jsonValue } from './config.js';
 import { StateJournal, checkpointsOf, sourceOf, validateStateRecipe, validateStateTransfer } from './rust-module-state.js';
 

@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_ORDER = ("cordis-kernel", "cordis-driver", "cordis", "cordis-plugin-api")
+PACKAGE_ORDER = ("cordis-kernel", "cordis-driver", "cordis-verus", "cordis-plugin-api")
 
 
 def cargo_patches(paths):

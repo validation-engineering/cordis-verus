@@ -57,7 +57,7 @@ export function writeNativeManifest(root, buildPath) {
   };
   const provenanceBytes=Buffer.from(json(provenance));
   mkdirSync(join(directory,'provenance'),{recursive:true});
-  const manifest={schema:'cordis-verus.native-manifest/v1',package:'@cordis-verus/compat-cordis',version:info.version,driverAbi:1,
+  const manifest={schema:'cordis-verus.native-manifest/v1',package:'@validation-engineering/cordis',version:info.version,driverAbi:1,
     artifacts:[{target:declared.id,platform:declared.platform,architecture:declared.architecture,libc:declared.libc,nodeApi:declared.nodeApi,
       kind:'default-core',file:'cordis.node',sha256,bytes:bytes.length,provenance:provenanceName,provenanceSha256:digest(provenanceBytes)}]};
   const staging=mkdtempSync(join(directory,'.manifest-'));

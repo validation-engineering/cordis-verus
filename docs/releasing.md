@@ -4,8 +4,10 @@ GitHub Releases distribute precompiled experimental runtimes from the public
 [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus)
 repository. [Toolchain archives](toolchains/README.md) only preserve development
 dependencies; they are not runtime releases. Registry publication is separate:
-workspace libraries remain unpublished, and the local `cordis` crate name is not a
-claim to that crates.io namespace. See [current status](status.md) and
+registry uploads require separate npm and crates.io account authorization.
+The Rust host is published as `cordis-verus`, with the `cordis` library/import name;
+`cordis` on crates.io belongs to an unrelated project. A registry upload is accepted only after the artifact and consumer checks below;
+changing package metadata alone is not a publication. See [current status](status.md) and
 [validation gates](validation.md) for the proof and compatibility boundaries.
 
 ## Local artifact dry run
@@ -125,3 +127,74 @@ source commit, checksums, platform records, limitations and installation instruc
 before publishing it. Retain the
 published assets: deleting a workflow artifact after its retention period should
 not remove the runtime release or its embedded evidence.
+
+## npm and crates.io registries
+
+Public npm packages use the `@validation-engineering` organization:
+
+| Package | Purpose |
+| --- | --- |
+| `@validation-engineering/cordis` | Node compatibility host, with all four native prebuilds |
+| `@validation-engineering/cordis-loader` | Module/configuration loader and host adapters |
+| `@validation-engineering/cordis-harness` | Harness Cordis profile; not the complete Harness application |
+
+Create the npm organization using the free public-package plan, then authenticate
+with `npm login`. `npm org ls validation-engineering` must show the publishing
+account as a member with package creation rights. GitHub organization ownership
+does not grant npm scope ownership. Authenticate crates.io separately with
+`cargo login`; keep access tokens out of Git and chat messages.
+
+The `Release validation` stage assembles `npm-registry-candidates-<attempt>` only
+after complete positive proof and all host tests pass. `package-npm-registry.py`
+revalidates that evidence, requires identical JS payloads across hosts and merges
+the unchanged native binaries/provenance using `package-native.mjs`. npm permits
+only one archive per package/version: never publish a host-only core archive.
+All four no-checkout installation jobs install the same universal tarballs,
+exercise native selection, ESM/CJS, both profiles and an original Cordis plugin,
+then reinstall and run offline. Their `npm-registry-install-<attempt>-<os>`
+receipts bind to the exact archive hashes and source commit.
+
+Download the candidates and all four receipts from one **successful complete**
+release-validation run at the clean checked-out commit. Then:
+
+```sh
+node scripts/publish-npm-registry.mjs --from-directory /tmp/npm-registry --receipts /tmp/npm-receipts
+# After reviewing the dry run, upload the exact accepted archives:
+node scripts/publish-npm-registry.mjs --from-directory /tmp/npm-registry --receipts /tmp/npm-receipts --publish
+node scripts/check-npm-registry.mjs --from-directory /tmp/npm-registry --registry
+```
+
+The helper refuses missing/mismatched installation receipts and changed archive
+bytes. Existing versions are skipped only if registry integrity matches the
+accepted archive, allowing an interrupted upload to resume without overwriting.
+The final check downloads from npm into an isolated consumer and compares the
+registry archive integrity with the accepted candidate. Run the `Registry consumers` workflow with the successful release-validation
+run ID to repeat that public-registry consumer check on all four release platforms
+without compiling or rerunning the proof.
+
+Rust crates publish in this dependency order: `cordis-kernel`, `cordis-driver`,
+`cordis-verus`, `cordis-plugin-api`. The `cordis-node` FFI crate remains private;
+its distribution is the npm native library. Run a real `cargo publish --dry-run`
+and then `cargo publish --locked` for each public crate, letting Cargo wait for
+index visibility before publishing dependents. For the first publication, a
+dependent's unpatched registry dry run can only pass after its dependency is
+available. The regular quality gate already tests every extracted crate with
+only extracted dependency archives; it does not fake registry availability.
+
+```sh
+cargo publish --locked --dry-run -p cordis-kernel
+cargo publish --locked -p cordis-kernel
+# Repeat dry run and publication for each remaining crate, in the order above.
+```
+
+Verify a fresh Rust consumer with the actual registry dependency:
+
+```toml
+[dependencies]
+cordis = { package = "cordis-verus", version = "0.1.0" }
+```
+
+This is a library dependency, not a `cargo install` CLI. Rust consumers compile
+ordinary Rust code; they do not need the Verus verifier or Node. Only the npm
+runtime is precompiled. Initial package publication does not expand the proof
+boundary or establish compatibility with every original plugin.

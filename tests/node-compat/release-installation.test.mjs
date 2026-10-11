@@ -8,7 +8,7 @@ import { hostTarget, installRelease, validateManifest } from '../../scripts/inst
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const target = hostTarget();
-const names = ['@cordis-verus/compat-cordis', '@cordis-verus/compat-harness', '@cordis-verus/compat-loader'];
+const names = ['@validation-engineering/cordis', '@validation-engineering/cordis-harness', '@validation-engineering/cordis-loader'];
 // Synthetic records exercise rejection/rollback only. They are not release evidence.
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'cordis-release-test-'));

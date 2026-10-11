@@ -1,5 +1,5 @@
 import { isAbsolute } from 'node:path';
-import { FiberState } from '@cordis-verus/compat-cordis';
+import { FiberState } from '@validation-engineering/cordis';
 import { LoaderError } from './config.js';
 import { StateJournal, checkpointsOf, sourceOf, validateStateRecipe, validateStateTransfer } from './rust-module-state.js';
 
@@ -88,7 +88,7 @@ export function createRustModulePlugin(ctx, options = {}) {
   };
   const Config = Object.freeze({ '~standard': Object.freeze({
     version: 1,
-    vendor: '@cordis-verus/compat-loader',
+    vendor: '@validation-engineering/cordis-loader',
     validate(raw) {
       try {
         check();

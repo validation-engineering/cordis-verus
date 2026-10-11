@@ -1,4 +1,4 @@
-import type { Context } from '@cordis-verus/compat-cordis';
+import type { Context } from '@validation-engineering/cordis';
 
 /** Structural surface of the pinned official Harness Loader/Include classes. */
 export interface OfficialEntryTree {

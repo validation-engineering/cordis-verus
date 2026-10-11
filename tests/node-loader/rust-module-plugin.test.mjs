@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Context, domainMutation, resolveConfig } from '../../packages/compat-cordis/index.js';
-import { createRustModulePlugin } from '@cordis-verus/compat-loader/rust-module-plugin';
+import { createRustModulePlugin } from '@validation-engineering/cordis-loader/rust-module-plugin';
 
 const extension = process.platform === 'darwin' ? 'dylib' : process.platform === 'win32' ? 'dll' : 'so';
 const revision = (version, config = {}) => {

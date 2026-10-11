@@ -1,6 +1,6 @@
 # Coordinating official Harness configuration changes
 
-`@cordis-verus/compat-loader/harness` provides three related interfaces:
+`@validation-engineering/cordis-loader/harness` provides three related interfaces:
 
 - `LoaderTransactions` explicitly coordinates a host-owned official Loader or Include tree.
 - `officialTransaction(ctx, execute)` composes host operations and application readiness checks inside one admitted revision.
@@ -13,8 +13,8 @@ The adapter keeps one native Harness Context graph. Official files remain unchan
 Register the native Harness facade before loading the official classes, then install the bridges before creating the application graph:
 
 ```js
-import '@cordis-verus/compat-harness/register';
-import { installOfficialTransactions } from '@cordis-verus/compat-loader/harness';
+import '@validation-engineering/cordis-harness/register';
+import { installOfficialTransactions } from '@validation-engineering/cordis-loader/harness';
 
 const [{ Entry, EntryGroup, EntryTree }, { default: Hmr }, { ConfigEditor }] = await Promise.all([
   import('@deepseek-ai/cordis-plugin-loader'),
@@ -47,7 +47,7 @@ be ready can hold the same domain revision through configuration editing,
 readiness checks and restoration:
 
 ```js
-import { officialTransaction } from '@cordis-verus/compat-loader/harness';
+import { officialTransaction } from '@validation-engineering/cordis-loader/harness';
 
 await officialTransaction(ctx, async () => {
   const previous = structuredClone(entry.options.config);

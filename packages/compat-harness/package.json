@@ -1,7 +1,6 @@
 {
-  "name": "@cordis-verus/compat-harness",
+  "name": "@validation-engineering/cordis-harness",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Harness Cordis profile over the shared native lifecycle driver",
   "engines": {
@@ -16,7 +15,28 @@
     "./register": "./register.js"
   },
   "peerDependencies": {
-    "@cordis-verus/compat-cordis": "0.1.0"
+    "@validation-engineering/cordis": "0.1.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/validation-engineering/cordis-verus.git",
+    "directory": "packages/compat-harness"
+  },
+  "homepage": "https://github.com/validation-engineering/cordis-verus#readme",
+  "bugs": {
+    "url": "https://github.com/validation-engineering/cordis-verus/issues"
+  },
+  "files": [
+    "*.js",
+    "*.cjs",
+    "*.d.ts",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ]
 }

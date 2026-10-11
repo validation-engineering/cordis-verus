@@ -254,7 +254,7 @@ listener 注册和注销的 effect 所有权接入 Driver。普通事件遵循�
 
 ## npm 模块和类型兼容
 
-拟发布 facade 使用项目自己的包名，例如 `@cordis-verus/compat-cordis` 和 `@cordis-verus/compat-harness`。引导器在应用的受控安装树中生成 alias/override 和必要的解析映射，使原插件的 `import 'cordis'` 或 scoped import 指向匹配 facade。不能占用上游 npm 包名，也不能仅修改应用入口而遗漏传递依赖。
+拟发布 facade 使用项目自己的包名，例如 `@validation-engineering/cordis` 和 `@validation-engineering/cordis-harness`。引导器在应用的受控安装树中生成 alias/override 和必要的解析映射，使原插件的 `import 'cordis'` 或 scoped import 指向匹配 facade。不能占用上游 npm 包名，也不能仅修改应用入口而遗漏传递依赖。
 
 解析必须覆盖 ESM、dynamic import、CommonJS、createRequire、conditional exports、项目相对路径、pnpm 嵌套与 symlink，以及被 profile 列出的 deep imports。Node customization hooks 是可用机制之一，具体 API 与最低 Node 版本在 M0 锁定并测试，不能据当前文档推断所有旧 Node 版本都支持。[Node 模块定制文档](https://nodejs.org/api/module.html#customization-hooks)
 

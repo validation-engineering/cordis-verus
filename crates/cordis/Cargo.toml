@@ -1,17 +1,21 @@
 [package]
-name = "cordis"
+name = "cordis-verus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/cordis-verus"
 description = "Typed Rust Cordis runtime backed by a verified lifecycle kernel"
 readme = "README.md"
 keywords = ["plugins", "lifecycle", "verification", "dependency-injection"]
 categories = ["development-tools", "asynchronous"]
 include = ["src/**", "tests/**", "examples/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
-# Repository starts private; registry publication is a separate maintainer decision.
-publish = false
+publish = ["crates-io"]
+
+# Keep the Rust import name used by the existing host API and examples.
+[lib]
+name = "cordis"
 
 [dependencies]
 cordis-driver = { path = "../cordis-driver", version = "=0.1.0" }

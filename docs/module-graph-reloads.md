@@ -1,13 +1,13 @@
 # Module graphs and reproducible Worker reloads
 
-`@cordis-verus/compat-loader/worker` now exposes the dependency edges observed by
+`@validation-engineering/cordis-loader/worker` now exposes the dependency edges observed by
 Node in a running `WorkerDomain`, and a reviewable plan for replacing its captured
 artifact. This is a full Worker restart boundary. It does not preserve JavaScript
 objects, mutate the current module namespace, or clear Node's caches in place.
 The official Harness main-thread HMR service is a separate integration.
 
 ```js
-import { WorkerDomain } from '@cordis-verus/compat-loader/worker';
+import { WorkerDomain } from '@validation-engineering/cordis-loader/worker';
 
 const domain = new WorkerDomain({ entry: 'cordis.json' });
 await domain.load('./materialized-project');
@@ -130,7 +130,7 @@ alone does not establish support on older Node versions.
 
 ## ProcessDomain: application native addons and external hosts
 
-The exported `@cordis-verus/compat-loader/process` API executes each artifact in
+The exported `@validation-engineering/cordis-loader/process` API executes each artifact in
 its own operating-system Node process. It reuses the Worker supervisor's serial
 revision queue, captured artifact journal, restoration sequence and cleanup
 barriers. `pid` identifies the currently active child, and changes on every
@@ -138,7 +138,7 @@ replacement and restoration. The default host creates exactly one native Cordis
 Context and JSON Loader in that child.
 
 ```js
-import { ProcessDomain } from '@cordis-verus/compat-loader/process';
+import { ProcessDomain } from '@validation-engineering/cordis-loader/process';
 
 const domain = new ProcessDomain({ entry: 'cordis.json', timeout: 30_000 });
 const loaded = await domain.load('./materialized-project');

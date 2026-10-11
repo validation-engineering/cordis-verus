@@ -50,17 +50,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cordis"
-version = "0.1.0"
-dependencies = [
- "atomicwrites",
- "cordis-driver",
- "cordis-kernel",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "cordis-driver"
 version = "0.1.0"
 dependencies = [
@@ -80,9 +69,9 @@ dependencies = [
 name = "cordis-node"
 version = "0.1.0"
 dependencies = [
- "cordis",
  "cordis-driver",
  "cordis-plugin-api",
+ "cordis-verus",
  "libloading",
  "napi",
  "napi-build",
@@ -96,6 +85,17 @@ dependencies = [
 name = "cordis-plugin-api"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cordis-verus"
+version = "0.1.0"
+dependencies = [
+ "atomicwrites",
+ "cordis-driver",
+ "cordis-kernel",
  "serde",
  "serde_json",
 ]

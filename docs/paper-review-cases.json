@@ -240,9 +240,10 @@
           "name": "provider_resources_remain_live_until_consumer_recovery"
         },
         {
-          "package": "cordis",
+          "package": "cordis-verus",
           "target": "runtime",
-          "name": "provider_waits_for_async_consumer_cleanup"
+          "name": "provider_waits_for_async_consumer_cleanup",
+          "crate": "crates/cordis"
         },
         {
           "package": "cordis-driver",
@@ -280,9 +281,10 @@
           "name": "failure_retains_selected_token_and_retry_rejects_old_or_foreign_receipts"
         },
         {
-          "package": "cordis",
+          "package": "cordis-verus",
           "target": "retry_cleanup",
-          "name": "failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success"
+          "name": "failed_retryable_cleanup_pins_provider_and_resumes_lifo_without_replaying_success",
+          "crate": "crates/cordis"
         },
         {
           "package": "cordis-node",
@@ -300,9 +302,10 @@
           "name": "foreign_and_duplicate_completions_return_payloads_without_overwriting_live_work"
         },
         {
-          "package": "cordis",
+          "package": "cordis-verus",
           "target": "retry_cleanup",
-          "name": "distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success"
+          "name": "distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_success",
+          "crate": "crates/cordis"
         },
         {
           "package": "cordis-kernel",
@@ -1054,9 +1057,10 @@
       ],
       "tests": [
         {
-          "package": "cordis",
+          "package": "cordis-verus",
           "target": "loader",
-          "name": "paper_leaf_projection_requires_resolution_and_preserves_raw_configuration"
+          "name": "paper_leaf_projection_requires_resolution_and_preserves_raw_configuration",
+          "crate": "crates/cordis"
         }
       ],
       "negativeControl": {

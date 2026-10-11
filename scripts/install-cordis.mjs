@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const names = ['@cordis-verus/compat-cordis', '@cordis-verus/compat-harness', '@cordis-verus/compat-loader'];
+const names = ['@validation-engineering/cordis', '@validation-engineering/cordis-harness', '@validation-engineering/cordis-loader'];
 const targets = ['darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8', 'win32-x64-napi8'];
 const safeName = name => typeof name === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name);
 const sha = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -75,10 +75,10 @@ async function regular(path) {
   return readFile(path);
 }
 const smoke = `import assert from 'node:assert/strict';
-import { Context } from '@cordis-verus/compat-cordis';
-import { Context as HarnessContext } from '@cordis-verus/compat-harness';
-import { Loader } from '@cordis-verus/compat-loader';
-import { selectNativeArtifact } from '@cordis-verus/compat-cordis/native-artifacts';
+import { Context } from '@validation-engineering/cordis';
+import { Context as HarnessContext } from '@validation-engineering/cordis-harness';
+import { Loader } from '@validation-engineering/cordis-loader';
+import { selectNativeArtifact } from '@validation-engineering/cordis/native-artifacts';
 const selected = selectNativeArtifact();
 assert.equal(selected.entry.target, process.env.CORDIS_RELEASE_TARGET);
 assert.equal(selected.manifestSha256, process.env.CORDIS_RELEASE_MANIFEST);
@@ -95,7 +95,7 @@ for (const [Type, profile] of [[Context, 'cordis'], [HarnessContext, 'harness']]
 }
 console.log('Verified native release installation.');
 `;
-const example = `import { Context } from '@cordis-verus/compat-cordis';
+const example = `import { Context } from '@validation-engineering/cordis';
 const ctx = new Context();
 try {
   await ctx.plugin(c => { c.provide('greeter', { greet: name => 'Hello, ' + name }); });

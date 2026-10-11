@@ -1,5 +1,5 @@
-import { Context } from '@cordis-verus/compat-cordis';
-import { loadRustModule, RustModuleController, type RustModuleDescriptor } from '@cordis-verus/compat-loader/rust-module';
+import { Context } from '@validation-engineering/cordis';
+import { loadRustModule, RustModuleController, type RustModuleDescriptor } from '@validation-engineering/cordis-loader/rust-module';
 const ctx = new Context();
 const controller = await loadRustModule(ctx, { path: '/plugin.dylib', sha256: 'digest', plugins: [
   { id: 'text', factory: 'native-text-analysis', config: { threshold: 3 } },

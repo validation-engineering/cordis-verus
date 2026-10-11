@@ -19,7 +19,7 @@ For an application that has installed the workspace package, the equivalent
 bootstrap is:
 
 ```sh
-node --import @cordis-verus/compat-cordis/register app.mjs
+node --import @validation-engineering/cordis/register app.mjs
 ```
 
 The package is currently private and is not published to npm. The example uses

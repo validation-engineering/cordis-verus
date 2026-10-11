@@ -2,15 +2,29 @@
 
 [English](native-distribution.md) | 简体中文
 
-Node 兼容层在源码目录和解包后的 npm 安装中使用同一个清单选择器。GitHub Releases 分发三个预编译 npm 压缩包，并附带证明、运行测试和源码记录。npm 注册表发布仍在计划中。
+Node 兼容层在源码目录和解包后的 npm 安装中使用同一个清单选择器。GitHub Releases 分发三个预编译 npm 压缩包，并附带证明、运行测试和源码记录。npm 使用统一的 `@validation-engineering` scope；核心包将四个平台的预编译库放入同一个归档。发布前验证四个平台实际安装，发布后再从公共注册表下载并核对归档完整性。
+
+## 从 npm 安装
+
+```sh
+npm install @validation-engineering/cordis
+# 按需添加 Loader 或 Harness profile：
+npm install @validation-engineering/cordis-loader @validation-engineering/cordis-harness
+```
+
+准备 Node.js 22.22+。npm 包自带四个平台的原生库，运行时自动选择当前平台；不使用安装脚本，也不需要本机编译。仅运行纯 Rust 应用无需 Node。
+原版 Cordis 插件使用 `node --import @validation-engineering/cordis/register app.mjs`；Harness 插件使用 `@validation-engineering/cordis-harness/register`。
+两个 profile 共用原生内核，`cordis-harness` 包是兼容适配层，完整应用在独立的 Cordis Harness 仓库。
+
+历史 `v0.1.0-preview.1` 的产物仍保留 `@cordis-verus/compat-*` 包名；不要在同一个应用中混用新旧发布系列。
 
 ## 无需编译，安装已发布的运行时
 
 准备 **Node.js 22.22+ 和 npm**，然后运行：
 
 ```sh
-curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
-node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0/install-cordis.mjs
+node install-cordis.mjs --release v0.1.0 --project my-cordis-app
 cd my-cordis-app
 npm start
 ```
@@ -25,8 +39,8 @@ Windows PowerShell 请将 `curl` 写成 `curl.exe`。无需 Rust、Verus、GitHu
 
 生成的项目包含可运行的 `app.mjs`、软件包锁文件、保留在 `.vendor/cordis/` 中供离线
 `npm ci` 使用的压缩包，以及记录源码提交、目标平台和清单哈希的 `cordis-release.json`。
-可以正常从 `@cordis-verus/compat-cordis` 导入，也可以通过
-`node --import @cordis-verus/compat-cordis/register app.mjs` 启动现有 Cordis 插件。
+可以从 `@validation-engineering/cordis` 导入，也可以通过
+`node --import @validation-engineering/cordis/register app.mjs` 启动现有 Cordis 插件。
 Loader 和 Harness profile 软件包一并安装，并使用同一个原生生命周期驱动。
 
 此处交付的是 **Node 兼容运行时**，不包含完整 Harness 应用或自定义 Rust 插件。
@@ -82,7 +96,7 @@ node scripts/check-npm-package.mjs
 生成的原生元数据不纳入整个源码的证明指纹，但会纳入 npm 分发指纹。
 
 ```js
-import { selectNativeArtifact, verifyNativeManifest } from '@cordis-verus/compat-cordis/native-artifacts'
+import { selectNativeArtifact, verifyNativeManifest } from '@validation-engineering/cordis/native-artifacts'
 const selected = selectNativeArtifact()
 console.log(selected.path, selected.entry.target, selected.manifestSha256)
 const inventory = verifyNativeManifest() // 计算清单中所有产物的哈希，不执行任何产物

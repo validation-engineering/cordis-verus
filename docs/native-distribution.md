@@ -2,15 +2,29 @@
 
 English | [简体中文](native-distribution.zh-CN.md)
 
-The Node facade uses the same manifest selector in a source checkout and an extracted npm installation. GitHub Releases distribute three precompiled npm tarballs together with their proof, runtime and source provenance. These packages are not yet published to the npm registry.
+The Node facade uses the same manifest selector in a source checkout and an extracted npm installation. GitHub Releases distribute three precompiled npm tarballs together with their proof, runtime and source provenance. npm packages use the `@validation-engineering` scope. The core archive includes all four native prebuilds; release checks install it on each platform, then repeat the download from the public registry and verify archive integrity after publication.
+
+## Install from npm
+
+```sh
+npm install @validation-engineering/cordis
+# Add the Loader or Harness profile when needed:
+npm install @validation-engineering/cordis-loader @validation-engineering/cordis-harness
+```
+
+Use Node.js 22.22+. The package already contains all four native libraries and selects the current platform at runtime. No install scripts or local compilation are required. Pure Rust applications do not need Node.
+For original Cordis imports, run `node --import @validation-engineering/cordis/register app.mjs`; use `@validation-engineering/cordis-harness/register` for Harness plugins.
+Both profiles use the same native kernel. The `cordis-harness` package is the profile adapter; the complete application lives in the separate Cordis Harness repository.
+
+Historical `v0.1.0-preview.1` assets retain the `@cordis-verus/compat-*` names. Do not mix the old and new release families within one application.
 
 ## Install a published runtime without compiling
 
 Install **Node.js 22.22+ with npm**, then run:
 
 ```sh
-curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
-node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0/install-cordis.mjs
+node install-cordis.mjs --release v0.1.0 --project my-cordis-app
 cd my-cordis-app
 npm start
 ```
@@ -27,9 +41,8 @@ the destination absent. Its parent directory must already exist.
 
 The resulting project contains a working `app.mjs`, a package lock, retained
 `.vendor/cordis/` tarballs for offline `npm ci`, and `cordis-release.json` recording
-the source commit, target and manifest hash. Use normal imports from
-`@cordis-verus/compat-cordis`, or start existing Cordis plugins with
-`node --import @cordis-verus/compat-cordis/register app.mjs`. The loader and Harness
+the source commit, target and manifest hash. Import from `@validation-engineering/cordis`, or start original Cordis plugins with
+`node --import @validation-engineering/cordis/register app.mjs`. The loader and Harness
 profile packages are installed alongside the same native lifecycle driver.
 
 This delivers the **Node compatibility runtime**, not the complete Harness
@@ -91,7 +104,7 @@ core distribution. Generated native metadata is excluded from whole-source proof
 fingerprints, but is included in npm distribution fingerprints.
 
 ```js
-import { selectNativeArtifact, verifyNativeManifest } from '@cordis-verus/compat-cordis/native-artifacts'
+import { selectNativeArtifact, verifyNativeManifest } from '@validation-engineering/cordis/native-artifacts'
 const selected = selectNativeArtifact()
 console.log(selected.path, selected.entry.target, selected.manifestSha256)
 const inventory = verifyNativeManifest() // hashes every listed artifact; executes none

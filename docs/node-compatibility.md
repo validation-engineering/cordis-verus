@@ -18,9 +18,9 @@ npm run test:node
 
 ```sh
 # 独立 Cordis 原插件
-node --import @cordis-verus/compat-cordis/register app.mjs
+node --import @validation-engineering/cordis/register app.mjs
 # Harness Cordis 原插件
-node --import @cordis-verus/compat-harness/register app.mjs
+node --import @validation-engineering/cordis-harness/register app.mjs
 ```
 
 引导器覆盖所选 bare 包名的 ESM、dynamic import、CommonJS、createRequire。两个入口不能在同一 environment 混用；不支持的 deep imports 会拒绝，不会回退到原版调度器。直接开发也可导入项目自己的包名。TS 应显式构建为 JS；注册入口不是 TS 编译器。
@@ -128,7 +128,7 @@ update/restart/dispose/retryCleanup 与最终 `Context.dispose()` 提供统一�
 仍需各自适配，不能把这里的 Fiber 级接入称为全部装载协议已经完成。
 
 ```js
-import { domainMutation } from '@cordis-verus/compat-cordis'
+import { domainMutation } from '@validation-engineering/cordis'
 await domainMutation(ctx, async steps => {
   await steps.update(existingFiber, { prefix: 'Welcome' })
   await ctx.plugin(anotherPlugin)
@@ -151,10 +151,10 @@ child/effect/completion 继续推进；关闭失败仍保留恢复入口。Harne
 
 ## JSON Loader 与 Worker 代码更新
 
-`@cordis-verus/compat-loader` 提供 JSON Include/group、稳定 entry ID、isolate/inject、模块解析、串行配置事务和失败恢复。配置更新先准备模块，按稳定 ID、factory/revision、配置和 realm 比较，只排空变化子树；未变 Fiber 保留，依赖触发的 episode 重启仍由 Driver 决定。候选失败必须先清理候选，再按保存的旧 factory/config recipe 恢复。内部 child/effect 注册不排在全局事务队列后面。
+`@validation-engineering/cordis-loader` 提供 JSON Include/group、稳定 entry ID、isolate/inject、模块解析、串行配置事务和失败恢复。配置更新先准备模块，按稳定 ID、factory/revision、配置和 realm 比较，只排空变化子树；未变 Fiber 保留，依赖触发的 episode 重启仍由 Driver 决定。候选失败必须先清理候选，再按保存的旧 factory/config recipe 恢复。内部 child/effect 注册不排在全局事务队列后面。
 
 ```js
-import { Loader } from '@cordis-verus/compat-loader'
+import { Loader } from '@validation-engineering/cordis-loader'
 const loader = new Loader(ctx)
 await loader.loadFile('./cordis.json')
 await loader.update('greeting', { config: { prefix: 'Welcome' } })
@@ -220,7 +220,7 @@ npm run test:upstream-core   # 12 个原文件、87 项核心行为测试
 
 ## 官方 Loader 的显式事务适配
 
-`@cordis-verus/compat-loader/harness` 提供 `LoaderTransactions(ctx, tree)`，
+`@validation-engineering/cordis-loader/harness` 提供 `LoaderTransactions(ctx, tree)`，
 复用实际官方 Loader/Include 的 create/update/remove，并等待同一 Loader 图中
 旧/新 Fiber 和真实 Include 写队列。请求在修改 options 或文件前进入域级队列，
 因此后续 revision 和 Context 关闭等待已经接纳的操作。错误不会冒充原子回滚。

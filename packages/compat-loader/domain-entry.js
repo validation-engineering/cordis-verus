@@ -27,9 +27,9 @@ export function startEndpoint(channel, launch, options = {}) {
       host = candidate;
       await host.ready;
     } else {
-      await import('@cordis-verus/compat-cordis/register');
+      await import('@validation-engineering/cordis/register');
       graph = new ModuleGraph(launch.directory, options).install();
-      const { Context } = await import('@cordis-verus/compat-cordis');
+      const { Context } = await import('@validation-engineering/cordis');
       const { Loader, ModuleHost } = await import('./index.js');
       const ctx = new Context();
       const loader = new Loader(ctx, { moduleHost: new ModuleHost({ rootDirectory: launch.directory }), allowPending: launch.allowPending });

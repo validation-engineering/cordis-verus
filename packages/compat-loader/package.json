@@ -1,7 +1,6 @@
 {
-  "name": "@cordis-verus/compat-loader",
+  "name": "@validation-engineering/cordis-loader",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Experimental JSON module loader over the native Cordis facade",
   "engines": {
@@ -34,7 +33,28 @@
     }
   },
   "peerDependencies": {
-    "@cordis-verus/compat-cordis": "0.1.0"
+    "@validation-engineering/cordis": "0.1.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/validation-engineering/cordis-verus.git",
+    "directory": "packages/compat-loader"
+  },
+  "homepage": "https://github.com/validation-engineering/cordis-verus#readme",
+  "bugs": {
+    "url": "https://github.com/validation-engineering/cordis-verus/issues"
+  },
+  "files": [
+    "*.js",
+    "*.cjs",
+    "*.d.ts",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ]
 }

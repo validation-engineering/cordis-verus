@@ -5,8 +5,10 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/cordis-plugin-api"
 description = "Versioned C ABI and Rust SDK for Cordis native plugins"
 readme = "README.md"
+publish = ["crates-io"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

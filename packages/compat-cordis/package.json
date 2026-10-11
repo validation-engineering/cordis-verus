@@ -1,7 +1,6 @@
 {
-  "name": "@cordis-verus/compat-cordis",
+  "name": "@validation-engineering/cordis",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Experimental Cordis language facade over the Rust lifecycle driver",
   "engines": {
@@ -35,5 +34,18 @@
     "native/manifest.json",
     "native/provenance/*.json",
     "native/prebuilds/*/cordis.node"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/validation-engineering/cordis-verus.git",
+    "directory": "packages/compat-cordis"
+  },
+  "homepage": "https://github.com/validation-engineering/cordis-verus#readme",
+  "bugs": {
+    "url": "https://github.com/validation-engineering/cordis-verus/issues"
+  }
 }

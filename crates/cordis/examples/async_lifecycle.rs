@@ -1,4 +1,4 @@
-//! Run with: cargo run -p cordis --example async_lifecycle
+//! Run with: cargo run -p cordis-verus --example async_lifecycle
 use cordis::{Context, Effect, Inverse, Plugin, Runtime, ServiceKey};
 use std::future::{poll_fn, Future};
 use std::sync::{Arc, Mutex};

@@ -192,7 +192,7 @@ process-group supervision and stronger isolation belong to the application.
 Run the actual subprocess tests with:
 
 ```sh
-cargo test -p cordis --test process_plugin --offline
+cargo test -p cordis-verus --test process_plugin --offline
 ```
 
 On Unix these create executable fixtures, exercise literal argument passing,

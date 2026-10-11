@@ -27,8 +27,8 @@ copies these to `target/node-compat/dynamic-fixture-<version>.dylib` on macOS,
 `.so` on Linux or `.dll` on Windows. For the text fixture:
 
 ```js
-import { Context } from '@cordis-verus/compat-cordis';
-import { loadRustModule } from '@cordis-verus/compat-loader/rust-module';
+import { Context } from '@validation-engineering/cordis';
+import { loadRustModule } from '@validation-engineering/cordis-loader/rust-module';
 
 const ctx = new Context();
 const plugins = await loadRustModule(ctx, {
@@ -176,7 +176,7 @@ Opening it does not pull an item. Objects must use the public `adaptObject`
 helper; a plain object with similar properties does not grant a capability:
 
 ```js
-import { adaptObject, adaptCallback } from '@cordis-verus/compat-cordis';
+import { adaptObject, adaptCallback } from '@validation-engineering/cordis';
 
 child.provide('jsHost', {
   async *stream() { yield 'hello'; yield '世界'; },
@@ -345,7 +345,7 @@ owned lifecycle graph, without creating a `RustModuleController` or entering a
 second host transaction:
 
 ```js
-import { createRustModulePlugin } from '@cordis-verus/compat-loader/rust-module-plugin';
+import { createRustModulePlugin } from '@validation-engineering/cordis-loader/rust-module-plugin';
 
 const plugin = createRustModulePlugin(ctx, {
   name: 'native-text',
@@ -451,7 +451,7 @@ For applications that must keep a handle even if the initial setup fails, use
 an explicit controller:
 
 ```js
-import { RustModuleController } from '@cordis-verus/compat-loader/rust-module';
+import { RustModuleController } from '@validation-engineering/cordis-loader/rust-module';
 
 const plugins = new RustModuleController(ctx, {
   plugins: [{ id: 'text', factory: 'native-text-analysis', config: {} }],
@@ -504,8 +504,8 @@ across ordinary restarts of its outer Fiber. A host which validates additional
 consumers must keep a transaction open through their acceptance:
 
 ```js
-import { beginRustModuleMigration } from '@cordis-verus/compat-loader/rust-module-plugin';
-import { officialTransaction } from '@cordis-verus/compat-loader/harness';
+import { beginRustModuleMigration } from '@validation-engineering/cordis-loader/rust-module-plugin';
+import { officialTransaction } from '@validation-engineering/cordis-loader/harness';
 
 await officialTransaction(ctx, async () => {
   const entry = ctx.loader.resolve('native-analysis');

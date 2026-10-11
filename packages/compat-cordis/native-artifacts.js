@@ -59,7 +59,7 @@ export function verifyNativeManifest(directory = join(packageRoot,'native')) {
   const manifestPath=checkedFile(directory,'manifest.json');
   const manifest=jsonFile(manifestPath);
   if (!object(manifest) || manifest.schema!=='cordis-verus.native-manifest/v1'
-    || manifest.package!=='@cordis-verus/compat-cordis' || manifest.version!==packageVersion || manifest.driverAbi!==1
+    || manifest.package!=='@validation-engineering/cordis' || manifest.version!==packageVersion || manifest.driverAbi!==1
     || !Array.isArray(manifest.artifacts) || !manifest.artifacts.length) fail('NATIVE_MANIFEST_INVALID','Unsupported or incomplete native manifest');
   const seen=new Set(), artifacts=[];
   for (const entry of manifest.artifacts) {

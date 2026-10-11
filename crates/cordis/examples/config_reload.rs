@@ -1,4 +1,4 @@
-//! Run with: cargo run -p cordis --example config_reload
+//! Run with: cargo run -p cordis-verus --example config_reload
 use cordis::config::{Field, Schema};
 use cordis::loader::{FactoryRegistry, Loader};
 use cordis::{Context, Plugin, ServiceKey};

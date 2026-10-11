@@ -133,6 +133,15 @@ jobs:
           PY
       - name: Collect all four platforms from this commit
         run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA"
+      - name: Assemble one universal npm archive per package
+        run: python3 scripts/package-npm-registry.py --input "$RUNNER_TEMP/release-assets" --output "$RUNNER_TEMP/npm-registry" --commit "$GITHUB_SHA"
+      - name: Retain the universal npm registry candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-registry-candidates-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/npm-registry/
+          if-no-files-found: error
+          retention-days: 14
       - name: Retain the exact assets used by installation and publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -168,6 +177,20 @@ jobs:
           npm ci --offline --ignore-scripts --no-audit --no-fund
           npm start
 
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-registry-candidates-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/npm-registry
+      - name: Install the exact universal npm packages and reinstall offline
+        run: node "$RUNNER_TEMP/npm-registry/check-npm-registry.mjs" --from-directory "$RUNNER_TEMP/npm-registry" --output "$RUNNER_TEMP/npm-installation.json"
+      - name: Retain source-bound registry installation receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-registry-install-${{ github.run_attempt }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/npm-installation.json
+          if-no-files-found: error
+          retention-days: 14
+
   draft-release:
     name: Collect and upload a draft runtime prerelease
     needs: [plan, quality, runtime, stage, install]
@@ -188,6 +211,45 @@ jobs:
           path: ${{ runner.temp }}/downloaded
       - name: Validate and collect the exact selected platform asset sets
         run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA" --targets-json "$RELEASE_TARGETS_JSON"
+      - name: Download accepted universal npm packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-registry-candidates-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/npm-registry
+      - name: Download all four registry installation receipts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: npm-registry-install-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/npm-receipts
+      - name: Retain registry candidates and exact installation evidence in the release
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          output = temporary / 'release-assets'
+          inputs = temporary / 'npm-registry'
+          record = json.loads((inputs / 'npm-registry.json').read_text())
+          receipts = [json.loads(path.read_text()) for path in (temporary / 'npm-receipts').rglob('npm-installation.json')]
+          if len(receipts) != 4 or sorted(item['target'] for item in receipts) != sorted(record['targets']):
+              raise SystemExit('Four distinct installation receipts are required')
+          for receipt in receipts:
+              if (receipt['status'] != 'passed' or receipt['offlineReinstall'] != 'passed'
+                      or receipt['sourceCommit'] != os.environ['GITHUB_SHA']
+                      or receipt['nativeManifestSha256'] != record['nativeManifestSha256']
+                      or receipt['packages'] != record['packages']):
+                  raise SystemExit('Registry installation receipts differ from the candidates')
+              (output / f"npm-installation-{receipt['target']}.json").write_text(json.dumps(receipt, indent=2) + '\n')
+          for path in inputs.iterdir():
+              if path.name == 'SHA256SUMS':
+                  continue
+              destination = output / path.name
+              if destination.exists() and destination.read_bytes() != path.read_bytes():
+                  raise SystemExit('Runtime and registry assets disagree: ' + path.name)
+              shutil.copyfile(path, destination)
+          paths = sorted(path for path in output.iterdir() if path.name != 'SHA256SUMS')
+          (output / 'SHA256SUMS').write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.name + '\n' for path in paths))
+          PY
       - name: Create draft prerelease with tested runtime packages
         env:
           GH_TOKEN: ${{ github.token }}

@@ -8,5 +8,5 @@ cargo test --workspace --locked
 echo 'END WORKSPACE TESTS'
 for source in crates/cordis/examples/*.rs; do
     example="$(basename "$source" .rs)"
-    cargo run --locked -p cordis --example "$example"
+    cargo run --locked -p cordis-verus --example "$example"
 done

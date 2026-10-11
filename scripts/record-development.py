@@ -157,9 +157,9 @@ def node_build_evidence(path):
 
 
 NPM_PACKAGES = {
-    "compat-cordis": "@cordis-verus/compat-cordis",
-    "compat-loader": "@cordis-verus/compat-loader",
-    "compat-harness": "@cordis-verus/compat-harness",
+    "compat-cordis": "@validation-engineering/cordis",
+    "compat-loader": "@validation-engineering/cordis-loader",
+    "compat-harness": "@validation-engineering/cordis-harness",
 }
 
 

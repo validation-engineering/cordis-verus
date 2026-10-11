@@ -1,0 +1,77 @@
+name: Registry consumers
+
+on:
+  workflow_dispatch:
+    inputs:
+      validation_run:
+        description: Successful Release validation run containing the exact published npm candidates
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  accepted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      attempt: ${{ steps.run.outputs.attempt }}
+      commit: ${{ steps.run.outputs.commit }}
+    steps:
+      - name: Require a successful release validation from this repository
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATION_RUN: ${{ inputs.validation_run }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          run_id = os.environ['VALIDATION_RUN']
+          if not re.fullmatch(r'[0-9]+', run_id):
+              raise SystemExit('Expected a numeric workflow run ID')
+          repository = os.environ['GITHUB_REPOSITORY']
+          record = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repository}/actions/runs/{run_id}'], text=True))
+          if (record['conclusion'] != 'success' or record['path'] != '.github/workflows/release-validation.yml'
+                  or record['head_repository']['full_name'] != repository):
+              raise SystemExit('Registry consumers require a successful release-validation run from this repository')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"attempt={record['run_attempt']}\ncommit={record['head_sha']}\n")
+          PY
+
+  install:
+    name: Download from npm (${{ matrix.os }})
+    needs: accepted
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-registry-candidates-${{ needs.accepted.outputs.attempt }}
+          path: ${{ runner.temp }}/npm-registry
+          run-id: ${{ inputs.validation_run }}
+          github-token: ${{ github.token }}
+      - name: Bind candidates to the accepted workflow commit
+        env:
+          ACCEPTED_COMMIT: ${{ needs.accepted.outputs.commit }}
+        run: |
+          node --input-type=module -e 'import {readFileSync} from "node:fs"; import assert from "node:assert/strict"; assert.equal(JSON.parse(readFileSync(process.argv[1])).sourceCommit, process.env.ACCEPTED_COMMIT);' "$RUNNER_TEMP/npm-registry/npm-registry.json"
+      - name: Install from the public registry, run original plugins and reinstall offline
+        run: node "$RUNNER_TEMP/npm-registry/check-npm-registry.mjs" --from-directory "$RUNNER_TEMP/npm-registry" --registry --output "$RUNNER_TEMP/registry-consumer.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-registry-consumer-${{ github.run_attempt }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/registry-consumer.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,11 +1,22 @@
-# Experimental native Cordis facade
+# @validation-engineering/cordis
 
 This package executes JavaScript plugins in Node and delegates activation, dependency
 selection, invalidation, cleanup admission and removal to `cordis-driver` through
 `cordis-node`. It does not include the upstream Fiber scheduler. Values, callbacks,
 closures, iterators and Promise objects stay in the Node environment.
 
-From the repository root:
+The npm distribution includes precompiled libraries for Linux x64 (GNU libc),
+macOS Apple Silicon / Intel and Windows x64. It requires Node.js 22.22+; no Rust
+compiler, Verus or installation scripts are needed.
+
+```sh
+npm install @validation-engineering/cordis
+```
+
+Precompiled archives and source-bound evidence are also available in
+[GitHub Releases](https://github.com/validation-engineering/cordis-verus/releases).
+
+For contributors, from the repository root:
 
 ```sh
 node scripts/build-node.mjs
@@ -14,7 +25,7 @@ npm run test:types
 ```
 
 ```js
-import { Context, Service } from './packages/compat-cordis/index.js'
+import { Context, Service } from '@validation-engineering/cordis'
 
 class Greeter extends Service {
   constructor(ctx) {
@@ -40,20 +51,19 @@ decimal strings at the native protocol boundary; public uid retains upstream num
 The default addon is selected from `native/manifest.json`; a local build keeps its
 binary at `native/cordis.node`, while an assembled bundle uses `native/prebuilds/`.
 Selection verifies the target, Node-API floor, binary SHA-256 and build provenance.
-`@cordis-verus/compat-cordis/native-artifacts` exposes the same selector for auditing.
+`@validation-engineering/cordis/native-artifacts` exposes the same selector for auditing.
 `CORDIS_NATIVE_BINDING` or the Context constructor's `addon` option can select an
 explicit custom build, outside the default artifact manifest. Missing/incompatible
 addons fail: startup validates the ABI, profile, package identity and object-table value model before constructing the driver. There is no JavaScript scheduler fallback. ESM and CommonJS share the
-same constructors and symbols. The package is private until its compatibility and
-platform matrix are accepted. Node 22.22 is the local development baseline, not a
-claim that the Node 24 or multi-platform release matrix passed.
+same constructors and symbols. Release acceptance runs on Node 22.22 on all four supported platforms.
+The per-platform records identify the operating systems and runtime versions tested.
 
 The implemented surface includes function/object/class plugins, initialization,
 service injection, dynamic publications and checks, isolation, callable services,
 mixins/accessors, method/class decorators, LoggerService, events, effects and
 explicit owned tasks. Rust and Node use the same lifecycle control driver.
-`@cordis-verus/compat-harness` selects a separate configuration/retry policy;
-`@cordis-verus/compat-loader` adds JSON loading and fresh-Worker artifact recovery.
+`@validation-engineering/cordis-harness` selects a separate configuration/retry policy;
+`@validation-engineering/cordis-loader` adds JSON loading and fresh-Worker artifact recovery.
 
 This is not complete Cordis/Harness compatibility. The full upstream suite is
 executed unchanged and preserves known lifecycle safety differences. Deep imports,

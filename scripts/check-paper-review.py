@@ -95,8 +95,9 @@ def check(root, index_path, guide_path):
                     f"Source symbol absent: {symbol['file']}::{symbol['symbol']}")
             symbols += 1
         for test in case["tests"]:
-            crate = f"crates/{test['package']}"
+            crate = test.get("crate", f"crates/{test['package']}")
             manifest = inside(root, f"{crate}/Cargo.toml").read_text(encoding="utf-8")
+            manifest = re.search(r"(?ms)^\[package\]\s*\n(.*?)(?=^\[|\Z)", manifest).group(1)
             require(re.search(rf'^name\s*=\s*"{re.escape(test["package"])}"\s*$', manifest, re.MULTILINE),
                     f"Cargo package differs: {crate}")
             source = inside(root, f"{crate}/tests/{test['target']}.rs").read_text(encoding="utf-8")

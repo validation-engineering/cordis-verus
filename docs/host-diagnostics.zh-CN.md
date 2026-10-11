@@ -7,7 +7,7 @@ Node 宿主通过 `ctx.snapshot()` 导出实际 shared Driver 状态，用于解
 不重试清理，也不读取服务 payload。
 
 ```js
-import { Context } from '@cordis-verus/compat-cordis';
+import { Context } from '@validation-engineering/cordis';
 const ctx = new Context();
 try {
   const worker = await ctx.inject(['storage'], () => {});

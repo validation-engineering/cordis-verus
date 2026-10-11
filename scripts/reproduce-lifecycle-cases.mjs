@@ -66,7 +66,7 @@ report.nativeBuild = nativeBuild;
 // Harness re-exports the bare core package. Check the same ESM resolution that
 // its entry uses instead of trusting a workspace symlink label alone.
 const resolution = spawnSync(process.execPath, ['--input-type=module', '--eval',
-  "process.stdout.write(import.meta.resolve('@cordis-verus/compat-cordis'))"], {
+  "process.stdout.write(import.meta.resolve('@validation-engineering/cordis'))"], {
   cwd: path.join(root, 'packages/compat-harness'), encoding: 'utf8', timeout: 10000,
   env: { ...process.env, NODE_OPTIONS: '' },
 });

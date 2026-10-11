@@ -5,9 +5,10 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/cordis-driver"
 description = "Value-independent Cordis lifecycle command driver"
 readme = "README.md"
-publish = false
+publish = ["crates-io"]
 
 [dependencies]
 cordis-kernel = { path = "../cordis-kernel", version = "=0.1.0" }

@@ -1,4 +1,4 @@
-import type { Context } from '@cordis-verus/compat-cordis';
+import type { Context } from '@validation-engineering/cordis';
 import type { JSONValue } from './index.js';
 export interface RustModuleArtifact { path: string; sha256: string; }
 export interface RustModuleEntry { id: string; factory: string; config?: JSONValue; state?: 'migrate'; }

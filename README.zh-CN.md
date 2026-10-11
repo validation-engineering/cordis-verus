@@ -8,7 +8,7 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 
 你可以构建原生 Rust 插件系统，也可以通过可选的 Node 宿主运行支持范围内的原版 Cordis 插件，将 Rust 与 JavaScript 组合使用。配套项目 [Cordis Harness](https://github.com/validation-engineering/cordis-harness) 在这个运行时上运行官方 DeepSeek Harness 工作流。
 
-**实验性、尚未达到 1.0。** API 仍在演进。预编译运行时通过 GitHub Releases 分发；crates.io 和 npm 注册表发布仍在计划中。
+**实验性、尚未达到 1.0。** API 仍在演进。Node 运行时可从 npm 安装，Rust 库通过 crates.io 使用；GitHub Releases 同时保留预编译归档和验证证据。
 
 ## 为什么使用 cordis-verus
 
@@ -18,18 +18,31 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 
 ## 快速开始
 
-准备 **Node.js 22.22+ 和 npm**，即可运行预编译的 Node 兼容运行时。Release 支持 Linux x64（GNU libc）、macOS Apple Silicon / Intel 和 Windows x64。Windows PowerShell 请将下载命令中的 `curl` 写成 `curl.exe`。
+准备 **Node.js 22.22+ 和 npm**，安装预编译运行时：
 
 ```sh
-curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
-node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
-cd my-cordis-app
-npm start
+npm install @validation-engineering/cordis
 ```
 
-示例通过原生 Rust 生命周期驱动输出 `Hello, Cordis`。无需 Rust 工具链、Verus、源码检出或模型凭据；编辑 `app.mjs` 即可添加插件。离线安装与平台要求见[安装指南](docs/native-distribution.zh-CN.md)。
+将以下内容保存为 `app.mjs`：
 
-纯 Rust 应用可从[运行时指南](docs/runtime.md)与[基础示例](crates/cordis/examples/basic.rs)开始；编译和验证方式见[开发环境说明](CONTRIBUTING.md)。
+```js
+import { Context } from '@validation-engineering/cordis'
+
+const app = new Context()
+try {
+  await app.plugin(ctx => {
+    ctx.provide('greeter', { greet: name => `Hello, ${name}` })
+  })
+  console.log(app.greeter.greet('Cordis'))
+} finally {
+  await app.dispose()
+}
+```
+
+运行 `node app.mjs`，输出 `Hello, Cordis`。支持 Linux x64（GNU libc）、macOS Apple Silicon / Intel 和 Windows x64，无需 Rust 编译器、Verus 或源码检出。原版插件导入、Loader/Harness 包和 GitHub/离线安装见[安装指南](docs/native-distribution.zh-CN.md)。
+
+**纯 Rust 应用**可用 `cargo add cordis-verus --rename cordis` 添加库。Node 为可选依赖；Cargo 编译 Rust 依赖时无需运行 Verus。用法见[运行时指南](docs/runtime.md)和[基础示例](crates/cordis/examples/basic.rs)。
 
 ## 架构
 

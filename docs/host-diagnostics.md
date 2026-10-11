@@ -8,7 +8,7 @@ cleanup action, or an old episode rejection. Reading a snapshot does not drive
 transitions, run `Service.check`, retry cleanup, or read service payloads.
 
 ```js
-import { Context } from '@cordis-verus/compat-cordis';
+import { Context } from '@validation-engineering/cordis';
 const ctx = new Context();
 try {
   const worker = await ctx.inject(['storage'], () => {});

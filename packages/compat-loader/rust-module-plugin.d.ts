@@ -1,4 +1,4 @@
-import type { Context, Fiber, Plugin } from '@cordis-verus/compat-cordis';
+import type { Context, Fiber, Plugin } from '@validation-engineering/cordis';
 import type { RustModuleRevision } from './rust-module.js';
 
 export interface RustModulePlugin extends Plugin.Object<RustModuleRevision> {

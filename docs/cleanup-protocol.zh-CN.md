@@ -206,7 +206,7 @@ Inactive，接纳与 finish 分别跟踪；这是宿主扩展，不是论文的 
 cargo test --offline -p cordis-driver --test shared_lifecycle --test cleanup_outcomes --test cleanup_resources
 cargo test --offline -p cordis-driver --test episode_failure --test reservation_effects
 cargo test --offline -p cordis-kernel --test cleanup_protocol --test cleanup_journal --test cleanup_queue
-cargo test --offline -p cordis --test retry_cleanup
+cargo test --offline -p cordis-verus --test retry_cleanup
 cargo test --offline -p cordis-node --test plugin_runtime typed_retryable_cleanup_recovers_only_on_a_new_host_attempt -- --exact
 ```
 

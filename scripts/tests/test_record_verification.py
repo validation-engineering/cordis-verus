@@ -292,7 +292,7 @@ class CheckScriptRoutingTests(unittest.TestCase):
                     self.assertEqual(len(lines), 3)
                     self.assertEqual(json.loads(lines[0]), ["scripts/check-positive.py"])
                     self.assertEqual(lines[1:], ["cargo test --workspace --locked",
-                                                "cargo run --locked -p cordis --example demo"])
+                                                "cargo run --locked -p cordis-verus --example demo"])
 
 
 @unittest.skipUnless(os.name == "posix", "supported Verus platforms are POSIX")

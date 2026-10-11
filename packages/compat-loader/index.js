@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathToFileURL } from 'node:url';
-import { Context, FiberState, Inject, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
-import { isConstructor } from '@cordis-verus/compat-cordis/utils';
+import { Context, FiberState, Inject, assertDomainMutation, domainMutation } from '@validation-engineering/cordis';
+import { isConstructor } from '@validation-engineering/cordis/utils';
 import { LoaderError, fileURL, jsonValue, readTree } from './config.js';
 import { ModuleHost } from './module-host.js';
 

@@ -23,7 +23,7 @@ async function fixture(t,target=nativeTargets[0],source='same source') {
     build:{reportSha256:hash('build report'),sourceHashes:sources,sourceDigest:sourceDigest(sources),cargoLockSha256:sources['Cargo.lock'],toolchainLockSha256:sources['toolchain.lock.json']},
     validation:{platform:target.platform,architecture:target.architecture,libc:target.libc,node:'v22.22.0',nodeApi:10,nodeModuleAbi:127,osRelease:'synthetic-test',checkedAt:'2026-10-05T00:00:00Z',otherTargets:'not validated',uploaded:false}};
   const entry={target:target.id,platform:target.platform,architecture:target.architecture,libc:target.libc,nodeApi:8,kind:'default-core',file:'cordis.node',sha256:hash(bytes),bytes:bytes.length,provenance:'provenance/'+target.id+'.json',provenanceSha256:hash(json(provenance))};
-  const manifest={schema:'cordis-verus.native-manifest/v1',package:'@cordis-verus/compat-cordis',version,driverAbi:1,artifacts:[entry]};
+  const manifest={schema:'cordis-verus.native-manifest/v1',package:'@validation-engineering/cordis',version,driverAbi:1,artifacts:[entry]};
   await writeFile(join(directory,'cordis.node'),bytes);
   async function save() { entry.provenanceSha256=hash(json(provenance)); await writeFile(join(directory,entry.provenance),json(provenance)); await writeFile(join(directory,'manifest.json'),json(manifest)); }
   await save(); return {root,directory,bytes,target,entry,manifest,provenance,save};

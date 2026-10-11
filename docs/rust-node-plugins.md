@@ -93,7 +93,7 @@ wrapper 有私有品牌，不能由普通 `{ object: id }` 冒充，也不能传
 反向接口由 JS 显式声明 adapter：
 
 ```js
-import { adaptObject, adaptCallback } from '@cordis-verus/compat-cordis'
+import { adaptObject, adaptCallback } from '@validation-engineering/cordis'
 
 ctx.provide('resources', {
   object() {

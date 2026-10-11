@@ -64,18 +64,18 @@ import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { realpath, mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
-import { Context, adaptObject, adaptCallback } from '@cordis-verus/compat-cordis';
-import { selectNativeArtifact } from '@cordis-verus/compat-cordis/native-artifacts';
-import { Loader } from '@cordis-verus/compat-loader';
-import { WorkerDomain } from '@cordis-verus/compat-loader/worker';
-import { ProcessDomain } from '@cordis-verus/compat-loader/process';
-import { loadRustModule } from '@cordis-verus/compat-loader/rust-module';
+import { Context, adaptObject, adaptCallback } from '@validation-engineering/cordis';
+import { selectNativeArtifact } from '@validation-engineering/cordis/native-artifacts';
+import { Loader } from '@validation-engineering/cordis-loader';
+import { WorkerDomain } from '@validation-engineering/cordis-loader/worker';
+import { ProcessDomain } from '@validation-engineering/cordis-loader/process';
+import { loadRustModule } from '@validation-engineering/cordis-loader/rust-module';
 const require = createRequire(import.meta.url);
-const facade = fileURLToPath(import.meta.resolve('@cordis-verus/compat-cordis'));
-const loaderPath = fileURLToPath(import.meta.resolve('@cordis-verus/compat-loader'));
+const facade = fileURLToPath(import.meta.resolve('@validation-engineering/cordis'));
+const loaderPath = fileURLToPath(import.meta.resolve('@validation-engineering/cordis-loader'));
 const installed = await realpath(join(process.cwd(), 'node_modules'));
 for (const path of [facade, loaderPath]) assert.ok((await realpath(path)).startsWith(installed + sep));
-assert.equal(require('@cordis-verus/compat-cordis').Context, Context);
+assert.equal(require('@validation-engineering/cordis').Context, Context);
 const selected=selectNativeArtifact();
 assert.ok(selected.path.startsWith(installed + sep));
 const binding = require(selected.path);
@@ -227,13 +227,13 @@ const harnessSmoke = `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { Context, Service } from '@deepseek-ai/cordis';
-import { Context as PackageContext } from '@cordis-verus/compat-harness';
-import { LoaderTransactions, installOfficialTransactions } from '@cordis-verus/compat-loader/harness';
+import { Context as PackageContext } from '@validation-engineering/cordis-harness';
+import { LoaderTransactions, installOfficialTransactions } from '@validation-engineering/cordis-loader/harness';
 assert.equal(typeof LoaderTransactions, 'function');
 assert.equal(typeof installOfficialTransactions, 'function');
 const require = createRequire(import.meta.url);
 assert.equal(Context, PackageContext);
-assert.equal(require('@cordis-verus/compat-harness').Context, Context);
+assert.equal(require('@validation-engineering/cordis-harness').Context, Context);
 const context = new Context();
 assert.equal(context.snapshot().profile, 'harness');
 class Message extends Service { constructor(ctx) { super(ctx, 'packedHarness'); this.value = 'packed'; } }
@@ -304,7 +304,7 @@ async function main() {
       const paths = record.files.map(item => item.path);
       for (const required of ['package.json', 'index.js', 'index.d.ts', 'README.md', 'LICENSE', 'NOTICE']) assert.ok(paths.includes(required), `${record.name} lacks ${required}`);
       for (const path of paths) assert.ok(!path.startsWith('/') && !path.split('/').some(part => ['..', '.git', 'node_modules', 'upstream', 'target'].includes(part)), `Unsafe packed file ${path}`);
-      if (record.name === '@cordis-verus/compat-cordis') {
+      if (record.name === '@validation-engineering/cordis') {
         const expected=verified.artifacts.map(item=>'native/'+item.entry.file);
         for (const required of ['native/manifest.json',...expected,...verified.artifacts.map(item=>'native/'+item.entry.provenance)]) assert.ok(paths.includes(required), 'Packed facade lacks '+required);
         assert.deepEqual(paths.filter(name=>name.endsWith('.node')).sort(), expected.sort(), 'Unlisted or custom SDK addon in default distribution');
@@ -333,11 +333,11 @@ async function main() {
     }
     await writeFile(join(consumer, 'dynamic-modules.json'), JSON.stringify(dynamicArtifacts));
     await writeFile(join(consumer, 'smoke.mjs'), smoke);
-    const observation = JSON.parse(run(process.execPath, ['--import', '@cordis-verus/compat-cordis/register', 'smoke.mjs'], consumer, env));
+    const observation = JSON.parse(run(process.execPath, ['--import', '@validation-engineering/cordis/register', 'smoke.mjs'], consumer, env));
     assert.equal(observation.nativeManifestSha256, selected.manifestSha256, 'Installed native manifest differs from checkout');
     assert.equal(observation.nativeTarget, selected.entry.target);
     await writeFile(join(consumer, 'harness-smoke.mjs'), harnessSmoke);
-    const harnessObservation = JSON.parse(run(process.execPath, ['--import', '@cordis-verus/compat-harness/register', 'harness-smoke.mjs'], consumer, env));
+    const harnessObservation = JSON.parse(run(process.execPath, ['--import', '@validation-engineering/cordis-harness/register', 'harness-smoke.mjs'], consumer, env));
     for (const [version, source] of Object.entries(dynamicSources)) {
       assert.equal(await fileDigest(source), build.dynamicFixtures[version].sha256, 'Dynamic plugin fixture changed during distribution check');
     }

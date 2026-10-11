@@ -2,7 +2,7 @@
 
 `cordis::config` 与 `cordis::loader` 是可运行的普通 Rust 宿主层。生命周期的退休、依赖守卫和 fresh identity 使用 Verus 内核；JSON 解析、schema、factory、文件 I/O、回滚与任意插件代码没有因此获得形式证明。
 
-运行 `cargo run -p cordis --example config_reload` 可看到 Include 文件加载、服务隔离、依赖绑定、配置热更新、消费者先释放旧服务、group 禁用及等待完整清理。
+运行 `cargo run -p cordis-verus --example config_reload` 可看到 Include 文件加载、服务隔离、依赖绑定、配置热更新、消费者先释放旧服务、group 禁用及等待完整清理。
 
 `cordis_kernel::configuration_entry::Entry` 单独形式化论文 Definition 81 的六字段，
 其构造、开关和配置编辑有 Verus 契约。`loader::Entry::as_paper_entry(resolve_url)`
@@ -119,10 +119,10 @@ plugin.on_config_update(move |setup, previous, next| {
 
 计划与提交时的重读可以发现已发生的编辑，但标准文件系统没有跨普通编辑器的 compare-and-swap；最后一次检查与 rename 之间仍有竞争窗口。需要多个写入者同时编辑时，由应用提供独占的编辑/保存协调；不要把这个接口视为对不合作外部进程的锁。网络文件系统还取决于其 rename/fsync 语义。文件 I/O、JSON merge 和任意 plugin callback 均属于测试覆盖的宿主层，不在 Verus 证明内。
 
-运行 `cargo run -p cordis --example config_persistence` 演示本地修改、保留外部字段、显式保存和再加载。
+运行 `cargo run -p cordis-verus --example config_persistence` 演示本地修改、保留外部字段、显式保存和再加载。
 
 ## 上游与检查
 
 对照固定快照的 `packages/loader/src/config/{entry,tree,group}.ts`、`packages/include/src/index.ts`、`packages/hmr/src/index.ts`、`packages/core/src/context.ts` 与 Harness `packages/core/scope/src/index.ts`。配置分组、作用域注入、quiescent disposal 与 factory 替换能够表达 Harness 风格组合，不表示重写了 Harness 应用。
 
-`cargo test -p cordis --test config --test loader --test loader_update --test service_configuration --test persistence` 覆盖 schema/default、metadata/interception、realm/inject、最小变更、setup 回滚、旧 factory 恢复、恢复失败后重试、并发 cleanup 屏障、取消期间恢复、Include 环/重复来源/源文件错误、文件 reload、include 拓扑保存、并发编辑冲突、部分提交重试、旧计划拒绝、权限与临时文件处理。正式验证及其他 runtime 检查通过项目根目录的 `./scripts/check.sh` 运行。
+`cargo test -p cordis-verus --test config --test loader --test loader_update --test service_configuration --test persistence` 覆盖 schema/default、metadata/interception、realm/inject、最小变更、setup 回滚、旧 factory 恢复、恢复失败后重试、并发 cleanup 屏障、取消期间恢复、Include 环/重复来源/源文件错误、文件 reload、include 拓扑保存、并发编辑冲突、部分提交重试、旧计划拒绝、权限与临时文件处理。正式验证及其他 runtime 检查通过项目根目录的 `./scripts/check.sh` 运行。

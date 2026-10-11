@@ -129,7 +129,7 @@ setup/stage 返回 Err，或其 callback factory/poll panic，会锁存失败并
 - [async_lifecycle.rs](../crates/cordis/examples/async_lifecycle.rs)：异步 setup、多阶段 effect、动态子组件与逆序恢复。
 - [config_reload.rs](../crates/cordis/examples/config_reload.rs)：Include、隔离、fresh identity、文件重载与 group 禁用。
 
-分别运行 `cargo run -p cordis --example basic`、`cargo run -p cordis --example async_lifecycle`、`cargo run -p cordis --example config_reload`；根目录 `./scripts/check.sh` 执行正式验证、测试、示例和负向变异检查。计数以当前 revision 的实际检查报告为准。
+分别运行 `cargo run -p cordis-verus --example basic`、`cargo run -p cordis-verus --example async_lifecycle`、`cargo run -p cordis-verus --example config_reload`；根目录 `./scripts/check.sh` 执行正式验证、测试、示例和负向变异检查。计数以当前 revision 的实际检查报告为准。
 
 ## 维护与集成接口
 

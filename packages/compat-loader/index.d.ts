@@ -1,4 +1,4 @@
-import type { Context, Fiber, Plugin } from '@cordis-verus/compat-cordis';
+import type { Context, Fiber, Plugin } from '@validation-engineering/cordis';
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
 export type Injection = string[] | Record<string, JSONValue>;
 export type Isolation = string[] | Record<string, true | string>;

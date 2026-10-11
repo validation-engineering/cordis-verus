@@ -7,13 +7,13 @@ import { LoaderError } from './config.js';
 const posix = path => path.replaceAll('\\', '/');
 const require = createRequire(import.meta.url);
 const facadeURLs = new Set([
-  import.meta.resolve('@cordis-verus/compat-cordis'),
-  pathToFileURL(require.resolve('@cordis-verus/compat-cordis')).href,
+  import.meta.resolve('@validation-engineering/cordis'),
+  pathToFileURL(require.resolve('@validation-engineering/cordis')).href,
 ]);
 const harnessURLs = new Set();
 try {
-  harnessURLs.add(import.meta.resolve('@cordis-verus/compat-harness'));
-  harnessURLs.add(pathToFileURL(require.resolve('@cordis-verus/compat-harness')).href);
+  harnessURLs.add(import.meta.resolve('@validation-engineering/cordis-harness'));
+  harnessURLs.add(pathToFileURL(require.resolve('@validation-engineering/cordis-harness')).href);
 } catch { /* Harness is optional for the default Cordis host. */ }
 
 /** Observed Node module edges in one Worker, not a static parser or cache reset. */

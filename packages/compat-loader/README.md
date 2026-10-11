@@ -2,13 +2,13 @@
 
 This experimental package loads real JS Cordis plugins through `compat-cordis` and the Rust native driver. It adds a **JSON configuration API** and an explicit **whole-Worker code replacement API**. It does not yet implement the upstream Loader/Include classes or Harness configuration language. A Loader can use either native Context profile; the Worker bootstrap selects the Cordis profile.
 
-Build the native addon first (`npm run build:native`). No additional runtime dependencies are required beyond the sibling facade package and Node 22.22+.
+Use the matching `@validation-engineering/cordis` package, which includes the precompiled native addon. No compiler or additional runtime dependencies are required beyond that package and Node 22.22+. Source contributors can rebuild it with `npm run build:native`.
 
 ## Load a configuration in the current environment
 
 ```js
-import { Context } from '@cordis-verus/compat-cordis';
-import { Loader } from '@cordis-verus/compat-loader';
+import { Context } from '@validation-engineering/cordis';
+import { Loader } from '@validation-engineering/cordis-loader';
 
 const context = new Context();
 const loader = new Loader(context);
@@ -19,7 +19,7 @@ await loader.dispose();
 await context.dispose();
 ```
 
-Start the program with `--import @cordis-verus/compat-cordis/register` when plugin sources import the original `cordis` package name. The registered facade is still the only lifecycle implementation.
+Start the program with `--import @validation-engineering/cordis/register` when plugin sources import the original `cordis` package name. The registered facade is still the only lifecycle implementation.
 
 ```json
 [
@@ -62,7 +62,7 @@ The Loader imports modules and validates candidate JSON inputs before disturbing
 
 ## Explicit transactions for the official Harness Loader
 
-The separate `@cordis-verus/compat-loader/harness` entry adapts the **installed,
+The separate `@validation-engineering/cordis-loader/harness` entry adapts the **installed,
 unchanged** official Harness `Loader` and `Include` classes. It does not replace
 this package's JSON API. `LoaderTransactions` offers explicit host operations;
 `installOfficialTransactions` additionally connects the official configuration UI
@@ -71,7 +71,7 @@ The tested contract is Harness Cordis 4.0.4, Loader 1.0.5 and Include 1.0.9.
 Use the native Harness profile and a live, fully initialized tree:
 
 ```js
-import { LoaderTransactions } from '@cordis-verus/compat-loader/harness';
+import { LoaderTransactions } from '@validation-engineering/cordis-loader/harness';
 
 // ctx and ctx.loader already belong to the booted official application.
 // Select an Include file owned by this host, not an unrelated profile overlay.
@@ -158,7 +158,7 @@ or arbitrary callback effects.
 An embedding host can supply an adapter for **already prepared factories**:
 
 ```js
-import { ModuleHost } from '@cordis-verus/compat-loader';
+import { ModuleHost } from '@validation-engineering/cordis-loader';
 
 const moduleHost = new ModuleHost({
   loadModule: async canonicalURL => preparedFactories.get(canonicalURL),
@@ -172,7 +172,7 @@ Resolution still requires an explicit existing file path and applies `rootDirect
 Use a `WorkerDomain` for real code replacement, including changed transitive imports:
 
 ```js
-import { WorkerDomain } from '@cordis-verus/compat-loader/worker';
+import { WorkerDomain } from '@validation-engineering/cordis-loader/worker';
 
 const domain = new WorkerDomain({ entry: 'cordis.json' });
 await domain.load('./plugin-project');
@@ -197,7 +197,7 @@ Objects/functions stay ordinary JS objects **inside** each Worker. `WorkerDomain
 
 ### Replace an OS process
 
-Use `ProcessDomain` from `@cordis-verus/compat-loader/process` for application
+Use `ProcessDomain` from `@validation-engineering/cordis-loader/process` for application
 native addons or a whole application process. It has the same captured-artifact
 load/reload/call workflow and adds a read-only PID. A successful replacement needs
 both a cleanup acknowledgement and exit code zero; a timeout or crash is not

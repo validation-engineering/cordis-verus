@@ -8,7 +8,7 @@ cordis-verus brings formal methods into a working plugin runtime. It implements 
 
 Build native Rust plugin systems, or use the optional Node host to run supported original Cordis plugins and compose Rust and JavaScript together. The companion [Cordis Harness](https://github.com/validation-engineering/cordis-harness) runs official DeepSeek Harness workflows on this runtime.
 
-**Experimental, pre-1.0.** APIs are evolving. Precompiled runtimes are distributed through GitHub Releases; crates.io and npm registry publication remain planned.
+**Experimental, pre-1.0.** APIs are evolving. Install the Node runtime from npm or use the Rust libraries from crates.io. Precompiled archives and validation evidence are also available in GitHub Releases.
 
 ## Why cordis-verus
 
@@ -18,18 +18,31 @@ Build native Rust plugin systems, or use the optional Node host to run supported
 
 ## Quick start
 
-Run the precompiled Node compatibility runtime with **Node.js 22.22+ and npm**. Supported release targets are Linux x64 (GNU libc), macOS Apple Silicon / Intel, and Windows x64. Use `curl.exe` for the download command in Windows PowerShell.
+With **Node.js 22.22+ and npm**, install the precompiled runtime:
 
 ```sh
-curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
-node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
-cd my-cordis-app
-npm start
+npm install @validation-engineering/cordis
 ```
 
-The example prints `Hello, Cordis` using the native Rust lifecycle driver. It needs no Rust toolchain, Verus, source checkout or model credentials. Edit `app.mjs` to add plugins. See the [installation guide](docs/native-distribution.md) for offline installs and platform requirements.
+Save this as `app.mjs`:
 
-For a pure Rust application, start with the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs); [developer setup](CONTRIBUTING.md) covers compilation and verification.
+```js
+import { Context } from '@validation-engineering/cordis'
+
+const app = new Context()
+try {
+  await app.plugin(ctx => {
+    ctx.provide('greeter', { greet: name => `Hello, ${name}` })
+  })
+  console.log(app.greeter.greet('Cordis'))
+} finally {
+  await app.dispose()
+}
+```
+
+Run `node app.mjs` to print `Hello, Cordis`. Linux x64 (GNU libc), macOS Apple Silicon / Intel and Windows x64 are supported. No Rust compiler, Verus or source checkout is needed. The [installation guide](docs/native-distribution.md) covers original plugin imports, Loader/Harness packages and GitHub/offline installation.
+
+For a **pure Rust application**, add the library with `cargo add cordis-verus --rename cordis`. Node is optional; Cargo compiles the Rust dependencies without running Verus. Start with the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs).
 
 ## Architecture
 

@@ -2,6 +2,12 @@
 
 Changes are recorded before release. Runtime previews are distributed through GitHub Releases.
 
+## 0.1.0 — 2026-10-11
+
+- Public npm packages under `@validation-engineering`: `cordis`, `cordis-loader` and `cordis-harness`.
+- Publish the Rust host package as `cordis-verus` while retaining the `cordis` library/import name; enable crates.io metadata for the kernel, driver and plugin SDK.
+- Assemble universal npm archives from the four source-matched release builds and require per-platform clean installation plus offline reinstall before publication.
+
 ## 0.1.0-preview.1
 
 - Distribute precompiled Node runtimes for Linux x64 GNU, macOS Apple Silicon and

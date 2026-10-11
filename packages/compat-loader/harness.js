@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { FiberState, assertDomainMutation, domainMutation } from '@cordis-verus/compat-cordis';
+import { FiberState, assertDomainMutation, domainMutation } from '@validation-engineering/cordis';
 import { LoaderError } from './config.js';
 import { installModuleObservation, reloadModules } from './official-hmr.js';
 
