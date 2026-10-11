@@ -8,7 +8,7 @@ cordis-verus brings formal methods into a working plugin runtime. It implements 
 
 Build native Rust plugin systems, or use the optional Node host to run supported original Cordis plugins and compose Rust and JavaScript together. The companion [Cordis Harness](https://github.com/validation-engineering/cordis-harness) runs official DeepSeek Harness workflows on this runtime.
 
-**Experimental, pre-1.0.** APIs are evolving; crates and npm packages are not yet published.
+**Experimental, pre-1.0.** APIs are evolving. Precompiled runtimes are distributed through GitHub Releases; crates.io and npm registry publication remain planned.
 
 ## Why cordis-verus
 
@@ -18,24 +18,18 @@ Build native Rust plugin systems, or use the optional Node host to run supported
 
 ## Quick start
 
-This Rust example needs no Node, model credentials or external service. Prepare Git, Rustup, Python 3.9+, curl and a native Rust build toolchain. The source and checksum-locked toolchain archives are public; see the [setup notes](CONTRIBUTING.md#toolchain-availability).
+Run the precompiled Node compatibility runtime with **Node.js 22.22+ and npm**. Supported release targets are Linux x64 (GNU libc), macOS Apple Silicon / Intel, and Windows x64. Use `curl.exe` for the download command in Windows PowerShell.
 
 ```sh
-git clone https://github.com/validation-engineering/cordis-verus.git
-cd cordis-verus
-./scripts/install-verus.sh
-bash -c 'source scripts/toolchain-env.sh && cargo run --locked -p cordis --example basic'
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
+node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
+cd my-cordis-app
+npm start
 ```
 
-The [basic example](crates/cordis/examples/basic.rs) mounts a consumer before its provider, then shuts them down:
+The example prints `Hello, Cordis` using the native Rust lifecycle driver. It needs no Rust toolchain, Verus, source checkout or model credentials. Edit `app.mjs` to add plugins. See the [installation guide](docs/native-distribution.md) for offline installs and platform requirements.
 
-```text
-consumer: hello from verified Cordis
-consumer cleanup still sees: hello from verified Cordis
-provider cleanup follows the consumer
-```
-
-The consumer can still use its service during cleanup. The provider is released afterwards. For existing JavaScript plugins, follow the separate [Node setup and example](docs/node-compatibility.md).
+For a pure Rust application, start with the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs); [developer setup](CONTRIBUTING.md) covers compilation and verification.
 
 ## Architecture
 
@@ -72,7 +66,7 @@ The project has an executable verified kernel, Rust and Node plugin hosts, and a
 
 1. **Broader refinement:** connect more lifecycle behavior and host execution to the paper's constraints.
 2. **Closer compatibility:** resolve known differences where alignment is intended and test more original plugins.
-3. **Reproducible releases:** complete full platform validation and publish precompiled runtime assets through the [GitHub Release installation path](docs/native-distribution.md). Runtime releases are not yet available.
+3. **Reproducible releases:** expand platform qualification, signing and application packaging beyond the [precompiled runtime](docs/native-distribution.md).
 
 See the [roadmap](docs/roadmap.md) for acceptance criteria and the [paper ledger](docs/paper-coverage.md) for individual claims. Complete paper refinement and production readiness are still future work.
 

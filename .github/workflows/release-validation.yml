@@ -3,11 +3,6 @@ name: Release validation
 on:
   workflow_dispatch:
     inputs:
-      include_macos_intel:
-        description: Also require release validation and runtime assets for Intel macOS
-        required: true
-        default: false
-        type: boolean
       create_draft:
         description: Create a draft runtime prerelease after proof, tests and asset installation pass
         required: true
@@ -32,6 +27,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       quality: ${{ steps.matrix.outputs.quality }}
+      install: ${{ steps.matrix.outputs.install }}
       targets: ${{ steps.matrix.outputs.targets }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -39,7 +35,7 @@ jobs:
           persist-credentials: false
       - name: Select matching quality and runtime asset platforms
         id: matrix
-        run: python3 scripts/package-runtime-release.py plan --github-output "$GITHUB_OUTPUT" ${{ inputs.include_macos_intel && '--include-macos-intel' || '' }}
+        run: python3 scripts/package-runtime-release.py plan --github-output "$GITHUB_OUTPUT"
 
   quality:
     name: Release quality (${{ matrix.os }})
@@ -83,13 +79,6 @@ jobs:
         run: node scripts/package-native.mjs --output target/release-artifacts/native packages/compat-cordis/native
       - name: Stage runtime release assets from the full gate
         run: python3 scripts/package-runtime-release.py package
-      - name: Install release assets in a new project without compiling sources
-        run: |
-          node scripts/install-cordis.mjs --from-directory target/github-release --project "$RUNNER_TEMP/cordis-release-consumer"
-          cd "$RUNNER_TEMP/cordis-release-consumer"
-          npm start
-          npm ci --offline --ignore-scripts --no-audit --no-fund
-          npm start
       - name: Retain full validation evidence, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -108,9 +97,80 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  runtime:
+    name: Build and test every additional runtime
+    uses: ./.github/workflows/runtime-platforms.yml
+
+  stage:
+    name: Join proof and platform evidence
+    needs: [quality, runtime]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - name: Download this run's full proof and host acceptance artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/downloaded
+      - name: Package host binaries only against matching whole-kernel evidence
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          downloaded = Path(os.environ['RUNNER_TEMP']) / 'downloaded'
+          attempt = os.environ['GITHUB_RUN_ATTEMPT']
+          quality = downloaded / f'full-validation-{attempt}-ubuntu-24.04/docs/verification-report.json'
+          for host in ('macos-15', 'macos-15-intel', 'windows-2025'):
+              inputs = downloaded / f'runtime-validation-{attempt}-{host}'
+              subprocess.run(['python3', 'scripts/package-runtime-release.py', 'package',
+                              '--runtime-input', str(inputs), '--quality-report', str(quality),
+                              '--output', str(inputs / 'target/github-release')], check=True)
+          PY
+      - name: Collect all four platforms from this commit
+        run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA"
+      - name: Retain the exact assets used by installation and publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-release-assets-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-assets/
+          if-no-files-found: error
+          retention-days: 14
+
+  install:
+    name: Install without a compiler (${{ matrix.os }})
+    needs: [plan, stage]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.install) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: runtime-release-assets-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-assets
+      - name: Install into a path with spaces, run, and reinstall offline
+        run: |
+          node "$RUNNER_TEMP/release-assets/install-cordis.mjs" --from-directory "$RUNNER_TEMP/release-assets" --project "$RUNNER_TEMP/my cordis project"
+          cd "$RUNNER_TEMP/my cordis project"
+          npm start
+          npm ci --offline --ignore-scripts --no-audit --no-fund
+          npm start
+
   draft-release:
     name: Collect and upload a draft runtime prerelease
-    needs: [plan, quality]
+    needs: [plan, quality, runtime, stage, install]
     if: ${{ inputs.create_draft }}
     runs-on: ubuntu-24.04
     env:
@@ -124,7 +184,7 @@ jobs:
       - name: Download this run's successful full-quality artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: full-validation-${{ github.run_attempt }}-*
+          name: runtime-release-assets-${{ github.run_attempt }}
           path: ${{ runner.temp }}/downloaded
       - name: Validate and collect the exact selected platform asset sets
         run: python3 scripts/package-runtime-release.py collect --input "$RUNNER_TEMP/downloaded" --output "$RUNNER_TEMP/release-assets" --commit "$GITHUB_SHA" --targets-json "$RELEASE_TARGETS_JSON"
@@ -146,12 +206,12 @@ jobs:
           if 'HTTP 404' not in existing.stderr:
               raise SystemExit('Could not establish that the release tag is unused: ' + existing.stderr)
           notes = Path('runtime-release-notes.md')
-          labels = {'linux-x64-gnu-napi8': 'Linux x64 GNU', 'darwin-arm64-napi8': 'macOS Apple Silicon', 'darwin-x64-napi8': 'macOS Intel'}
+          labels = {'linux-x64-gnu-napi8': 'Linux x64 GNU', 'darwin-arm64-napi8': 'macOS Apple Silicon', 'darwin-x64-napi8': 'macOS Intel', 'win32-x64-napi8': 'Windows x64'}
           platforms = ', '.join(labels[target] for target in json.loads(os.environ['RELEASE_TARGETS_JSON']))
           notes.write_text('Precompiled Node compatibility runtime for ' + platforms + '.\n\n'
-                           'All selected platforms passed whole-kernel verification, runtime and compatibility tests, package installation and native smoke checks. Full negative regressions run independently and are recorded as not_run in these release assets.\n\n'
+                           'The complete kernel passed the pinned Verus release-quality gate on Linux. The identical source snapshot passed runtime and compatibility tests, package installation and native smoke checks on all four platforms. Proof execution is not claimed on the additional hosts. Full negative regressions run independently and are recorded as not_run in these release assets.\n\n'
                            'This is an experimental runtime prerelease, not the complete Harness application. The kernel proof scope has not expanded; paper-wide completion is not claimed. Node.js 22.22+ is required; the exact accepted runtime is recorded in each asset manifest. See docs/native-distribution.md for installation and platform limits.\n\n'
-                           'Assets bind to commit ' + os.environ['GITHUB_SHA'] + '. Review this draft before publishing.\n')
+                           'Assets bind to commit ' + os.environ['GITHUB_SHA'] + '. The Quick start installs these exact precompiled assets without Rust or Verus.\n')
           assets = [str(path) for path in sorted((Path(os.environ['RUNNER_TEMP']) / 'release-assets').iterdir())]
           subprocess.run(['gh', 'release', 'create', tag, '--repo', repository, '--target', os.environ['GITHUB_SHA'],
                           '--draft', '--prerelease', '--title', 'Cordis runtime ' + tag, '--notes-file', str(notes), *assets], check=True)

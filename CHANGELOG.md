@@ -1,8 +1,18 @@
 # Changelog
 
-Changes are recorded before release. There is no published release yet.
+Changes are recorded before release. Runtime previews are distributed through GitHub Releases.
 
-## Unreleased — 0.1.0
+## 0.1.0-preview.1
+
+- Distribute precompiled Node runtimes for Linux x64 GNU, macOS Apple Silicon and
+  Intel, and Windows x64 MSVC. Install from public GitHub Releases with Node/npm;
+  no checkout, Rust compiler, verifier or GitHub CLI is required.
+- Bind one complete Linux proof to independent runtime and package checks for
+  every release target. Require actual four-platform installation and offline
+  reinstallation before creating a release draft. Runtime-only evidence cannot
+  replace the full proof or another platform's test results.
+- Simplify English and Chinese Quick starts around the precompiled runtime while
+  retaining the optional Node architecture and pure Rust development path.
 
 - Retry transient executable-busy errors when launching process plugins, within
   the same startup deadline used for initialization. Keep other launch failures

@@ -37,7 +37,7 @@ test('native manifest selects exact target and retains only its recorded validat
   rejectsCode(()=>selectNativeArtifact({directory:f.directory,target:nativeTargets[1]}),'NATIVE_ARTIFACT_MISSING');
 });
 test('native selector rejects undeclared platform, architecture, libc and old Node API',()=>{
-  for(const target of [{platform:'win32',architecture:'x64',nodeApi:10},{platform:'linux',architecture:'arm64',libc:'gnu',nodeApi:10},{platform:'linux',architecture:'x64',libc:'musl',nodeApi:10}]) rejectsCode(()=>nativeTargetFor(target),'NATIVE_TARGET_UNSUPPORTED');
+  for(const target of [{platform:'win32',architecture:'arm64',nodeApi:10},{platform:'linux',architecture:'arm64',libc:'gnu',nodeApi:10},{platform:'linux',architecture:'x64',libc:'musl',nodeApi:10}]) rejectsCode(()=>nativeTargetFor(target),'NATIVE_TARGET_UNSUPPORTED');
   rejectsCode(()=>nativeTargetFor({...nativeTargets[0],nodeApi:7}),'NATIVE_NODE_API');
 });
 test('binary and provenance byte tampering fail before native loading',async t=>{

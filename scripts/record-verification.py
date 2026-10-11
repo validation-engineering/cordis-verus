@@ -159,7 +159,7 @@ def source_hashes():
 def test_counts(log):
     suites, doctests = {}, {}
     current = None
-    for line in log.splitlines():
+    for line in log.replace("\\", "/").splitlines():
         # The extracted-package checks repeat suites; the main workspace run is
         # before the negative controls. Record its numbers only.
         if "OK unmodified kernel:" in line:

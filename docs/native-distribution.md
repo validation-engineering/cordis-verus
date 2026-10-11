@@ -2,33 +2,22 @@
 
 English | [简体中文](native-distribution.zh-CN.md)
 
-The Node facade uses the same manifest selector in a source checkout and an
-extracted npm installation. The three npm packages can be delivered as precompiled GitHub Release assets.
-No runtime release has been published yet; the commands below become usable after
-a maintainer publishes a validated runtime draft. The source repository is public;
-its npm packages remain unpublished. Registry publication and signing are separate work.
+The Node facade uses the same manifest selector in a source checkout and an extracted npm installation. GitHub Releases distribute three precompiled npm tarballs together with their proof, runtime and source provenance. These packages are not yet published to the npm registry.
 
 ## Install a published runtime without compiling
 
-Prerequisites are Node.js 22.22+ with npm, and the [GitHub CLI](https://cli.github.com/manual/gh_release_download).
-A private repository also requires `gh auth login` with read access. Rust, Verus,
-a source checkout, and a C/C++ compiler are not needed. Choose an explicit published
-runtime tag from the repository's Releases page; toolchain archive tags are not
-runtime releases.
+Install **Node.js 22.22+ with npm**, then run:
 
 ```sh
-# Replace the placeholder with a published runtime tag. No runtime tag exists yet.
-CORDIS_RELEASE_TAG='<published-runtime-tag>'
-gh release download "$CORDIS_RELEASE_TAG" \
-  --repo validation-engineering/cordis-verus \
-  --pattern install-cordis.mjs --dir ./cordis-installer
-node ./cordis-installer/install-cordis.mjs \
-  --release "$CORDIS_RELEASE_TAG" --project ./my-cordis-app
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
+node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
 cd my-cordis-app
 npm start
 ```
 
-The installer selects the current macOS ARM64/x64 or Linux x64 GNU target,
+On Windows PowerShell use `curl.exe` instead of `curl`. Rust, Verus, GitHub CLI, a source checkout and a C/C++ compiler are not needed. The installer downloads from the public release over HTTPS. For a private mirror, download assets with an authenticated client and use `--from-directory` below.
+
+The installer selects the current macOS ARM64/x64, Linux x64 GNU or Windows x64 target,
 downloads three existing npm tarballs plus their evidence, verifies size/SHA-256,
 and installs with `npm --offline --ignore-scripts`. It verifies the installed native
 manifest/provenance and actually loads both Cordis profiles before creating the
@@ -70,15 +59,10 @@ is attempted when a target, dependency or binary cannot be used.
 | `darwin-arm64-napi8` | macOS / ARM64 | Node-API 8 |
 | `darwin-x64-napi8` | macOS / x64 | Node-API 8 |
 | `linux-x64-gnu-napi8` | Linux / x64 / GNU libc | Node-API 8 |
+| `win32-x64-napi8` | Windows / x64 / MSVC | Node-API 8 |
 
-These are allowed artifact targets, not a passed test matrix. Release validation
-selects Linux x64 and macOS Apple Silicon by default; macOS Intel is opt-in through
-`include_macos_intel=true`. Each release contains only the targets actually selected
-and accepted in its run; an omitted Intel target has no assets or validation claim
-in that release. The package engine
-requires Node 22.22 or newer; Node-API 8 does not certify older Node releases. Node 24,
-Windows, Linux ARM64 and musl have not gained acceptance through this implementation.
-OS deployment versions and minimum glibc compatibility need separate release tests.
+Every runtime release requires all four targets. The release runners are Ubuntu 24.04, macOS 15 (Apple Silicon and Intel), and Windows Server 2025 x64, using Node 22.22.0. Node-API 8 does not certify older Node versions. Older OS releases, lower glibc versions, Windows ARM64, Linux ARM64 and musl are not qualified by this matrix. Node 24 needs its own qualification despite satisfying the package engine range.
+
 Each actual artifact records the host OS release, Node version, Node-API and module
 ABI used when loading it. The build profile is recorded; a development build is not
 silently relabeled an optimized release build.
@@ -168,8 +152,7 @@ tarballs to remain present. A committed development report alone is insufficient
 SHA-256 provides byte-integrity and source binding, not publisher authentication.
 Provenance remains an unsigned claim by its producing build environment; verifying
 it does not prove an arbitrary supplied native program safe. Signing/attestations,
-minimum OS/libc release qualification and a passed multi-platform release matrix
-remain separate acceptance work. JavaScript and native FFI behavior are not covered
+additional minimum OS/libc qualification remain separate work. JavaScript and native FFI behavior are not covered
 by the lifecycle kernel's Verus proofs.
 
 ## Release asset production
@@ -181,19 +164,12 @@ binds all package/build inputs, and requires a clean source commit (the newly ge
 verification report is the only permitted tracked difference). It preserves the
 actual native build profile rather than silently calling a development build optimized.
 
-The [full release workflow](../.github/workflows/release-validation.yml) defaults to
-Linux x64 and macOS Apple Silicon; dispatch it with `include_macos_intel=true` to add
-macOS Intel. Each selected platform directly completes the positive proof and
-quality/package gate. [Whole-crate negative controls](full-negative-validation.md)
-run independently and are explicitly `not_run` in release evidence. The
-`runtime-release/v2` manifest and installer enforce this distinction. It installs each staged runtime in a new
-project and checks a second offline `npm ci` followed by the example. When explicitly
-dispatched with `create_draft=true` and a new `release_tag`, it collects exactly the
-selected platforms' matching-commit asset sets, adds `SHA256SUMS`, and creates a
-**draft prerelease**. Any failed selected platform prevents this job from running.
-It refuses an existing tag and never publishes the draft automatically. A development
-workflow cannot upload runtime releases.
+The [release workflow](../.github/workflows/release-validation.yml) runs the full quality gate, including the complete pinned Verus proof and compilation, on Linux. The other three platforms run [host acceptance](../.github/workflows/runtime-platforms.yml): Rust tests, examples, native/Node compatibility tests and independent extracted package checks. `record-runtime.py` explicitly records `proofExecuted: false` and cannot authorize a release alone.
 
-A workflow definition is not execution evidence. The first runtime release still
-requires successful full-quality runs on its exact commit and maintainer review.
-See [the release procedure](releasing.md) for the remaining release checklist.
+The shared-proof policy currently permits only test and Verus ghost conditional compilation in the kernel. Release assembly rejects explicit platform/feature branches or generated kernel inclusions until their proof portability has been reviewed. All four declared runtime targets are 64-bit.
+
+The collector requires identical source hashes and one commit across the full proof and every host record. `runtime-release/v3` keeps these records separate; a Linux runtime pass cannot stand in for a Windows or macOS pass. It checks native provenance and tarball hashes before staging. All four hosts then install the exact collected assets in a new directory containing spaces, run the example, and repeat it after offline `npm ci`. This installation job has no source checkout or compiler step.
+
+[Whole-crate negative controls](full-negative-validation.md) remain independent and explicitly `not_run` in these release records. Proof contracts and scope are unchanged: platform tests do not prove Node, FFI or arbitrary plugins.
+
+Dispatch with `create_draft=true` and a new `release_tag` to create a **draft prerelease** only after every required job succeeds. The draft contains all four asset sets, the standalone installer and `SHA256SUMS`. Existing tags are refused. Review and publish the draft after checking its results; the workflow does not publish automatically. See the [release procedure](releasing.md).

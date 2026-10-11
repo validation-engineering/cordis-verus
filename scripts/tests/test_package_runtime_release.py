@@ -35,6 +35,34 @@ class RuntimeReleaseTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 MODULE.validate_quality({**self.report(), **changes}, self.verifier())
 
+    def test_shared_proof_rejects_os_feature_and_generated_kernel_branches(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.checkout(Path(directory))
+            kernel = root / 'crates/cordis-kernel/src/lib.rs'
+            with patch.object(MODULE, 'ROOT', root):
+                kernel.write_text('#[cfg(all(test, not(verus_keep_ghost)))] fn test_only() {}')
+                MODULE.validate_shared_kernel()
+                for source in ['#[cfg(windows)] fn windows_only() {}',
+                               '#[cfg(target_os = "linux")] fn linux_only() {}',
+                               '#[cfg(feature = "new-kernel")] fn feature_only() {}',
+                               '#[cfg_attr(windows, path = "win.rs")] mod platform;',
+                               'const WINDOWS: bool = cfg!(windows);', 'include!("generated.rs");']:
+                    kernel.write_text(source)
+                    with self.subTest(source=source), self.assertRaisesRegex(ValueError, 'proof portability'):
+                        MODULE.validate_shared_kernel()
+
+    def test_host_only_record_requires_matching_proof_and_exact_host_packages(self):
+        from test_record_runtime import MODULE as runtime, RuntimeAcceptanceTests
+        record = RuntimeAcceptanceTests().record()
+        verifier = SimpleNamespace(helper=lambda *_: runtime)
+        evidence = {'sourceCommit': record['sourceCommit'], 'verification': {'sha256': record['sha256']},
+                    'runtimeValidation': record, 'npm': record['npmDistribution'], 'build': record['nodeBuild']}
+        MODULE.validate_host_evidence(evidence, verifier)
+        with self.assertRaisesRegex(ValueError, 'host acceptance'):
+            MODULE.validate_host_evidence({**evidence, 'npm': {'nativeTarget': 'linux-x64-gnu-napi8'}}, verifier)
+        with self.assertRaisesRegex(ValueError, 'stale'):
+            MODULE.validate_host_evidence({**evidence, 'verification': {'sha256': {'old': 'hash'}}}, verifier)
+
     def test_asset_paths_and_bytes_are_bound(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -58,7 +86,7 @@ class RuntimeReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(MODULE, 'run', return_value='a' * 40):
             root = Path(directory)
             (root / 'cordis-runtime-darwin-arm64-napi8.json').write_text(json.dumps({
-                'schema': 'cordis-verus.runtime-release/v2', 'target': 'darwin-arm64-napi8', 'sourceCommit': 'b' * 40}))
+                'schema': 'cordis-verus.runtime-release/v3', 'target': 'darwin-arm64-napi8', 'sourceCommit': 'b' * 40}))
             with self.assertRaisesRegex(ValueError, 'mixed-commit'):
                 MODULE.collect(root, root / 'output', 'a' * 40)
             self.assertFalse((root / 'output').exists())
@@ -76,7 +104,7 @@ class RuntimeReleaseTests(unittest.TestCase):
                'nativeArtifactSha256': 'binary', 'packages': packages}
         evidence = directory / f'cordis-evidence-{target}.json'
         MODULE.write(evidence, {'sourceCommit': commit, 'verification': {**self.report(), 'npmDistribution': npm}, 'npm': npm})
-        record = {'schema': 'cordis-verus.runtime-release/v2', 'sourceCommit': commit, 'target': target,
+        record = {'schema': 'cordis-verus.runtime-release/v3', 'sourceCommit': commit, 'target': target,
                   'nativeManifestSha256': 'manifest', 'nativeArtifactSha256': 'binary',
                   'acceptance': {'releaseQuality': True, 'negativeControls': 'not_run', 'paperCompletion': False},
                   'packages': packages, 'evidence': MODULE.asset(evidence)}
@@ -87,6 +115,8 @@ class RuntimeReleaseTests(unittest.TestCase):
     def checkout(self, root):
         checkout = root / 'checkout'
         (checkout / 'scripts').mkdir(parents=True)
+        kernel = checkout / 'crates/cordis-kernel/src'; kernel.mkdir(parents=True)
+        (kernel / 'lib.rs').write_text('fn shared() {}')
         (checkout / 'scripts/install-cordis.mjs').write_bytes(b'installer')
         return checkout
 
@@ -127,9 +157,9 @@ class RuntimeReleaseTests(unittest.TestCase):
                 self.assertFalse((root / 'output').exists())
 
     def test_collection_rejects_missing_selected_and_extra_unselected_platforms(self):
-        cases = [(MODULE.DEFAULT_TARGETS, sorted(MODULE.TARGETS), 'All selected'),
+        cases = [(MODULE.TARGETS - {'win32-x64-napi8'}, sorted(MODULE.TARGETS), 'All selected'),
                  ({'linux-x64-gnu-napi8'}, None, 'All selected'),
-                 (MODULE.TARGETS, None, 'unselected')]
+                 (MODULE.TARGETS | {'freebsd-x64-napi8'}, None, 'unselected')]
         for artifacts, selection, error in cases:
             with self.subTest(artifacts=artifacts, selection=selection), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)

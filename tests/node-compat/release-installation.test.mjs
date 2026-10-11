@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import { hostTarget, installRelease, validateManifest } from '../../scripts/install-cordis.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -28,7 +28,7 @@ async function fixture() {
   };
   evidence.verification.npmDistribution = evidence.npm;
   const bytes = JSON.stringify(evidence); await writeFile(join(assets, 'evidence.json'), bytes);
-  const manifest = { schema: 'cordis-verus.runtime-release/v2', target, sourceCommit: evidence.sourceCommit,
+  const manifest = { schema: 'cordis-verus.runtime-release/v3', target, sourceCommit: evidence.sourceCommit,
     acceptance: { releaseQuality: true, paperCompletion: false, negativeControls: 'not_run' },
     nativeManifestSha256: evidence.npm.nativeManifestSha256, nativeArtifactSha256: evidence.npm.nativeArtifactSha256,
     packages, evidence: { file: 'evidence.json', bytes: Buffer.byteLength(bytes), sha256: hash(bytes) } };
@@ -45,7 +45,8 @@ test('release installer selects only supported host targets', () => {
   assert.equal(hostTarget('darwin', 'arm64', null), 'darwin-arm64-napi8');
   assert.equal(hostTarget('linux', 'x64', 'gnu'), 'linux-x64-gnu-napi8');
   assert.throws(() => hostTarget('linux', 'x64', 'musl'), /Unsupported/);
-  assert.throws(() => hostTarget('win32', 'x64', null), /Unsupported/);
+  assert.equal(hostTarget('win32', 'x64', null), 'win32-x64-napi8');
+  assert.throws(() => hostTarget('win32', 'arm64', null), /Unsupported/);
 });
 test('release manifest rejects development evidence, wrong target, missing and unsafe packages', async () => {
   const f = await fixture();
@@ -129,16 +130,12 @@ test('native source provenance must be covered by the full-quality record', asyn
   } finally { await f.dispose(); }
 });
 test('GitHub download failure does not create a destination', async () => {
-  const f = await fixture(), oldPath = process.env.PATH;
+  const f = await fixture();
+  const download = mock.method(globalThis, 'fetch', async () => { throw new Error('download-unavailable'); });
   try {
-    const bin = join(f.root, 'bin'); await mkdir(bin);
-    const gh = join(bin, 'gh');
-    await writeFile(gh, '#!/bin/sh\necho download-unavailable >&2\nexit 1\n'); await chmod(gh, 0o755);
-    process.env.PATH = bin;
     await assert.rejects(installRelease({ project: f.project, release: 'v0.1.0-fixture' }), /download-unavailable/);
-    await assert.rejects(lstat(f.project), { code: 'ENOENT' });
-    assert.deepEqual((await readdir(f.root)).sort(), ['assets', 'bin']);
-  } finally { process.env.PATH = oldPath; await f.dispose(); }
+    await noProject(f);
+  } finally { download.mock.restore(); await f.dispose(); }
 });
 
 
@@ -155,6 +152,31 @@ test('release evidence rejects legacy, partial or uncompiled proof and misleadin
       const bytes = JSON.stringify(evidence); await writeFile(path, bytes);
       f.manifest.evidence.bytes = Buffer.byteLength(bytes); f.manifest.evidence.sha256 = hash(bytes); await f.save();
       await assert.rejects(installRelease({ project: f.project, fromDirectory: f.assets }), { code: 'ERR_ASSERTION' });
+      await noProject(f);
+    } finally { await f.dispose(); }
+  }
+});
+
+
+test('shared proof cannot replace a missing, stale or failed host runtime acceptance', async () => {
+  for (const mutate of [r => { r.sha256 = {}; }, r => { r.sourceCommit = 'e'.repeat(40); },
+    r => { r.target = 'other'; }, r => { r.steps.pop(); }, r => { r.tests.nodeCompatibility.skipped = 1; },
+    r => { r.npmDistribution = {}; }, r => { r.proofExecuted = true; }]) {
+    const f = await fixture();
+    try {
+      const path = join(f.assets, f.manifest.evidence.file);
+      const evidence = JSON.parse(await readFile(path, 'utf8'));
+      evidence.runtimeValidation = {
+        schema:'cordis-verus.runtime-validation/v1',status:'passed',proofExecuted:false,releaseAcceptance:false,
+        sourceCommit:evidence.sourceCommit,target,sha256:evidence.verification.sha256,
+        steps:['clippy','rust-tests','examples','native-build','node-tests','crate-packages','npm-packages'].map(name=>({name,status:'passed'})),
+        tests:{total:1,nodeCompatibility:{tests:1,pass:1,fail:0,cancelled:0,skipped:0,todo:0}},
+        logSha256:'f'.repeat(64),npmDistribution:evidence.npm,
+      };
+      mutate(evidence.runtimeValidation);
+      const bytes = JSON.stringify(evidence); await writeFile(path, bytes);
+      f.manifest.evidence.bytes = Buffer.byteLength(bytes); f.manifest.evidence.sha256 = hash(bytes); await f.save();
+      await assert.rejects(installRelease({project:f.project,fromDirectory:f.assets}), {code:'ERR_ASSERTION'});
       await noProject(f);
     } finally { await f.dispose(); }
   }

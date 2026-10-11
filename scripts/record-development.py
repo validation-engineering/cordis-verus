@@ -4,11 +4,12 @@
 import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import importlib.util
 import json
 import os
+if os.name == "posix":
+    import fcntl
 from pathlib import Path
 import platform
 import re
@@ -34,7 +35,7 @@ FIXED_SCRIPTS = (
     "scripts/verify.sh", "scripts/toolchain-env.sh", "scripts/install-verus.py",
     "scripts/package-check.py", "scripts/build-node.mjs", "scripts/build-node.sh",
     "scripts/check-npm-package.mjs", "scripts/sync-profile-types.mjs",
-    "scripts/write-native-manifest.mjs", "scripts/package-native.mjs",
+    "scripts/write-native-manifest.mjs", "scripts/package-native.mjs", "scripts/install-cordis.mjs",
 )
 HARNESS_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
@@ -183,7 +184,7 @@ def distribution_inputs(names, directories, suffixes=None):
 
 def npm_source_hashes():
     return distribution_inputs(
-        ["package.json", "package-lock.json", "LICENSE", "NOTICE", "scripts/check-npm-package.mjs"],
+        ["package.json", "package-lock.json", "LICENSE", "NOTICE", "scripts/check-npm-package.mjs", "scripts/install-cordis.mjs"],
         ["packages/" + name for name in NPM_PACKAGES])
 
 

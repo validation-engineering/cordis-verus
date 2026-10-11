@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Stage GitHub Release assets from fresh release quality checks; never upload.
 
-`collect` requires every selected platform from the same commit. Linux x64 and
-macOS ARM64 are required; macOS Intel is optional. Development records cannot
-substitute for release proof and runtime acceptance. Negative regressions are
-independent and are recorded as not_run by the release gate.
+`collect` requires all four targets from the same commit. A complete positive
+proof is shared by byte-identical sources; runtime and installation acceptance
+are required on each host. Host-only records never substitute for that proof.
 """
 import argparse
 import hashlib
@@ -17,8 +16,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-TARGETS = {'darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8'}
-DEFAULT_TARGETS = {'darwin-arm64-napi8', 'linux-x64-gnu-napi8'}
+TARGETS = {'darwin-arm64-napi8', 'darwin-x64-napi8', 'linux-x64-gnu-napi8', 'win32-x64-napi8'}
+DEFAULT_TARGETS = TARGETS.copy()
 NAMES = {'@cordis-verus/compat-cordis', '@cordis-verus/compat-harness', '@cordis-verus/compat-loader'}
 
 
@@ -62,7 +61,25 @@ def verification_module():
     return module
 
 
+def validate_shared_kernel():
+    # Sharing the Linux proof is restricted to this platform-independent kernel.
+    # New conditional compilation requires reviewing that policy, not silently
+    # using a proof of the Linux branch for another platform's executable code.
+    files = list((ROOT / 'crates/cordis-kernel/src').rglob('*.rs'))
+    if not files:
+        raise ValueError('Missing shared kernel sources')
+    allowed = {'all', 'any', 'not', 'test', 'verus_keep_ghost'}
+    for path in files:
+        source = path.read_text()
+        if re.search(r'\bcfg_attr\s*\(|\b(?:cfg|include)\s*!', source):
+            raise ValueError(f'Conditional/generated kernel code needs a proof portability review: {path.name}')
+        for expression in re.findall(r'#\s*!?\s*\[\s*cfg\s*\((.*?)\)\s*\]', source, re.S):
+            if set(re.findall(r'[A-Za-z_][A-Za-z_0-9]*', expression)) - allowed:
+                raise ValueError(f'Platform/feature-specific kernel code needs a proof portability review: {path.name}')
+
+
 def validate_quality(record, verifier):
+    validate_shared_kernel()
     if record.get('schema') != 'cordis-verus.verification/v4' or record.get('status') != 'passed':
         raise ValueError('A fresh full release verification report is required')
     verifier.validate_release_report(record)
@@ -83,19 +100,33 @@ def asset(path):
     return {'file': path.name, 'bytes': path.stat().st_size, 'sha256': digest(path)}
 
 
+def validate_host_evidence(evidence, verifier):
+    quality = evidence['verification']
+    runtime = evidence.get('runtimeValidation')
+    accepted = quality
+    if runtime is not None:
+        verifier.helper('record-runtime.py', 'runtime_acceptance').validate(
+            runtime, sources=quality['sha256'], commit=evidence['sourceCommit'])
+        accepted = runtime
+    if accepted.get('npmDistribution') != evidence.get('npm') or accepted.get('nodeBuild') != evidence.get('build'):
+        raise ValueError('Runtime packages differ from their host acceptance evidence')
+
+
 def publish_directory(stage, output):
     # Exclusive reservation; never replace prior evidence.
     output.mkdir()
     try:
-        stage.rename(output)
+        for child in stage.iterdir():
+            child.rename(output / child.name)
+        stage.rmdir()
     except BaseException:
-        output.rmdir()
+        shutil.rmtree(output)
         raise
 
 
-def package(output):
+def package(output, runtime_input=None, quality_report=None):
     verifier = verification_module()
-    verification = read(ROOT / 'docs/verification-report.json')
+    verification = read(quality_report or ROOT / 'docs/verification-report.json')
     validate_quality(verification, verifier)
     # The recorder only changes its own checked-in report. No source may differ
     # from the release commit, including newly created untracked source files.
@@ -105,18 +136,29 @@ def package(output):
     commit = run('git', 'rev-parse', 'HEAD')
     if not re.fullmatch(r'[a-f0-9]{40}', commit):
         raise ValueError('Invalid source commit')
-    npm_directory = ROOT / 'target/release-artifacts/npm'
+    inputs = runtime_input or ROOT
+    npm_directory = inputs / 'target/release-artifacts/npm'
     npm = read(npm_directory / 'package-report.json')
-    build = read(ROOT / 'target/node-compat/build.json')
-    if verification.get('npmDistribution') != npm or verification.get('nodeBuild') != build:
-        raise ValueError('Runtime packages differ from their release-quality evidence')
+    build = read(inputs / 'target/node-compat/build.json')
+    evidence_record = {'sourceCommit': commit, 'verification': verification, 'npm': npm, 'build': build}
+    if runtime_input is not None:
+        runtime = read(inputs / 'target/runtime-validation/report.json')
+        if runtime.get('logSha256') != digest(inputs / 'target/runtime-validation/runtime.log'):
+            raise ValueError('Runtime validation log changed')
+        evidence_record['runtimeValidation'] = runtime
+    validate_host_evidence(evidence_record, verifier)
     if npm.get('schema') != 'cordis-verus.npm-package/v1' or npm.get('status') != 'passed':
         raise ValueError('A successful independent npm installation is required')
-    bound_files(ROOT, npm['sourceHashes'])
+    for name, expected in npm['sourceHashes'].items():
+        bound_files(inputs if name.startswith('packages/compat-cordis/native/') else ROOT, {name: expected})
     bound_files(ROOT, npm['nativeSourceHashes'])
-    if npm['buildReportSha256'] != digest(ROOT / 'target/node-compat/build.json'):
+    if npm['buildReportSha256'] != digest(inputs / 'target/node-compat/build.json'):
         raise ValueError('Native build report changed')
-    selection = json.loads(run('node', '--input-type=module', '-e', "import {selectNativeArtifact} from './packages/compat-cordis/native-artifacts.js'; const s=selectNativeArtifact(); console.log(JSON.stringify({target:s.entry.target,manifest:s.manifestSha256,binary:s.entry.sha256}));"))
+    selection = json.loads(run('node', '--input-type=module', '-e',
+        "import {verifyNativeManifest} from './packages/compat-cordis/native-artifacts.js'; "
+        "const v=verifyNativeManifest(process.argv[1]); if(v.artifacts.length!==1) throw Error('Expected one host artifact'); "
+        "const s=v.artifacts[0]; console.log(JSON.stringify({target:s.entry.target,manifest:v.manifestSha256,binary:s.entry.sha256}));",
+        str(inputs / 'packages/compat-cordis/native')))
     target = npm['nativeTarget']
     if target not in TARGETS or selection != {'target': target, 'manifest': npm['nativeManifestSha256'], 'binary': npm['nativeArtifactSha256']}:
         raise ValueError('Native package provenance or platform differs')
@@ -138,8 +180,8 @@ def package(output):
             shutil.copyfile(source, destination)
             packages.append({**asset(destination), 'name': item['name'], 'version': item['version']})
         evidence = stage / f'cordis-evidence-{target}.json'
-        write(evidence, {'sourceCommit': commit, 'verification': verification, 'npm': npm, 'build': build})
-        manifest = {'schema': 'cordis-verus.runtime-release/v2', 'sourceCommit': commit, 'target': target,
+        write(evidence, evidence_record)
+        manifest = {'schema': 'cordis-verus.runtime-release/v3', 'sourceCommit': commit, 'target': target,
                     'nativeManifestSha256': npm['nativeManifestSha256'], 'nativeArtifactSha256': npm['nativeArtifactSha256'],
                     'acceptance': {'releaseQuality': True, 'negativeControls': 'not_run', 'paperCompletion': False},
                     'packages': packages, 'evidence': asset(evidence)}
@@ -157,8 +199,8 @@ def selected_targets(targets):
     selection = set(targets)
     if len(selection) != len(targets):
         raise ValueError('Duplicate release targets')
-    if selection not in (DEFAULT_TARGETS, TARGETS):
-        raise ValueError('Release targets must include Linux x64 and macOS ARM64, with only macOS Intel optional')
+    if selection != TARGETS:
+        raise ValueError('A release requires Linux x64, both macOS architectures, and Windows x64')
     return selection
 
 
@@ -182,7 +224,7 @@ def collect(inputs, output, commit, targets=None):
     for path in manifests:
         record = read(path)
         target = record.get('target')
-        if record.get('schema') != 'cordis-verus.runtime-release/v2' or not isinstance(target, str) or target not in required or target in seen or record.get('sourceCommit') != commit:
+        if record.get('schema') != 'cordis-verus.runtime-release/v3' or not isinstance(target, str) or target not in required or target in seen or record.get('sourceCommit') != commit:
             raise ValueError('Duplicate, unselected, unsupported or mixed-commit platform evidence')
         if record.get('acceptance', {}).get('releaseQuality') is not True or record['acceptance'].get('paperCompletion') is not False:
             raise ValueError('A development artifact is not a release artifact')
@@ -202,8 +244,7 @@ def collect(inputs, output, commit, targets=None):
         if record['acceptance'].get('negativeControls') != evidence['verification']['negativeControls']['status']:
             raise ValueError('Independent negative-control status differs')
         npm = evidence.get('npm', {})
-        if evidence['verification'].get('npmDistribution') != npm or evidence['verification'].get('nodeBuild') != evidence.get('build'):
-            raise ValueError('Runtime packages differ from their release-quality evidence')
+        validate_host_evidence(evidence, verifier)
         if (npm.get('status') != 'passed' or npm.get('nativeTarget') != target
                 or npm.get('nativeManifestSha256') != record.get('nativeManifestSha256')
                 or npm.get('nativeArtifactSha256') != record.get('nativeArtifactSha256')
@@ -233,35 +274,35 @@ def collect(inputs, output, commit, targets=None):
     print(f'Collected {len(required)} selected platforms: {", ".join(sorted(required))}. No upload performed.')
 
 
-def release_plan(include_macos_intel=False):
-    platforms = [('ubuntu-24.04', 'linux-x64-gnu-napi8'), ('macos-15', 'darwin-arm64-napi8')]
-    if include_macos_intel:
-        platforms.append(('macos-15-intel', 'darwin-x64-napi8'))
-    return {'quality': {'os': [os_name for os_name, _ in platforms]},
-            'targets': [target for _, target in platforms]}
+def release_plan():
+    quality = ['ubuntu-24.04']
+    runtime = ['macos-15', 'macos-15-intel', 'windows-2025']
+    return {'quality': {'os': quality}, 'runtime': {'os': runtime},
+            'install': {'os': quality + runtime}, 'targets': sorted(TARGETS)}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     planning = commands.add_parser('plan')
-    planning.add_argument('--include-macos-intel', action='store_true')
     planning.add_argument('--github-output', type=Path, required=True)
     staging = commands.add_parser('package')
     staging.add_argument('--output', type=Path, default=ROOT / 'target/github-release')
+    staging.add_argument('--runtime-input', type=Path, help='Downloaded host acceptance artifact')
+    staging.add_argument('--quality-report', type=Path, help='Matching full release-quality report')
     collecting = commands.add_parser('collect')
     collecting.add_argument('--input', type=Path, required=True)
     collecting.add_argument('--output', type=Path, required=True)
     collecting.add_argument('--commit', required=True)
     collecting.add_argument('--targets-json', type=parse_targets_json,
-                            help='JSON array of release targets; defaults to Linux x64 and macOS ARM64')
+                            help='JSON array of release targets; defaults to all four platforms')
     args = parser.parse_args()
     if args.command == 'plan':
         with args.github_output.open('a') as stream:
-            for key, value in release_plan(args.include_macos_intel).items():
+            for key, value in release_plan().items():
                 stream.write(key + '=' + json.dumps(value, separators=(',', ':')) + '\n')
     elif args.command == 'package':
-        package(args.output)
+        package(args.output, args.runtime_input, args.quality_report)
     else:
         collect(args.input, args.output, args.commit, args.targets_json)
 

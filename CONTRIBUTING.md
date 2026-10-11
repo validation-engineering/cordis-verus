@@ -89,7 +89,8 @@ published, the latest 0.x release receive maintenance; no LTS commitment exists.
 The supported Rust compiler is the pinned Rust 1.98.1, also declared as the
 minimum package version. Raising it requires a documented toolchain update and
 the complete verification gate. The source repository is [validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus),
-now public. No runtime release or registry namespace is configured; see `docs/releasing.md` before distribution.
+now public. GitHub Releases distribute precompiled runtime previews; registry
+publication remains separate. See `docs/releasing.md` before distribution.
 
 By submitting a contribution, you license it under the project's MIT license.
 Preserve upstream attribution and keep the reference paper out of source/crate

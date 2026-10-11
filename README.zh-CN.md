@@ -8,7 +8,7 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 
 你可以构建原生 Rust 插件系统，也可以通过可选的 Node 宿主运行支持范围内的原版 Cordis 插件，将 Rust 与 JavaScript 组合使用。配套项目 [Cordis Harness](https://github.com/validation-engineering/cordis-harness) 在这个运行时上运行官方 DeepSeek Harness 工作流。
 
-**实验性、尚未达到 1.0。** API 仍在演进，crate 和 npm 包尚未发布。
+**实验性、尚未达到 1.0。** API 仍在演进。预编译运行时通过 GitHub Releases 分发；crates.io 和 npm 注册表发布仍在计划中。
 
 ## 为什么使用 cordis-verus
 
@@ -18,24 +18,18 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 
 ## 快速开始
 
-这个 Rust 示例不需要 Node、模型凭据或外部服务。请准备 Git、Rustup、Python 3.9+、curl 和本机 Rust 编译工具链。源码仓库与经过校验和锁定的工具链归档均已公开，详见[环境准备说明](CONTRIBUTING.md#toolchain-availability)。
+准备 **Node.js 22.22+ 和 npm**，即可运行预编译的 Node 兼容运行时。Release 支持 Linux x64（GNU libc）、macOS Apple Silicon / Intel 和 Windows x64。Windows PowerShell 请将下载命令中的 `curl` 写成 `curl.exe`。
 
 ```sh
-git clone https://github.com/validation-engineering/cordis-verus.git
-cd cordis-verus
-./scripts/install-verus.sh
-bash -c 'source scripts/toolchain-env.sh && cargo run --locked -p cordis --example basic'
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
+node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
+cd my-cordis-app
+npm start
 ```
 
-[基础示例](crates/cordis/examples/basic.rs) 先挂载消费者，再挂载提供者，最后执行清理：
+示例通过原生 Rust 生命周期驱动输出 `Hello, Cordis`。无需 Rust 工具链、Verus、源码检出或模型凭据；编辑 `app.mjs` 即可添加插件。离线安装与平台要求见[安装指南](docs/native-distribution.zh-CN.md)。
 
-```text
-consumer: hello from verified Cordis
-consumer cleanup still sees: hello from verified Cordis
-provider cleanup follows the consumer
-```
-
-消费者在清理期间仍能使用其服务，提供者随后才被释放。已有 JavaScript 插件的使用方式见独立的 [Node 安装与示例指南](docs/node-compatibility.md)。
+纯 Rust 应用可从[运行时指南](docs/runtime.md)与[基础示例](crates/cordis/examples/basic.rs)开始；编译和验证方式见[开发环境说明](CONTRIBUTING.md)。
 
 ## 架构
 
@@ -72,7 +66,7 @@ Verus 在开发阶段检查内核，已编译应用无需运行验证器。完�
 
 1. **扩大 refinement：** 将更多生命周期行为与宿主执行连接到论文约束。
 2. **完善兼容性：** 修复需要对齐的已知差异，验证更多原版插件。
-3. **准备可复现发布：** 完成全部平台的发布验收，通过 [GitHub Release 安装路径](docs/native-distribution.zh-CN.md)提供预编译运行产物；当前尚无可下载的 runtime release。
+3. **完善可复现发布：** 在[预编译运行时](docs/native-distribution.zh-CN.md)基础上扩大平台认证，补充签名和完整应用打包。
 
 具体验收条件见[路线图](docs/roadmap.md)，逐项主张见[论文清单](docs/paper-coverage.md)。完整论文 refinement 与生产就绪仍是后续目标。
 

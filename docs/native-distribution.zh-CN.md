@@ -2,31 +2,22 @@
 
 [English](native-distribution.md) | 简体中文
 
-Node 兼容层在源码检出目录和解包后的 npm 安装中使用同一个清单选择器。
-三个 npm 包可以作为预编译产物通过 GitHub Release 分发。
-**目前尚未发布运行时 Release**；以下命令需等维护者发布通过验证的运行时草稿后才能使用。
-源码仓库已公开，npm 软件包尚未发布；注册表发布和签名属于单独的工作。
+Node 兼容层在源码目录和解包后的 npm 安装中使用同一个清单选择器。GitHub Releases 分发三个预编译 npm 压缩包，并附带证明、运行测试和源码记录。npm 注册表发布仍在计划中。
 
 ## 无需编译，安装已发布的运行时
 
-前置依赖为 Node.js 22.22+、npm 和 [GitHub CLI](https://cli.github.com/manual/gh_release_download)。
-访问私有仓库还需要通过 `gh auth login` 登录具有读取权限的账号。
-不需要 Rust、Verus、源码检出目录或 C/C++ 编译器。
-请从仓库的 Releases 页面选择一个明确的已发布运行时标签；工具链归档标签不是运行时 Release。
+准备 **Node.js 22.22+ 和 npm**，然后运行：
 
 ```sh
-# 将占位符替换为已发布的运行时标签。目前尚无此类标签。
-CORDIS_RELEASE_TAG='<published-runtime-tag>'
-gh release download "$CORDIS_RELEASE_TAG" \
-  --repo validation-engineering/cordis-verus \
-  --pattern install-cordis.mjs --dir ./cordis-installer
-node ./cordis-installer/install-cordis.mjs \
-  --release "$CORDIS_RELEASE_TAG" --project ./my-cordis-app
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0-preview.1/install-cordis.mjs
+node install-cordis.mjs --release v0.1.0-preview.1 --project my-cordis-app
 cd my-cordis-app
 npm start
 ```
 
-安装器根据当前环境选择 macOS ARM64/x64 或 Linux x64 GNU 目标，下载现有的三个 npm
+Windows PowerShell 请将 `curl` 写成 `curl.exe`。无需 Rust、Verus、GitHub CLI、源码检出或 C/C++ 编译器。安装器通过 HTTPS 从公开 Release 下载产物；私有镜像可通过已认证客户端下载，再使用下文的 `--from-directory`。
+
+安装器根据当前环境选择 macOS ARM64/x64、Linux x64 GNU 或 Windows x64 目标，下载现有的三个 npm
 压缩包及其验证记录，校验大小与 SHA-256，然后使用 `npm --offline --ignore-scripts` 安装。
 它会验证安装后的原生清单与构建来源记录，并实际加载两种 Cordis profile，之后才创建指定目录。
 安装器不会覆盖已有项目。下载、哈希校验、软件包安装或原生加载失败时，会移除临时目录，
@@ -62,16 +53,11 @@ node ./release-assets/install-cordis.mjs \
 | `darwin-arm64-napi8` | macOS / ARM64 | Node-API 8 |
 | `darwin-x64-napi8` | macOS / x64 | Node-API 8 |
 | `linux-x64-gnu-napi8` | Linux / x64 / GNU libc | Node-API 8 |
+| `win32-x64-napi8` | Windows / x64 / MSVC | Node-API 8 |
 
-这些是允许的产物目标，不代表整个测试矩阵已经通过。发布验证默认选择 Linux x64
-和 macOS Apple Silicon；设置 `include_macos_intel=true` 可加入 macOS Intel。
-每次 Release 只包含本次实际选择并验收通过的目标；未选择 Intel 时，该 Release
-不包含 Intel 产物，也不宣称完成 Intel 验证。
-软件包要求 Node 22.22 或更高版本；Node-API 8 不构成对更早 Node 版本的验证。
-Node 24、Windows、Linux ARM64 和 musl 尚未通过本实现的验收。
-操作系统部署版本和最低 glibc 兼容性需要单独的发布测试。
-每个实际产物都会记录加载它时使用的宿主操作系统版本、Node 版本、Node-API 和模块 ABI。
-构建 profile 也会被记录，不会将开发构建悄悄标为经过优化的发布构建。
+每次运行时发布必须包含这四个平台。验收环境为 Ubuntu 24.04、macOS 15（Apple Silicon 和 Intel）、Windows Server 2025 x64，以及 Node 22.22.0。Node-API 8 不代表旧版 Node 已获得支持；更早的操作系统、较低版本 glibc、Windows ARM64、Linux ARM64 和 musl 不在当前验收范围内。Node 24 虽满足包的版本范围，仍需单独认证。
+
+每份原生产物记录实际执行的操作系统、Node 版本、Node-API 和模块 ABI，以及真实构建配置；不会将开发构建重新标记为优化构建。
 
 ## 构建、选择与验证
 
@@ -155,23 +141,14 @@ SHA-256 提供字节完整性与源码绑定，不提供发布者身份认证。
 签名与 attestation、最低操作系统/libc 的发布资格，以及通过多个平台的发布矩阵，
 仍属于单独的验收工作。JavaScript 和原生 FFI 的行为不在生命周期内核的 Verus 证明覆盖范围内。
 
-## 生成 Release 产物
+## Release 产物生成
 
-[`package-runtime-release.py`](../scripts/package-runtime-release.py)
-复用现有的三个已独立安装验证的压缩包及原生构建来源记录。
-它只接受与当前源码一致的 `verification/v4` 发布验证记录，检查完整正向证明和运行测试证据，绑定所有软件包与构建输入，
-并要求源码提交保持干净；唯一允许的已跟踪文件差异是新生成的验证报告。
-它保留真实的原生构建 profile，不会将开发构建悄悄称为优化构建。
+[发布工作流](../.github/workflows/release-validation.yml)在 Linux 上运行完整质量门禁，包括固定 Verus 工具链的全量证明与编译。其余三种平台运行[本机验收](../.github/workflows/runtime-platforms.yml)：Rust 测试、示例、原生/Node 兼容测试，以及独立解包后的软件包检查。`record-runtime.py` 明确记录 `proofExecuted: false`，不能单独授权发布。
 
-[完整发布工作流](../.github/workflows/release-validation.yml)默认选择 Linux x64 和
-macOS Apple Silicon；手动触发时设置 `include_macos_intel=true` 可加入 macOS Intel。
-每个选定平台直接完成完整正向证明、运行测试与软件包检查，然后将暂存的运行时安装到新项目中，
-执行一次离线 `npm ci` 并运行示例。[整 crate 负控](full-negative-validation.zh-CN.md)独立运行，
-发布证据明确记为 `not_run`；`runtime-release/v2` 清单及安装器按此区分验收。
-当显式使用 `create_draft=true` 和新的 `release_tag` 触发时，
-工作流只收集与本次选定平台准确对应、源码提交一致的产物，添加 `SHA256SUMS`，
-并创建**预发布草稿**。任一选定平台失败都会阻止该任务运行。
-它拒绝使用已有标签，也不会自动发布草稿。开发工作流不能上传运行时 Release。
+共享证明策略目前只允许内核中的测试条件与 Verus ghost 条件编译；新增平台/feature 分支或生成代码引入会被发布收集器拒绝，必须先审查证明的可移植性。当前四个运行时目标均为 64 位。
 
-工作流定义不等于执行证据。第一个运行时 Release 仍需要在其准确提交上通过完整质量验证，
-并经过维护者审查。其余发布检查项见[发布流程](releasing.md)。
+收集器要求完整证明与每个平台的运行记录绑定同一提交和完全一致的源码哈希。`runtime-release/v3` 分开保留两类证据；Linux 运行测试通过不能替代 Windows 或 macOS 的通过结果。收集器在打包前核对原生产物来源与压缩包哈希。四个平台随后在名称带空格的新目录中安装同一批产物，运行示例，再离线执行 `npm ci` 并重新运行。安装任务没有源码检出或编译步骤。
+
+[整 crate 负控](full-negative-validation.md)保持独立，在发布记录中明确标注 `not_run`。证明合同和范围不变：平台测试不等于对 Node、FFI 或任意插件的证明。
+
+使用 `create_draft=true` 与新的 `release_tag` 触发工作流；只有所有必需任务通过，才会创建**预发布草稿**。草稿包含四个平台的产物、独立安装器与 `SHA256SUMS`，不允许复用已有标签。检查结果后发布草稿，工作流本身不会自动公开发布。详见[发布流程](releasing.md)。

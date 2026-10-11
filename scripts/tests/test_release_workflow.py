@@ -183,39 +183,46 @@ class AllPlatformNegativeWorkflowTests(NegativeWorkflowTests):
 
 
 class ReleaseWorkflowTests(unittest.TestCase):
-    def test_release_has_no_negative_dependency_and_draft_requires_all_quality_jobs(self):
+    def test_publication_requires_proof_every_runtime_and_every_installation(self):
         text = RELEASE_WORKFLOW.read_text()
         self.assertNotIn('negative-shards.py', text)
-        self.assertNotIn('diagnostic_keep_going', text)
-        self.assertNotIn('target/proof-negative', text)
-        self.assertNotIn('  preflight:', text)
-        self.assertNotIn('  negative:', text)
-        quality = text.split('\n  quality:', 1)[1].split('\n  draft-release:', 1)[0]
-        self.assertRegex(quality, r'(?m)^    needs: plan$')
-        self.assertIn('run: exec python3 scripts/record-verification.py', quality)
-        self.assertIn('target/positive-proof/', quality)
-        self.assertIn('package-runtime-release.py package', quality)
-        self.assertIn('install-cordis.mjs --from-directory', quality)
-        self.assertIn('npm ci --offline --ignore-scripts', quality)
+        self.assertNotIn('continue-on-error:', text)
+        self.assertIn('run: exec python3 scripts/record-verification.py', text)
+        self.assertIn('uses: ./.github/workflows/runtime-platforms.yml', text)
+        stage = text.split('\n  stage:', 1)[1].split('\n  install:', 1)[0]
+        self.assertIn('needs: [quality, runtime]', stage)
+        self.assertIn('--runtime-input', stage)
+        self.assertIn('--quality-report', stage)
+        install = text.split('\n  install:', 1)[1].split('\n  draft-release:', 1)[0]
+        self.assertIn('needs: [plan, stage]', install)
+        self.assertIn('matrix: ${{ fromJSON(needs.plan.outputs.install) }}', install)
+        self.assertIn('install-cordis.mjs', install)
+        self.assertIn('npm ci --offline --ignore-scripts', install)
+        self.assertNotIn('actions/checkout', install)
+        self.assertNotIn('cargo ', install)
         draft = text.split('\n  draft-release:', 1)[1]
-        self.assertRegex(draft, r'(?m)^    needs: \[plan, quality\]$')
+        self.assertIn('needs: [plan, quality, runtime, stage, install]', draft)
         self.assertIn('if: ${{ inputs.create_draft }}', draft)
-        self.assertIn('pattern: full-validation-${{ github.run_attempt }}-*', draft)
+        self.assertIn('name: runtime-release-assets-${{ github.run_attempt }}', draft)
         self.assertIn('--targets-json "$RELEASE_TARGETS_JSON"', draft)
         self.assertIn('recorded as not_run', draft)
-        self.assertNotIn('continue-on-error:', text)
 
-    def test_release_plan_cli_selects_matching_jobs_and_assets_without_a_mutation_manifest(self):
-        for intel in (False, True):
-            with self.subTest(intel=intel), tempfile.TemporaryDirectory() as directory:
-                output = Path(directory) / 'outputs'
-                command = ['python3', str(ROOT / 'scripts/package-runtime-release.py'), 'plan', '--github-output', str(output)]
-                if intel: command.append('--include-macos-intel')
-                subprocess.run(command, check=True, capture_output=True)
-                plan = {key: json.loads(value) for key, value in (line.split('=', 1) for line in output.read_text().splitlines())}
-                self.assertEqual(plan, PACKAGE.release_plan(intel))
-                self.assertEqual(set(plan['targets']), PACKAGE.TARGETS if intel else PACKAGE.DEFAULT_TARGETS)
-                self.assertEqual(len(plan['quality']['os']), len(plan['targets']))
+    def test_one_complete_proof_is_shared_by_four_runtime_platforms(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'outputs'
+            subprocess.run(['python3', str(ROOT / 'scripts/package-runtime-release.py'), 'plan',
+                            '--github-output', str(output)], check=True, capture_output=True)
+            plan = {key: json.loads(value) for key, value in (line.split('=', 1) for line in output.read_text().splitlines())}
+            self.assertEqual(plan, PACKAGE.release_plan())
+            self.assertEqual(set(plan['targets']), PACKAGE.TARGETS)
+            self.assertEqual(plan['quality']['os'], ['ubuntu-24.04'])
+            self.assertEqual(set(plan['runtime']['os']), {'macos-15', 'macos-15-intel', 'windows-2025'})
+            self.assertEqual(set(plan['install']['os']), set(plan['quality']['os'] + plan['runtime']['os']))
+        runtime = (ROOT / '.github/workflows/runtime-platforms.yml').read_text()
+        self.assertIn('scripts/record-runtime.py', runtime)
+        self.assertIn('if: always()', runtime)
+        self.assertNotIn('install-verus', runtime)
+        self.assertNotIn('continue-on-error:', runtime)
 
 
 class DevelopmentWorkflowTests(unittest.TestCase):
@@ -228,8 +235,8 @@ class DevelopmentWorkflowTests(unittest.TestCase):
         choices = re.findall(r"'(\[.+?\])'", expression)
         self.assertEqual(len(choices), 2)
         manual, default = map(json.loads, choices)
-        self.assertEqual(default, PACKAGE.release_plan()['quality']['os'])
-        self.assertEqual(manual, PACKAGE.release_plan(include_macos_intel=True)['quality']['os'])
+        self.assertEqual(default, ['ubuntu-24.04', 'macos-15'])
+        self.assertEqual(manual, ['ubuntu-24.04', 'macos-15', 'macos-15-intel'])
         self.assertIn('exec python3 scripts/record-development.py', text)
 
 

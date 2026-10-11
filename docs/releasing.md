@@ -1,13 +1,12 @@
 # Release procedure
 
-No Cordis runtime release has been published. [Toolchain archives](toolchains/README.md)
-preserve development dependencies and do not certify this project for release. The workspace crate manifests intentionally set `publish = false`:
-the source repository is public at
-[validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus). Registry names
-and a monitored security reporting route must be confirmed before a public release.
-The initial GitHub source snapshot is a development checkpoint, not a release;
-see [current status](status.md) and [validation gates](validation.md). In particular, the
-local name `cordis` is not a claim to that crates.io namespace.
+GitHub Releases distribute precompiled experimental runtimes from the public
+[validation-engineering/cordis-verus](https://github.com/validation-engineering/cordis-verus)
+repository. [Toolchain archives](toolchains/README.md) only preserve development
+dependencies; they are not runtime releases. Registry publication is separate:
+workspace libraries remain unpublished, and the local `cordis` crate name is not a
+claim to that crates.io namespace. See [current status](status.md) and
+[validation gates](validation.md) for the proof and compatibility boundaries.
 
 ## Local artifact dry run
 
@@ -49,10 +48,9 @@ paper copies, and build outputs must not appear in them.
    upstream attribution. Configure branch protection for all quality jobs.
 2. Review known limitations, issue backlog, dependency advisories, and proof
    assumptions. Do not describe 0.1 as audited, production-proven, or a complete
-   paper implementation. Every platform selected for the release must actually
-   pass: Linux x64 and macOS Apple Silicon by default, plus macOS Intel when
-   `include_macos_intel=true`. Claim validation and provide assets only for that
-   selected, accepted set.
+   paper implementation. All four release platforms must actually pass runtime and installation checks:
+   Linux x64, macOS Apple Silicon / Intel, and Windows x64. The complete positive
+   proof runs once on Linux and must bind the same source bytes as every host record.
 3. Choose matching crate versions and the exact host-to-kernel dependency.
    Update `CHANGELOG.md`, Rust/toolchain policy if changed, and migration notes.
    Refresh the checked verification report from the exact release sources with
@@ -81,24 +79,23 @@ token; only the explicitly requested draft-release job has `contents: write`, fo
 The runtime distribution does not require publishing to npm or crates.io. It
 contains the existing `compat-cordis`, `compat-harness` and `compat-loader` tarballs,
 with the native addon already inside the core package. Consumers need Node/npm;
-private downloads also need an authenticated GitHub CLI. See
+private mirrors can be downloaded with an authenticated client before offline installation. See
 [installation and architecture boundaries](native-distribution.md#install-a-published-runtime-without-compiling).
-No runtime release is available yet.
-
 From a clean, reviewed commit, run the `Release validation` workflow with
-`create_draft=true` and an unused tag such as a chosen `v0.1.0-rc.N`. The default
-platforms are Linux x64 and macOS Apple Silicon; set `include_macos_intel=true` to
-include macOS Intel. Every selected platform must pass `record-verification.py`
-with complete positive proof, runtime/compatibility tests and package checks
-before its packages can be staged. [Full negative regressions](full-negative-validation.md)
-run independently; release evidence explicitly records them as `not_run`.
-Evidence binds the source, tools, platform and run attempt; rerun the whole workflow
-after a failure. The workflow then tests installation, native loading and offline
-reinstallation on that same platform. The collector requires exactly the selected
-platform manifests from the same source commit, rechecks the full-quality records,
-and copies their original package bytes into a draft prerelease with checksums and
-an installer. It does not rebuild after verification. A default run neither validates
-Intel nor produces Intel assets.
+`create_draft=true` and an unused preview tag. All four platforms are mandatory.
+The Linux job runs `record-verification.py`, retaining complete positive proof,
+runtime tests and package checks. The other three hosts run `record-runtime.py`
+without executing Verus. The collector requires identical source fingerprints,
+the same commit, successful host tests, and unchanged native/tarball bytes before
+joining these records. A host-only record cannot authorize a release.
+
+The exact assembled assets are then installed on all four platforms, without a
+source checkout, in a directory containing spaces. Each host runs the generated
+application, performs offline `npm ci`, and runs it again. Only after all four
+installations pass can the draft job collect their original bytes, checksums and
+installer. No binary is rebuilt after acceptance. [Full negative regressions](full-negative-validation.md)
+run independently and remain explicitly `not_run` in release evidence. Rerun the
+whole release workflow after a failure so artifact attempts are never mixed.
 
 The `create_draft` default is false. A failed gate leaves only diagnostic Actions
 artifacts; an interrupted upload can leave an incomplete draft, which must be

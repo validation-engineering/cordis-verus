@@ -30,12 +30,14 @@ It is not automatically scheduled by this change.
 Default push/PR CI runs development checks on Linux x86_64 and macOS Apple Silicon.
 A manual development run can add Intel with `include_macos_intel=true`.
 
-The manual **Release validation** workflow uses the same two default platforms;
-`include_macos_intel=true` adds Intel. Each platform directly runs the complete
-positive proof, runtime/compatibility tests and crate/npm package checks, then
-stages and installs its runtime assets in a fresh project. It also exercises
-native loading and offline reinstallation. These checks share the development
-implementation and do not repeat the positive proof or invoke mutation shards.
+The manual **Release validation** workflow requires Linux x64, macOS Apple
+Silicon / Intel, and Windows x64. Linux runs the complete positive proof and
+quality gate. The other hosts run Rust, Node and extracted-package acceptance,
+without executing Verus. The collector requires the same commit and source
+fingerprints before joining proof and host records. All four platforms install
+the exact assembled runtime, run its example, and repeat after offline `npm ci`.
+No platform can inherit another host's runtime pass. Negative controls remain
+independent of this release gate.
 
 A draft runtime prerelease can be created only after **all selected platforms**
 pass, using assets from the same commit and workflow attempt. Source hashes,

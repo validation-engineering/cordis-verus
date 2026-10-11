@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve, relative } from 'node:path';
+import { dirname, join, resolve, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { npmCommand } from './install-cordis.mjs';
 import { selectNativeArtifact, verifyNativeManifest } from '../packages/compat-cordis/native-artifacts.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,7 +16,7 @@ const output = join(root, 'target/release-artifacts/npm');
 const reportPath = join(output, 'package-report.json');
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const fileDigest = async path => digest(await readFile(path));
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npm = 'npm';
 
 async function filesUnder(directory, accept = () => true) {
   const result = [];
@@ -40,7 +41,7 @@ async function nativeInputs() {
   return Object.fromEntries(await Promise.all(files.sort().map(async name => [name, await fileDigest(join(root, name))])));
 }
 async function inputs() {
-  const files = ['package.json', 'package-lock.json', 'LICENSE', 'NOTICE', 'scripts/check-npm-package.mjs'];
+  const files = ['package.json', 'package-lock.json', 'LICENSE', 'NOTICE', 'scripts/check-npm-package.mjs', 'scripts/install-cordis.mjs'];
   for (const directory of packageDirectories) for (const path of await filesUnder(join(root, directory))) files.push(relative(root, path).split('\\').join('/'));
   return Object.fromEntries(await Promise.all(files.sort().map(async name => [name, await fileDigest(join(root, name))])));
 }
@@ -50,7 +51,8 @@ function assertHashes(actual, expected, message) {
   assert.equal(changed.length, 0, `${message}: ${changed.slice(0, 10).join(', ')}${changed.length > 10 ? ` (+${changed.length - 10} more)` : ''}`);
 }
 function run(command, args, cwd, env) {
-  const result = spawnSync(command, args, { cwd, env, encoding: 'utf8', timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
+  const invocation = command === npm ? [...npmCommand(env), ...args] : [command, ...args];
+  const result = spawnSync(invocation[0], invocation.slice(1), { cwd, env, encoding: 'utf8', timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} failed (${result.status}):\n${result.stdout}\n${result.stderr}`);
   return result.stdout.trim();
@@ -59,7 +61,7 @@ function run(command, args, cwd, env) {
 const smoke = `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { realpath, mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
 import { Context, adaptObject, adaptCallback } from '@cordis-verus/compat-cordis';
@@ -72,10 +74,10 @@ const require = createRequire(import.meta.url);
 const facade = fileURLToPath(import.meta.resolve('@cordis-verus/compat-cordis'));
 const loaderPath = fileURLToPath(import.meta.resolve('@cordis-verus/compat-loader'));
 const installed = await realpath(join(process.cwd(), 'node_modules'));
-for (const path of [facade, loaderPath]) assert.ok((await realpath(path)).startsWith(installed + '/'));
+for (const path of [facade, loaderPath]) assert.ok((await realpath(path)).startsWith(installed + sep));
 assert.equal(require('@cordis-verus/compat-cordis').Context, Context);
 const selected=selectNativeArtifact();
-assert.ok(selected.path.startsWith(installed + '/'));
+assert.ok(selected.path.startsWith(installed + sep));
 const binding = require(selected.path);
 const nativeDriver=typeof binding.createDriver==='function'?binding.createDriver():new binding.NativeDriver();
 assert.deepEqual(JSON.parse(nativeDriver.rustInfo()).factories, []);
@@ -315,7 +317,7 @@ async function main() {
     for (const item of packageResults) {
       const installed = join(consumer, 'node_modules', item.name);
       assert.equal((await lstat(installed)).isSymbolicLink(), false, 'Installation must extract tarballs, not link source');
-      for (const path of await filesUnder(installed)) assert.ok((await realpath(path)).startsWith(consumer + '/'));
+      for (const path of await filesUnder(installed)) assert.ok((await realpath(path)).startsWith(consumer + sep));
     }
     // Plugin images are independent application artifacts, not hidden factories
     // linked into the default addon. Verify and copy them outside the checkout.

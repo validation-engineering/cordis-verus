@@ -1,0 +1,63 @@
+name: Runtime platforms
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to test (all includes both macOS architectures and Windows)
+        type: choice
+        default: all
+        options: [all, macos-15, macos-15-intel, windows-2025]
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    name: Runtime acceptance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.platform && inputs.platform != 'all' && format('["{0}"]', inputs.platform) || '["macos-15","macos-15-intel","windows-2025"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: never
+      RUST_BACKTRACE: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - name: Install pinned Rust without a verifier dependency
+        run: |
+          ${{ runner.os == 'Windows' && 'python' || 'python3' }} - <<'PY'
+          import json, subprocess
+          rust = json.load(open('toolchain.lock.json'))['rust']
+          subprocess.run(['rustup', 'toolchain', 'install', rust['channel'], '--profile', rust['profile'],
+                          '--no-self-update', *[arg for component in rust['components'] for arg in ['--component', component]]], check=True)
+          PY
+      - name: Install locked JavaScript dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Test the host runtime, native modules and extracted packages
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} scripts/record-runtime.py
+      - name: Retain host evidence and native bytes, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-validation-${{ github.run_attempt }}-${{ matrix.os }}
+          path: |
+            target/runtime-validation/
+            target/node-compat/build.json
+            target/release-artifacts/
+            packages/compat-cordis/native/
+          if-no-files-found: warn
+          retention-days: 14

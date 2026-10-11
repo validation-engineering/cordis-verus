@@ -1,7 +1,7 @@
 // Hashes bind local bytes to their recorded build inputs; they are not signatures.
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = dirname(fileURLToPath(import.meta.url));
@@ -9,6 +9,7 @@ const packageVersion = JSON.parse(readFileSync(join(packageRoot, 'package.json')
 export const nativeTargets = Object.freeze([
   Object.freeze({ id:'darwin-arm64-napi8', platform:'darwin', architecture:'arm64', libc:null, nodeApi:8 }),
   Object.freeze({ id:'darwin-x64-napi8', platform:'darwin', architecture:'x64', libc:null, nodeApi:8 }),
+  Object.freeze({ id:'win32-x64-napi8', platform:'win32', architecture:'x64', libc:null, nodeApi:8 }),
   Object.freeze({ id:'linux-x64-gnu-napi8', platform:'linux', architecture:'x64', libc:'gnu', nodeApi:8 }),
 ]);
 export class NativeArtifactError extends Error {
@@ -43,7 +44,7 @@ function checkedFile(directory, name) {
   }
   if (!lstatSync(cursor).isFile()) fail('NATIVE_MANIFEST_INVALID', `Native artifact is not a regular file: ${name}`);
   const location=relative(directory,realpathSync(cursor));
-  if (isAbsolute(location) || location==='..' || location.startsWith('../')) fail('NATIVE_MANIFEST_INVALID', `Native artifact escapes its package: ${name}`);
+  if (isAbsolute(location) || location==='..' || location.startsWith('..'+sep)) fail('NATIVE_MANIFEST_INVALID', `Native artifact escapes its package: ${name}`);
   return cursor;
 }
 function jsonFile(path) {

@@ -2,8 +2,9 @@
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync, renameSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
 import { writeNativeManifest } from './write-native-manifest.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,7 +40,12 @@ function installAddon(source, destination) {
   }
 }
 const before = sourceHashes();
-const result = spawnSync('bash', [join(root, 'scripts/build-node.sh'), ...args], { cwd: root, stdio: ['inherit', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+const toolchain = JSON.parse(readFileSync(join(root, 'toolchain.lock.json'), 'utf8'));
+const buildEnv = { ...process.env, RUSTUP_TOOLCHAIN: toolchain.rust.channel };
+const pathKey = Object.keys(buildEnv).find(key => key.toUpperCase() === 'PATH') ?? 'PATH';
+buildEnv[pathKey] = join(process.env.CARGO_HOME ?? join(homedir(), '.cargo'), 'bin') + delimiter + (buildEnv[pathKey] ?? '');
+if (args.includes('--offline')) buildEnv.CARGO_NET_OFFLINE = 'true';
+const result = spawnSync('cargo', ['build', '--release', '--locked', '-p', 'cordis-node', '-p', 'cordis-plugin-api', '--lib', '--examples', '--message-format=json-render-diagnostics'], { cwd: root, env: buildEnv, stdio: ['inherit', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status ?? 1);
 const filenames = { darwin: 'libcordis_node.dylib', linux: 'libcordis_node.so', win32: 'cordis_node.dll' };
