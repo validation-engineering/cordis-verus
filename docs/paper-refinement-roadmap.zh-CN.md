@@ -29,7 +29,7 @@ R1 已经把创建子组件的父组件、实际续体和动态子组件根的�
 
 原文总函数上下文与真实严格失败没有被默认为等价。原文第 28、47、55、56、57 项仍保留原审计状态。
 
-R2 已把实际 publication 载荷、租约选择的值、实际等待到的清理结果，以及 inverse 落地后的 continuation 决定连接到生产调用者。详见 [R2 执行合同](r2-execution.zh-CN.md)。完整回调效果合同、并发生产状态组合和整条轨迹对应仍未完成，R2 的退出条件保持不变。R3 继续推广 owner 创建的 Child、owner publication 的消费者、多个 episode 与内部 Unload；R4 再组合调度、全局进展与合流义务。
+R2 已把实际 publication 载荷、租约选择的值、实际等待到的清理结果，以及 inverse 落地后的 continuation 决定连接到生产调用者。原生调用合同还保留了实际工厂参数与结果；Rust／静态宿主的全部清理队列、整体重试与关闭也已由共同的受验证容器持有。详见 [R2 执行合同](r2-execution.zh-CN.md)。完整回调效果合同、并发生产状态组合和整条轨迹对应仍未完成，R2 的退出条件保持不变。R3 继续推广 owner 创建的 Child、owner publication 的消费者、多个 episode 与内部 Unload；R4 再组合调度、全局进展与合流义务。
 
 ## 每轮验收
 

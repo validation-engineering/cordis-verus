@@ -3518,6 +3518,58 @@
         }
       ],
       "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-group-drain-omits-nonroot-work",
+      "mutation": {
+        "file": "cleanup_groups.rs",
+        "old": "if !queue.is_empty() || queue.is_pending() || !queue.is_settled() {return false;}\n            i+=1;",
+        "new": "if !queue.is_empty() || queue.is_pending() || !queue.is_settled() {return false;}\n            i+=1;\n            if i==1 {return true;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_groups",
+          "descendants": false,
+          "function": "cordis_negative::cleanup_groups::CleanupGroups::can_seal"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_groups::CleanupGroups::can_seal",
+          "module": "cleanup_groups",
+          "file": "cleanup_groups.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires self.wf(),ensures out==self.all_drained(),"
+        }
+      ],
+      "selectionRationale": "The real group owner must inspect every queue before sealing. A fresh selected positive, complete mutant compilation and exact drain-contract rejection are required; not full negative acceptance."
+    },
+    {
+      "name": "r2-invocation-substitutes-actual-argument",
+      "mutation": {
+        "file": "async_completion.rs",
+        "old": "invoke(input,operation).into_result()",
+        "new": "invoke(input ^ 1u64,operation).into_result()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "async_completion",
+          "descendants": false,
+          "function": "cordis_negative::async_completion::witnessed_invocation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::async_completion::witnessed_invocation",
+          "module": "async_completion",
+          "file": "async_completion.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn witnessed_invocation(input:u64)->(out:u64)\n    ensures out==input ^ 37u64,"
+        }
+      ],
+      "selectionRationale": "This checked caller must derive the result from its actual input via invoke. This is a concrete callback-contract instance, not a proof of arbitrary plugin effects. Require positive, compile and exact rejection."
     }
   ]
 }

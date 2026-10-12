@@ -348,6 +348,10 @@ JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验�
 实际 publication 的泛型载荷、旧租约读取、替换和清理释放现在通过
 `PublicationStore` 的可执行合同关联；生产 Rust 异步清理通过原生 Verus
 `await_completion` 保存实际等待结果，`land_result` 从实际 inverse 与取消状态
-决定后续动作。当前可见键值表与保留租约值是两个不同观察。
+决定后续动作。原生 `invoke`／`invoke_future` 直接调用实际 callback，并保留其
+真实返回值或 Future；插件效果律仍是独立义务。`CleanupGroups` 持有 Rust／静态
+宿主的全部清理队列，整体重试先检查全部失败，关闭时检查未落地 stage、已交付
+凭据和实际载荷并关闭注册。根 setup、Child 请求和生命周期／publication 的统一
+编排尚未完成。当前可见键值表与保留租约值是两个不同观察。
 这些增量尚不构成整个宿主或任意回调的效果正确性证明；R2 仍在推进。
 详见[执行合同和剩余验收内容](r2-execution.zh-CN.md)（[English](r2-execution.md)）。

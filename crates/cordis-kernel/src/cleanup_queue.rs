@@ -49,17 +49,19 @@ impl<T> CleanupQueue<T> {
     pub fn scope(domain:u64)->(out:Self)
         ensures out.wf(),out.slots()==Seq::<Option<T>>::empty(),!out.issued(),
             out.protocol().domain_id()==domain,out.protocol().selected().is_none(),out.protocol().waiting().len()==0,
+            !out.protocol().stage().pending(),
     {Self {journal:CleanupJournal::scope(domain),payloads:Vec::new(),in_flight:false}}
     pub fn iterator(domain:u64,committed:Vec<Binding>)->(out:Self)
         ensures out.wf(),out.slots()==Seq::<Option<T>>::empty(),!out.issued(),
             out.protocol().domain_id()==domain,out.protocol().selected().is_none(),out.protocol().waiting().len()==0,
+            !out.protocol().stage().pending(),
             out.protocol().stage().committed_view()==committed@,
     {Self {journal:CleanupJournal::iterator(domain,committed),payloads:Vec::new(),in_flight:false}}
 
     /// Allocate the token and store its real payload in one exclusive operation.
     pub fn register(&mut self,payload:T)->(token:usize)
         requires old(self).wf(),
-        ensures final(self).wf(),token==old(self).slots().len(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),token==old(self).slots().len(),
             final(self).slots()==old(self).slots().push(Some(payload)),
             final(self).protocol().waiting()==old(self).protocol().waiting().push(token),
             final(self).protocol().selected()==old(self).protocol().selected(),
@@ -91,7 +93,7 @@ impl<T> CleanupQueue<T> {
     /// Rejected landings return the exact input payload without changing state.
     pub fn land(&mut self,payload:T)->(out:Result<usize,T>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok()==old(self).protocol().stage().pending(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).protocol().stage().pending(),
             out.is_err() ==> out.unwrap_err()==payload && final(self).same(old(self)),
             out.is_ok() ==> out->Ok_0==old(self).slots().len()
                 && final(self).slots()==old(self).slots().push(Some(payload))
@@ -131,7 +133,7 @@ impl<T> CleanupQueue<T> {
     /// New work follows LIFO; an admitted retry uses its same retained slot.
     pub fn pop(&mut self)->(out:Result<Option<(RestoreTicket,T)>,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_err() || out.unwrap().is_none() ==> final(self).same(old(self)),
             out.is_ok() && out.unwrap().is_some() ==> {
                 let (ticket,payload)=out.unwrap().unwrap();
@@ -186,7 +188,7 @@ impl<T> CleanupQueue<T> {
     pub fn complete(&mut self,ticket:RestoreTicket,outcome:RestoreOutcome,retained:Option<T>)
         ->(out:Result<(),Option<T>>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok()==old(self).completion_enabled(ticket,outcome,retained),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).completion_enabled(ticket,outcome,retained),
             out.is_err() ==> out.unwrap_err()==retained && final(self).same(old(self)),
             out.is_ok() ==> !final(self).issued()
                 && final(self).slots()==old(self).slots().update(ticket.token as int,retained)
@@ -211,7 +213,7 @@ impl<T> CleanupQueue<T> {
     /// A consumed nonretryable failure cannot be converted into an empty retry.
     pub fn retry(&mut self)->(out:Result<RestoreTicket,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok()==old(self).retry_enabled(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).retry_enabled(),
             final(self).slots()==old(self).slots(),final(self).issued()==old(self).issued(),
             final(self).protocol().waiting()==old(self).protocol().waiting(),
             out.is_err() ==> final(self).same(old(self)),
@@ -232,20 +234,26 @@ impl<T> CleanupQueue<T> {
         out
     }
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
-        requires old(self).wf(),ensures final(self).wf(),final(self).slots()==old(self).slots(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),
     {self.journal.admit(target)}
     pub fn end(&mut self)->(out:bool)
-        requires old(self).wf(),ensures final(self).wf(),final(self).slots()==old(self).slots(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),out==old(self).protocol().stage().pending(),
             out ==> !final(self).protocol().stage().pending() && final(self).protocol().stage().settled()
                 && accumulator_step(old(self).protocol().stage().abstract_view(),final(self).protocol().stage().abstract_view(),
                     if old(self).protocol().stage().cancellation() {AccumulatorRule::Divert(None)} else {AccumulatorRule::Finish}),
     {self.journal.end()}
     pub fn cancel(&mut self)
-        requires old(self).wf(),ensures final(self).wf(),final(self).slots()==old(self).slots(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),
     {self.journal.cancel();}
+    pub fn domain(&self)->(out:u64)
+        ensures out==self.protocol().domain_id(),
+    {self.journal.domain()}
+    pub fn is_settled(&self)->(out:bool)
+        ensures out==self.protocol().stage().settled(),
+    {self.journal.is_settled()}
     pub fn is_pending(&self)->(out:bool)
         ensures out==self.protocol().stage().pending(),
     {self.journal.is_pending()}
@@ -255,6 +263,10 @@ impl<T> CleanupQueue<T> {
     pub fn can_finish(&self,target:&[Binding])->(out:bool)
         requires self.wf(),ensures out ==> self.protocol().selected().is_none() && !self.issued(),
     {self.journal.can_finish(target)}
+    pub proof fn empty_payloads(&self)
+        requires self.wf(),self.protocol().waiting().len()==0,self.protocol().selected().is_none(),
+        ensures !self.issued(),forall|i:int| 0<=i<self.slots().len() ==> #[trigger] self.slots()[i].is_none(),
+    { }
     pub fn is_empty(&self)->(out:bool)
         requires self.wf(),
         ensures out==(self.protocol().waiting().len()==0 && self.protocol().selected().is_none()),

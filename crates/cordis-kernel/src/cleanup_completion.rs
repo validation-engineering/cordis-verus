@@ -35,7 +35,7 @@ impl<T> CleanupQueue<T> {
     fn accept_result<E>(&mut self,ticket:RestoreTicket,result:Result<(),E>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:CleanupReport<E,T>)
         requires old(self).wf(),old(self).issued(),old(self).protocol().selected()==Some(ticket),!old(self).protocol().failed_spec(),
-        ensures final(self).wf(),out.result==result,out.outcome==outcome(result,retry,policy),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.result==result,out.outcome==outcome(result,retry,policy),
             out.discarded==if result.is_ok() {retry} else {None},
             !final(self).issued(),final(self).protocol().waiting()==old(self).protocol().waiting(),
             final(self).slots()==old(self).slots().update(ticket.token as int,retained(result,retry)),
@@ -56,7 +56,7 @@ impl<T> CleanupQueue<T> {
     pub fn complete_future<E>(&mut self,completion:Completion<RestoreTicket,Result<(),E>>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(Completion<RestoreTicket,Result<(),E>>,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(completion.argument()) && !old(self).protocol().failed_spec()),
             out.is_err() ==> final(self).same(old(self)) && out->Err_0==(completion,retry),
             out.is_ok() ==> out->Ok_0.result==completion.result()
@@ -81,7 +81,7 @@ impl<T> CleanupQueue<T> {
     pub fn complete_failure<E>(&mut self,ticket:RestoreTicket,error:E,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(RestoreTicket,E,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(ticket) && !old(self).protocol().failed_spec()),
             out.is_err() ==> final(self).same(old(self)) && out->Err_0==(ticket,error,retry),
             out.is_ok() ==> out->Ok_0.result==Err(error) && out->Ok_0.outcome!=RestoreOutcome::Succeeded

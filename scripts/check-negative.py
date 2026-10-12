@@ -1396,6 +1396,18 @@ def mutation_manifest():
             'Ok((lease.publication,self.payloads[lease.publication.0].as_ref().unwrap()))',
             'Ok((PublicationId(0),self.payloads[lease.publication.0].as_ref().unwrap()))',
         ),
+        (
+            'r2-group-drain-omits-nonroot-work',
+            'cleanup_groups.rs',
+            'if !queue.is_empty() || queue.is_pending() || !queue.is_settled() {return false;}\n            i+=1;',
+            'if !queue.is_empty() || queue.is_pending() || !queue.is_settled() {return false;}\n            i+=1;\n            if i==1 {return true;}',
+        ),
+        (
+            'r2-invocation-substitutes-actual-argument',
+            'async_completion.rs',
+            'invoke(input,operation).into_result()',
+            'invoke(input ^ 1u64,operation).into_result()',
+        ),
     ]
 
 

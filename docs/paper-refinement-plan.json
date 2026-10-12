@@ -786,10 +786,25 @@
       },
       {
         "id": "invocation-effect-origin",
-        "status": "open",
+        "status": "partial",
         "scope": "Establish actual argument, executed operation, result, continuation and inverse laws for extensible managed plugin entry points.",
-        "remaining": "Define and instantiate the production effect boundary with checked primitive laws; a ready Future or an assumed expected output is insufficient.",
+        "remaining": "Native invoke/invoke_future now carry actual argument-to-call and factory-to-Future contracts in production. Complete registered-plugin provenance and primitive inverse laws remain open; generic FnOnce laws do not prove arbitrary plugin bodies.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/async_completion.rs",
+            "symbol": "invoke",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/async_completion.rs",
+            "symbol": "invoke_future",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/async_completion.rs",
+            "symbol": "witnessed_invocation",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/guarded_components.rs",
             "symbol": "member_is_component",
@@ -804,10 +819,25 @@
       },
       {
         "id": "production-composition",
-        "status": "open",
+        "status": "partial",
         "scope": "One checked production invariant owns all concurrent groups, dynamic Child, admitted work, publications and drain/release decisions.",
-        "remaining": "Compose real group creation/landing/removal and complete resource manifests with lifecycle release; current adapters retain ordinary Rust orchestration.",
+        "remaining": "CleanupGroups now owns all Rust/static cleanup queues, preserves other groups, preflights every retry and seals from their actual state. Root setup, child requests and the joint lifecycle/publication invariant still use ordinary host orchestration.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/cleanup_groups.rs",
+            "symbol": "seal",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_groups.rs",
+            "symbol": "remove",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_groups.rs",
+            "symbol": "retry_all",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/publication_values.rs",
             "symbol": "finish_resources",

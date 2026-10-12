@@ -327,8 +327,7 @@ impl StaticPlugin {
                 )
             })
             .collect();
-        let mut cleanups = BTreeMap::new();
-        cleanups.insert(0, Cleanups::new());
+        let cleanups = Cleanups::new();
         let setup = AsyncSetup {
             generation,
             owner,
@@ -342,7 +341,6 @@ impl StaticPlugin {
                 cleanups,
                 groups: Vec::new(),
                 children: Vec::new(),
-                next_group: 1,
                 cancelled_groups: Default::default(),
                 driver: None,
                 static_only: true,
@@ -501,7 +499,7 @@ impl StaticEpisode {
             && progress.abandoned.is_none()
             && progress.cleanup_error.is_some()
             && !progress.cleanup_running
-            && state.cleanups.get(&0).is_some_and(Cleanups::can_retry)
+            && state.cleanups.can_retry(0)
     }
     fn start_cleanup(&self, retry: bool) -> Result<StaticFuture, String> {
         let mut state = lock(&self.setup.state);
@@ -525,17 +523,13 @@ impl StaticEpisode {
         }
         let mut previous_error = None;
         if retry {
-            if progress.cleanup_error.is_none()
-                || !state.cleanups.get(&0).is_some_and(Cleanups::can_retry)
-            {
+            if progress.cleanup_error.is_none() || !state.cleanups.can_retry(0) {
                 return Err("StaticCleanupNotRetryable".into());
             }
             state
                 .cleanups
-                .get_mut(&0)
-                .unwrap()
                 .protocol
-                .retry()
+                .retry(0)
                 .map_err(|error| format!("StaticCleanupRetry: {error:?}"))?;
             previous_error = progress.cleanup_error.take();
         }
@@ -645,11 +639,12 @@ impl StaticCleanupFuture {
         reply: CleanupReply,
         retry: Option<RetryCleanup>,
     ) -> CallbackResult {
-        let completed = lock(&self.episode.setup.state)
-            .cleanups
-            .get_mut(&0)
-            .unwrap()
-            .complete_reply(reply, retry, CleanupPolicy::RetainFailure);
+        let completed = lock(&self.episode.setup.state).cleanups.complete_reply(
+            0,
+            reply,
+            retry,
+            CleanupPolicy::RetainFailure,
+        );
         let report = match completed {
             Ok(report) => report,
             Err(rejected) => {
@@ -679,9 +674,7 @@ impl StaticCleanupFuture {
         };
         let completed = lock(&self.episode.setup.state)
             .cleanups
-            .get_mut(&0)
-            .unwrap()
-            .complete(ticket, outcome, retained);
+            .complete(0, ticket, outcome, retained);
         assert!(completed.is_ok(), "exact issued restoration receipt");
         result
     }
@@ -711,13 +704,11 @@ impl Future for StaticCleanupFuture {
             if self.running.is_none() {
                 let (action, released, previous, notifications) = {
                     let mut state = lock(&self.episode.setup.state);
-                    let journal = state.cleanups.get_mut(&0).unwrap();
-                    let action = journal.pop();
-                    if action.is_none() && journal.is_empty() {
+                    let action = state.cleanups.pop(0);
+                    if action.is_none() && state.cleanups.protocol.seal() {
                         // The verified journal includes the outstanding receipt:
                         // a failed or pending callback can never seal the episode.
                         state.phase = EpisodePhase::Closed;
-                        state.cleanups.clear();
                         (
                             None,
                             Some(std::mem::take(&mut state.values)),

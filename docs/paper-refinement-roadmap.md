@@ -42,6 +42,8 @@ items 28, 47, 55, 56 and 57 retain their audit status.
 
 R2 now connects actual publication payloads, lease-selected values, awaited
 cleanup results and landed inverse/continuation decisions to production callers.
+Native call contracts also preserve actual factory arguments/results, and one
+verified container now owns all Rust/static cleanup queues, bulk retries and sealing.
 See [R2 execution contracts](r2-execution.md) for the proved scope and review path.
 R2 remains open for the complete callback effect contract, concurrent production
 composition and whole-trace correspondence; its exit criteria are unchanged.

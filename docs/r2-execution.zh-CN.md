@@ -14,8 +14,11 @@ refinement，也没有证明任意插件回调满足 Component 合同。
 | 替换保留 publication 身份并返回真实旧值 | `replace_checked` 和 `ValueCell::replace`；拒绝时原样返还新值 | `Driver::set`、Rust `ServiceSlot::replace` |
 | 旧清理租约仍读取自己保留的值 | `leased_value` 从真实租约记录中取得 publication 身份与载荷 | `Driver::read` |
 | 只有生命周期和完整资源清单检查通过，才能转移实际载荷 | `finish_resources` 将已有票据／租约协议与载荷转移组合；拒绝时三者均保持原状 | `LifecycleDriver::finish_cleanup_values` |
-| 异步清理消费其 Future 实际返回的结果 | `await_completion` 用 Verus 原生 Future 语义保存来源与实际结果；`complete_future` 据此判定成功、失败或消耗 | Rust `initialize_cleanup`、`Runtime::finish_reply`、`StaticCleanupFuture::complete_reply` |
+| 在轮询 Future 前，用实际参数调用工厂 | `invoke` 使用 Verus 原生 `FnOnce` 合同；`invoke_future` 保留工厂实际返回的 Future，`Awaiting::complete` 等待该值 | Rust `initialize_callback`、`initialize_cleanup`、`Runtime::poll_groups` |
+| 异步清理消费其 Future 实际返回的结果 | `Awaiting::complete`／`await_completion` 用 Verus 原生 Future 语义保存来源与实际结果；`complete_future` 据此判定成功、失败或消耗 | Rust `initialize_cleanup`、`Runtime::finish_reply`、`StaticCleanupFuture::complete_reply` |
 | 先保存实际返回的 inverse，再决定是否继续 | `CleanupQueue::land_result` 自行分配 token、保存实际 inverse，并根据结果和取消状态选择后续动作 | `Runtime::poll_groups` |
+| 不能因为一个组为空就关闭仍有其他工作的 episode | `CleanupGroups` 持有全部清理队列；`remove`、`seal` 检查未落地 stage、已交付凭据、保留失败和实际载荷，然后关闭注册入口 | `Runtime::poll_groups`、`Runtime::poll_settle`、`StaticCleanupFuture::poll` |
+| 整体重试遇到不可重试失败时，不能先推进其他组 | `can_retry_all`／`retry_all` 先检查全部队列，保持其他组并生成新尝试身份 | `Runtime::retry_cleanup` |
 
 Node 容器保存的是实际的 `u64` JavaScript 值句柄；Rust 值单元保存的是实际的
 `Arc<dyn Any + Send + Sync>`。这些合同不解释 JavaScript 对象的可变字段，也
@@ -60,9 +63,32 @@ Begin 时的 committed bindings，以及 Finish、Retire、Remove、Unload 的�
 也不证明调度公平。`Completion` 的字段不能由接收者替换，但它不是外部 I/O 的
 真实性凭证：调用者仍可以包装一个立即完成的 Future。
 
-插件实参到 callback factory、factory 到实际 Future、返回 inverse 到实际效果，
-仍需要经过检查的实现合同。调用任意闭包的普通 Rust 适配层在验证 crate 之外；
-它们的测试和小型 `witnessed_completion` 调用者都不能证明全部生产回调满足这些条件。
+`invoke` 通过实际调用建立
+`callback.ensures((actual_argument,), actual_result)`；`invoke_future` 立即调用
+工厂并保留其实际返回的 Future，不会把工厂副作用或 panic 捕获推迟到第一次轮询。
+生产 setup、iterator 和 cleanup 入口已使用这些函数，适配层不传入预期结果。
+经过检查的 `witnessed_invocation` 与 `witnessed_completion` 用真实代码实例化
+了这条数据传递路径。
+
+受验证的调用者仍需建立 callback 的 `requires`，受验证的插件仍需证明自己的
+效果律。普通 Rust／JavaScript 插件体与宿主注册仍在这个证明之外。这条泛型
+调用关系和小型实例不能证明插件 inverse law、注册插件与完整调用之间的关系，
+或任意外部 I/O 的真实性。
+
+## 已由内核持有的组合状态
+
+`CleanupGroups<T>` 替代了宿主原来持有多个独立队列的可变 map。字段是私有的，
+也不向外借出可变队列。修改一个组保持其他组。移除的队列退出活跃 map，仅保留
+递增的身份计数，因此存储和排空扫描随活跃组数量增长，不扫描历史空槽；移除后
+也不能复用旧域冒充另一个组。
+关闭时检查全部队列，因此根队列为空不能掩盖其他组的未落地 stage 或已交付清理。
+已取消 stage 必须落地后才能移除其组，实际返回的 inverse 继续保留。
+整体重试的预检查失败不修改任何组。关闭成功证明全部已持有队列都没有保留载荷、
+已交付回调或未落地 stage，并关闭该容器后续的注册入口。
+
+轮询 Rust Runtime 和静态适配器都使用这一组合。它仍没有在同一个不变式中持有
+根 setup Future、待处理 Child 请求，以及生命周期和 publication 状态。
+这些编排仍有普通宿主代码，因此仅完成队列组合还不能关闭整个生产状态的验收义务。
 
 ## R2 剩余验收内容
 
@@ -70,7 +96,9 @@ Begin 时的 committed bindings，以及 Finish、Retire、Remove、Unload 的�
    真实 inverse”的关系，并由具体原语证明效果律；不能改成调用方提供预期结果，
    或直接假设任意回调正确。
 2. 用同一受验证的生产状态持有并组合全部并发效果组、动态子插件、publication、
-   已准入工作与排空／释放决定。当前载荷释放与票据／租约验证的组合比这个整体不变量窄。
+   已准入工作与排空／释放决定。全部清理队列现已有共同的受验证 owner，载荷释放
+   也已组合票据／租约验证；根 setup、Child 准入和联合生命周期／publication 状态
+   仍需与它们组合。
 3. 证明完整生产执行轨迹的步骤分类及其与 R1 解释的关系，包括明确列出的多版本和
    动态接口扩展。列出一些方法的分类本身不构成这一定理。
 
@@ -80,17 +108,19 @@ Begin 时的 committed bindings，以及 Finish、Retire、Remove、Unload 的�
 ## 审查与复现
 
 ```sh
-cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --offline
+cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --test cleanup_groups --offline
 python3 scripts/record-development.py --offline
 ```
 
 定向测试覆盖不可复制载荷、新旧 publication、过时代次、异域、完整清理清单、
-Future 逆序完成、失败重试、析构所有权以及取消后的迟到落地。常规开发检查还会
+Future 逆序完成、工厂调用时机、失败重试、析构所有权、取消后的迟到落地，
+以及仍有非根组工作时尝试关闭。常规开发检查还会
 重新构建并测试实际 Rust 和 Node 宿主。
 
-四个负向对照分别把真实值改为 `None`、替换租约的 publication 身份、把实际等待到
-的错误改成成功、允许已取消的 continuation 继续。定向实验必须先证明未修改版本、
-编译错误版本，再确认指定合同确实拒绝该修改。定向通过不表示完整的 136 项负向
+六个负向对照分别把真实值改为 `None`、替换租约的 publication 身份、把实际等待到
+的错误改成成功、允许已取消的 continuation 继续、从排空检查遗漏非根组，以及
+篡改受验证 `invoke` 调用者的实际参数。定向实验必须先证明未修改版本、
+编译错误版本，再确认指定合同确实拒绝该修改。定向通过不表示完整的 138 项负向
 回归已运行，详见[验证等级](validation.md)。
 
 绑定源码的开发报告独立记录完整正向检查，不表示发布验收或整篇论文完成。本轮

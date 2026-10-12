@@ -139,3 +139,40 @@ fn executable_caller_derives_output_from_the_actual_input() {
     let completion = ready(witnessed_completion(123));
     assert_eq!(completion.into_parts(), (123, 123 ^ 37));
 }
+
+#[test]
+fn actual_factory_runs_once_before_poll_and_receives_the_owned_argument() {
+    use cordis_kernel::async_completion::{invoke, invoke_future, witnessed_invocation};
+    assert_eq!(witnessed_invocation(17), 17 ^ 37);
+    let input = Box::new(String::from("actual input"));
+    let address = std::ptr::from_ref(input.as_ref());
+    let output = invoke(input, |value| {
+        assert_eq!(std::ptr::from_ref(value.as_ref()), address);
+        value
+    })
+    .into_result();
+    assert_eq!(*output, "actual input");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = calls.clone();
+    let awaiting = invoke_future(84_u64, output, move |input| {
+        observed.fetch_add(1, Ordering::SeqCst);
+        async move { Err::<(), _>(input) }
+    });
+    assert_eq!(calls.load(Ordering::SeqCst), 1); // Factory invocation is not deferred to first poll.
+    let completion = ready(awaiting.complete());
+    let (origin, result) = completion.into_parts();
+    assert_eq!(origin, 84);
+    assert_eq!(*result.unwrap_err(), "actual input");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn factory_panic_is_caught_at_invocation_and_never_becomes_a_completion() {
+    use cordis_kernel::async_completion::invoke_future;
+    let result = std::panic::catch_unwind(|| {
+        invoke_future(85_u64, (), |()| -> std::future::Ready<()> {
+            panic!("factory failed before returning a Future");
+        })
+    });
+    assert!(result.is_err());
+}

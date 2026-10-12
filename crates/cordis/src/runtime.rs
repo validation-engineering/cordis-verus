@@ -11,11 +11,11 @@ use crate::future_support::poll_catching_unwind;
 use crate::service_error::{ServiceReadError, ServiceReadFailure};
 use crate::CallbackError;
 use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
-use cordis_kernel::async_completion::{await_completion, Completion};
+use cordis_kernel::async_completion::{invoke, invoke_future, Completion};
+use cordis_kernel::cleanup_groups::CleanupGroups;
 use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
 use cordis_kernel::cleanup_queue::completion::{CleanupPolicy, CleanupReport};
 use cordis_kernel::cleanup_queue::landing::StageReport;
-use cordis_kernel::cleanup_queue::CleanupQueue;
 use cordis_kernel::publication::values::ValueCell;
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::{Any, TypeId};
@@ -150,45 +150,56 @@ enum CleanupAction {
     Child(ChildHandle),
 }
 struct Cleanups {
-    protocol: CleanupQueue<CleanupAction>,
+    protocol: CleanupGroups<CleanupAction>,
 }
 impl Cleanups {
     fn new() -> Self {
         Self {
-            protocol: CleanupQueue::scope(fresh(&NEXT_CLEANUP)),
+            protocol: CleanupGroups::new(fresh(&NEXT_CLEANUP)),
         }
     }
-    fn iterator(committed: Vec<Binding>) -> Self {
-        Self {
-            protocol: CleanupQueue::iterator(fresh(&NEXT_CLEANUP), committed),
-        }
+    fn contains(&self, group: usize) -> bool {
+        self.protocol.contains(group)
     }
-    fn push(&mut self, cleanup: CleanupAction) {
-        self.protocol.register(cleanup);
+    fn push(&mut self, group: usize, cleanup: CleanupAction) {
+        let accepted = self.protocol.register(group, cleanup);
+        assert!(
+            accepted.is_ok(),
+            "only live groups accept cleanup registration"
+        );
+    }
+    fn iterator(&mut self, committed: Vec<Binding>) -> usize {
+        self.protocol
+            .add_iterator(fresh(&NEXT_CLEANUP), committed)
+            .expect("fresh cleanup domain and open episode")
     }
     #[allow(clippy::type_complexity)]
     fn land_result(
         &mut self,
+        group: usize,
         result: Option<Result<Inverse, CallbackError>>,
     ) -> Result<StageReport<CallbackError>, Result<Option<CleanupAction>, CallbackError>> {
         self.protocol.land_result(
+            group,
             result
                 .transpose()
                 .map(|inverse| inverse.map(|inverse| CleanupAction::Callback(inverse.0))),
         )
     }
-    fn pop(&mut self) -> Option<(RestoreTicket, CleanupAction)> {
+    fn pop(&mut self, group: usize) -> Option<(RestoreTicket, CleanupAction)> {
         self.protocol
-            .pop()
-            .expect("cleanup attempt identities exhausted")
+            .pop(group)
+            .expect("live cleanup group and available attempt identity")
     }
     fn complete(
         &mut self,
+        group: usize,
         ticket: RestoreTicket,
         outcome: RestoreOutcome,
         retry: Option<RetryCleanup>,
     ) -> Result<(), Option<CleanupAction>> {
         self.protocol.complete(
+            group,
             ticket,
             outcome,
             retry.map(|retry| CleanupAction::Callback(CleanupCallback::Retryable(retry))),
@@ -196,6 +207,7 @@ impl Cleanups {
     }
     fn complete_reply(
         &mut self,
+        group: usize,
         reply: CleanupReply,
         retry: Option<RetryCleanup>,
         policy: CleanupPolicy,
@@ -205,19 +217,18 @@ impl Cleanups {
         match reply {
             CleanupReply::Awaited(completion) => self
                 .protocol
-                .complete_future(completion, retry, policy)
+                .complete_future(group, completion, retry, policy)
                 .map_err(|(completion, retry)| RejectedCleanup::Awaited(completion, retry)),
             CleanupReply::Failed(ticket, error) => self
                 .protocol
-                .complete_failure(ticket, error, retry, policy)
+                .complete_failure(group, ticket, error, retry, policy)
                 .map_err(|(ticket, error, retry)| RejectedCleanup::Failed(ticket, error, retry)),
         }
     }
-    fn can_retry(&self) -> bool {
-        self.protocol.can_retry()
-    }
-    fn is_empty(&self) -> bool {
-        self.protocol.is_empty()
+    fn can_retry(&self, group: usize) -> bool {
+        self.protocol
+            .get(group)
+            .is_some_and(|queue| queue.can_retry())
     }
 }
 
@@ -648,10 +659,9 @@ struct GroupRequest {
 struct Episode {
     phase: EpisodePhase,
     values: Values,
-    cleanups: BTreeMap<usize, Cleanups>,
+    cleanups: Cleanups,
     groups: Vec<GroupRequest>,
     children: Vec<ChildRequest>,
-    next_group: usize,
     cancelled_groups: std::collections::BTreeSet<usize>,
     driver: Option<Waker>,
     static_only: bool,
@@ -697,8 +707,7 @@ impl AsyncSetup {
     /// timer, event or child resource acquisition should use this guard first.
     pub fn ensure_active(&self) -> CallbackResult {
         let state = lock(&self.state);
-        if state.cancelled_groups.contains(&self.group) || !state.cleanups.contains_key(&self.group)
-        {
+        if state.cancelled_groups.contains(&self.group) || !state.cleanups.contains(self.group) {
             return Err(CANCELLED.into());
         }
         match state.phase {
@@ -711,7 +720,7 @@ impl AsyncSetup {
         let state = lock(&self.state);
         matches!(state.phase, EpisodePhase::Restoring | EpisodePhase::Closed)
             || state.cancelled_groups.contains(&self.group)
-            || !state.cleanups.contains_key(&self.group)
+            || !state.cleanups.contains(self.group)
     }
     pub fn owner(&self) -> PluginId {
         self.owner
@@ -948,11 +957,12 @@ impl AsyncSetup {
     fn register_inverse(&self, inverse: Inverse) -> CallbackResult {
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
-        let group = state
+        if !state.cleanups.contains(self.group) {
+            return Err("effect group has completed".into());
+        }
+        state
             .cleanups
-            .get_mut(&self.group)
-            .ok_or("effect group has completed")?;
-        group.push(CleanupAction::Callback(inverse.0));
+            .push(self.group, CleanupAction::Callback(inverse.0));
         let waker = state.driver.take();
         drop(state);
         if let Some(waker) = waker {
@@ -999,11 +1009,12 @@ impl AsyncSetup {
             state: identity,
             external,
         };
+        if !state.cleanups.contains(self.group) {
+            return Err("effect group has completed".into());
+        }
         state
             .cleanups
-            .get_mut(&self.group)
-            .ok_or("effect group has completed")?
-            .push(CleanupAction::Child(handle.clone()));
+            .push(self.group, CleanupAction::Child(handle.clone()));
         let notify = state.dynamic_host.clone();
         state.children.push(ChildRequest {
             context: context.clone(),
@@ -1028,17 +1039,13 @@ impl AsyncSetup {
         if state.phase == EpisodePhase::Restoring || state.cancelled_groups.contains(&self.group) {
             return Err(CANCELLED.into());
         }
-        if !state.cleanups.contains_key(&self.group) {
+        if !state.cleanups.contains(self.group) {
             return Err("effect group has completed".into());
         }
-        let group = state.next_group;
-        state.next_group += 1;
+        let group = state.cleanups.iterator(self.bindings.clone());
         let handle = EffectHandle {
             status: Arc::new(Mutex::new(EffectStatus::default())),
         };
-        state
-            .cleanups
-            .insert(group, Cleanups::iterator(self.bindings.clone()));
         state.groups.push(GroupRequest {
             group,
             iterator: Box::new(effect),
@@ -1289,10 +1296,12 @@ fn initialize_callback(
 ) -> Result<RootSetup, CallbackError> {
     catch_unwind(AssertUnwindSafe(|| match callback {
         Callback::Sync(callback) => {
-            callback(&mut Setup { inner: episode })?;
+            invoke(&mut Setup { inner: episode }, callback).into_result()?;
             Ok(RootSetup::Done)
         }
-        Callback::Async(callback) => Ok(RootSetup::Queued(callback(episode.clone()))),
+        Callback::Async(callback) => Ok(RootSetup::Queued(
+            invoke(episode.clone(), callback).into_result(),
+        )),
     }))
     .unwrap_or_else(|panic| Err(CallbackError::panic(panic_message(panic))))
 }
@@ -1332,16 +1341,23 @@ fn initialize_cleanup(
     cleanup: CleanupCallback,
 ) -> Result<RunningCleanup, CleanupFailure> {
     let (result, retry) = match cleanup {
-        CleanupCallback::Once(cleanup) => (catch_unwind(AssertUnwindSafe(cleanup)), None),
+        CleanupCallback::Once(cleanup) => (
+            catch_unwind(AssertUnwindSafe(|| {
+                invoke_future(ticket, (), |()| cleanup())
+            })),
+            None,
+        ),
         CleanupCallback::Retryable(mut cleanup) => {
-            let result = catch_unwind(AssertUnwindSafe(&mut cleanup));
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                invoke_future(ticket, (), |()| cleanup())
+            }));
             (result, Some(cleanup))
         }
     };
     match result {
         Ok(future) => Ok(RunningCleanup {
             ticket,
-            future: Box::pin(await_completion(ticket, future)),
+            future: Box::pin(future.complete()),
             retry,
         }),
         Err(panic) => Err(CleanupFailure {
@@ -1703,14 +1719,13 @@ impl Runtime {
             if let Some(parent) = parent {
                 let owner = self.mounted.get_mut(&parent).unwrap();
                 if let Some(episode) = &owner.episode {
-                    lock(&episode.state)
-                        .cleanups
-                        .get_mut(&0)
-                        .unwrap()
-                        .push(CleanupAction::Child(ChildHandle {
+                    lock(&episode.state).cleanups.push(
+                        0,
+                        CleanupAction::Child(ChildHandle {
                             state: Arc::new(Mutex::new(Ok(Some(id)))),
                             external: None,
-                        }));
+                        }),
+                    );
                 } else {
                     owner.owned.push(id);
                 }
@@ -1779,15 +1794,7 @@ impl Runtime {
             .ok_or(RuntimeError::InactiveOwner(id))?
             .clone();
         let mut state = lock(&episode.state);
-        if !state
-            .cleanups
-            .values()
-            .any(|group| group.protocol.has_failed())
-            || state
-                .cleanups
-                .values()
-                .any(|group| group.protocol.has_failed() && !group.can_retry())
-        {
+        if !state.cleanups.protocol.can_retry_all() {
             return Err(RuntimeError::Cleanup {
                 plugin: id,
                 error: "retained cleanup cannot be retried".into(),
@@ -1795,13 +1802,10 @@ impl Runtime {
         }
         // Preflight every journal before the shared verified protocol changes.
         self.kernel.retry_cleanup(id).map_err(kernel_error)?;
-        for group in state
-            .cleanups
-            .values_mut()
-            .filter(|group| group.protocol.has_failed())
-        {
-            group.protocol.retry().expect("preflighted retry capacity");
-        }
+        assert!(
+            state.cleanups.protocol.retry_all(),
+            "preflighted every live queue"
+        );
         self.mounted.get_mut(&id).unwrap().cleanup_failure = None;
         let wake = state.driver.take();
         drop(state);
@@ -2274,10 +2278,9 @@ impl Runtime {
             // Retain precisely the committed dependencies until restoration
             // finishes; unrelated services must not gain implicit Arc owners.
             values,
-            cleanups: BTreeMap::new(),
+            cleanups: Cleanups::new(),
             groups: Vec::new(),
             children: Vec::new(),
-            next_group: 1,
             cancelled_groups: Default::default(),
             driver: Some(cx.waker().clone()),
             static_only: false,
@@ -2286,14 +2289,15 @@ impl Runtime {
             service_updates: None,
             unsupported: None,
         };
-        let mut root = Cleanups::new();
         for child in plugin.owned.drain(..) {
-            root.push(CleanupAction::Child(ChildHandle {
-                state: Arc::new(Mutex::new(Ok(Some(child)))),
-                external: None,
-            }));
+            state.cleanups.push(
+                0,
+                CleanupAction::Child(ChildHandle {
+                    state: Arc::new(Mutex::new(Ok(Some(child)))),
+                    external: None,
+                }),
+            );
         }
-        state.cleanups.insert(0, root);
         let episode = AsyncSetup {
             generation: fresh(&NEXT_EPISODE),
             owner: id,
@@ -2406,9 +2410,7 @@ impl Runtime {
         let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
         let completed = lock(&episode.state)
             .cleanups
-            .get_mut(&group)
-            .unwrap()
-            .complete(ticket, outcome, retained);
+            .complete(group, ticket, outcome, retained);
         // Rejected payloads, like successful factories, must be dropped only
         // after releasing the episode lock; user Drop may reenter registration.
         assert!(completed.is_ok(), "exact issued restoration receipt");
@@ -2434,11 +2436,12 @@ impl Runtime {
         retry: Option<RetryCleanup>,
     ) {
         let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
-        let completed = lock(&episode.state)
-            .cleanups
-            .get_mut(&group)
-            .unwrap()
-            .complete_reply(reply, retry, CleanupPolicy::DrainConsumed);
+        let completed = lock(&episode.state).cleanups.complete_reply(
+            group,
+            reply,
+            retry,
+            CleanupPolicy::DrainConsumed,
+        );
         // Both discarded and rejected user payloads leave the bookkeeping lock.
         let report = match completed {
             Ok(report) => report,
@@ -2474,10 +2477,7 @@ impl Runtime {
         let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
         let mut progress = false;
         if running.is_none() {
-            let action = lock(&episode.state)
-                .cleanups
-                .get_mut(&group)
-                .and_then(Cleanups::pop);
+            let action = lock(&episode.state).cleanups.pop(group);
             if let Some((ticket, action)) = action {
                 progress = true;
                 match action {
@@ -2554,7 +2554,7 @@ impl Runtime {
                 // Completed iterators also pass through abstract Leave before
                 // their accumulator is restored. In-flight cancellation still
                 // keeps the delayed abstract Reloading state until landing.
-                state.cleanups.get_mut(&group.id).unwrap().protocol.cancel();
+                state.cleanups.protocol.cancel(group.id);
             }
             if group.iterator.is_some() {
                 let mut setup = self.mounted[&id].episode.as_ref().unwrap().clone();
@@ -2566,15 +2566,18 @@ impl Runtime {
                 };
                 let admitted = {
                     let mut state = lock(&setup.state);
-                    let protocol = &mut state.cleanups.get_mut(&group.id).unwrap().protocol;
-                    protocol.admit(target.as_deref())
+                    state.cleanups.protocol.admit(group.id, target.as_deref())
                 };
                 if !admitted {
                     group.iterator = None;
                     progress = true;
                 } else {
                     let result = catch_unwind(AssertUnwindSafe(|| {
-                        group.iterator.as_mut().unwrap().poll_next(cx, &setup)
+                        invoke(
+                            (group.iterator.as_mut().unwrap(), &mut *cx, &setup),
+                            |(iterator, cx, setup)| iterator.poll_next(cx, setup),
+                        )
+                        .into_result()
                     }));
                     let result = match result {
                         Ok(result) => result,
@@ -2585,11 +2588,7 @@ impl Runtime {
                     match result {
                         Poll::Pending => pending = true,
                         Poll::Ready(result) => {
-                            let landed = lock(&setup.state)
-                                .cleanups
-                                .get_mut(&group.id)
-                                .unwrap()
-                                .land_result(result);
+                            let landed = lock(&setup.state).cleanups.land_result(group.id, result);
                             let report = match landed {
                                 Ok(report) => report,
                                 Err(result) => {
@@ -2631,12 +2630,10 @@ impl Runtime {
                 pending |= waiting;
                 let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
                 let mut state = lock(&episode.state);
-                let empty = state.cleanups.get(&group.id).is_none_or(Cleanups::is_empty);
-                if group.running.is_none() && empty {
+                if group.running.is_none() && state.cleanups.protocol.remove(group.id) {
                     // Seal under the same lock used by inverse registration.
                     // An escaped context either registers before sealing, or
                     // observes a completed group and receives an error.
-                    state.cleanups.remove(&group.id);
                     drop(state);
                     let mut status = lock(&group.handle.status);
                     status.finished = true;
@@ -2765,10 +2762,7 @@ impl Runtime {
                 {
                     // Do not restore any resource while any group has a setup
                     // poll outstanding: it may still rely on that resource.
-                    let in_flight = lock(&episode.state)
-                        .cleanups
-                        .values()
-                        .any(|group| group.protocol.is_pending());
+                    let in_flight = lock(&episode.state).cleanups.protocol.has_pending();
                     if !in_flight {
                         if let Err(error) = self.kernel.settle_setup(id) {
                             return Poll::Ready(Err(kernel_error(error)));
@@ -2802,11 +2796,7 @@ impl Runtime {
                     progress |= did;
                     pending |= waiting;
                     let mut state = lock(&episode.state);
-                    let root_empty = state.cleanups.get(&0).is_none_or(Cleanups::is_empty);
-                    let retained_failure = state
-                        .cleanups
-                        .values()
-                        .any(|group| group.protocol.has_failed());
+                    let retained_failure = state.cleanups.protocol.has_failed();
                     let callbacks_idle = self.mounted[&id].root_running.is_none()
                         && self.mounted[&id]
                             .groups
@@ -2823,8 +2813,8 @@ impl Runtime {
                             progress = true;
                         }
                     } else if self.mounted[&id].root_running.is_none()
-                        && root_empty
                         && self.mounted[&id].groups.is_empty()
+                        && state.cleanups.protocol.seal()
                     {
                         let ticket = self
                             .kernel
@@ -2876,12 +2866,10 @@ impl Runtime {
                         continue;
                     }
                     let target = self.kernel.target(id);
-                    if !state.cleanups.iter().all(|(group, cleanups)| {
-                        *group == 0
-                            || target
-                                .as_ref()
-                                .is_some_and(|target| cleanups.protocol.can_finish(target))
-                    }) {
+                    if !target
+                        .as_ref()
+                        .is_some_and(|target| state.cleanups.protocol.can_finish(target))
+                    {
                         // The protocol rejects publication while any admitted
                         // stage remains outstanding or its target has drifted.
                         drop(state);

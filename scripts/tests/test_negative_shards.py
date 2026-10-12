@@ -673,7 +673,7 @@ class PlatformPlanTests(unittest.TestCase):
                  patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
                  patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
                 plan = SHARDS.regression_plan(include_macos=True, include_macos_intel=include_intel)
-                self.assertEqual(plan['mutationCount'], 136)
+                self.assertEqual(plan['mutationCount'], 138)
                 self.assertEqual(len(plan['negative']['include']), 94 if include_intel else 48)
                 expected = [('ubuntu-24.04', 2400, 20, 55), ('macos-15', 3600, 28, 75)]
                 if include_intel:
@@ -827,12 +827,12 @@ class SelectionTests(unittest.TestCase):
 
     def test_all_canonical_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
-        self.assertEqual(len(manifest), 136)
+        self.assertEqual(len(manifest), 138)
         for count, maximum in [(20, 7), (28, 5), (46, 3)]:
             with self.subTest(count=count):
                 pieces = [SHARDS.assigned(manifest, index, count) for index in range(count)]
                 flattened = [item for group in pieces for item in group]
-                self.assertEqual(len(flattened), 136)
+                self.assertEqual(len(flattened), 138)
                 self.assertEqual(set(flattened), set(manifest))
                 self.assertEqual(max(map(len, pieces)), maximum)
 

@@ -55,12 +55,12 @@ impl CleanupJournal {
 
     pub fn register(&mut self,token:usize)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).waiting()==old(self).waiting().push(token),
+        ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).waiting()==old(self).waiting().push(token),
             final(self).selected()==old(self).selected(),final(self).failed_spec()==old(self).failed_spec(),
     {self.stages.register(token);}
     pub fn land(&mut self,token:usize)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),out==old(self).stage().pending(),
+        ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),out==old(self).stage().pending(),
             final(self).selected()==old(self).selected(),final(self).failed_spec()==old(self).failed_spec(),
             out ==> final(self).waiting()==old(self).waiting().push(token)
                 && !final(self).stage().pending() && final(self).stage().settled()==old(self).stage().cancellation()
@@ -69,11 +69,11 @@ impl CleanupJournal {
             !out ==> final(self).same(old(self)),
     {self.stages.land(token)}
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
-        requires old(self).wf(),ensures final(self).wf(),final(self).selected()==old(self).selected(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
     {self.stages.admit(target)}
     pub fn end(&mut self)->(out:bool)
-        requires old(self).wf(),ensures final(self).wf(),final(self).selected()==old(self).selected(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
             out==old(self).stage().pending(),
             out ==> !final(self).stage().pending() && final(self).stage().settled()
@@ -81,9 +81,10 @@ impl CleanupJournal {
                     if old(self).stage().cancellation() {AccumulatorRule::Divert(None)} else {AccumulatorRule::Finish}),
     {self.stages.end()}
     pub fn cancel(&mut self)
-        requires old(self).wf(),ensures final(self).wf(),final(self).selected()==old(self).selected(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
     {self.stages.cancel();}
+    pub fn domain(&self)->(out:u64) ensures out==self.domain_id(), {self.domain}
     pub fn is_settled(&self)->(out:bool)
         ensures out==self.stage().settled(),
     {self.stages.is_settled()}

@@ -15,8 +15,11 @@ refinement or Component membership for arbitrary plugin callbacks.
 | Replacement keeps publication identity and returns the real previous value | `replace_checked` and `ValueCell::replace`; rejected operations return the new input intact | `Driver::set`, Rust `ServiceSlot::replace` |
 | An old cleanup lease continues to read its own retained value | `leased_value` derives both publication identity and payload from the actual lease record | `Driver::read` |
 | Release moves the real values only after lifecycle and full resource-manifest validation | `finish_resources` composes the existing receipt/lease protocol with actual payload transfer; rejection preserves all three states | `LifecycleDriver::finish_cleanup_values` |
-| Async cleanup consumes the result its Future actually returned | `await_completion` pairs a captured origin with the native Verus `Future` output; `complete_future` derives success/failure/drain from that output | Rust `initialize_cleanup`, `Runtime::finish_reply`, `StaticCleanupFuture::complete_reply` |
+| A factory is invoked with the actual argument before its Future is polled | `invoke` uses native Verus `FnOnce` contracts; `invoke_future` retains the actual returned Future, then `Awaiting::complete` awaits that value | Rust `initialize_callback`, `initialize_cleanup`, `Runtime::poll_groups` |
+| Async cleanup consumes the result its Future actually returned | `Awaiting::complete` / `await_completion` pair a captured origin with the native Verus `Future` output; `complete_future` derives success/failure/drain from that output | Rust `initialize_cleanup`, `Runtime::finish_reply`, `StaticCleanupFuture::complete_reply` |
 | A landed inverse is retained before the continuation is selected | `CleanupQueue::land_result` allocates the token itself, stores the actual inverse and derives continuation from the result and cancellation state | `Runtime::poll_groups` |
+| One empty group cannot authorize closing an episode with other work | `CleanupGroups` owns every cleanup queue; `remove` and `seal` check pending stages, issued receipts, retained failures and real payloads, then close registration | `Runtime::poll_groups`, `Runtime::poll_settle`, `StaticCleanupFuture::poll` |
+| Bulk retry does not partially advance a set containing a nonretryable failure | `can_retry_all` / `retry_all` preflight every owned queue, preserve other groups and issue fresh attempt identities | `Runtime::retry_cleanup` |
 
 The Node store's payload is its actual `u64` JavaScript value handle. The Rust
 value cell holds its actual `Arc<dyn Any + Send + Sync>`. Neither contract
@@ -75,11 +78,39 @@ completion nor scheduler fairness. A constructor-free `Completion` prevents a
 receiver from replacing its fields, but it is not an authenticity token for
 external I/O: a caller can wrap an immediately ready Future.
 
-The association from plugin argument to callback factory, the factory's produced
-Future, and the returned inverse's effect still needs a checked implementation
-contract. The ordinary Rust adapters that invoke arbitrary closures are outside
-the verified crate. Their tests and the small `witnessed_completion` caller are
-not a proof that every production callback satisfies those obligations.
+`invoke` establishes `callback.ensures((actual_argument,), actual_result)` by
+calling that callback. `invoke_future` invokes the factory immediately and keeps
+its returned Future; it does not delay factory side effects or panic handling to
+the first poll. These helpers now run at production setup, iterator and cleanup
+entry points. No expected result is supplied by the adapter. The checked
+`witnessed_invocation` and `witnessed_completion` callers instantiate the data
+flow with executable code.
+
+A checked caller must establish the callback's `requires`, and a checked plugin
+must prove its own effect law. Ordinary Rust/JavaScript plugin bodies and host
+registration remain outside that proof. The generic call relation and small
+witnesses do not establish a plugin's inverse law, the complete relationship
+between a registered plugin and its invocation, or arbitrary external I/O truth.
+
+## Composition now owned by the kernel
+
+`CleanupGroups<T>` replaces the host's mutable map of individually verified
+queues. Its fields are private and it exposes no mutable queue reference. A
+mutation preserves all other groups. Removed queues leave the active map; only
+monotonic identity counters survive, so storage and drain scans follow live
+groups instead of the number of groups ever created. Live and removed group identities cannot
+be substituted by reusing a domain. Sealing inspects all queues, so an empty root
+cannot hide another group's pending stage or issued cleanup. A cancelled stage
+must land before its group can be removed; any returned inverse remains owned.
+A failed bulk-retry preflight changes no group. Successful sealing proves that
+no owned queue retains a payload, issued callback or pending stage, and closes
+all subsequent registration in that container.
+
+This composition is used by both the polled Rust runtime and the static adapter.
+It does not yet own the root setup Future, queued child requests or the lifecycle
+and publication states in the same invariant. Their remaining orchestration is
+still ordinary host code; the queue composition alone cannot discharge that
+whole-state obligation.
 
 ## Remaining R2 acceptance
 
@@ -89,8 +120,9 @@ not a proof that every production callback satisfies those obligations.
    or assume arbitrary callback correctness.
 2. Own and compose all concurrent groups, dynamic children, publications,
    admitted work and drain/release decisions in one checked production state.
-   The current composition of payload release with receipt/lease validation is
-   narrower than that whole-host invariant.
+   All cleanup queues now share a verified owner, and payload release composes
+   with receipt/lease validation. Root setup, child admission and the joint
+   lifecycle/publication state remain to be composed with them.
 3. Prove the complete production trace's classification and its relation to
    the R1 interpretation, including the stated multi-version and dynamic
    interface extensions. A list of classified methods is not this theorem.
@@ -102,20 +134,22 @@ outcomes have not been promoted by this increment.
 ## Review and reproduction
 
 ```sh
-cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --offline
+cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --test cleanup_groups --offline
 python3 scripts/record-development.py --offline
 ```
 
 The targeted tests exercise noncopy payloads, old/new publications, stale
 generations, foreign domains, exact cleanup manifests, reverse Future completion
-order, failed retries, destructor ownership and late cancelled landings. The
+order, factory invocation timing, failed retries, destructor ownership, late
+cancelled landings and sealing with non-root work still outstanding. The
 normal development checks additionally rebuild and test the Rust and Node hosts.
 
-Four negative controls replace a real value with `None`, substitute a lease's
-publication identity, turn an awaited error into success, or keep a cancelled
-continuation alive. Each scoped experiment needs a fresh positive proof, a
+Six negative controls replace a real value with `None`, substitute a lease's
+publication identity, turn an awaited error into success, keep a cancelled
+continuation alive, omit non-root groups from the drain check, or alter the
+argument in a checked `invoke` caller. Each scoped experiment needs a fresh positive proof, a
 compiled mutant and rejection of the named contract. A scoped result does not
-mean the full 136-case negative regression ran; see [validation](validation.md).
+mean the full 138-case negative regression ran; see [validation](validation.md).
 
 The source-bound development report records the full positive check separately
 from release acceptance and paper completion. No Node dependency is added for

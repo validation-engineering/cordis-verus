@@ -9,6 +9,7 @@ pub mod canonical;
 pub mod causal_normalization;
 pub mod child_driver;
 pub mod child_history;
+pub mod cleanup_groups;
 pub mod cleanup_journal;
 pub mod cleanup_queue;
 pub mod coeffects;
