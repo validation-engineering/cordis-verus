@@ -18,6 +18,10 @@ use objects::{ForeignObject, ObjectAction, RustObject};
 pub use objects::{JsCallback, JsObject, ObjectDescriptor, ObjectOwnership, PluginObject};
 #[path = "streams.rs"]
 mod streams;
+use cordis_driver::{
+    request_ledger::{RequestError, RequestLedger},
+    RequestTicket,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, VecDeque};
@@ -214,6 +218,7 @@ impl Future for RequestFuture {
 #[derive(Serialize)]
 pub(crate) struct HostRequest {
     pub request: String,
+    pub authority: RequestTicket,
     pub session: String,
     pub job: String,
     pub kind: &'static str,
@@ -229,22 +234,19 @@ pub(crate) struct HostRequest {
     pub restoring: bool,
 }
 struct PendingRequest {
-    job: u64,
-    session: u64,
+    ticket: cordis_driver::request_ledger::RequestTicket,
     kind: &'static str,
     service: String,
     stream: Option<String>,
     object: Option<String>,
-    restoring: bool,
     state: Arc<Mutex<ReplyState>>,
 }
 enum ResourceReference {
     Stream(String),
     Object(String),
 }
-#[derive(Default)]
 struct Transport {
-    next: u64,
+    ledger: RequestLedger,
     requests: VecDeque<HostRequest>,
     pending: BTreeMap<u64, PendingRequest>,
     foreign_streams: BTreeMap<String, ForeignStream>,
@@ -256,6 +258,8 @@ struct Transport {
 /// after the action completes. Cleanup can read its committed JS services.
 #[derive(Clone)]
 pub struct PluginContext {
+    owner: usize,
+    generation: u64,
     session: u64,
     job: u64,
     descriptor: FactoryDescriptor,
@@ -334,8 +338,17 @@ impl PluginContext {
             Some(ResourceReference::Object(id)) => (None, Some(id)),
             None => (None, None),
         };
-        transport.next = transport.next.checked_add(1).ok_or("RequestCapacity")?;
-        let request = transport.next;
+        let ticket = transport
+            .ledger
+            .issue(
+                self.owner,
+                self.generation,
+                self.session,
+                self.job,
+                self.cleanup,
+            )
+            .map_err(request_error)?;
+        let request = ticket.request;
         let state = Arc::new(Mutex::new(ReplyState {
             result: None,
             waker: None,
@@ -343,18 +356,17 @@ impl PluginContext {
         transport.pending.insert(
             request,
             PendingRequest {
-                job: self.job,
-                session: self.session,
+                ticket,
                 kind,
                 service: service.into(),
                 stream: stream.clone(),
                 object: object.clone(),
-                restoring: self.cleanup,
                 state: state.clone(),
             },
         );
         transport.requests.push_back(HostRequest {
             request: request.to_string(),
+            authority: ticket.into(),
             session: self.session.to_string(),
             job: self.job.to_string(),
             kind,
@@ -455,7 +467,16 @@ pub(crate) struct Backend {
     notify: Arc<dyn Fn() + Send + Sync>,
 }
 impl Backend {
+    // Backend-only fixtures have no lifecycle Driver. Production always uses its domain.
+    #[cfg(test)]
     pub fn new(registry: FactoryRegistry, notify: Arc<dyn Fn() + Send + Sync>) -> Self {
+        Self::with_domain(0, registry, notify)
+    }
+    pub fn with_domain(
+        domain: u64,
+        registry: FactoryRegistry,
+        notify: Arc<dyn Fn() + Send + Sync>,
+    ) -> Self {
         Self {
             registry,
             modules: BTreeMap::new(),
@@ -477,7 +498,15 @@ impl Backend {
             next_object: 0,
             objects: BTreeMap::new(),
             owned_objects: Vec::new(),
-            transport: Arc::new(Mutex::new(Transport::default())),
+            transport: Arc::new(Mutex::new(Transport {
+                ledger: RequestLedger::new(domain),
+                requests: VecDeque::new(),
+                pending: BTreeMap::new(),
+                foreign_streams: BTreeMap::new(),
+                foreign_objects: BTreeMap::new(),
+                object_order: 0,
+                waiters: Vec::new(),
+            })),
             notify,
         }
     }
@@ -498,7 +527,7 @@ impl Backend {
                 value
             })
             .collect::<Vec<_>>();
-        serde_json::json!({"abi":1,"factories":factories})
+        serde_json::json!({"abi":1,"requestProtocol":1,"factories":factories})
     }
     pub fn owner(&self, session: u64) -> PluginResult<(usize, u64)> {
         let s = self.sessions.get(&session).ok_or("UnknownSession")?;
@@ -523,6 +552,8 @@ impl Backend {
     pub fn can_close(&self) -> bool {
         self.sessions.is_empty() && self.jobs.is_empty()
     }
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn authority(&self, session: u64, job: u64) -> PluginResult<(usize, u64, bool)> {
         let job = self.jobs.get(&job).ok_or("StaleAuthority")?;
         if job.session != session {
@@ -531,20 +562,46 @@ impl Backend {
         let (owner, generation) = self.owner(session)?;
         Ok((owner, generation, job.restoring))
     }
+    /// Authority is the exact admitted receipt, not a claim about a session/job.
+    pub fn validate_request(&self, ticket: RequestTicket) -> PluginResult<(usize, u64, bool)> {
+        self.transport
+            .lock()
+            .unwrap()
+            .ledger
+            .validate(ticket.into())
+            .map_err(request_error)?;
+        Ok((ticket.id, ticket.generation, ticket.restoring))
+    }
+    pub fn check_request_wait(
+        &self,
+        driver: &cordis_driver::Driver,
+        ticket: RequestTicket,
+        target: usize,
+    ) -> PluginResult<Option<usize>> {
+        let transport = self.transport.lock().unwrap();
+        driver
+            .check_request_wait(&transport.ledger, ticket, target)
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn request_authority(
         &self,
         session: u64,
         job: u64,
         request: u64,
     ) -> PluginResult<(usize, u64, bool)> {
-        self.authority(session, job)?;
-        let transport = self.transport.lock().unwrap();
-        let request = transport.pending.get(&request).ok_or("StaleAuthority")?;
-        if request.session != session || request.job != job {
-            return Err("InvalidAuthority".into());
-        }
-        let (id, generation) = self.owner(session)?;
-        Ok((id, generation, request.restoring))
+        let mut ticket: RequestTicket = self
+            .transport
+            .lock()
+            .unwrap()
+            .ledger
+            .pending(request)
+            .ok_or("StaleAuthority")?
+            .into();
+        ticket.session = session;
+        ticket.job = job;
+        self.validate_request(ticket)
     }
     pub fn is_resource_method(
         &self,
@@ -567,6 +624,8 @@ impl Backend {
     fn context(&self, session: u64, job: u64, cleanup: bool) -> PluginResult<PluginContext> {
         let s = self.sessions.get(&session).ok_or("UnknownSession")?;
         Ok(PluginContext {
+            owner: s.id,
+            generation: s.generation,
             session,
             job,
             descriptor: s.descriptor.clone(),
@@ -849,14 +908,38 @@ impl Backend {
         self.native_checkpoints.release_session(session);
         Ok(())
     }
+    // Numeric convenience exists only in backend fixtures; the NAPI wire requires
+    // a complete receipt and exercises reply_request directly.
+    #[cfg(test)]
     pub fn reply(&mut self, request: u64, result: PluginResult<Value>) -> PluginResult<()> {
-        let pending = self
+        let ticket = self
             .transport
             .lock()
             .unwrap()
-            .pending
-            .remove(&request)
+            .ledger
+            .pending(request)
             .ok_or("StaleRequest")?;
+        self.reply_request(ticket.into(), result)
+    }
+    pub fn reply_request(
+        &mut self,
+        ticket: RequestTicket,
+        result: PluginResult<Value>,
+    ) -> PluginResult<()> {
+        let pending = {
+            let mut transport = self.transport.lock().unwrap();
+            if !transport.pending.contains_key(&ticket.request) {
+                return Err("StaleRequest".into());
+            }
+            transport
+                .ledger
+                .complete(ticket.into())
+                .map_err(request_error)?;
+            transport
+                .pending
+                .remove(&ticket.request)
+                .expect("payload checked under transport lock")
+        };
         let result = if pending.kind == "stream_close" {
             result.and_then(|value| {
                 if value.get("done").and_then(Value::as_bool) != Some(true) {
@@ -901,8 +984,8 @@ impl Backend {
                 transport.foreign_objects.insert(
                     id.into(),
                     ForeignObject {
-                        session: pending.session,
-                        job: pending.job,
+                        session: pending.ticket.session,
+                        job: pending.ticket.job,
                         service: pending.service.clone(),
                         descriptor,
                         order,
@@ -938,8 +1021,8 @@ impl Backend {
                 transport.foreign_streams.insert(
                     id.into(),
                     ForeignStream {
-                        session: pending.session,
-                        job: pending.job,
+                        session: pending.ticket.session,
+                        job: pending.ticket.job,
                         service: pending.service.clone(),
                         pull: false,
                         closing: false,
@@ -984,7 +1067,7 @@ impl Backend {
                 .map_err(|_| "InvalidPublicationReply")?;
                 let session = self
                     .sessions
-                    .get_mut(&pending.session)
+                    .get_mut(&pending.ticket.session)
                     .ok_or("UnknownSession")?;
                 if let Some(typed) = &session.typed {
                     typed.check_publication(&pending.service, port)?;
@@ -1004,10 +1087,10 @@ impl Backend {
         if pending.kind == "stream_open"
             && self
                 .jobs
-                .get(&pending.job)
+                .get(&pending.ticket.job)
                 .is_some_and(|job| job.cancellation.is_cancelled())
         {
-            self.cancel_foreign_streams(pending.job)?;
+            self.cancel_foreign_streams(pending.ticket.job)?;
         }
         let wake = {
             let mut state = pending.state.lock().unwrap();
@@ -1019,7 +1102,7 @@ impl Backend {
         }
         // A future may have already returned after dropping an RPC future. Its
         // result still cannot land until every dispatched external call lands.
-        if let Some(job) = self.jobs.get(&pending.job) {
+        if let Some(job) = self.jobs.get(&pending.ticket.job) {
             job.wake.wake_by_ref();
         }
         Ok(())
@@ -1050,10 +1133,9 @@ impl Backend {
                             .foreign_objects
                             .values()
                             .any(|o| o.session == job.session && o.job == id)
-                        || transport
-                            .pending
-                            .values()
-                            .any(|r| r.job == id && matches!(r.kind, "stream_open" | "object_open"))
+                        || transport.pending.values().any(|r| {
+                            r.ticket.job == id && matches!(r.kind, "stream_open" | "object_open")
+                        })
                 };
                 if !job.finalizing && needs_finalization {
                     job.main_result = job.result.take();
@@ -1069,13 +1151,12 @@ impl Backend {
                     job.wake.wake_by_ref();
                     continue;
                 }
-                if !self
+                if self
                     .transport
                     .lock()
                     .unwrap()
-                    .pending
-                    .values()
-                    .any(|r| r.job == id)
+                    .ledger
+                    .job_drained(job.session, id)
                 {
                     completed.push(id);
                 }
@@ -1191,4 +1272,13 @@ impl Drop for Backend {
             contain_drop(factory);
         }
     }
+}
+
+fn request_error(error: RequestError) -> String {
+    match error {
+        RequestError::Capacity => "RequestCapacity",
+        RequestError::Stale => "StaleAuthority",
+        RequestError::WrongDomain | RequestError::Mismatch => "InvalidAuthority",
+    }
+    .into()
 }

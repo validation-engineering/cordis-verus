@@ -103,11 +103,17 @@ Verus kernel, with real Driver/JS callers, rejection witnesses and failure/retry
 regressions. The [case study](cases/reentrant-wait.md) provides reproduction and
 paper-to-code navigation; current acceptance is recorded in the development report.
 
-The stage's guarantee is the exact decision relative to the host's invocation
-facts. Invocation ancestry and transport completeness, general RPC cycles and
-scheduler progress remain separate integration work. Next, connect checked request
-ownership to those facts and include the case in the standalone Harness report.
-This stage does not close the complete F1 or paper-wide obligations.
+Native reverse requests now obtain complete receipts from `RequestLedger` in the
+real transport. Receipt validation, concurrent pending requests, job drain queries
+and the wait decision use executable verified methods; cancellation and dropped
+futures do not acknowledge JS work. The host still captures initial metadata,
+aligns payloads/wakers with records and maintains invocation ancestry. JS setup,
+cleanup, tasks and effects now register with `InvocationLedger`; exact completion,
+record reclamation and the scan of every supplied ancestor are checked as well.
+The host still supplies complete ALS ancestry and reports actual callback results;
+general RPC cycles and scheduler progress remain separate work. Next, include the
+case in the standalone Harness report and review those remaining host boundaries. This stage does not close complete F1 or
+paper-wide obligations.
 
 ## Milestones and exit criteria
 

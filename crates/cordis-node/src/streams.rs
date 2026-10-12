@@ -203,8 +203,8 @@ impl PluginContext {
                         return Poll::Ready(Some((id.clone(), state.failed.clone())));
                     }
                 } else if !transport.pending.values().any(|r| {
-                    r.session == self.session
-                        && job.is_none_or(|j| r.job == j)
+                    r.ticket.session == self.session
+                        && job.is_none_or(|j| r.ticket.job == j)
                         && r.kind == "stream_open"
                 }) {
                     return Poll::Ready(None);

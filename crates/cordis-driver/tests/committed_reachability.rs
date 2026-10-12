@@ -168,3 +168,88 @@ fn wait_admission_checks_subtree_identity_live_scope_and_exact_episode() {
     // Observation does not withdraw providers or consume the caller's episode.
     assert!(driver.committed_reaches(leaf, 1, provider).unwrap());
 }
+
+#[test]
+fn pending_request_contract_uses_committed_providers_and_exact_receipts() {
+    use cordis_driver::{request_ledger::RequestLedger, RequestTicket};
+    let mut driver = Driver::new().unwrap();
+    let (source, _) = provider(&mut driver, port(11, 0), 10);
+    let leaf = driver.mount(None, vec![port(11, 0)], vec![]).unwrap();
+    let setup = setup(&mut driver, leaf);
+    driver.complete(setup, true, None).unwrap();
+    let mut requests = RequestLedger::new(driver.domain());
+    let a = requests.issue(leaf, 1, 100, 200, false).unwrap();
+    let b = requests.issue(leaf, 1, 100, 200, true).unwrap();
+    let c = requests.issue(leaf, 1, 101, 200, false).unwrap();
+    assert!(!requests.job_drained(100, 200));
+    assert!(!requests.job_drained(101, 200));
+    assert!(requests.job_drained(100, 201));
+    assert_eq!(
+        driver
+            .check_request_wait(&requests, a.into(), source)
+            .unwrap(),
+        Some(source)
+    );
+    let wrong = RequestTicket {
+        generation: 2,
+        ..a.into()
+    };
+    assert_eq!(
+        driver
+            .check_request_wait(&requests, wrong, source)
+            .unwrap_err()
+            .code,
+        "InvalidAuthority"
+    );
+    assert!(requests.complete(wrong.into()).is_err());
+    requests.complete(a).unwrap();
+    assert!(!requests.job_drained(100, 200));
+    assert_eq!(
+        driver
+            .check_request_wait(&requests, a.into(), source)
+            .unwrap_err()
+            .code,
+        "StaleAuthority"
+    );
+    requests.complete(b).unwrap();
+    assert!(requests.job_drained(100, 200));
+    assert!(!requests.job_drained(101, 200));
+    requests.complete(c).unwrap();
+    // IDs are never reused, even when all payloads have been reclaimed.
+    let d = requests.issue(leaf, 1, 100, 200, false).unwrap();
+    assert!(d.request > c.request);
+    assert!(requests.complete(a).is_err());
+    assert!(requests.validate(d).is_ok());
+    let stale = requests.issue(leaf, 0, 100, 201, false).unwrap();
+    assert_eq!(
+        driver
+            .check_request_wait(&requests, stale.into(), source)
+            .unwrap_err()
+            .code,
+        "StaleEpisode"
+    );
+}
+
+#[test]
+fn request_ticket_json_preserves_large_identities_and_rejects_lossy_numbers() {
+    use cordis_driver::RequestTicket;
+    let ticket = RequestTicket {
+        domain: u64::MAX,
+        id: usize::MAX,
+        generation: u64::MAX,
+        session: u64::MAX,
+        job: u64::MAX,
+        request: u64::MAX,
+        restoring: true,
+    };
+    let value = serde_json::to_value(ticket).unwrap();
+    assert_eq!(
+        serde_json::from_value::<RequestTicket>(value.clone()).unwrap(),
+        ticket
+    );
+    for field in ["domain", "id", "generation", "session", "job", "request"] {
+        let mut bad = value.clone();
+        bad[field] = json!(1);
+        assert!(serde_json::from_value::<RequestTicket>(bad).is_err());
+    }
+}

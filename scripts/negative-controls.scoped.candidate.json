@@ -3213,6 +3213,131 @@
         }
       ],
       "selectionRationale": "The actual host wait admission must reject stale and conflicting waits and admit unrelated targets. Fresh matching positive proofs and compiled mutants are required; this is scoped evidence, not the full negative regression."
+    },
+    {
+      "name": "request-receipt-accepts-altered-owner",
+      "mutation": {
+        "file": "request_ledger.rs",
+        "old": "if pending != ticket {",
+        "new": "if pending.request != ticket.request {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "request_ledger",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::request_ledger::RequestLedger::validate",
+          "module": "request_ledger",
+          "file": "request_ledger.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok() == self.recorded(ticket),"
+        }
+      ],
+      "selectionRationale": "The production transport must validate the exact receipt, retain requests until reply, and use recorded ownership in wait admission. A fresh matching positive proof and compiled mutant are required; selected checks do not replace the full negative regression."
+    },
+    {
+      "name": "request-drains-before-reply",
+      "mutation": {
+        "file": "request_ledger.rs",
+        "old": "                return false;",
+        "new": "                return true;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "request_ledger",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::request_ledger::RequestLedger::job_drained",
+          "module": "request_ledger",
+          "file": "request_ledger.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out == !self.outstanding(session, job),"
+        }
+      ],
+      "selectionRationale": "The production transport must validate the exact receipt, retain requests until reply, and use recorded ownership in wait admission. A fresh matching positive proof and compiled mutant are required; selected checks do not replace the full negative regression."
+    },
+    {
+      "name": "request-wait-discards-live-ownership",
+      "mutation": {
+        "file": "request_ledger.rs",
+        "old": "Ok(kernel.check_wait(ticket.id, ticket.generation, target, true))",
+        "new": "Ok(kernel.check_wait(ticket.id, ticket.generation, target, false))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "request_ledger",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::request_ledger::RequestLedger::check_wait",
+          "module": "request_ledger",
+          "file": "request_ledger.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> ((out.unwrap() == WaitDecision::Allowed)\n                == (kernel.generation_of(ticket.id) == Some(ticket.generation) && !kernel.wait_conflict(ticket.id, target))),"
+        }
+      ],
+      "selectionRationale": "The production transport must validate the exact receipt, retain requests until reply, and use recorded ownership in wait admission. A fresh matching positive proof and compiled mutant are required; selected checks do not replace the full negative regression."
+    },
+    {
+      "name": "invocation-wait-discards-live-ownership",
+      "mutation": {
+        "file": "invocation_ledger.rs",
+        "old": "match kernel.check_wait(ticket.id, ticket.generation, target, true) {",
+        "new": "match kernel.check_wait(ticket.id, ticket.generation, target, false) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "invocation_ledger",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::invocation_ledger::InvocationLedger::check_one",
+          "module": "invocation_ledger",
+          "file": "invocation_ledger.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures (out == Ok(None)) == self.safe(kernel, handle, target),"
+        }
+      ],
+      "selectionRationale": "The real JS wait path must use live native scope ownership and check every supplied ancestor, including after a completed nested scope. A compiled mutant and fresh matching positive proof are required; this selected experiment is not full negative acceptance."
+    },
+    {
+      "name": "invocation-wait-stops-at-completed-scope",
+      "mutation": {
+        "file": "invocation_ledger.rs",
+        "old": "if block.is_some() {",
+        "new": "if block.is_some() || i == 0 {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "invocation_ledger",
+          "descendants": false
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::invocation_ledger::InvocationLedger::check_wait",
+          "module": "invocation_ledger",
+          "file": "invocation_ledger.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures (out == Ok(None)) == (forall|i:int| 0 <= i < handles.len() ==> self.safe(kernel, handles[i], target)),"
+        }
+      ],
+      "selectionRationale": "The real JS wait path must use live native scope ownership and check every supplied ancestor, including after a completed nested scope. A compiled mutant and fresh matching positive proof are required; this selected experiment is not full negative acceptance."
     }
   ]
 }

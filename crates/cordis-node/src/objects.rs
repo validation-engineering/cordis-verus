@@ -305,8 +305,8 @@ impl PluginContext {
                 // Finish all admissions before choosing the most recently
                 // acquired object; a late open must not reverse cleanup order.
                 let opening = transport.pending.values().any(|r| {
-                    r.session == self.session
-                        && job.is_none_or(|j| r.job == j)
+                    r.ticket.session == self.session
+                        && job.is_none_or(|j| r.ticket.job == j)
                         && r.kind == "object_open"
                 });
                 if !opening {

@@ -3,7 +3,7 @@ use crate::{
     plugin::{Backend, FactoryRegistry, ResolvedImport},
     NativeDriver,
 };
-use cordis_driver::{ActionKind, ActionTicket};
+use cordis_driver::{ActionKind, ActionTicket, RequestTicket};
 use napi::{
     bindgen_prelude::Function,
     threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 
 type WakeCallback = ThreadsafeFunction<(), (), (), Status, false, true>;
 pub(crate) type WakeSlot = Arc<Mutex<Option<WakeCallback>>>;
-pub(crate) fn backend(registry: FactoryRegistry) -> (RefCell<Backend>, WakeSlot) {
+pub(crate) fn backend(domain: u64, registry: FactoryRegistry) -> (RefCell<Backend>, WakeSlot) {
     let slot: WakeSlot = Arc::new(Mutex::new(None));
     let wake = slot.clone();
     let notify = Arc::new(move || {
@@ -24,7 +24,10 @@ pub(crate) fn backend(registry: FactoryRegistry) -> (RefCell<Backend>, WakeSlot)
             callback.call((), ThreadsafeFunctionCallMode::NonBlocking);
         }
     });
-    (RefCell::new(Backend::new(registry, notify)), slot)
+    (
+        RefCell::new(Backend::with_domain(domain, registry, notify)),
+        slot,
+    )
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,14 +35,7 @@ struct Caller {
     id: String,
     generation: String,
     ticket: Option<ActionTicket>,
-    authority: Option<Authority>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Authority {
-    session: String,
-    job: String,
-    request: String,
+    authority: Option<RequestTicket>,
 }
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
@@ -140,8 +136,12 @@ enum Request {
         session: String,
         stream: String,
     },
+    CheckWait {
+        authority: RequestTicket,
+        target: String,
+    },
     Reply {
-        request: String,
+        authority: RequestTicket,
         success: bool,
         #[serde(default)]
         value: Value,
@@ -173,9 +173,10 @@ impl NativeDriver {
     /// may export a createDriver function returning this object. No second graph
     /// or Rust Runtime is constructed by the plugin executor.
     pub fn with_factories(registry: FactoryRegistry) -> Result<Self> {
-        let (backend, wake) = backend(registry);
+        let driver = cordis_driver::Driver::new().map_err(plugin_error)?;
+        let (backend, wake) = backend(driver.domain(), registry);
         Ok(Self {
-            driver: RefCell::new(cordis_driver::Driver::new().map_err(plugin_error)?),
+            driver: RefCell::new(driver),
             faulted: std::cell::Cell::new(false),
             backend,
             wake,
@@ -240,10 +241,8 @@ impl NativeDriver {
                         .backend
                         .try_borrow()
                         .map_err(|_| "ReentrantRustAction")?;
-                    let session = identity(&authority.session)?;
-                    let job = identity(&authority.job)?;
                     let (source, source_generation, restoring_authority) =
-                        backend.request_authority(session, job, identity(&authority.request)?)?;
+                        backend.validate_request(*authority)?;
                     drop(backend);
                     if !driver
                         .committed_reaches(source, source_generation, id)
@@ -781,8 +780,20 @@ impl NativeDriver {
                 .try_borrow_mut()
                 .map_err(|_| "ReentrantRustAction")?
                 .stream_close(identity(&session)?, identity(&stream)?),
+            Request::CheckWait { authority, target } => {
+                let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
+                let backend = self
+                    .backend
+                    .try_borrow()
+                    .map_err(|_| "ReentrantRustAction")?;
+                let retained =
+                    backend.check_request_wait(&driver, authority, identity(&target)?)?;
+                Ok(
+                    json!({"blocked": retained.is_some(), "retained": retained.map(|id| id.to_string())}),
+                )
+            }
             Request::Reply {
-                request,
+                authority,
                 success,
                 value,
                 error,
@@ -795,7 +806,7 @@ impl NativeDriver {
                 self.backend
                     .try_borrow_mut()
                     .map_err(|_| "ReentrantRustAction")?
-                    .reply(identity(&request)?, result)?;
+                    .reply_request(authority, result)?;
                 Ok(json!({}))
             }
             Request::CancelJob { job } => {

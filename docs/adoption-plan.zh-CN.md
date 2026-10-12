@@ -85,9 +85,14 @@ A07/F1 中限定范围的清理安全合同组已实现并证明：请求、成�
 [案例说明](cases/reentrant-wait.zh-CN.md)提供复现和论文到代码的审查入口；当前验收
 以绑定源码的开发记录为准。
 
-本阶段保证相对于宿主提供的 invocation 事实，准入判断精确。invocation 祖先链和
-transport 完整性、一般 RPC 等待环及调度进展仍是独立集成工作。下一步将受检请求
-所有权接到这些事实，并把案例纳入独立 Harness 报告。本阶段不关闭完整 F1 或整篇义务。
+native 反向请求已在真实 transport 中取得 `RequestLedger` 的完整票据；票据校验、
+并发请求保留、job 排空查询及等待判断调用可执行受检方法。取消和丢弃 Future 不确认
+JS 工作完成。宿主仍负责捕获初始身份、维护 payload/waker 与记录对应以及 invocation
+祖先链。JS setup、cleanup、task 和 effect 已接入 `InvocationLedger`；精确结束、
+记录回收及传入祖先集合的遍历也由 Verus 检查。宿主仍提供完整 ALS 祖先链并报告实际
+回调结果；一般 RPC 等待环和调度进展仍单独推进。下一步把案例纳入独立 Harness
+报告，并审查剩余宿主边界。本阶段不关闭完整 F1
+或整篇义务。
 
 ## 阶段与退出条件
 

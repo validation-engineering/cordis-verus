@@ -74,6 +74,77 @@ impl From<cordis_kernel::Port> for ServicePort {
     }
 }
 
+/// Domain-local, never-reused identity of one JS callback invocation.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ScopeHandle {
+    #[serde(with = "decimal")]
+    pub domain: u64,
+    #[serde(with = "decimal")]
+    pub scope: u64,
+}
+impl From<ScopeHandle> for cordis_kernel::invocation_ledger::ScopeHandle {
+    fn from(value: ScopeHandle) -> Self {
+        Self {
+            domain: value.domain,
+            scope: value.scope,
+        }
+    }
+}
+impl From<cordis_kernel::invocation_ledger::ScopeHandle> for ScopeHandle {
+    fn from(value: cordis_kernel::invocation_ledger::ScopeHandle) -> Self {
+        Self {
+            domain: value.domain,
+            scope: value.scope,
+        }
+    }
+}
+
+/// An exact native reverse-request receipt. All identities survive JS round trips.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RequestTicket {
+    #[serde(with = "decimal")]
+    pub domain: u64,
+    #[serde(with = "decimal")]
+    pub id: usize,
+    #[serde(with = "decimal")]
+    pub generation: u64,
+    #[serde(with = "decimal")]
+    pub session: u64,
+    #[serde(with = "decimal")]
+    pub job: u64,
+    #[serde(with = "decimal")]
+    pub request: u64,
+    pub restoring: bool,
+}
+impl From<RequestTicket> for cordis_kernel::request_ledger::RequestTicket {
+    fn from(t: RequestTicket) -> Self {
+        Self {
+            domain: t.domain,
+            id: t.id,
+            generation: t.generation,
+            session: t.session,
+            job: t.job,
+            request: t.request,
+            restoring: t.restoring,
+        }
+    }
+}
+impl From<cordis_kernel::request_ledger::RequestTicket> for RequestTicket {
+    fn from(t: cordis_kernel::request_ledger::RequestTicket) -> Self {
+        Self {
+            domain: t.domain,
+            id: t.id,
+            generation: t.generation,
+            session: t.session,
+            job: t.job,
+            request: t.request,
+            restoring: t.restoring,
+        }
+    }
+}
+
 /// An action acknowledged once, even when cancellation happened in flight.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -149,6 +220,23 @@ pub enum Command {
         generation: u64,
         #[serde(with = "decimal")]
         publication: usize,
+    },
+    BeginScope {
+        #[serde(with = "decimal")]
+        id: usize,
+        #[serde(with = "decimal")]
+        generation: u64,
+    },
+    FinishScope {
+        scope: ScopeHandle,
+    },
+    ScopesLive {
+        scopes: Vec<ScopeHandle>,
+    },
+    CheckScopeWait {
+        scopes: Vec<ScopeHandle>,
+        #[serde(with = "decimal")]
+        target: usize,
     },
     CheckWait {
         #[serde(with = "decimal")]

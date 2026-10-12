@@ -11,9 +11,13 @@ mod protocol;
 use availability::{Availability, Candidate};
 pub use availability::{CheckAction, CheckTicket};
 pub mod shared;
+use cordis_kernel::invocation_ledger::{InvocationLedger, ScopeError};
 use cordis_kernel::publication::{LeaseId, PublicationError, PublicationId, PublicationRegistry};
+pub use cordis_kernel::request_ledger;
 use cordis_kernel::{Error as KernelError, Phase, Port};
-pub use protocol::{ActionKind, ActionTicket, Command, HostAction, Profile, ServicePort};
+pub use protocol::{
+    ActionKind, ActionTicket, Command, HostAction, Profile, RequestTicket, ScopeHandle, ServicePort,
+};
 use serde_json::{json, Value};
 use shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
 use std::collections::BTreeMap;
@@ -42,6 +46,19 @@ impl std::error::Error for DriverError {}
 impl From<KernelError> for DriverError {
     fn from(value: KernelError) -> Self {
         Self::new("Kernel", format!("{value:?}"))
+    }
+}
+impl From<ScopeError> for DriverError {
+    fn from(value: ScopeError) -> Self {
+        Self::new(
+            match value {
+                ScopeError::StaleEpisode => "StaleEpisode",
+                ScopeError::Completed => "StaleAuthority",
+                ScopeError::Capacity => "Capacity",
+                ScopeError::WrongDomain | ScopeError::Unknown => "InvalidAuthority",
+            },
+            format!("invocation scope: {value:?}"),
+        )
     }
 }
 impl From<PublicationError> for DriverError {
@@ -79,6 +96,7 @@ pub struct Driver {
     domain: u64,
     kernel: LifecycleDriver,
     publications: PublicationRegistry,
+    invocations: InvocationLedger,
     nodes: BTreeMap<usize, Node>,
     values: BTreeMap<usize, u64>,
     next_slot: usize,
@@ -99,6 +117,7 @@ impl Driver {
             domain,
             kernel,
             publications: PublicationRegistry::for_domain(domain),
+            invocations: InvocationLedger::new(domain),
             nodes: BTreeMap::new(),
             values: BTreeMap::new(),
             next_slot: 0,
@@ -1152,6 +1171,7 @@ impl Driver {
             "leaseAllocations": self.publications.lease_allocation_count(),
             "liveLeases": self.nodes.values().map(|node| node.resources.len()).sum::<usize>(),
             "publishedValues": self.values.len(),
+            "invocationScopes": self.invocations.live_count(),
             "pendingActions": self.nodes.values().filter(|node| node.pending.is_some()).count(),
         });
         json!({"abi":1,"diagnosticsSchema":"cordis.driver/v1","profile":self.profile,"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics(),"storage":storage})
@@ -1176,7 +1196,8 @@ impl Driver {
             })
     }
 
-    /// Checked read-only admission; `holding` is the host's live invocation fact.
+    /// Low-level read-only admission with an explicit host ownership fact.
+    /// Managed JS uses CheckScopeWait; reverse callbacks use check_request_wait.
     pub fn check_wait(
         &self,
         from: usize,
@@ -1191,6 +1212,37 @@ impl Driver {
             WaitDecision::StaleEpisode => Err(DriverError::new(
                 "StaleEpisode",
                 "wait admission belongs to an earlier episode",
+            )),
+        }
+    }
+
+    /// Admit a wait using the transport's recorded request, never a host boolean.
+    pub fn check_request_wait(
+        &self,
+        ledger: &request_ledger::RequestLedger,
+        ticket: RequestTicket,
+        target: usize,
+    ) -> Result<Option<usize>, DriverError> {
+        use cordis_kernel::wait_guard::WaitDecision;
+        use request_ledger::RequestError;
+        let decision = ledger
+            .check_wait(&self.kernel, self.domain, ticket.into(), target)
+            .map_err(|error| {
+                DriverError::new(
+                    if error == RequestError::Stale {
+                        "StaleAuthority"
+                    } else {
+                        "InvalidAuthority"
+                    },
+                    "wait requires an outstanding request in this domain",
+                )
+            })?;
+        match decision {
+            WaitDecision::Allowed => Ok(None),
+            WaitDecision::Blocked { retained } => Ok(Some(retained)),
+            WaitDecision::StaleEpisode => Err(DriverError::new(
+                "StaleEpisode",
+                "wait belongs to an earlier episode",
             )),
         }
     }
@@ -1213,6 +1265,29 @@ impl Driver {
 
     pub fn execute(&mut self, command: Command) -> Result<Value, DriverError> {
         match command {
+            Command::BeginScope { id, generation } => {
+                let scope: ScopeHandle =
+                    self.invocations.begin(&self.kernel, id, generation)?.into();
+                Ok(json!({"scope":scope}))
+            }
+            Command::FinishScope { scope } => {
+                self.invocations.finish(scope.into())?;
+                Ok(json!({}))
+            }
+            Command::ScopesLive { scopes } => {
+                let scopes: Vec<_> = scopes.into_iter().map(Into::into).collect();
+                Ok(json!({"live":self.invocations.any_live(&scopes)?}))
+            }
+            Command::CheckScopeWait { scopes, target } => {
+                let scopes: Vec<_> = scopes.into_iter().map(Into::into).collect();
+                let block = self.invocations.check_wait(&self.kernel, &scopes, target)?;
+                Ok(match block {
+                    None => json!({"blocked":false}),
+                    Some(block) => json!({"blocked":true,"scope":ScopeHandle::from(block.scope),
+                        "owner":block.id.to_string(),"generation":block.generation.to_string(),
+                        "retained":block.retained.to_string()}),
+                })
+            }
             Command::CheckWait {
                 from,
                 generation,

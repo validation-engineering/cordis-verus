@@ -2,6 +2,23 @@
 
 Changes are recorded before release. Runtime previews are distributed through GitHub Releases.
 
+## Unreleased
+
+- Record JS setup, cleanup, task and effect ownership in a verified invocation
+  ledger. Lifecycle waits check every supplied ancestor against live native
+  records; cancellation does not complete a scope. Completed records are
+  reclaimed without reusing identities. Expose `storage.invocationScopes` and
+  require `scopeProtocol: 1` from custom addons.
+
+- Connect native reverse requests to a verified ledger for exact receipt
+  validation, concurrent request retention and job drain checks. Lifecycle waits
+  from these callbacks use recorded ownership. Cancellation and dropped futures
+  do not acknowledge outstanding JavaScript work.
+- Require the matching reverse-request protocol when loading a custom addon;
+  plugin-facing call APIs and the native dynamic-module ABI remain unchanged.
+  See the [wait-admission case](docs/cases/reentrant-wait.md) for proofs,
+  reproduction and remaining host assumptions.
+
 ## 0.2.0 — 2026-10-12
 
 - Declare required services once with `Plugin::with_dependencies`: typed setup

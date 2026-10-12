@@ -180,9 +180,23 @@ Rust 外层把 callback 存为 `Vec<Option<CleanupAction>>`，每个效果组使
 `assertNotWaitingForAncestor` 调用这些经过验证的只读方法。
 `retained_dependency_blocks_cleanup` 将非自反依赖路径接到实际 cleanup guard。
 
-宿主仍提供 invocation 活跃事实及祖先链，并负责执行域选择、JSON/FFI 和实际错误
-传播。该合同不是一般调用等待图或异步终止证明，不改变第 73 条状态。
-[案例说明](cases/reentrant-wait.zh-CN.md)给出失败重试及合法嵌套调用复现。
+native 反向请求的所有权进一步来自 `request_ledger::RequestLedger`：真实 enqueue
+调用 `issue`，回复携带完整 domain/owner/generation/session/job/request/restoring
+票据调用 `complete`，job 结束前调用 `job_drained`；多请求可并存，取消和丢弃 Future
+不消费记录。`RequestLedger::check_wait` 将已记录请求与 kernel 判断组合，拒绝
+过期／错误票据，不再依赖 JS 的 `holding` 标志。失败回复表示请求结束而非资源释放
+成功；资源 journal 的失败保留与重试仍独立执行。
+
+JS setup、cleanup、task 和 effect 通过 `InvocationLedger::begin/finish` 登记和
+结束存活记录；generation 必须匹配内核，记录回收但 ID 不复用。`check_wait` 遍历全部
+传入作用域，只有全部身份已分配且存活记录都有效、无冲突才放行，不接受 `holding`
+覆盖。已完成身份表示不再持有工作，JS 仍对其执行 episode 新鲜性检查。
+
+宿主仍捕获初始 context 身份、维持 payload/waker 与账本对应及完整 invocation
+祖先链，决定何时登记／报告实际回调结果，并负责 JSON/FFI 和错误传播。账本不是独立
+清理屏障，也无法识别漏传的祖先。这些连接以测试检查，尚非整个宿主证明。该合同不是一般调用等待图或异步终止证明，不改变第 73
+条状态。[案例说明](cases/reentrant-wait.zh-CN.md)给出失败重试、票据隔离及合法嵌套
+调用复现。
 
 ## 当前没有声称的证明
 

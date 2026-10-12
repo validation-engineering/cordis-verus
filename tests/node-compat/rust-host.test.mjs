@@ -23,7 +23,7 @@ function bridge(service = {}) {
     errors, diagnostics, fibers: new Map(),
     wake() {},
     driver: {
-      rustInfo: () => JSON.stringify({ abi: 1, factories: [factory] }),
+      rustInfo: () => JSON.stringify({ abi: 1, requestProtocol: 1, factories: [factory] }),
       rustWake() {},
       rustCommand(encoded) {
         const command = JSON.parse(encoded);
@@ -54,7 +54,10 @@ function bridge(service = {}) {
     jobs: new Set(), services: new Map(), cancelled: false, closed: false, cleaning: false,
   };
   host.sessions.set(session.id, session);
-  const request = (method, fields = {}) => ({ request: '18', session: session.id, job: '21', kind: 'call', restoring: false, service: 'js', method, args: [], ...fields });
+  const request = (method, fields = {}) => {
+    const call = { request: '18', session: session.id, job: '21', kind: 'call', restoring: false, service: 'js', method, args: [], ...fields };
+    return {...call,authority:{domain:'9',id:'41',generation:'7',session:call.session,job:call.job,request:call.request,restoring:call.restoring}};
+  };
   const admit = (kind = 'call', job = '21') => session.jobs.add({ job, kind, promise: Promise.resolve() });
   const enqueue = call => { batches.push({ calls: [call], jobs: [] }); host.poll(); };
   return { host, session, invocation, commands, replies, errors, diagnostics, request, admit, enqueue,
@@ -115,7 +118,7 @@ test('reverse call waits for the JS Promise and invokes a method getter exactly 
   await turn();
   assert.equal(reads, 1);
   assert.equal(receiver, service);
-  assert.deepEqual(wire.replies, [{ op: 'reply', request: '18', success: true, value: { value: 42, marker: 'original receiver' } }]);
+  assert.deepEqual(wire.replies, [{ op: 'reply', authority: wire.request('method').authority, success: true, value: { value: 42, marker: 'original receiver' } }]);
   assert.deepEqual(wire.errors, []);
 });
 
@@ -130,7 +133,8 @@ test('cleanup reverse calls retain the actual cleanup invocation through await',
   assert.equal(observed.fiber, wire.session.cleanupToken.fiber);
   assert.equal(observed.kind, 'cleanup');
   assert.equal(observed.generation, wire.session.cleanupToken.generation);
-  assert.deepEqual(observed.rustAuthority, { session: '5', job: '21', request: '18' });
+  assert.deepEqual(observed.rustAuthority, wire.request('method', {restoring:true}).authority);
+  assert(Object.isFrozen(observed.rustAuthority));
   assert.equal(observed.ticket.action, '99');
   assert.equal(wire.replies.length, 1);
   assert.equal(wire.replies[0].success, true);
@@ -241,4 +245,10 @@ test('dynamic reverse replies are bounded before native decoding and complete on
     else assert.match(wire.replies[0].error, scenario.error);
     assert.deepEqual(wire.errors, []);
   }
+});
+
+
+test('an addon without exact request receipts is rejected before dispatch', () => {
+  const domain = {driver:{rustInfo: () => JSON.stringify({abi:1,factories:[]})}};
+  assert.throws(() => new RustHost(domain, {}), /Unsupported Rust request protocol/);
 });

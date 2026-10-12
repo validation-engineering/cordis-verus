@@ -45,6 +45,7 @@ function nativeDriver(options) {
   if (info?.abi !== 1 || info?.profile !== 'cordis-4.0.0-rc.10-experimental' || info?.package !== 'cordis-node' || info?.values !== 'javascript-object-table') {
     throw new Error(`Incompatible Cordis addon at ${addon}: expected ABI 1 and profile cordis-4.0.0-rc.10-experimental with JavaScript object-table values`);
   }
+  if (info.scopeProtocol !== 1) throw new Error('Incompatible Cordis addon: invocation scope protocol 1 is required');
   if (options.profile === 'harness' && !info.profiles?.includes('harness')) {
     throw new Error('Incompatible Cordis addon: Harness profile support is required');
   }
@@ -74,16 +75,34 @@ function assertCurrentInvocation(domain, operation = 'context operation') {
   }
 }
 
+// The native ledger owns the live fact. `active` remains a host admission marker
+// for setup/child dispatch; it is never an input to the wait decision.
+function beginInvocation(fiber, properties = {}) {
+  const generation = properties.generation ?? fiber._generation;
+  const scope = fiber._domain.command({op:'begin_scope',id:fiber.id,generation}).scope;
+  return {...properties,fiber,generation,active:true,scopeAuthority:Object.freeze(scope)};
+}
+function finishInvocation(token) {
+  token.fiber._domain.command({op:'finish_scope',scope:token.scopeAuthority});
+  token.active = false;
+}
+function localScopes(domain) {
+  return [...invocationScopes()].filter(token => token.fiber._domain === domain);
+}
+function scopeHandles(scopes) {
+  return scopes.flatMap(token => token.scopeAuthority ? [token.scopeAuthority] : []);
+}
+
 // Effects preserve the caller's cleanup/Rust authority, while their initializer
 // or inverse independently keeps its owner busy until the actual result lands.
 // Parent tokens remain shared so completing a nested synchronous callback cannot
 // hide an in-flight setup, cleanup, task or reverse Rust call.
 function runEffectInvocation(fiber, execute) {
   const parentInvocation = invocation.getStore();
-  const effectScope = {fiber,generation:fiber._generation,active:true};
+  const effectScope = beginInvocation(fiber);
   const token = {...(parentInvocation ?? {fiber,generation:fiber._generation,kind:'effect'}),
     active:false,parentInvocation,effectScope};
-  const finish = () => { effectScope.active = false; };
+  const finish = () => finishInvocation(effectScope);
   try {
     const result = invocation.run(token,execute);
     if (result?.then) Promise.resolve(result).then(finish,finish);
@@ -92,32 +111,33 @@ function runEffectInvocation(fiber, execute) {
   } catch (error) { finish(); throw error; }
 }
 
-// AsyncLocalStorage also follows detached continuations after a callback has
-// landed. Those continuations retain their episode, but no longer hold the
-// action/task whose completion an ancestor shutdown would otherwise await.
-// Reverse Rust calls keep their independently admitted lease authority.
-function invocationBlocksWait(token) {
-  return !!token && (token.active !== false || token.rustAuthority !== undefined);
-}
-
+// Detached continuations retain their episode, but their completed scope no
+// longer holds work. Scope identities are checked even after their record is
+// reclaimed. Reverse Rust scopes use the separate native request ledger.
 function assertNotWaitingForAncestor(target, operation) {
   target = target.ctx.fiber;
   const domain = target._domain;
   assertCurrentInvocation(domain, operation);
-  for (const token of invocationScopes()) {
-    if (token.fiber._domain !== domain) continue;
-    const reply = domain.command({op:'check_wait',from:token.fiber.id,
-      generation:token.generation ?? 0,target:target.id,holding:invocationBlocksWait(token)});
-    if (reply.blocked) {
-      throw new CordisError('REENTRANT_MUTATION',
-        `Cannot await ${operation} from the current fiber action or its ancestor, or a provider retained by that action`,
-        {operation,owner:token.fiber.id,generation:token.generation ?? 0,target:target.id,retained:reply.retained});
-    }
+  const scopes = localScopes(domain);
+  const js = scopeHandles(scopes);
+  const reject = reply => {
+    if (reply.blocked) throw new CordisError('REENTRANT_MUTATION',
+      `Cannot await ${operation} from the current fiber action or its ancestor, or a provider retained by that action`,
+      {operation,owner:reply.owner,generation:reply.generation,target:target.id,retained:reply.retained});
+  };
+  if (js.length) reject(domain.command({op:'check_scope_wait',scopes:js,target:target.id}));
+  for (const token of scopes) {
+    if (!token.rustAuthority) continue;
+    reject({...domain.rust.command({op:'check_wait',authority:token.rustAuthority,target:target.id}),
+      owner:token.fiber.id,generation:token.generation});
   }
 }
 
 function liveInvocation(domain) {
-  return [...invocationScopes()].some(token => token.fiber._domain === domain && invocationBlocksWait(token));
+  const scopes = localScopes(domain);
+  const js = scopeHandles(scopes);
+  const live = js.length && domain.command({op:'scopes_live',scopes:js}).live;
+  return !!live || scopes.some(token => token.rustAuthority !== undefined);
 }
 
 export function assertDomainMutation(ctx, options = {}) {
@@ -440,8 +460,9 @@ class Domain {
     for (const frame of this.updateFrames) {
       // A config observer may revise children or unrelated fibers, but must not
       // wait for itself, its owners, or a provider retained by its own episode.
-      invocation.run({fiber:frame.fiber,generation:frame.fiber._generation,
-        kind:'update',active:true,parentInvocation:frame.origin}, () => assertNotWaitingForAncestor(target, operation));
+      const token = beginInvocation(frame.fiber, {kind:'update',parentInvocation:frame.origin});
+      try { invocation.run(token, () => assertNotWaitingForAncestor(target, operation)); }
+      finally { finishInvocation(token); }
     }
   }
   delegateUpdateMutation(fiber, operation, ...args) {
@@ -542,15 +563,16 @@ class Domain {
   }
   command(command) {
     // Checks/reclamation can change admission even when their public result looks
-    // like a read. Unknown commands are writers by default. Drive is accounted
-    // for by pump(), except the explicit constructor/root drive.
-    if (!['snapshot','snapshot_state','resolve','validate','validate_check','committed_reaches','check_wait'].includes(command.op)
+    // like a read. Scope-only bookkeeping does not change lifecycle admission.
+    // Unknown commands are writers by default. Drive is accounted for by pump(),
+    // except the explicit constructor/root drive.
+    if (!['snapshot','snapshot_state','resolve','validate','validate_check','committed_reaches','check_wait','begin_scope','finish_scope','scopes_live','check_scope_wait'].includes(command.op)
       && !(command.op === 'drive' && this.pumping)) this.driverDirty = true;
     try {
       const result = this.driver.command(JSON.stringify(command));
       const reply = typeof result === 'string' ? JSON.parse(result) : result;
       if (reply?.error) throw new CordisError(reply.code ?? 'NATIVE_DRIVER', typeof reply.error === 'string' ? reply.error : JSON.stringify(reply.error));
-      if (!['snapshot','snapshot_state','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches','check_wait'].includes(command.op)) this.wake();
+      if (!['snapshot','snapshot_state','resolve','validate','drive','reclaim','checks','validate_check','committed_reaches','check_wait','begin_scope','finish_scope','scopes_live','check_scope_wait'].includes(command.op)) this.wake();
       return reply;
     } catch (error) {
       // Even a rejected read may report a faulted native domain. Never let a
@@ -727,7 +749,7 @@ class Domain {
   }
   async settle() {
     assertCurrentInvocation(this);
-    if ([...invocationScopes()].some(token => token.fiber._domain === this && invocationBlocksWait(token))) throw new CordisError('REENTRANT_MUTATION','Cannot await domain settlement from its own action');
+    if (liveInvocation(this)) throw new CordisError('REENTRANT_MUTATION','Cannot await domain settlement from its own action');
     if (!(mutation.getStore()?.domain === this && mutation.getStore().active)) {
       while (this.currentMutation || this.mutationQueue.length) {
         const revision = this.progress;
@@ -846,7 +868,7 @@ export class Fiber {
   async _activate(ticket) {
     this._generation = ticket.generation;
     this._error = undefined;
-    const token = {fiber:this, generation:ticket.generation, kind:'setup',ticket,active:true};
+    const token = beginInvocation(this, {generation:ticket.generation,kind:'setup',ticket});
     let success = true;
     try {
       this._setState(FiberState.LOADING);
@@ -879,7 +901,7 @@ export class Fiber {
     } catch (error) {
       success = false; this._error = error;
       try { this.ctx.logger.error(error); } catch (loggingError) { this._domain.errors.push(loggingError); }
-    } finally { token.active = false; }
+    } finally { finishInvocation(token); }
     this._domain.command({op:'complete', ticket, success, ...(success ? {} : {error:serializableError(this._error)})});
     this._domain.schedule();
   }
@@ -887,7 +909,7 @@ export class Fiber {
     const errors = [];
     const observation = hostDiagnostics(this);
     try { this._setState(FiberState.UNLOADING); } catch(error) { errors.push(error); }
-    const token = {fiber:this, generation:ticket.generation, kind:'cleanup',ticket,active:true};
+    const token = beginInvocation(this, {generation:ticket.generation,kind:'cleanup',ticket});
     try { await invocation.run(token, async () => {
       // Task admission closed with native withdrawal. Every owned task must
       // land before any resource inverse, regardless of registration order.
@@ -931,7 +953,7 @@ export class Fiber {
         observation.stage('closing-sessions');
         try { await this._domain.rust.closeSessions(this); } catch (error) { errors.push(error); }
       }
-    }); } finally { token.active = false; }
+    }); } finally { finishInvocation(token); }
     this._domain.command({op:'complete',ticket,success:errors.length === 0,...(errors.length ? {error:errors.map(serializableError).join('; ')} : {})});
     if (!errors.length) this._publications.clear();
     if (errors.length) { this._error = new AggregateError(errors, `Cleanup failed for ${this.name}`, this._error ? {cause:this._error} : undefined); this._domain.errors.push(this._error); }
@@ -1123,7 +1145,7 @@ export class Fiber {
     if (fiber._generation === '0') throw new CordisError('INACTIVE_EFFECT','owned tasks require an admitted activation');
     if (typeof execute !== 'function') throw new TypeError('task requires a function');
     const controller = new AbortController();
-    const token = {fiber,generation:fiber._generation,kind:'task',active:true,parentInvocation:invocation.getStore()};
+    const token = beginInvocation(fiber, {kind:'task',parentInvocation:invocation.getStore()});
     let promise;
     const dispose = () => { controller.abort(); return promise.then(() => {}, () => {}); };
     defineProperty(dispose,symbols.effect,{label,children:[]});
@@ -1133,12 +1155,12 @@ export class Fiber {
     promise = Promise.resolve().then(() => invocation.run(token,() => execute(controller.signal)));
     const owned = {promise,cancel:reason => controller.abort(reason)};
     fiber._ownedTasks.add(owned);
-    const finish = () => { token.active = false; remove(); fiber._ownedTasks.delete(owned); fiber._domain.wake(); };
+    const finish = () => { finishInvocation(token); remove(); fiber._ownedTasks.delete(owned); fiber._domain.wake(); };
     promise.then(finish,finish);
     return Object.freeze({
       promise, signal:controller.signal, cancel:reason => controller.abort(reason),
       join() {
-        if (token.active && [...invocationScopes()].includes(token)) throw new CordisError('REENTRANT_MUTATION','A task cannot join itself');
+        if ([...invocationScopes()].includes(token) && fiber._domain.command({op:'scopes_live',scopes:[token.scopeAuthority]}).live) throw new CordisError('REENTRANT_MUTATION','A task cannot join itself');
         return promise;
       },
     });

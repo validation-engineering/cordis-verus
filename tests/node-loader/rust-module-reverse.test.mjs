@@ -269,3 +269,67 @@ test('dynamic reverse replies at the size/depth boundary finish as releasable jo
     zeroResources(ctx);
   } finally { await ctx.dispose(); }
 });
+
+for (const profile of ['cordis', 'harness']) {
+  test(`reverse receipts reject altered, cross-domain and replayed replies (${profile})`, async () => {
+    const roots = [new Context({profile}), new Context({profile})];
+    const gates = roots.map(() => Promise.withResolvers());
+    const entered = roots.map(() => Promise.withResolvers());
+    const tickets = [], controllers = [], calls = [], completed = [false, false];
+    try {
+      for (const [index, ctx] of roots.entries()) {
+        ctx.provide('jsHost', {record: () => null, query: async () => {
+          const token = ctx.fiber._domain.rust.hooks.invocation();
+          tickets[index] = token.rustAuthority;
+          // This flag cannot override a request still recorded by the transport.
+          token.active = false;
+          await assert.rejects(ctx.fiber.dispose(), error => error.code === 'REENTRANT_MUTATION');
+          entered[index].resolve();
+          await gates[index].promise;
+          return index;
+        }});
+        controllers[index] = await loadRustModule(ctx, options());
+        calls[index] = invoke(ctx, 'query').then(value => { completed[index] = true; return value; });
+        calls[index].catch(() => {});
+      }
+      await Promise.all(entered.map(item => item.promise));
+      const hosts = roots.map(ctx => ctx.fiber._domain.rust);
+      const [a, b] = tickets;
+      assert.equal(a.request, b.request);
+      assert.equal(a.job, b.job);
+      assert.equal(a.session, b.session);
+      assert.notEqual(a.domain, b.domain);
+      const reply = authority => ({op:'reply',authority,success:true,value:null});
+      assert.throws(() => hosts[1].command(reply(a)), /InvalidAuthority/);
+      for (const key of ['domain','id','generation','session','job','request']) {
+        const wrong = {...a,[key]:(BigInt(a[key]) + 100n).toString()};
+        assert.throws(() => hosts[0].command(reply(wrong)), /InvalidAuthority|StaleRequest/);
+      }
+      assert.throws(() => hosts[0].command(reply({...a,restoring:!a.restoring})), /InvalidAuthority/);
+      // Old numeric-only envelopes no longer acknowledge any callback.
+      assert.throws(() => hosts[0].command({op:'reply',request:a.request,success:true,value:null}));
+      for (const [index, authority] of tickets.entries()) {
+        assert.deepEqual(hosts[index].command({op:'check_wait',authority,target:authority.id}),
+          {blocked:true,retained:authority.id});
+      }
+      await turn();
+      assert.deepEqual(completed, [false, false]);
+      gates[0].resolve();
+      assert.equal(await calls[0], 0);
+      assert.throws(() => hosts[0].command(reply(a)), /StaleRequest/);
+      assert.throws(() => hosts[0].command({op:'check_wait',authority:a,target:a.id}), /StaleAuthority/);
+      assert.deepEqual(hosts[1].command({op:'check_wait',authority:b,target:b.id}),
+        {blocked:true,retained:b.id});
+      gates[1].resolve();
+      assert.equal(await calls[1], 1);
+      for (const [index, controller] of controllers.entries()) {
+        await controller.dispose();
+        zeroResources(roots[index]);
+      }
+    } finally {
+      gates.forEach(gate => gate.resolve());
+      await Promise.allSettled(calls);
+      await Promise.all(roots.map(ctx => ctx.dispose()));
+    }
+  });
+}

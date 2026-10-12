@@ -42,6 +42,10 @@ impl PluginFactory for Factory {
                         name: "dropped".into(),
                         kind: MethodKind::Async,
                     },
+                    MethodDescriptor {
+                        name: "dropped_pair".into(),
+                        kind: MethodKind::Async,
+                    },
                 ],
             }],
         }
@@ -75,15 +79,18 @@ impl PluginInstance for Instance {
         Ok(json!(42))
     }
     fn call_async(&self, ctx: PluginContext, _: &str, method: &str, _: Value) -> PluginFuture {
-        if method == "dropped" {
+        if method == "dropped" || method == "dropped_pair" {
+            let count = if method == "dropped_pair" { 2 } else { 1 };
             Box::pin(async move {
-                let mut request = Box::pin(ctx.call("input", "wait", json!([])));
-                std::future::poll_fn(|cx| {
-                    assert!(request.as_mut().poll(cx).is_pending());
-                    Poll::Ready(())
-                })
-                .await;
-                drop(request);
+                for _ in 0..count {
+                    let mut request = Box::pin(ctx.call("input", "wait", json!([])));
+                    std::future::poll_fn(|cx| {
+                        assert!(request.as_mut().poll(cx).is_pending());
+                        Poll::Ready(())
+                    })
+                    .await;
+                    drop(request);
+                }
                 Ok(json!("returned"))
             })
         } else {
@@ -2360,4 +2367,113 @@ fn borrowed_adapter_release_failure_is_retryable_after_calls_land_with_captured_
     backend.object_close(session, object).unwrap();
     assert_eq!(backend.poll()["jobs"][0]["success"], true);
     assert_eq!(probe.releases.load(Ordering::Relaxed), 2);
+}
+
+fn receipt(call: &Value) -> cordis_driver::RequestTicket {
+    serde_json::from_value(call["authority"].clone()).unwrap()
+}
+
+#[test]
+fn exact_receipts_survive_cancel_and_dropped_futures_until_every_reply_lands() {
+    let (mut backend, session) = ready();
+    let job = number(
+        &backend
+            .call(session, "service", "dropped_pair", json!([]), false, false)
+            .unwrap(),
+        "job",
+    );
+    let poll = backend.poll();
+    let first = receipt(&poll["calls"][0]);
+    let second = receipt(&poll["calls"][1]);
+    assert_eq!(first.job, second.job);
+    assert_ne!(first.request, second.request);
+    assert_eq!(first.job, job);
+    backend.cancel_job(job).unwrap();
+    for wrong in [
+        cordis_driver::RequestTicket {
+            domain: first.domain + 1,
+            ..first
+        },
+        cordis_driver::RequestTicket {
+            id: first.id + 1,
+            ..first
+        },
+        cordis_driver::RequestTicket {
+            generation: first.generation + 1,
+            ..first
+        },
+        cordis_driver::RequestTicket {
+            session: first.session + 1,
+            ..first
+        },
+        cordis_driver::RequestTicket {
+            job: first.job + 1,
+            ..first
+        },
+        cordis_driver::RequestTicket {
+            request: u64::MAX,
+            ..first
+        },
+        cordis_driver::RequestTicket {
+            restoring: !first.restoring,
+            ..first
+        },
+    ] {
+        assert!(backend.reply_request(wrong, Ok(Value::Null)).is_err());
+        assert_eq!(backend.validate_request(first).unwrap(), (1, 1, false));
+        assert!(backend.validate_request(second).is_ok());
+        assert_eq!(backend.poll()["jobs"], json!([]));
+    }
+    // Out-of-order failure is a receipt, but the other call still owns this job.
+    backend
+        .reply_request(second, Err("JS failed".into()))
+        .unwrap();
+    assert_eq!(backend.poll()["jobs"], json!([]));
+    assert!(backend.reply_request(second, Ok(Value::Null)).is_err());
+    assert!(backend.validate_request(first).is_ok());
+    backend.reply_request(first, Ok(Value::Null)).unwrap();
+    assert_eq!(backend.poll()["jobs"][0]["job"], job.to_string());
+    assert!(backend.validate_request(first).is_err());
+    assert!(backend.reply_request(first, Ok(Value::Null)).is_err());
+}
+
+#[test]
+fn real_transport_receipt_drives_wait_admission_and_rejects_a_different_domain() {
+    use cordis_driver::{Driver, HostAction};
+    let mut driver = Driver::new().unwrap();
+    let owner = driver.mount(None, vec![], vec![]).unwrap();
+    let action = match driver.drive().unwrap().remove(0) {
+        HostAction::Setup { ticket, .. } => ticket,
+        _ => panic!("setup"),
+    };
+    let mut registry = FactoryRegistry::new();
+    registry.register(ReadyFactory).unwrap();
+    let mut backend = Backend::with_domain(driver.domain(), registry, Arc::new(|| {}));
+    backend
+        .start(owner, action.generation, "test", Value::Null)
+        .unwrap();
+    let call = backend.poll()["calls"][0].clone();
+    let ticket = receipt(&call);
+    assert_eq!(
+        backend.check_request_wait(&driver, ticket, owner).unwrap(),
+        Some(owner)
+    );
+    assert_eq!(
+        backend
+            .check_request_wait(&driver, ticket, usize::MAX)
+            .unwrap(),
+        None
+    );
+    let foreign = Driver::new().unwrap();
+    assert!(backend
+        .check_request_wait(&foreign, ticket, owner)
+        .unwrap_err()
+        .contains("InvalidAuthority"));
+    backend
+        .reply_request(ticket, Err("publication refused".into()))
+        .unwrap();
+    assert!(backend
+        .check_request_wait(&driver, ticket, owner)
+        .unwrap_err()
+        .contains("StaleAuthority"));
 }

@@ -93,6 +93,7 @@ export class RustHost {
     if (typeof driver.rustInfo !== 'function') return;
     const info = JSON.parse(driver.rustInfo());
     if (info.abi !== 1) throw new Error('Unsupported Rust plugin ABI');
+    if (info.requestProtocol !== 1) throw new Error('Unsupported Rust request protocol: rebuild the addon with this runtime');
     for (const factory of info.factories) {
       if (this.factories.has(factory.name)) throw new Error('Duplicate Rust factory');
       this.factories.set(factory.name,{...factory,plugin:undefined});
@@ -168,9 +169,9 @@ export class RustHost {
       Promise.resolve().then(() => this.dispatch(request)).then(value =>
         dynamic ? dynamicReplyValue(request.kind, value) : jsonValue(value ?? null),
       ).then(
-        value => this.command({op:'reply',request:request.request,success:true,value}),
+        value => this.command({op:'reply',authority:request.authority,success:true,value}),
         error => {
-          return this.command({op:'reply',request:request.request,success:false,
+          return this.command({op:'reply',authority:request.authority,success:false,
             error:dynamic ? dynamicErrorText(error) : errorText(error)});
         },
       ).then(() => this.schedule(),error => { if (!this.fault) { this.domain.errors.push(error); this.domain.wake(); } });
@@ -444,7 +445,7 @@ export class RustHost {
     const scope = job.kind === 'setup'
       ? {...session.token,kind:'setup',active:false,parentInvocation:session.setupToken}
       : job.kind === 'cleanup' ? session.cleanupToken : {...session.token,kind:'rust-call'};
-    const token = {...scope,rustAuthority:{session:session.id,job:job.job,request:request.request},rustResource:job.resource,rustResources:[...new Set([...(job.ancestors ?? []),...(job.resource ? [job.resource] : [])])]};
+    const token = {...scope,rustAuthority:Object.freeze({...request.authority}),rustResource:job.resource,rustResources:[...new Set([...(job.ancestors ?? []),...(job.resource ? [job.resource] : [])])]};
     return this.hooks.run(token,() => {
       if (request.kind === 'provide') {
         const descriptor = session.factory.services.find(service => service.name === request.service);

@@ -1324,6 +1324,36 @@ def mutation_manifest():
             '        WaitDecision::Allowed\n    }\n\n    /// A non-reflexive dependency path',
             '        WaitDecision::Blocked {retained:from}\n    }\n\n    /// A non-reflexive dependency path',
         ),
+        (
+            'request-receipt-accepts-altered-owner',
+            'request_ledger.rs',
+            'if pending != ticket {',
+            'if pending.request != ticket.request {',
+        ),
+        (
+            'request-drains-before-reply',
+            'request_ledger.rs',
+            '                return false;',
+            '                return true;',
+        ),
+        (
+            'request-wait-discards-live-ownership',
+            'request_ledger.rs',
+            'Ok(kernel.check_wait(ticket.id, ticket.generation, target, true))',
+            'Ok(kernel.check_wait(ticket.id, ticket.generation, target, false))',
+        ),
+        (
+            'invocation-wait-discards-live-ownership',
+            'invocation_ledger.rs',
+            'match kernel.check_wait(ticket.id, ticket.generation, target, true) {',
+            'match kernel.check_wait(ticket.id, ticket.generation, target, false) {',
+        ),
+        (
+            'invocation-wait-stops-at-completed-scope',
+            'invocation_ledger.rs',
+            'if block.is_some() {',
+            'if block.is_some() || i == 0 {',
+        ),
     ]
 
 

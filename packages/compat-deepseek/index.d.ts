@@ -61,6 +61,8 @@ export interface DriverStorageStats {
   liveLeases: number;
   publishedValues: number;
   pendingActions: number;
+  /** Live managed JS callbacks; completed scope records are reclaimed. */
+  invocationScopes: number;
 }
 /** Decimal strings preserve native identities beyond JavaScript's safe integers. */
 export interface DiagnosticPort { key: string; realm: string; service?: string; realmLabel?: string; }

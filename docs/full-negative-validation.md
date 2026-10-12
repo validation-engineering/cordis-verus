@@ -3,7 +3,7 @@
 English · [简体中文](full-negative-validation.zh-CN.md)
 
 This independent specification regression deliberately changes kernel operations, guards or specifications
-and requires the proofs to reject each change. Every one of the 124 canonical mutations must first
+and requires the proofs to reject each change. Every one of the 129 canonical mutations must first
 compile and then produce a concrete contract failure while verifying the entire
 crate. The unchanged kernel must also pass. A timeout, resource limit, frontend
 error or partial result does not satisfy this requirement.
@@ -37,7 +37,7 @@ stop its Verus and solver descendants; by default, failed workers stop further
 dispatch and cancel active siblings. Standard output, diagnostics and `.meta.json` stage records
 are retained, including elapsed time, command, exit status, source fingerprint and
 cancellation state. The queue contains only the active worker budget, rather than
-all 124 already-submitted tasks.
+all 129 already-submitted tasks.
 
 Termination is requested once per process group. The supervisor observes leader
 exit without reaping it until group cleanup finishes, so the process-group identity
@@ -95,7 +95,7 @@ needed (a single shard covers only its assigned controls):
 
 ```sh
 python3 scripts/negative-shards.py run \
-  --shard-index 0 --shard-count 18 --output target/negative-diagnostics/shard-0 \
+  --shard-index 0 --shard-count 19 --output target/negative-diagnostics/shard-0 \
   --jobs 1 --threads 2 --timeout 2400 --compile-timeout 300 --keep-going
 ```
 
@@ -131,9 +131,9 @@ plan supplies both the preflight and shard proof deadlines:
 
 | Platform | Proof deadline | Shards | Maximum controls per shard | Compile + proof budget | Job headroom |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Linux x64 | 40 min | 18 | 7 | 315 min | 45 min |
-| macOS ARM64 | 60 min | 25 | 5 | 325 min | 35 min |
-| macOS Intel (opt-in) | 90 min | 42 | 3 | 285 min | 75 min |
+| Linux x64 | 40 min | 19 | 7 | 315 min | 45 min |
+| macOS ARM64 | 60 min | 26 | 5 | 325 min | 35 min |
+| macOS Intel (opt-in) | 90 min | 43 | 3 | 285 min | 75 min |
 
 The planner checks complete mutation coverage and reserves at least 30 minutes
 within each six-hour shard job for installation, evidence checks,

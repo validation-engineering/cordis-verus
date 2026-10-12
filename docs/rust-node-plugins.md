@@ -72,6 +72,8 @@ JS 方法应返回 async iterator，或返回能生成它的 async iterable。�
 
 Rust 代码显式调用 `JsStream.close().await` 时，应先等待自己的 `next()`；仍有 pending pull 时返回 `StreamBusy`，不改变准入，也不发出新的关闭请求。这避免共享 clone 在反向回调链中等待自身。框架的取消和自动 journal 使用独立控制路径，仍先发 `return()` 再等待 pending `next()`，不能把业务 close 的 Busy 合同当成取消时跳过回收的理由。
 
+反向请求的完整票据由真实 transport 中的已验证 `RequestLedger` 发放和消费；取消或丢弃 Future 不消费票据，最后一个回复到达前 job 不能排空。等待守卫也使用相同记录，见[合同与复现案例](cases/reentrant-wait.zh-CN.md)。这不构成 JS callback 或整个异步宿主的证明。
+
 反向流的关闭权限绑定具体 pending request，允许沿旧 committed 依赖链完成恢复。取得可调用 `return` 后的异常 `next` getter、晚到的 open 和丢弃的 Rust request future 仍保留资源追踪；原生故障标记清理未确认，GC 不作为成功清理的证据。
 
 ## 显式对象与回调

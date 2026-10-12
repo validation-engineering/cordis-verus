@@ -16,16 +16,17 @@ function bridge(service) {
   const domain = {
     errors, diagnostics: [], wake() {},
     driver: {
-      rustInfo: () => JSON.stringify({ abi: 1, factories: [factory] }),
+      rustInfo: () => JSON.stringify({ abi: 1, requestProtocol: 1, factories: [factory] }),
       rustWake() {},
       rustCommand(encoded) {
         const command = JSON.parse(encoded);
         if (command.op === 'poll') return JSON.stringify(batches.shift() ?? { calls: [], jobs: [] });
         if (command.op === 'reply') {
           replies.push(command);
-          const waiter = pending.get(command.request);
+          const waiter = pending.get(command.authority?.request);
           assert.ok(waiter, 'each reverse request must receive exactly one reply');
-          pending.delete(command.request);
+          assert.deepEqual(command.authority, waiter.authority, 'the reply must preserve the entire issued receipt');
+          pending.delete(command.authority.request);
           waiter.resolve(command);
         }
         return '{}';
@@ -60,7 +61,12 @@ function bridge(service) {
     const request = String(++requestId);
     const waiter = Promise.withResolvers();
     pending.set(request, waiter);
-    batches.push({ calls: [{ session: owner.id, job: '21', restoring: false, service: 'js', method: 'open', args: [], ...fields, request, kind }], jobs: [] });
+    const call = {session:owner.id,job:'21',restoring:false,service:'js',method:'open',args:[],...fields,request,kind};
+    const target = host.sessions.get(call.session) ?? owner;
+    call.authority = {domain:'9',id:target.token.fiber.id,generation:target.token.generation,
+      session:call.session,job:call.job,request,restoring:call.restoring};
+    waiter.authority = {...call.authority};
+    batches.push({calls:[call],jobs:[]});
     host.poll();
     return waiter.promise.then(reply => {
       if (!reply.success) throw new Error(reply.error);
@@ -185,7 +191,7 @@ for (const firstFailure of ['throw', 'incomplete']) {
     assert.equal(attempts, 2, 'cleanup must retry the retained iterator');
     assert.equal(cleanupInvocation.ticket, wire.owner.cleanupToken.ticket);
     assert.equal(cleanupInvocation.kind, 'cleanup');
-    assert.deepEqual(cleanupInvocation.rustAuthority, { session: wire.owner.id, job: '31', request: wire.replies.at(-1).request });
+    assert.deepEqual(cleanupInvocation.rustAuthority, { domain:'9',id:wire.owner.token.fiber.id,generation:'7',session:wire.owner.id,job:'31',request:wire.replies.at(-1).authority.request,restoring:true });
     assert.deepEqual(wire.errors, []);
   });
 }
@@ -349,7 +355,7 @@ test('malformed acquisitions retain failed return work for the owning session cl
   assert.equal(attempts, 2);
   assert.equal(cleanupInvocation.ticket, wire.owner.cleanupToken.ticket);
   assert.equal(cleanupInvocation.kind, 'cleanup');
-  assert.deepEqual(cleanupInvocation.rustAuthority, { session: wire.owner.id, job: '31', request: wire.replies.at(-1).request });
+  assert.deepEqual(cleanupInvocation.rustAuthority, { domain:'9',id:wire.owner.token.fiber.id,generation:'7',session:wire.owner.id,job:'31',request:wire.replies.at(-1).authority.request,restoring:true });
   await wire.send('close_orphans', { job: '31', restoring: true });
   assert.equal(attempts, 2, 'successfully closed orphans must not be closed again');
 });
