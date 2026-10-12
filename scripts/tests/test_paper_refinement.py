@@ -69,6 +69,17 @@ class PaperRefinementTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Missing R1 semantic or executable'):
             checker.validate(self.plan, self.ledger)
 
+    def test_r2_cannot_complete_from_local_payload_and_result_contracts(self):
+        self.plan['milestones'][2]['status'] = 'complete'
+        with self.assertRaisesRegex(ValueError, 'whole-host obligations remain open'):
+            checker.validate(self.plan, self.ledger)
+
+    def test_r2_cannot_omit_the_unified_composition_obligation(self):
+        self.plan['r2Execution']['workItems'] = [w for w in self.plan['r2Execution']['workItems']
+                                                if w['id'] != 'production-composition']
+        with self.assertRaisesRegex(ValueError, 'all local and whole-host work items'):
+            checker.validate(self.plan, self.ledger)
+
     def test_final_milestone_cannot_hide_open_audit_or_integration(self):
         self.plan['milestones'][-1]['status'] = 'complete'
         with self.assertRaisesRegex(ValueError, 'audit outcomes remain open'):

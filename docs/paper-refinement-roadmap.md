@@ -40,9 +40,11 @@ Three explicit revisions record finite code representation, separate admission
 and recovery observations, and strict function-field interpretation. Original
 items 28, 47, 55, 56 and 57 retain their audit status.
 
-Next is R2: connect production service publication, dynamic Child creation and
-retryable cleanup through the managed plugin API to an applicable value/effect
-contract. Its Harness case should use that same execution path.
+R2 now connects actual publication payloads, lease-selected values, awaited
+cleanup results and landed inverse/continuation decisions to production callers.
+See [R2 execution contracts](r2-execution.md) for the proved scope and review path.
+R2 remains open for the complete callback effect contract, concurrent production
+composition and whole-trace correspondence; its exit criteria are unchanged.
 
 R3 then expands in three work packages: owner-created Child, consumers of owner
 publications, and repeated episodes/interior owner Unload. R4 follows with legal

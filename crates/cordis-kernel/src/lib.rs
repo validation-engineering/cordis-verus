@@ -2430,3 +2430,5 @@ pub mod paper_trace_independence;
 mod iteration_tests;
 
 pub mod guarded_components;
+
+pub mod async_completion;

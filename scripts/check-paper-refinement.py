@@ -134,6 +134,22 @@ def validate(data, ledger, root=ROOT):
             if revision['id'] == 'R1-FIELDS':
                 require(any(e['symbol'] == 'run_inspected' and e['role'] == 'execution' for e in review),
                         'R1 requires its actual executable caller')
+    execution = data.get('r2Execution', {})
+    work = execution.get('workItems', [])
+    required_r2 = {'managed-payloads', 'awaited-results', 'landed-continuation',
+                   'invocation-effect-origin', 'production-composition', 'complete-step-classification'}
+    require(len(work) == len(required_r2) and {w['id'] for w in work} == required_r2,
+            'R2 must retain all local and whole-host work items')
+    require(bool(execution.get('claim')), 'Missing R2 progress claim')
+    for item in work:
+        require(item.get('status') in {'open', 'partial', 'complete'}, 'Invalid R2 work status')
+        require(bool(item.get('scope')) and bool(item.get('remaining')), 'Missing R2 scope or boundary')
+        require(bool(item.get('reviewPath')), 'Missing R2 source review path')
+        for evidence in item['reviewPath']:
+            review_evidence(evidence, root, item['id'])
+    if milestones[2]['status'] == 'complete':
+        require(all(w['status'] == 'complete' for w in work),
+                'R2 cannot complete from local payload/result contracts while whole-host obligations remain open')
     if milestones[-1]['status'] == 'complete':
         require(all(i['status'] not in {'missing', 'partial'} for i in ledger['items']), 'R5 cannot complete while original-paper audit outcomes remain open')
         require(all(i['status'] == 'proved' for i in ledger['integrationObligations']), 'R5 cannot complete while integration obligations remain open')
@@ -157,8 +173,13 @@ def render(data, ledger):
                   'Explicit revisions:', '']
         lines += ['- ' + r['id'] + ': ' + r['decision'] for r in interpretation['revisions']]
         lines += ['', 'Remaining boundary: ' + interpretation['remainingBoundary']]
-    lines += ['', '## Work packages', '']
     owners = {}
+    lines += ['', '## R2 execution progress', '', data['r2Execution']['claim'], '',
+              '[Execution contracts and boundaries](r2-execution.md) · [执行合同与边界（中文）](r2-execution.zh-CN.md)', '',
+              '| Work item | Status | Scope | Remaining boundary |', '| --- | --- | --- | --- |']
+    for item in data['r2Execution']['workItems']:
+        lines.append(f'| {item["id"]} | {item["status"]} | {item["scope"]} | {item["remaining"]} |')
+    lines += ['', '## Work packages', '']
     for package in data['workPackages']:
         for item in package['paperItems']:
             owners[item] = package

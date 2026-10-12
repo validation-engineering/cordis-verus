@@ -116,7 +116,7 @@
         "R2",
         "R3"
       ],
-      "currentCoverage": "Generic effect laws are encoded and proved; executable resource and fixed-program drivers recover concrete journals.",
+      "currentCoverage": "Generic effect laws are encoded and proved; executable resource and fixed-program drivers recover concrete journals. R2 now preserves actual generic payloads, native awaited outputs, retry factories and landed continuation decisions in production adapters.",
       "openGap": "Production plugin callbacks do not yet instantiate every algebraic premise; opaque cleanup reports do not prove external restoration.",
       "nextAction": "Carry actual operation inputs, outputs and returned inverses through a checked extensible effect boundary.",
       "premises": [
@@ -141,6 +141,21 @@
         {
           "file": "crates/cordis-kernel/src/cleanup_queue.rs",
           "symbol": "complete",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/async_completion.rs",
+          "symbol": "await_completion",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "symbol": "complete_future",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/stage_landing.rs",
+          "symbol": "land_result",
           "role": "execution"
         }
       ]
@@ -289,8 +304,8 @@
         "R1",
         "R2"
       ],
-      "currentCoverage": "R1 completes semantic parent/continuation/child membership on the full finite strict carrier, actual value/code/journal interpretation, and an executable run_inspected client that constructs its evidence from empty. Original total Component membership is not conflated with this revision.",
-      "openGap": "R2 must cover production managed callbacks and host values. Original unrestricted Gamma and total Component witnesses remain independently open in the original ledger.",
+      "currentCoverage": "R1 completes semantic parent/continuation/child membership on the full finite strict carrier, actual value/code/journal interpretation, and an executable run_inspected client that constructs its evidence from empty. Original total Component membership is not conflated with this revision. R2 adds real publication/value lookup projection and propagates insertion arguments through LifecycleState.",
+      "openGap": "Production callback effect laws, complete Child/continuation composition and the relation between multi-version host values and R1 remain open. Original unrestricted Gamma and total Component witnesses remain independent.",
       "nextAction": "Connect the production publication/Child/cleanup path to an applicable value and effect contract, preserving the R1 representation and explicit error domains.",
       "premises": [
         "Child membership quantifies every input of its stated carrier.",
@@ -352,6 +367,21 @@
           "file": "crates/cordis-kernel/src/inspected_run.rs",
           "symbol": "run_inspected",
           "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/publication_values.rs",
+          "symbol": "publish_checked",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/publication_projection.rs",
+          "symbol": "appended_value",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-driver/src/lib.rs",
+          "symbol": "publish",
+          "role": "host"
         }
       ]
     },
@@ -671,5 +701,153 @@
       }
     ],
     "remainingBoundary": "Original unrestricted Gamma and total-function witnesses stay separate. Production callback/value contracts belong to R2; general interference recovery to R3; global termination and confluence to R4."
+  },
+  "r2Execution": {
+    "claim": "Source-linked progress for the existing R2 exit criteria; local payload/result contracts are not whole-host refinement.",
+    "workItems": [
+      {
+        "id": "managed-payloads",
+        "status": "complete",
+        "scope": "Actual generic payload ownership, key-local visible lookup, checked owner/generation/domain, lease-derived identity and atomic managed payload release.",
+        "remaining": "JS object contents and Rust interior mutation are not interpreted by payload identity.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "symbol": "publish_checked",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "symbol": "leased_value",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "symbol": "finish_resources",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/publication_projection.rs",
+            "symbol": "appended_value",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-driver/src/lib.rs",
+            "symbol": "publish",
+            "role": "host"
+          }
+        ]
+      },
+      {
+        "id": "awaited-results",
+        "status": "complete",
+        "scope": "Native async output/origin pairing and completion from the actual returned Result, retaining both host failure policies.",
+        "remaining": "This does not prove factory-to-Future association, external I/O truth or eventual return.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/async_completion.rs",
+            "symbol": "await_completion",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+            "symbol": "complete_future",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "initialize_cleanup",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/static_host.rs",
+            "symbol": "complete_reply",
+            "role": "host"
+          }
+        ]
+      },
+      {
+        "id": "landed-continuation",
+        "status": "complete",
+        "scope": "Actual inverse payload landing and continuation selection from result/cancellation, with the accumulator-step projection.",
+        "remaining": "The opaque inverse function effect is not interpreted by a token/payload accumulator.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/stage_landing.rs",
+            "symbol": "land_result",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "poll_groups",
+            "role": "host"
+          }
+        ]
+      },
+      {
+        "id": "invocation-effect-origin",
+        "status": "open",
+        "scope": "Establish actual argument, executed operation, result, continuation and inverse laws for extensible managed plugin entry points.",
+        "remaining": "Define and instantiate the production effect boundary with checked primitive laws; a ready Future or an assumed expected output is insufficient.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/guarded_components.rs",
+            "symbol": "member_is_component",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "initialize_callback",
+            "role": "host"
+          }
+        ]
+      },
+      {
+        "id": "production-composition",
+        "status": "open",
+        "scope": "One checked production invariant owns all concurrent groups, dynamic Child, admitted work, publications and drain/release decisions.",
+        "remaining": "Compose real group creation/landing/removal and complete resource manifests with lifecycle release; current adapters retain ordinary Rust orchestration.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "symbol": "finish_resources",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "poll_settle",
+            "role": "host"
+          }
+        ]
+      },
+      {
+        "id": "complete-step-classification",
+        "status": "partial",
+        "scope": "Classify the complete production trace against R1 and explicitly specified host extensions.",
+        "remaining": "Control wrappers, visible payload updates and accumulator projections have local contracts; the unified trace correspondence and all extensions remain to be proved.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state.rs",
+            "symbol": "insert",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state.rs",
+            "symbol": "begin",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state.rs",
+            "symbol": "finish",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/publication_projection.rs",
+            "symbol": "visible_frame",
+            "role": "proof"
+          }
+        ]
+      }
+    ]
   }
 }

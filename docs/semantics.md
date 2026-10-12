@@ -342,3 +342,12 @@ JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验�
 拒绝时保持队列并原样返回载荷，以及为空时没有仍保存或已交付的工作。重试必须
 仍有载荷。执行器调用后选择返回哪个工厂、回调真实性与外部效果仍属于宿主连接，
 不因容器证明而变成任意逆操作定理。详见[清理协议](cleanup-protocol.zh-CN.md)。
+
+## R2 生产载荷与实际完成结果
+
+实际 publication 的泛型载荷、旧租约读取、替换和清理释放现在通过
+`PublicationStore` 的可执行合同关联；生产 Rust 异步清理通过原生 Verus
+`await_completion` 保存实际等待结果，`land_result` 从实际 inverse 与取消状态
+决定后续动作。当前可见键值表与保留租约值是两个不同观察。
+这些增量尚不构成整个宿主或任意回调的效果正确性证明；R2 仍在推进。
+详见[执行合同和剩余验收内容](r2-execution.zh-CN.md)（[English](r2-execution.md)）。

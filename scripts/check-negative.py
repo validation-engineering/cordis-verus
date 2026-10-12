@@ -1372,6 +1372,30 @@ def mutation_manifest():
             '    kernel.check_insert(Some(parent),dependencies.as_slice(),provisions.as_slice())',
             '    Ok(())',
         ),
+        (
+            'r2-publication-value-read-returns-none',
+            'publication_values.rs',
+            'if id.0>=self.payloads.len() {None} else {self.payloads[id.0].as_ref()}',
+            'None',
+        ),
+        (
+            'r2-cleanup-future-forges-success',
+            'cleanup_completion.rs',
+            'Ok(self.accept_result(ticket,result,retry,policy))',
+            'Ok(self.accept_result(ticket,Ok(()),retry,policy))',
+        ),
+        (
+            'r2-stage-keeps-cancelled-continuation',
+            'stage_landing.rs',
+            'let continue_iteration=!self.journal.is_settled();',
+            'let continue_iteration=true;',
+        ),
+        (
+            'r2-lease-substitutes-publication-identity',
+            'publication_values.rs',
+            'Ok((lease.publication,self.payloads[lease.publication.0].as_ref().unwrap()))',
+            'Ok((PublicationId(0),self.payloads[lease.publication.0].as_ref().unwrap()))',
+        ),
     ]
 
 

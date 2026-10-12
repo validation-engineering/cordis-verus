@@ -12,7 +12,8 @@ use availability::{Availability, Candidate};
 pub use availability::{CheckAction, CheckTicket};
 pub mod shared;
 use cordis_kernel::invocation_ledger::{InvocationLedger, ScopeError};
-use cordis_kernel::publication::{LeaseId, PublicationError, PublicationId, PublicationRegistry};
+use cordis_kernel::publication::values::PublicationStore;
+use cordis_kernel::publication::{LeaseId, PublicationError, PublicationId};
 pub use cordis_kernel::request_ledger;
 use cordis_kernel::{Error as KernelError, Phase, Port};
 pub use protocol::{
@@ -95,11 +96,9 @@ pub struct Driver {
     configured: bool,
     domain: u64,
     kernel: LifecycleDriver,
-    publications: PublicationRegistry,
+    publications: PublicationStore<u64>,
     invocations: InvocationLedger,
     nodes: BTreeMap<usize, Node>,
-    values: BTreeMap<usize, u64>,
-    next_slot: usize,
     released: Vec<u64>,
     checked: BTreeMap<usize, u64>,
     availability: Availability,
@@ -116,11 +115,9 @@ impl Driver {
             configured: false,
             domain,
             kernel,
-            publications: PublicationRegistry::for_domain(domain),
+            publications: PublicationStore::for_domain(domain),
             invocations: InvocationLedger::new(domain),
             nodes: BTreeMap::new(),
-            values: BTreeMap::new(),
-            next_slot: 0,
             released: Vec::new(),
             checked: BTreeMap::new(),
             availability: Availability::default(),
@@ -297,13 +294,12 @@ impl Driver {
         value: u64,
     ) -> Result<usize, DriverError> {
         self.validate(id, generation)?;
-        let next_slot = self
-            .next_slot
-            .checked_add(1)
-            .ok_or_else(|| DriverError::new("Capacity", "value slot identity exhausted"))?;
         let port: Port = port.into();
-        if self.publications.resolve(port).is_some() {
+        if self.publications.registry().resolve(port).is_some() {
             return Err(PublicationError::Conflict.into());
+        }
+        if self.publications.registry().publication_records() == usize::MAX {
+            return Err(PublicationError::Capacity.into());
         }
         match self.kernel.declare_provision(id, port) {
             Ok(()) => {
@@ -316,10 +312,9 @@ impl Driver {
             Err(error) => return Err(error.into()),
         }
         let publication = self
-            .publications
-            .publish(id, generation, port, self.next_slot)?;
-        self.values.insert(self.next_slot, value);
-        self.next_slot = next_slot;
+            .kernel
+            .publish_value(&mut self.publications, id, generation, port, value)
+            .map_err(|rejected| DriverError::from(rejected.error))?;
         self.nodes
             .get_mut(&id)
             .unwrap()
@@ -336,6 +331,7 @@ impl Driver {
     ) -> Result<cordis_kernel::publication::Publication, DriverError> {
         let entry = self
             .publications
+            .registry()
             .entry(PublicationId(publication))
             .ok_or(PublicationError::Unknown)?;
         if entry.owner != id
@@ -368,10 +364,18 @@ impl Driver {
                 .checked_add(1)
                 .ok_or_else(|| DriverError::new("Capacity", "value revision exhausted"))?;
         }
-        if let Some(previous) = self.values.insert(entry.slot, value) {
-            if previous != value {
-                self.released.push(previous);
-            }
+        let previous = self
+            .kernel
+            .replace_value(
+                &mut self.publications,
+                PublicationId(publication),
+                id,
+                generation,
+                value,
+            )
+            .map_err(|rejected| DriverError::from(rejected.error))?;
+        if previous != value {
+            self.released.push(previous);
         }
         Ok(())
     }
@@ -414,13 +418,15 @@ impl Driver {
                 }
             }
             if let Some(binding) = node.resources.iter().find(|binding| binding.port == port) {
-                self.publications.leased_slot(binding.lease)?;
-                Some(binding.publication)
+                let (publication, _) = self.publications.leased_value(binding.lease)?;
+                Some(publication)
             } else {
                 self.publications
+                    .registry()
                     .resolve(port)
                     .filter(|publication| {
                         self.publications
+                            .registry()
                             .entry(*publication)
                             .is_some_and(|entry| entry.owner == consumer)
                     })
@@ -431,27 +437,35 @@ impl Driver {
                             .copied()
                             .find(|publication| {
                                 self.publications
+                                    .registry()
                                     .entry(*publication)
                                     .is_some_and(|entry| entry.port == port && entry.retained)
                             })
                     })
             }
         } else {
-            self.publications.resolve(port).filter(|publication| {
-                self.publications.entry(*publication).is_some_and(|entry| {
-                    self.kernel.phase(entry.owner) == Some(Phase::Active)
-                        && !self.kernel.retired(entry.owner)
+            self.publications
+                .registry()
+                .resolve(port)
+                .filter(|publication| {
+                    self.publications
+                        .registry()
+                        .entry(*publication)
+                        .is_some_and(|entry| {
+                            self.kernel.phase(entry.owner) == Some(Phase::Active)
+                                && !self.kernel.retired(entry.owner)
+                        })
                 })
-            })
         };
         let Some(publication) = publication else {
             return Ok(None);
         };
         let entry = self
             .publications
+            .registry()
             .entry(publication)
             .ok_or(PublicationError::Unknown)?;
-        let value = self.values.get(&entry.slot).ok_or_else(|| {
+        let value = self.publications.value(publication).ok_or_else(|| {
             DriverError::new("MissingValue", "retained publication has no host value")
         })?;
         Ok(Some(
@@ -469,8 +483,9 @@ impl Driver {
             let port = Port { key, realm };
             let visible = self
                 .publications
+                .registry()
                 .resolve(port)
-                .and_then(|id| self.publications.entry(id));
+                .and_then(|id| self.publications.registry().entry(id));
             if visible.is_some_and(|p| p.owner == owner) {
                 continue;
             }
@@ -507,8 +522,8 @@ impl Driver {
         if !entry.retained {
             return Ok(true);
         }
-        let slot = match self.publications.reclaim(PublicationId(publication)) {
-            Ok(slot) => slot,
+        let value = match self.publications.reclaim(PublicationId(publication)) {
+            Ok(value) => value,
             Err(PublicationError::Relied) => return Ok(false),
             Err(error) => return Err(error.into()),
         };
@@ -516,9 +531,7 @@ impl Driver {
         node.publications.retain(|p| p.0 != publication);
         node.restoring_publications.retain(|p| p.0 != publication);
         self.checked.remove(&publication);
-        if let Some(value) = self.values.remove(&slot) {
-            self.released.push(value);
-        }
+        self.released.push(value);
         self.reconcile_publications()?;
         Ok(true)
     }
@@ -528,8 +541,8 @@ impl Driver {
         if self.kernel.retired(consumer) || !node.dependencies.contains(&port) {
             return None;
         }
-        let publication = self.publications.resolve(port.into())?;
-        let entry = self.publications.entry(publication)?;
+        let publication = self.publications.registry().resolve(port.into())?;
+        let entry = self.publications.registry().entry(publication)?;
         if self.kernel.phase(entry.owner) != Some(Phase::Active) || self.kernel.retired(entry.owner)
         {
             return None;
@@ -538,7 +551,7 @@ impl Driver {
             consumer,
             port,
             publication: publication.0,
-            value: *self.values.get(&entry.slot)?,
+            value: *self.publications.value(publication)?,
             value_revision: *self.checked.get(&publication.0)?,
         })
     }
@@ -566,6 +579,7 @@ impl Driver {
         self.kernel.target(id).is_some_and(|bindings| {
             bindings.iter().all(|binding| {
                 self.publications
+                    .registry()
                     .resolve(Port {
                         key: binding.key,
                         realm: binding.realm,
@@ -573,16 +587,19 @@ impl Driver {
                     .is_some_and(|publication| {
                         // No callback or mutation can interleave these observations.
                         // Keep the resolved identity instead of rescanning visibility.
-                        self.publications.entry(publication).is_some_and(|entry| {
-                            entry.owner == binding.provider
-                                && !self.kernel.retired(entry.owner)
-                                && (!self.checked.contains_key(&publication.0)
-                                    || self.availability.available(
-                                        id,
-                                        entry.port.into(),
-                                        publication.0,
-                                    ))
-                        })
+                        self.publications
+                            .registry()
+                            .entry(publication)
+                            .is_some_and(|entry| {
+                                entry.owner == binding.provider
+                                    && !self.kernel.retired(entry.owner)
+                                    && (!self.checked.contains_key(&publication.0)
+                                        || self.availability.available(
+                                            id,
+                                            entry.port.into(),
+                                            publication.0,
+                                        ))
+                            })
                     })
             })
         })
@@ -609,6 +626,7 @@ impl Driver {
             .copied()
             .filter(|publication| {
                 self.publications
+                    .registry()
                     .entry(*publication)
                     .is_some_and(|entry| entry.visible)
             })
@@ -727,7 +745,9 @@ impl Driver {
                     Vec::new()
                 };
                 for publication in &prepared_publications {
-                    self.publications.can_adopt(*publication, id, 1)?;
+                    self.publications
+                        .registry()
+                        .can_adopt(*publication, id, 1)?;
                 }
                 let bindings = self
                     .kernel
@@ -747,6 +767,7 @@ impl Driver {
                     };
                     let publication = self
                         .publications
+                        .registry()
                         .resolve(port)
                         .ok_or(PublicationError::Unknown)?;
                     match self.publications.acquire_for(publication, id, generation) {
@@ -835,7 +856,7 @@ impl Driver {
                     let missing = self.nodes[&id]
                         .provisions
                         .iter()
-                        .any(|port| self.publications.resolve(*port).is_none());
+                        .any(|port| self.publications.registry().resolve(*port).is_none());
                     if missing && success {
                         self.nodes.get_mut(&id).unwrap().failed =
                             Some("declared service was not published".to_owned());
@@ -869,7 +890,7 @@ impl Driver {
                     .iter()
                     .map(|resource| resource.lease)
                     .collect();
-                let released = self.kernel.finish_cleanup_resources(
+                let released = self.kernel.finish_cleanup_values(
                     &mut self.publications,
                     id,
                     prepared_cleanup,
@@ -886,9 +907,7 @@ impl Driver {
                 node.publications.clear();
                 for resource in released {
                     self.checked.remove(&resource.publication.0);
-                    if let Some(value) = self.values.remove(&resource.slot) {
-                        self.released.push(value);
-                    }
+                    self.released.push(resource.value);
                 }
                 node.restoring_publications.clear();
                 node.restart = false;
@@ -955,17 +974,22 @@ impl Driver {
                 .find(|resource| resource.port == port)
                 .map(|resource| resource.publication)
         } else {
-            self.publications.resolve(port).filter(|publication| {
-                self.publications
-                    .entry(*publication)
-                    .is_some_and(|entry| entry.owner == binding.provider)
-            })
+            self.publications
+                .registry()
+                .resolve(port)
+                .filter(|publication| {
+                    self.publications
+                        .registry()
+                        .entry(*publication)
+                        .is_some_and(|entry| entry.owner == binding.provider)
+                })
         };
         // The old episode retains its own publication even when the current
         // resolver selects a different identity for the same port.
         let generation = if committed {
             publication.and_then(|publication| {
                 self.publications
+                    .registry()
                     .entry(publication)
                     .map(|entry| entry.generation)
             })
@@ -982,8 +1006,9 @@ impl Driver {
 
     fn dependency_blocker(&self, id: usize, port: ServicePort) -> Option<Value> {
         let provider = self.kernel.resolve(port.into());
-        let publication = self.publications.resolve(port.into());
-        let entry = publication.and_then(|publication| self.publications.entry(publication));
+        let publication = self.publications.registry().resolve(port.into());
+        let entry =
+            publication.and_then(|publication| self.publications.registry().entry(publication));
         let mut blocker = if let Some(provider) = provider {
             match entry {
                 None => json!({"code": "PublicationMissing", "provider": provider.to_string()}),
@@ -1021,6 +1046,7 @@ impl Driver {
                         .copied()
                         .chain(node.publications.iter().filter_map(|publication| {
                             self.publications
+                                .registry()
                                 .entry(*publication)
                                 .filter(|entry| entry.retained)
                                 .map(|entry| entry.port)
@@ -1166,11 +1192,11 @@ impl Driver {
             "declarationRecords": self.kernel.declaration_records(),
             "bindingRecords": self.kernel.binding_records(),
             "liveBindings": self.nodes.keys().map(|id| self.kernel.committed(*id).len()).sum::<usize>(),
-            "publicationRecords": self.publications.publication_records(),
-            "leaseRecords": self.publications.lease_record_count(),
-            "leaseAllocations": self.publications.lease_allocation_count(),
+            "publicationRecords": self.publications.registry().publication_records(),
+            "leaseRecords": self.publications.registry().lease_record_count(),
+            "leaseAllocations": self.publications.registry().lease_allocation_count(),
             "liveLeases": self.nodes.values().map(|node| node.resources.len()).sum::<usize>(),
-            "publishedValues": self.values.len(),
+            "publishedValues": self.publications.retained_count(),
             "invocationScopes": self.invocations.live_count(),
             "pendingActions": self.nodes.values().filter(|node| node.pending.is_some()).count(),
         });
@@ -1353,7 +1379,7 @@ impl Driver {
             Command::Drive => {
                 let actions = self.drive()?;
                 Ok(
-                    json!({"actions":actions,"released":std::mem::take(&mut self.released).into_iter().filter(|value| !self.values.values().any(|retained|retained == value)).map(|value|value.to_string()).collect::<Vec<_>>()}),
+                    json!({"actions":actions,"released":std::mem::take(&mut self.released).into_iter().filter(|value| !self.publications.contains_handle(*value)).map(|value|value.to_string()).collect::<Vec<_>>()}),
                 )
             }
             Command::Complete {

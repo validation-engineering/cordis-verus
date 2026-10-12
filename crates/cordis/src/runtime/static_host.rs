@@ -85,7 +85,7 @@ impl TypedSlot {
         self.0.accepts(context, config)
     }
     pub fn value(&self) -> Arc<dyn Any + Send + Sync> {
-        lock(&self.0.value).clone()
+        lock(&self.0.value).get().clone()
     }
 }
 #[derive(Clone)]
@@ -640,6 +640,26 @@ impl StaticCleanupFuture {
         self.finished = true;
         Poll::Ready(Err(error))
     }
+    fn complete_reply(
+        &mut self,
+        reply: CleanupReply,
+        retry: Option<RetryCleanup>,
+    ) -> CallbackResult {
+        let completed = lock(&self.episode.setup.state)
+            .cleanups
+            .get_mut(&0)
+            .unwrap()
+            .complete_reply(reply, retry, CleanupPolicy::RetainFailure);
+        let report = match completed {
+            Ok(report) => report,
+            Err(rejected) => {
+                rejected.discard();
+                panic!("exact issued restoration receipt");
+            }
+        };
+        drop(report.discarded);
+        report.result
+    }
     fn complete_callback(
         &mut self,
         ticket: RestoreTicket,
@@ -728,9 +748,8 @@ impl Future for StaticCleanupFuture {
                         Ok(future) => self.running = Some(future),
                         Err(failure) => {
                             let error = self
-                                .complete_callback(
-                                    failure.ticket,
-                                    Err(failure.message),
+                                .complete_reply(
+                                    CleanupReply::Failed(failure.ticket, failure.message),
                                     failure.retry,
                                 )
                                 .unwrap_err();
@@ -753,13 +772,11 @@ impl Future for StaticCleanupFuture {
                     }
                 }
             }
-            match poll_cleanup_callback(&mut self.running.as_mut().unwrap().future, cx) {
+            match poll_cleanup_callback(self.running.as_mut().unwrap(), cx) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(result) => {
                     let attempt = self.running.take().unwrap();
-                    if let Err(error) =
-                        self.complete_callback(attempt.ticket, result, attempt.retry)
-                    {
+                    if let Err(error) = self.complete_reply(result, attempt.retry) {
                         return self.fail(error);
                     }
                 }

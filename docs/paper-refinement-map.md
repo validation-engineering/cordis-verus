@@ -34,13 +34,28 @@ Explicit revisions:
 
 Remaining boundary: Original unrestricted Gamma and total-function witnesses stay separate. Production callback/value contracts belong to R2; general interference recovery to R3; global termination and confluence to R4.
 
+## R2 execution progress
+
+Source-linked progress for the existing R2 exit criteria; local payload/result contracts are not whole-host refinement.
+
+[Execution contracts and boundaries](r2-execution.md) · [执行合同与边界（中文）](r2-execution.zh-CN.md)
+
+| Work item | Status | Scope | Remaining boundary |
+| --- | --- | --- | --- |
+| managed-payloads | complete | Actual generic payload ownership, key-local visible lookup, checked owner/generation/domain, lease-derived identity and atomic managed payload release. | JS object contents and Rust interior mutation are not interpreted by payload identity. |
+| awaited-results | complete | Native async output/origin pairing and completion from the actual returned Result, retaining both host failure policies. | This does not prove factory-to-Future association, external I/O truth or eventual return. |
+| landed-continuation | complete | Actual inverse payload landing and continuation selection from result/cancellation, with the accumulator-step projection. | The opaque inverse function effect is not interpreted by a token/payload accumulator. |
+| invocation-effect-origin | open | Establish actual argument, executed operation, result, continuation and inverse laws for extensible managed plugin entry points. | Define and instantiate the production effect boundary with checked primitive laws; a ready Future or an assumed expected output is insufficient. |
+| production-composition | open | One checked production invariant owns all concurrent groups, dynamic Child, admitted work, publications and drain/release decisions. | Compose real group creation/landing/removal and complete resource manifests with lifecycle release; current adapters retain ordinary Rust orchestration. |
+| complete-step-classification | partial | Classify the complete production trace against R1 and explicitly specified host extensions. | Control wrappers, visible payload updates and accumulator projections have local contracts; the unified trace correspondence and all extensions remain to be proved. |
+
 ## Work packages
 
 ### effects
 
 Effects, tracking and recovery — R1, R2, R3
 
-**Current coverage:** Generic effect laws are encoded and proved; executable resource and fixed-program drivers recover concrete journals.
+**Current coverage:** Generic effect laws are encoded and proved; executable resource and fixed-program drivers recover concrete journals. R2 now preserves actual generic payloads, native awaited outputs, retry factories and landed continuation decisions in production adapters.
 
 **Open gap:** Production plugin callbacks do not yet instantiate every algebraic premise; opaque cleanup reports do not prove external restoration.
 
@@ -61,6 +76,9 @@ Effects, tracking and recovery — R1, R2, R3
 - contract: [recover](../crates/cordis-kernel/src/foundations.rs)
 - execution: [execute_and_recover](../crates/cordis-kernel/src/program.rs)
 - execution: [complete](../crates/cordis-kernel/src/cleanup_queue.rs)
+- execution: [await_completion](../crates/cordis-kernel/src/async_completion.rs)
+- execution: [complete_future](../crates/cordis-kernel/src/cleanup_completion.rs)
+- execution: [land_result](../crates/cordis-kernel/src/stage_landing.rs)
 
 ### context
 
@@ -122,9 +140,9 @@ Operations, observations and independence — R1, R3, R4
 
 Components, Child and lifting — R1, R2
 
-**Current coverage:** R1 completes semantic parent/continuation/child membership on the full finite strict carrier, actual value/code/journal interpretation, and an executable run_inspected client that constructs its evidence from empty. Original total Component membership is not conflated with this revision.
+**Current coverage:** R1 completes semantic parent/continuation/child membership on the full finite strict carrier, actual value/code/journal interpretation, and an executable run_inspected client that constructs its evidence from empty. Original total Component membership is not conflated with this revision. R2 adds real publication/value lookup projection and propagates insertion arguments through LifecycleState.
 
-**Open gap:** R2 must cover production managed callbacks and host values. Original unrestricted Gamma and total Component witnesses remain independently open in the original ledger.
+**Open gap:** Production callback effect laws, complete Child/continuation composition and the relation between multi-version host values and R1 remain open. Original unrestricted Gamma and total Component witnesses remain independent.
 
 **Next action:** Connect the production publication/Child/cleanup path to an applicable value and effect contract, preserving the R1 representation and explicit error domains.
 
@@ -152,6 +170,9 @@ Components, Child and lifting — R1, R2
 - proof: [root_component](../crates/cordis-kernel/src/reified_context.rs)
 - proof: [function_correspondence](../crates/cordis-kernel/src/reified_context.rs)
 - execution: [run_inspected](../crates/cordis-kernel/src/inspected_run.rs)
+- execution: [publish_checked](../crates/cordis-kernel/src/publication_values.rs)
+- proof: [appended_value](../crates/cordis-kernel/src/publication_projection.rs)
+- host: [publish](../crates/cordis-driver/src/lib.rs)
 
 ### transitions
 

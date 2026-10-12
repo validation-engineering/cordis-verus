@@ -2,6 +2,8 @@
 //! Opaque payloads move out once per attempt and return to the selected slot
 //! only after an accepted failure. No callback is invoked by this container.
 use crate::cleanup_journal::{CleanupJournal, RestoreError, RestoreOutcome, RestoreTicket};
+#[cfg(verus_keep_ghost)]
+use crate::episode::{accumulator_step, AccumulatorRule};
 use crate::Binding;
 use vstd::prelude::*;
 
@@ -93,7 +95,11 @@ impl<T> CleanupQueue<T> {
             out.is_err() ==> out.unwrap_err()==payload && final(self).same(old(self)),
             out.is_ok() ==> out->Ok_0==old(self).slots().len()
                 && final(self).slots()==old(self).slots().push(Some(payload))
-                && final(self).protocol().waiting()==old(self).protocol().waiting().push(out->Ok_0),
+                && final(self).protocol().waiting()==old(self).protocol().waiting().push(out->Ok_0)
+                && !final(self).protocol().stage().pending()
+                && final(self).protocol().stage().settled()==old(self).protocol().stage().cancellation()
+                && accumulator_step(old(self).protocol().stage().abstract_view(),final(self).protocol().stage().abstract_view(),
+                    if old(self).protocol().stage().cancellation() {AccumulatorRule::Divert(Some(out->Ok_0))} else {AccumulatorRule::Iter(out->Ok_0)}),
             final(self).protocol().selected()==old(self).protocol().selected(),final(self).issued()==old(self).issued(),
     {
         if !self.journal.is_pending() {return Err(payload);}
@@ -231,7 +237,10 @@ impl<T> CleanupQueue<T> {
     {self.journal.admit(target)}
     pub fn end(&mut self)->(out:bool)
         requires old(self).wf(),ensures final(self).wf(),final(self).slots()==old(self).slots(),
-            final(self).issued()==old(self).issued(),
+            final(self).issued()==old(self).issued(),out==old(self).protocol().stage().pending(),
+            out ==> !final(self).protocol().stage().pending() && final(self).protocol().stage().settled()
+                && accumulator_step(old(self).protocol().stage().abstract_view(),final(self).protocol().stage().abstract_view(),
+                    if old(self).protocol().stage().cancellation() {AccumulatorRule::Divert(None)} else {AccumulatorRule::Finish}),
     {self.journal.end()}
     pub fn cancel(&mut self)
         requires old(self).wf(),ensures final(self).wf(),final(self).slots()==old(self).slots(),
@@ -253,3 +262,9 @@ impl<T> CleanupQueue<T> {
     {self.journal.is_empty()}
 }
 }
+
+#[path = "cleanup_completion.rs"]
+pub mod completion;
+
+#[path = "stage_landing.rs"]
+pub mod landing;

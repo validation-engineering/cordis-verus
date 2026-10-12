@@ -179,3 +179,47 @@ fn success_cannot_silently_drop_a_supplied_retry_payload() {
     assert!(queue.is_empty());
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn actual_landing_result_selects_continuation_after_cancellation_or_terminal_reply() {
+    let mut queue = CleanupQueue::iterator(70, vec![]);
+    assert!(queue.admit(Some(&[])));
+    let first = queue
+        .land_result::<&str>(Ok(Some(String::from("first inverse"))))
+        .ok()
+        .unwrap();
+    assert!(first.continue_iteration);
+    assert_eq!(first.token, Some(0));
+    assert!(first.error.is_none());
+    assert!(queue.admit(Some(&[])));
+    queue.cancel();
+    assert!(queue.pop().unwrap().is_none());
+    let late = queue
+        .land_result::<&str>(Ok(Some(String::from("late inverse"))))
+        .ok()
+        .unwrap();
+    assert!(!late.continue_iteration);
+    assert_eq!(late.token, Some(1));
+    let rejected = queue
+        .land_result::<&str>(Ok(Some(String::from("unadmitted"))))
+        .err()
+        .unwrap();
+    assert_eq!(rejected, Ok(Some(String::from("unadmitted"))));
+    for expected in ["late inverse", "first inverse"] {
+        let (ticket, actual) = queue.pop().unwrap().unwrap();
+        assert_eq!(actual, expected);
+        assert!(queue
+            .complete(ticket, RestoreOutcome::Succeeded, None)
+            .is_ok());
+    }
+    assert!(queue.is_empty());
+    for actual in [Ok(None), Err("stage failed")] {
+        let mut queue: CleanupQueue<String> = CleanupQueue::iterator(71, vec![]);
+        assert!(queue.admit(Some(&[])));
+        let report = queue.land_result(actual).ok().unwrap();
+        assert!(!report.continue_iteration);
+        assert!(report.token.is_none());
+        assert!(queue.is_empty());
+        assert!(!queue.is_pending());
+    }
+}

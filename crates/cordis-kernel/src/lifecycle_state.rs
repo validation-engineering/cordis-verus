@@ -8,8 +8,8 @@ use crate::lifecycle_actions::{CleanupOutcome, LifecycleActions};
 use crate::publication::LeaseOwner;
 use crate::publication::{LeaseId, PublicationId, PublicationRegistry, ReleasedPublication};
 #[cfg(verus_keep_ghost)]
-use crate::{Binding, Phase};
-use crate::{Error, Kernel, Port};
+use crate::Binding;
+use crate::{Error, Kernel, Phase, Port};
 use vstd::prelude::*;
 
 verus! {
@@ -59,25 +59,63 @@ impl LifecycleState {
         ensures out.is_ok()==self.protocol().capacity_enabled(count),
     {self.actions.check_capacity(count)}
 
+    /// Managed service admission includes the explicit generation-zero
+    /// reservation extension. Hosts may impose additional preparation policy.
+    pub open spec fn service_open(&self,id:usize,generation:u64)->bool {
+        self.control().registered(id) && self.control().generation_of(id)==Some(generation)
+            && !self.control().is_retired(id)
+            && (self.control().phase_of(id)==Some(Phase::Loading)
+                || self.control().phase_of(id)==Some(Phase::Active)
+                || (generation==0 && self.control().phase_of(id)==Some(Phase::Inactive)))
+    }
+    pub fn check_service_access(&self,id:usize,generation:u64)->(out:Result<(),Error>)
+        requires self.wf(),ensures out.is_ok()==self.service_open(id,generation),
+    {
+        if !self.kernel.contains(id) {return Err(Error::Unknown);}
+        if self.kernel.episode_generation(id)!=Some(generation) {return Err(Error::InvalidState);}
+        if self.kernel.retired(id) {return Err(Error::Retired);}
+        match self.kernel.phase(id) {
+            Some(Phase::Loading)|Some(Phase::Active)=>Ok(()),
+            Some(Phase::Inactive) if generation==0=>Ok(()),
+            _=>Err(Error::InvalidState),
+        }
+    }
+
     pub fn insert(&mut self,parent:Option<usize>,dependencies:Vec<Port>,provisions:Vec<Port>)->(out:Result<usize,Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {self.kernel.insert(parent,dependencies,provisions)}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            out.is_ok()==old(self).control().insert_enabled(parent,dependencies@,provisions@),
+            out.is_err() ==> final(self).same(old(self)),
+            out.is_ok() ==> out->Ok_0==old(self).control().next_id()
+                && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),out->Ok_0,crate::refinement::Rule::Insert)
+                && final(self).control().paper().fibers[out->Ok_0].parent==parent
+                && (forall|p:Port| final(self).control().paper().fibers[out->Ok_0].dependencies.contains(p)==dependencies@.contains(p))
+                && (forall|p:Port| final(self).control().paper().fibers[out->Ok_0].provisions.contains(p)==provisions@.contains(p)),
+    {proof {self.actions.same_reflexive();} self.kernel.insert(parent,dependencies,provisions)}
 
     pub fn declare_provision(&mut self,id:usize,port:Port)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {self.kernel.declare_provision(id,port)}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            final(self).control().same_control(&old(self).control()),final(self).control().same_bindings(&old(self).control()),
+            out.is_err() ==> final(self).same(old(self)),
+            out.is_ok() ==> final(self).control().declares_provision(id,port),
+    {proof {self.actions.same_reflexive();} self.kernel.declare_provision(id,port)}
 
     pub fn configure_pending_dependencies(&mut self,id:usize,dependencies:Vec<Port>)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {self.kernel.configure_pending_dependencies(id,dependencies)}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            final(self).control().same_control(&old(self).control()),final(self).control().same_bindings(&old(self).control()),
+            out.is_err() ==> final(self).same(old(self)),
+            out.is_ok() ==> final(self).control().pending_dependencies_configured(&old(self).control(),id,dependencies@),
+    {proof {self.actions.same_reflexive();} self.kernel.configure_pending_dependencies(id,dependencies)}
 
     pub fn release_provision(&mut self,id:usize,port:Port)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {self.kernel.release_provision(id,port)}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            final(self).control().same_control(&old(self).control()),final(self).control().same_bindings(&old(self).control()),
+            out.is_err() ==> final(self).same(old(self)),
+            out.is_ok() ==> final(self).control().provision_released_from(&old(self).control(),id,port) && !final(self).control().declares_provision(id,port) && final(self).control().other_interfaces_preserved(&old(self).control(),id,port),
+    {proof {self.actions.same_reflexive();} self.kernel.release_provision(id,port)}
 
     pub fn begin(&mut self,id:usize)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),
@@ -89,7 +127,9 @@ impl LifecycleState {
             out.is_ok() ==> out.unwrap().kind==crate::action_ledger::ActionKind::Setup
                 && out.unwrap().id==id && out.unwrap().domain==old(self).protocol().domain_id()
                 && final(self).protocol().recorded(out.unwrap())
-                && final(self).control().generation_of(id)==Some(out.unwrap().generation),
+                && final(self).control().generation_of(id)==Some(out.unwrap().generation)
+                && final(self).control().committed_from(&old(self).control(),id)
+                && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Begin),
     {self.actions.begin(&mut self.kernel,id)}
 
     pub fn complete_setup(&mut self,ticket:ActionTicket)->(out:Result<(),ActionError>)
@@ -188,8 +228,11 @@ impl LifecycleState {
 
     pub fn finish(&mut self,id:usize)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {if self.actions.blocked(id) {return Err(Error::InvalidState);} self.kernel.finish(id)}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            out.is_ok()==(!old(self).protocol().blocked_spec(id) && old(self).control().iteration_enabled(id)),
+            out.is_err() ==> final(self).same(old(self)),
+            out.is_ok() ==> crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Finish),
+    {proof {self.actions.same_reflexive();} if self.actions.blocked(id) {proof {reveal(Kernel::unchanged);} return Err(Error::InvalidState);} self.kernel.finish(id)}
 
     pub fn remove(&mut self,id:usize)->(out:Result<(),Error>)
         requires old(self).wf(),
@@ -197,7 +240,8 @@ impl LifecycleState {
             out.is_err() ==> final(self).same(old(self)),
             final(self).control().same_bindings(&old(self).control()),
             final(self).protocol().same(&old(self).protocol()),
-            out.is_ok() ==> !old(self).protocol().blocked_spec(id) && !final(self).control().registered(id),
+            out.is_ok() ==> !old(self).protocol().blocked_spec(id) && !final(self).control().registered(id)
+                && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Remove),
     {reveal(Kernel::unchanged);proof {self.actions.same_reflexive();} if self.actions.blocked(id) {return Err(Error::InvalidState);} self.kernel.remove(id)}
 
     pub fn leave(&mut self,id:usize)->(out:Result<(),Error>)
@@ -206,6 +250,7 @@ impl LifecycleState {
             out.is_err() ==> final(self).same(old(self)),
             final(self).control().same_bindings(&old(self).control()),
             final(self).protocol().same(&old(self).protocol()),
+            out.is_ok() ==> crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Restart),
     {proof {self.actions.same_reflexive();} self.kernel.leave(id)}
 
     pub fn retire(&mut self,id:usize)->(out:Result<(),Error>)
@@ -214,17 +259,20 @@ impl LifecycleState {
             out.is_err() ==> final(self).same(old(self)),
             final(self).control().same_bindings(&old(self).control()),
             final(self).protocol().same(&old(self).protocol()),
+            out.is_ok() ==> crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Retire),
     {proof {self.actions.same_reflexive();} self.kernel.retire(id)}
 
     pub fn compact_bindings(&mut self)->(out:usize)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {self.kernel.compact_bindings()}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            final(self).control().paper()==old(self).control().paper(),
+    {proof {self.actions.same_reflexive();} self.kernel.compact_bindings()}
 
     pub fn compact_declarations(&mut self)->(out:usize)
         requires old(self).wf(),
-        ensures final(self).wf(),
-    {self.kernel.compact_declarations()}
+        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+            final(self).control().paper()==old(self).control().paper(),
+    {proof {self.actions.same_reflexive();} self.kernel.compact_declarations()}
 
     /// The host cannot pass a different Kernel to the cleanup receipt protocol.
     pub fn finish_cleanup_resources(&mut self,registry:&mut PublicationRegistry,id:usize,
@@ -232,6 +280,9 @@ impl LifecycleState {
         ->(out:Result<Vec<ReleasedPublication>,CleanupReleaseError>)
         requires old(self).wf(),old(registry).wf(),
         ensures final(self).wf(),final(registry).wf(),
+            out.is_ok()==(old(registry).domain_id()==Some(old(self).protocol().domain_id())
+                && old(self).protocol().resource_finish_enabled(&old(self).control(),id,reservation)
+                && old(registry).cleanup_batch_enabled(LeaseOwner {owner:id,generation:old(self).control().generation_of(id).unwrap()},leases@,publications@)),
             out.is_err() ==> final(self).control().unchanged(&old(self).control())
                 && final(self).protocol().same(&old(self).protocol()) && final(registry).unchanged(old(registry)),
             out.is_ok() ==> old(self).protocol().resource_finish_enabled(&old(self).control(),id,reservation)

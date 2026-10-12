@@ -42,7 +42,7 @@ fn has_publication(items:&[PublicationId],item:PublicationId)->(found:bool)
     false
 }
 
-proof fn prefix_member<T>(items:Seq<T>,i:int,value:T)
+pub(crate) proof fn prefix_member<T>(items:Seq<T>,i:int,value:T)
     requires 0<=i<items.len(),
     ensures items.subrange(0,i+1).contains(value)==(items.subrange(0,i).contains(value) || items[i]==value),
 {
@@ -72,7 +72,7 @@ impl PublicationRegistry {
         }
     }
 
-    pub closed spec fn cleanup_batch_enabled(&self,owner:LeaseOwner,leases:Seq<LeaseId>,publications:Seq<PublicationId>)->bool {
+    pub open spec fn cleanup_batch_enabled(&self,owner:LeaseOwner,leases:Seq<LeaseId>,publications:Seq<PublicationId>)->bool {
         &&& forall|i:int| 0<=i<leases.len() ==> self.active_lease(leases[i]).is_some()
             && self.active_lease(leases[i]).unwrap().consumer==Some(owner)
         &&& forall|i:int,j:int| 0<=i<j<leases.len() ==> leases[i]!=leases[j]
@@ -113,7 +113,7 @@ impl PublicationRegistry {
         }
     }
 
-    pub closed spec fn cleanup_batch_released(&self,prior:&Self,leases:Seq<LeaseId>,publications:Seq<PublicationId>,released:Seq<ReleasedPublication>)->bool {
+    pub open spec fn cleanup_batch_released(&self,prior:&Self,leases:Seq<LeaseId>,publications:Seq<PublicationId>,released:Seq<ReleasedPublication>)->bool {
         &&& self.lease_allocations()==prior.lease_allocations()
         &&& forall|token:LeaseId| self.active_lease(token)==if leases.contains(token) {None} else {prior.active_lease(token)}
         &&& self.publications().len()==prior.publications().len()

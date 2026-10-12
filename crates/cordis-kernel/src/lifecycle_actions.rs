@@ -251,7 +251,9 @@ impl LifecycleActions {
             out.is_ok() ==> out.unwrap().kind == ActionKind::Setup
                 && out.unwrap().id == id && out.unwrap().domain == old(self).domain_id()
                 && final(self).recorded(out.unwrap())
-                && final(kernel).generation_of(id) == Some(out.unwrap().generation),
+                && final(kernel).generation_of(id) == Some(out.unwrap().generation)
+                && final(kernel).committed_from(old(kernel),id)
+                && crate::refinement::step(old(kernel).paper(),final(kernel).paper(),id,crate::refinement::Rule::Begin),
             final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
     {
         proof {

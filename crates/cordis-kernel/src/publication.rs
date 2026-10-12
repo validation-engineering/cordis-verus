@@ -2,9 +2,10 @@
 //!
 //! A publication identifies one logical owner's service slot. Revocation hides
 //! that slot from new lookup without invalidating existing cleanup leases.
-//! Values and callbacks stay in the host; replacing a value in a slot does not
-//! replace its publication identity. This registry proves its own lifetime
-//! invariant, not correspondence with a host or the paper's fixed interfaces.
+//! The `values` module pairs this metadata with actual opaque payloads and
+//! proves key-local lookup updates. Replacing a value keeps its publication
+//! identity. Multi-version retention and dynamic interfaces are explicit host
+//! extensions; arbitrary callback effects remain outside these contracts.
 use crate::Port;
 use vstd::prelude::*;
 
@@ -466,6 +467,9 @@ impl PublicationRegistry {
 #[path = "publication_cleanup.rs"]
 pub mod cleanup;
 pub use cleanup::ReleasedPublication;
+
+#[path = "publication_values.rs"]
+pub mod values;
 
 #[cfg(test)]
 mod lease_storage_tests {

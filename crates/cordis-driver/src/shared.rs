@@ -257,6 +257,47 @@ impl LifecycleDriver {
                 CleanupReleaseError::Publication(error) => error.into(),
             })
     }
+    pub fn publish_value<T>(
+        &self,
+        store: &mut cordis_kernel::publication::values::PublicationStore<T>,
+        owner: usize,
+        generation: u64,
+        port: Port,
+        value: T,
+    ) -> Result<
+        cordis_kernel::publication::PublicationId,
+        cordis_kernel::publication::values::RejectedValue<T>,
+    > {
+        store.publish_checked(&self.state, owner, generation, port, value)
+    }
+    pub fn replace_value<T>(
+        &self,
+        store: &mut cordis_kernel::publication::values::PublicationStore<T>,
+        publication: cordis_kernel::publication::PublicationId,
+        owner: usize,
+        generation: u64,
+        value: T,
+    ) -> Result<T, cordis_kernel::publication::values::RejectedValue<T>> {
+        store.replace_checked(&self.state, publication, owner, generation, value)
+    }
+    /// Release the actual publication payloads in the same checked operation
+    /// that releases their leases and committed dependency bindings.
+    pub fn finish_cleanup_values<T>(
+        &mut self,
+        store: &mut cordis_kernel::publication::values::PublicationStore<T>,
+        id: usize,
+        reservation: bool,
+        leases: &[cordis_kernel::publication::LeaseId],
+        publications: &[cordis_kernel::publication::PublicationId],
+    ) -> Result<Vec<cordis_kernel::publication::values::ReleasedValue<T>>, DriverError> {
+        use cordis_kernel::lifecycle_actions::resources::CleanupReleaseError;
+        store
+            .finish_resources(&mut self.state, id, reservation, leases, publications)
+            .map_err(|error| match error {
+                CleanupReleaseError::Lifecycle(error) => error.into(),
+                CleanupReleaseError::Publication(error) => error.into(),
+            })
+    }
     pub fn finish_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
         self.state
             .execute_cleanup(CleanupCommand::Release {

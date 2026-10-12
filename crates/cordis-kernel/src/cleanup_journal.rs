@@ -3,6 +3,8 @@
 //! explicit retry replaces only its attempt identity, never pops another token.
 //! CleanupQueue owns the real payloads; callback effects and report truth remain host obligations.
 use crate::episode::StageProtocol;
+#[cfg(verus_keep_ghost)]
+use crate::episode::{accumulator_step, AccumulatorRule};
 use crate::Binding;
 use vstd::prelude::*;
 
@@ -60,7 +62,10 @@ impl CleanupJournal {
         requires old(self).wf(),
         ensures final(self).wf(),out==old(self).stage().pending(),
             final(self).selected()==old(self).selected(),final(self).failed_spec()==old(self).failed_spec(),
-            out ==> final(self).waiting()==old(self).waiting().push(token),
+            out ==> final(self).waiting()==old(self).waiting().push(token)
+                && !final(self).stage().pending() && final(self).stage().settled()==old(self).stage().cancellation()
+                && accumulator_step(old(self).stage().abstract_view(),final(self).stage().abstract_view(),
+                    if old(self).stage().cancellation() {AccumulatorRule::Divert(Some(token))} else {AccumulatorRule::Iter(token)}),
             !out ==> final(self).same(old(self)),
     {self.stages.land(token)}
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
@@ -70,11 +75,18 @@ impl CleanupJournal {
     pub fn end(&mut self)->(out:bool)
         requires old(self).wf(),ensures final(self).wf(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
+            out==old(self).stage().pending(),
+            out ==> !final(self).stage().pending() && final(self).stage().settled()
+                && accumulator_step(old(self).stage().abstract_view(),final(self).stage().abstract_view(),
+                    if old(self).stage().cancellation() {AccumulatorRule::Divert(None)} else {AccumulatorRule::Finish}),
     {self.stages.end()}
     pub fn cancel(&mut self)
         requires old(self).wf(),ensures final(self).wf(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
     {self.stages.cancel();}
+    pub fn is_settled(&self)->(out:bool)
+        ensures out==self.stage().settled(),
+    {self.stages.is_settled()}
     pub fn is_pending(&self)->(out:bool)
         ensures out==self.stage().pending(),
     {self.stages.is_pending()}

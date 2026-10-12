@@ -11,8 +11,12 @@ use crate::future_support::poll_catching_unwind;
 use crate::service_error::{ServiceReadError, ServiceReadFailure};
 use crate::CallbackError;
 use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
+use cordis_kernel::async_completion::{await_completion, Completion};
 use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
+use cordis_kernel::cleanup_queue::completion::{CleanupPolicy, CleanupReport};
+use cordis_kernel::cleanup_queue::landing::StageReport;
 use cordis_kernel::cleanup_queue::CleanupQueue;
+use cordis_kernel::publication::values::ValueCell;
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
@@ -33,7 +37,7 @@ pub const CANCELLED: &str = "owner episode cancelled";
 type Value = Arc<dyn Any + Send + Sync>;
 type ServiceCheck = Arc<dyn Fn(&Value, &Context, &serde_json::Value) -> bool + Send + Sync>;
 struct ServiceSlot {
-    value: Mutex<Value>,
+    value: Mutex<ValueCell<Value>>,
     check: Option<ServiceCheck>,
 }
 type SharedSlot = Arc<ServiceSlot>;
@@ -50,25 +54,25 @@ type ConfigUpdateCallback = Box<
 impl ServiceSlot {
     fn new(value: Value, check: Option<ServiceCheck>) -> SharedSlot {
         Arc::new(Self {
-            value: Mutex::new(value),
+            value: Mutex::new(ValueCell::new(value)),
             check,
         })
     }
     fn get<T: Any + Send + Sync>(&self) -> Option<Arc<T>> {
-        lock(&self.value).clone().downcast::<T>().ok()
+        lock(&self.value).get().clone().downcast::<T>().ok()
     }
     fn accepts(&self, context: &Context, config: &serde_json::Value) -> bool {
         let Some(check) = &self.check else {
             return true;
         };
-        let value = lock(&self.value).clone();
+        let value = lock(&self.value).get().clone();
         // A user availability predicate never runs under host bookkeeping locks.
         catch_unwind(AssertUnwindSafe(|| check(&value, context, config))).unwrap_or(false)
     }
     fn replace(&self, value: Value) -> Value {
         // Callers serialize episode/handle liveness with this swap, then drop
         // the previous payload after releasing every bookkeeping lock.
-        std::mem::replace(&mut *lock(&self.value), value)
+        lock(&self.value).replace(value)
     }
 }
 fn typed_check<T: Any + Send + Sync>(
@@ -162,8 +166,16 @@ impl Cleanups {
     fn push(&mut self, cleanup: CleanupAction) {
         self.protocol.register(cleanup);
     }
-    fn land(&mut self, inverse: Inverse) -> Result<usize, CleanupAction> {
-        self.protocol.land(CleanupAction::Callback(inverse.0))
+    #[allow(clippy::type_complexity)]
+    fn land_result(
+        &mut self,
+        result: Option<Result<Inverse, CallbackError>>,
+    ) -> Result<StageReport<CallbackError>, Result<Option<CleanupAction>, CallbackError>> {
+        self.protocol.land_result(
+            result
+                .transpose()
+                .map(|inverse| inverse.map(|inverse| CleanupAction::Callback(inverse.0))),
+        )
     }
     fn pop(&mut self) -> Option<(RestoreTicket, CleanupAction)> {
         self.protocol
@@ -181,6 +193,25 @@ impl Cleanups {
             outcome,
             retry.map(|retry| CleanupAction::Callback(CleanupCallback::Retryable(retry))),
         )
+    }
+    fn complete_reply(
+        &mut self,
+        reply: CleanupReply,
+        retry: Option<RetryCleanup>,
+        policy: CleanupPolicy,
+    ) -> Result<CleanupReport<CallbackError, CleanupAction>, RejectedCleanup> {
+        let retry =
+            retry.map(|factory| CleanupAction::Callback(CleanupCallback::Retryable(factory)));
+        match reply {
+            CleanupReply::Awaited(completion) => self
+                .protocol
+                .complete_future(completion, retry, policy)
+                .map_err(|(completion, retry)| RejectedCleanup::Awaited(completion, retry)),
+            CleanupReply::Failed(ticket, error) => self
+                .protocol
+                .complete_failure(ticket, error, retry, policy)
+                .map_err(|(ticket, error, retry)| RejectedCleanup::Failed(ticket, error, retry)),
+        }
     }
     fn can_retry(&self) -> bool {
         self.protocol.can_retry()
@@ -1265,9 +1296,30 @@ fn initialize_callback(
     }))
     .unwrap_or_else(|panic| Err(CallbackError::panic(panic_message(panic))))
 }
+type CompletionFuture =
+    Pin<Box<dyn Future<Output = Completion<RestoreTicket, CallbackResult>> + Send>>;
+enum CleanupReply {
+    Awaited(Completion<RestoreTicket, CallbackResult>),
+    Failed(RestoreTicket, CallbackError),
+}
+enum RejectedCleanup {
+    Awaited(
+        Completion<RestoreTicket, CallbackResult>,
+        Option<CleanupAction>,
+    ),
+    Failed(RestoreTicket, CallbackError, Option<CleanupAction>),
+}
+impl RejectedCleanup {
+    fn discard(self) {
+        match self {
+            Self::Awaited(completion, retry) => drop((completion, retry)),
+            Self::Failed(ticket, error, retry) => drop((ticket, error, retry)),
+        }
+    }
+}
 struct RunningCleanup {
     ticket: RestoreTicket,
-    future: CleanupFuture,
+    future: CompletionFuture,
     retry: Option<RetryCleanup>,
 }
 struct CleanupFailure {
@@ -1289,7 +1341,7 @@ fn initialize_cleanup(
     match result {
         Ok(future) => Ok(RunningCleanup {
             ticket,
-            future,
+            future: Box::pin(await_completion(ticket, future)),
             retry,
         }),
         Err(panic) => Err(CleanupFailure {
@@ -1300,12 +1352,16 @@ fn initialize_cleanup(
     }
 }
 fn poll_cleanup_callback(
-    future: &mut CleanupFuture,
+    attempt: &mut RunningCleanup,
     cx: &mut TaskContext<'_>,
-) -> Poll<CallbackResult> {
-    match poll_catching_unwind(future.as_mut(), cx) {
-        Ok(result) => result,
-        Err(panic) => Poll::Ready(Err(CallbackError::panic(panic_message(panic)))),
+) -> Poll<CleanupReply> {
+    match poll_catching_unwind(attempt.future.as_mut(), cx) {
+        Ok(Poll::Pending) => Poll::Pending,
+        Ok(Poll::Ready(completion)) => Poll::Ready(CleanupReply::Awaited(completion)),
+        Err(panic) => Poll::Ready(CleanupReply::Failed(
+            attempt.ticket,
+            CallbackError::panic(panic_message(panic)),
+        )),
     }
 }
 
@@ -2369,6 +2425,42 @@ impl Runtime {
             self.record_cleanup(id, handle, message);
         }
     }
+    fn finish_reply(
+        &mut self,
+        id: PluginId,
+        group: usize,
+        handle: Option<&EffectHandle>,
+        reply: CleanupReply,
+        retry: Option<RetryCleanup>,
+    ) {
+        let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
+        let completed = lock(&episode.state)
+            .cleanups
+            .get_mut(&group)
+            .unwrap()
+            .complete_reply(reply, retry, CleanupPolicy::DrainConsumed);
+        // Both discarded and rejected user payloads leave the bookkeeping lock.
+        let report = match completed {
+            Ok(report) => report,
+            Err(rejected) => {
+                rejected.discard();
+                panic!("exact issued restoration receipt");
+            }
+        };
+        drop(report.discarded);
+        if let Err(message) = report.result {
+            if report.outcome == RestoreOutcome::Failed {
+                self.mounted
+                    .get_mut(&id)
+                    .unwrap()
+                    .cleanup_failure
+                    .get_or_insert_with(|| message.clone());
+            } else {
+                self.mounted.get_mut(&id).unwrap().cleanup_drained = true;
+            }
+            self.record_cleanup(id, handle, message);
+        }
+    }
     // Independent groups can progress, but a failed retryable inverse blocks
     // every earlier inverse in its own group until an explicit retry.
     fn poll_cleanup(
@@ -2397,12 +2489,11 @@ impl Runtime {
                     }
                     CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
                         Ok(future) => *running = Some(future),
-                        Err(failure) => self.finish_callback(
+                        Err(failure) => self.finish_reply(
                             id,
                             group,
                             handle,
-                            failure.ticket,
-                            Err(failure.message),
+                            CleanupReply::Failed(failure.ticket, failure.message),
                             failure.retry,
                         ),
                     },
@@ -2410,11 +2501,11 @@ impl Runtime {
             }
         }
         if let Some(attempt) = running.as_mut() {
-            match poll_cleanup_callback(&mut attempt.future, cx) {
+            match poll_cleanup_callback(attempt, cx) {
                 Poll::Pending => return (progress, true),
                 Poll::Ready(result) => {
                     let attempt = running.take().unwrap();
-                    self.finish_callback(id, group, handle, attempt.ticket, result, attempt.retry);
+                    self.finish_reply(id, group, handle, result, attempt.retry);
                     progress = true;
                 }
             }
@@ -2485,59 +2576,37 @@ impl Runtime {
                     let result = catch_unwind(AssertUnwindSafe(|| {
                         group.iterator.as_mut().unwrap().poll_next(cx, &setup)
                     }));
-                    match result {
-                        Ok(Poll::Pending) => {
-                            pending = true;
+                    let result = match result {
+                        Ok(result) => result,
+                        Err(panic) => {
+                            Poll::Ready(Some(Err(CallbackError::panic(panic_message(panic)))))
                         }
-                        Ok(Poll::Ready(Some(Ok(inverse)))) => {
+                    };
+                    match result {
+                        Poll::Pending => pending = true,
+                        Poll::Ready(result) => {
                             let landed = lock(&setup.state)
                                 .cleanups
                                 .get_mut(&group.id)
                                 .unwrap()
-                                .land(inverse);
-                            assert!(landed.is_ok(), "only admitted stages may land");
-                            progress = true;
-                            if cancelled {
+                                .land_result(result);
+                            let report = match landed {
+                                Ok(report) => report,
+                                Err(result) => {
+                                    // A rejected inverse may own arbitrary user values.
+                                    drop(result);
+                                    panic!("only admitted stages may land");
+                                }
+                            };
+                            if let Some(message) = report.error {
+                                if !(cancelled && message.is_cancelled()) {
+                                    lock(&group.handle.status).errors.push(message.clone());
+                                    self.latch(id, message);
+                                }
+                            }
+                            if !report.continue_iteration {
                                 group.iterator = None;
                             }
-                        }
-                        Ok(Poll::Ready(Some(Err(message)))) => {
-                            assert!(lock(&setup.state)
-                                .cleanups
-                                .get_mut(&group.id)
-                                .unwrap()
-                                .protocol
-                                .end());
-                            if !(cancelled && message.is_cancelled()) {
-                                lock(&group.handle.status).errors.push(message.clone());
-                                self.latch(id, message);
-                            }
-                            group.iterator = None;
-                            progress = true;
-                        }
-                        Ok(Poll::Ready(None)) => {
-                            assert!(lock(&setup.state)
-                                .cleanups
-                                .get_mut(&group.id)
-                                .unwrap()
-                                .protocol
-                                .end());
-                            group.iterator = None;
-                            progress = true;
-                        }
-                        Err(panic) => {
-                            assert!(lock(&setup.state)
-                                .cleanups
-                                .get_mut(&group.id)
-                                .unwrap()
-                                .protocol
-                                .end());
-                            let message = CallbackError::panic(panic_message(panic));
-                            if !(cancelled && message.is_cancelled()) {
-                                lock(&group.handle.status).errors.push(message.clone());
-                                self.latch(id, message);
-                            }
-                            group.iterator = None;
                             progress = true;
                         }
                     }

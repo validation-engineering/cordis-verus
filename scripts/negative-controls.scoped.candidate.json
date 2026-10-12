@@ -3416,6 +3416,108 @@
         }
       ],
       "selectionRationale": "The public executable inspection API must return its actual captured inverse even when inspection succeeds. Require a fresh matching positive proof, complete mutant compilation and exact postcondition rejection; this is not full negative acceptance."
+    },
+    {
+      "name": "r2-publication-value-read-returns-none",
+      "mutation": {
+        "file": "publication_values.rs",
+        "old": "if id.0>=self.payloads.len() {None} else {self.payloads[id.0].as_ref()}",
+        "new": "None"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "publication::values",
+          "descendants": false,
+          "function": "cordis_negative::publication::values::PublicationStore::value"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::publication::values::PublicationStore::value",
+          "module": "publication::values",
+          "file": "publication_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_some()==(id.0<self.values().len() && self.values()[id.0 as int].is_some()),"
+        }
+      ],
+      "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-cleanup-future-forges-success",
+      "mutation": {
+        "file": "cleanup_completion.rs",
+        "old": "Ok(self.accept_result(ticket,result,retry,policy))",
+        "new": "Ok(self.accept_result(ticket,Ok(()),retry,policy))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue::completion",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete_future",
+          "module": "cleanup_queue::completion",
+          "file": "cleanup_completion.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.result==completion.result()"
+        }
+      ],
+      "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-stage-keeps-cancelled-continuation",
+      "mutation": {
+        "file": "stage_landing.rs",
+        "old": "let continue_iteration=!self.journal.is_settled();",
+        "new": "let continue_iteration=true;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue::landing",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::land_result",
+          "module": "cleanup_queue::landing",
+          "file": "stage_landing.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {"
+        }
+      ],
+      "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-lease-substitutes-publication-identity",
+      "mutation": {
+        "file": "publication_values.rs",
+        "old": "Ok((lease.publication,self.payloads[lease.publication.0].as_ref().unwrap()))",
+        "new": "Ok((PublicationId(0),self.payloads[lease.publication.0].as_ref().unwrap()))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "publication::values",
+          "descendants": false,
+          "function": "cordis_negative::publication::values::PublicationStore::leased_value"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::publication::values::PublicationStore::leased_value",
+          "module": "publication::values",
+          "file": "publication_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.0==self.registry_view().active_lease(token).unwrap().publication"
+        }
+      ],
+      "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
     }
   ]
 }
