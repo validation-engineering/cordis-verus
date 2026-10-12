@@ -86,9 +86,29 @@ Begin 时的 committed bindings，以及 Finish、Retire、Remove、Unload 的�
 整体重试的预检查失败不修改任何组。关闭成功证明全部已持有队列都没有保留载荷、
 已交付回调或未落地 stage，并关闭该容器后续的注册入口。
 
-轮询 Rust Runtime 和静态适配器都使用这一组合。它仍没有在同一个不变式中持有
-根 setup Future、待处理 Child 请求，以及生命周期和 publication 状态。
-这些编排仍有普通宿主代码，因此仅完成队列组合还不能关闭整个生产状态的验收义务。
+轮询 Rust Runtime 和静态适配器都使用这一组合。下面的 `SetupWork` 进一步
+连接根 setup 的交付凭据和待处理请求；生命周期和 publication 仍需与它们建立
+联合语义不变式，因此这些局部组合还不能关闭整个生产状态的验收义务。
+
+## setup 与请求也参与排空
+
+`SetupWork<C, G>` 持有真实的 Child／效果组请求，跟踪根 setup 和已经交给宿主
+执行的请求。`WorkItem`、`PendingWork`、`WorkReceipt` 的载荷与身份字段都是
+私有的：实际请求经过 `run` 调用后产生结果凭据；异步工厂经过 `start` 后保留
+实际 Future，只有该 Future 返回才产生其完成结果。派发队列为空而已交付请求
+尚未返回时，整个 episode 仍未排空。队列采用 `VecDeque`，不会在每次派发时
+搬移剩余请求；已完成票据退出活跃 map。
+
+Child 请求与对应的真实 inverse 通过 `enqueue_owned_child` 一起登记，拒绝时
+二者原样返回，由宿主在释放锁后析构。最终 `seal` 检查根 setup、排队与已派发
+请求以及全部清理队列，并检查二者属于同一清理域。Rust Runtime 和静态宿主都
+使用该守卫；普通 Runtime 的初始化完成也使用同一组实际状态。
+
+尚未开始轮询的根 Future 可以在撤回后取消。已经开始的 Future 必须返回，或
+保留为未确认的放弃状态；它不能走“尚未运行”的取消路径。异步完成保留实际
+`Result`，失败不能使初始化成功。异常捕获仍由普通 Rust 适配器报告到只允许
+失败的入口；Verus 没有证明该适配器的 poll／panic 对应关系。调用关系也不能
+替代 Child 实际分配的语义证明或插件的效果律。
 
 ## R2 剩余验收内容
 
@@ -97,8 +117,8 @@ Begin 时的 committed bindings，以及 Finish、Retire、Remove、Unload 的�
    或直接假设任意回调正确。
 2. 用同一受验证的生产状态持有并组合全部并发效果组、动态子插件、publication、
    已准入工作与排空／释放决定。全部清理队列现已有共同的受验证 owner，载荷释放
-   也已组合票据／租约验证；根 setup、Child 准入和联合生命周期／publication 状态
-   仍需与它们组合。
+   也已组合票据／租约验证；根 setup 和请求现已参与排空守卫。Child 的实际分配、
+   poll／panic 适配与联合生命周期／publication 状态仍需语义组合。
 3. 证明完整生产执行轨迹的步骤分类及其与 R1 解释的关系，包括明确列出的多版本和
    动态接口扩展。列出一些方法的分类本身不构成这一定理。
 
@@ -108,7 +128,7 @@ Begin 时的 committed bindings，以及 Finish、Retire、Remove、Unload 的�
 ## 审查与复现
 
 ```sh
-cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --test cleanup_groups --offline
+cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --test cleanup_groups --test setup_work --offline
 python3 scripts/record-development.py --offline
 ```
 
@@ -117,10 +137,10 @@ Future 逆序完成、工厂调用时机、失败重试、析构所有权、取�
 以及仍有非根组工作时尝试关闭。常规开发检查还会
 重新构建并测试实际 Rust 和 Node 宿主。
 
-六个负向对照分别把真实值改为 `None`、替换租约的 publication 身份、把实际等待到
+八个负向对照分别把真实值改为 `None`、替换租约的 publication 身份、把实际等待到
 的错误改成成功、允许已取消的 continuation 继续、从排空检查遗漏非根组，以及
-篡改受验证 `invoke` 调用者的实际参数。定向实验必须先证明未修改版本、
-编译错误版本，再确认指定合同确实拒绝该修改。定向通过不表示完整的 138 项负向
+篡改受验证 `invoke` 调用者的实际参数、遗漏已派发请求，以及取消已经运行的根 Future。定向实验必须先证明未修改版本、
+编译错误版本，再确认指定合同确实拒绝该修改。定向通过不表示完整的 140 项负向
 回归已运行，详见[验证等级](validation.md)。
 
 绑定源码的开发报告独立记录完整正向检查，不表示发布验收或整篇论文完成。本轮

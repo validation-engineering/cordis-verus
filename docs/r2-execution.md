@@ -107,10 +107,36 @@ no owned queue retains a payload, issued callback or pending stage, and closes
 all subsequent registration in that container.
 
 This composition is used by both the polled Rust runtime and the static adapter.
-It does not yet own the root setup Future, queued child requests or the lifecycle
-and publication states in the same invariant. Their remaining orchestration is
-still ordinary host code; the queue composition alone cannot discharge that
-whole-state obligation.
+The SetupWork protocol below further connects root dispatch and actual queued
+requests. Lifecycle and publication still need a joint semantic invariant with
+these protocols; the local composition does not discharge that whole-state
+obligation.
+
+## Setup and requests participate in drain
+
+`SetupWork<C, G>` owns actual Child/group requests and tracks root setup plus
+requests already dispatched to a host. `WorkItem`, `PendingWork` and `WorkReceipt`
+have private payload and identity fields. `run` produces a receipt by actually
+calling the operation on the owned request. `start` immediately calls the
+factory and retains its returned Future; completing that Future produces the
+actual result. An empty dispatch queue cannot hide a request still being
+executed. The FIFO uses VecDeque, avoiding movement of remaining requests on
+each dispatch; completed receipts leave the active map.
+
+`enqueue_owned_child` admits the actual Child request and retains its inverse
+atomically, returning both unchanged on rejection for disposal outside the host
+mutex. Final `seal` checks root setup, queued/dispatched requests and every
+cleanup queue, including their common cleanup domain. Rust Runtime and the
+static host use this guard. The polled Runtime's initialization completion also
+uses the same actual state.
+
+An unpolled root Future may be cancelled after withdrawal. A started Future
+must return or remain explicitly abandoned and blocking; it cannot take the
+unpolled cancellation path. Async completion preserves the actual Result, and
+failure cannot authorize successful initialization. Ordinary Rust still reports
+caught panics through a failure-only entry; Verus has not proved the adapter's
+poll/panic correspondence. The invocation relation also does not replace the
+semantic proof of actual Child allocation or a plugin's effect laws.
 
 ## Remaining R2 acceptance
 
@@ -121,8 +147,9 @@ whole-state obligation.
 2. Own and compose all concurrent groups, dynamic children, publications,
    admitted work and drain/release decisions in one checked production state.
    All cleanup queues now share a verified owner, and payload release composes
-   with receipt/lease validation. Root setup, child admission and the joint
-   lifecycle/publication state remain to be composed with them.
+   with receipt/lease validation. Root and request receipts now participate in
+   drain checks. Actual Child allocation, poll/panic adaptation and the joint
+   lifecycle/publication state still need semantic composition.
 3. Prove the complete production trace's classification and its relation to
    the R1 interpretation, including the stated multi-version and dynamic
    interface extensions. A list of classified methods is not this theorem.
@@ -134,7 +161,7 @@ outcomes have not been promoted by this increment.
 ## Review and reproduction
 
 ```sh
-cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --test cleanup_groups --offline
+cargo test -p cordis-kernel --test publication_values --test async_completion --test cleanup_queue --test cleanup_groups --test setup_work --offline
 python3 scripts/record-development.py --offline
 ```
 
@@ -144,12 +171,12 @@ order, factory invocation timing, failed retries, destructor ownership, late
 cancelled landings and sealing with non-root work still outstanding. The
 normal development checks additionally rebuild and test the Rust and Node hosts.
 
-Six negative controls replace a real value with `None`, substitute a lease's
+Eight negative controls replace a real value with `None`, substitute a lease's
 publication identity, turn an awaited error into success, keep a cancelled
 continuation alive, omit non-root groups from the drain check, or alter the
-argument in a checked `invoke` caller. Each scoped experiment needs a fresh positive proof, a
+argument in a checked `invoke` caller, omit dispatched requests, or discard an already running root. Each scoped experiment needs a fresh positive proof, a
 compiled mutant and rejection of the named contract. A scoped result does not
-mean the full 138-case negative regression ran; see [validation](validation.md).
+mean the full 140-case negative regression ran; see [validation](validation.md).
 
 The source-bound development report records the full positive check separately
 from release acceptance and paper completion. No Node dependency is added for

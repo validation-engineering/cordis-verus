@@ -1408,6 +1408,18 @@ def mutation_manifest():
             'invoke(input,operation).into_result()',
             'invoke(input ^ 1u64,operation).into_result()',
         ),
+        (
+            'r2-drain-ignores-dispatched-requests',
+            'setup_work.rs',
+            '{self.root==RootStatus::Settled && self.children.len()==0 && self.groups.len()==0 && self.issued.is_empty()}',
+            '{self.root==RootStatus::Settled && self.children.len()==0 && self.groups.len()==0}',
+        ),
+        (
+            'r2-cancellation-discards-running-root',
+            'setup_work.rs',
+            'if !self.root_ticket(ticket) || self.root!=RootStatus::Queued || self.accepting {return false;}',
+            'if !self.root_ticket(ticket) || (self.root!=RootStatus::Queued && self.root!=RootStatus::Running) || self.accepting {return false;}',
+        ),
     ]
 
 

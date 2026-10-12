@@ -788,7 +788,7 @@
         "id": "invocation-effect-origin",
         "status": "partial",
         "scope": "Establish actual argument, executed operation, result, continuation and inverse laws for extensible managed plugin entry points.",
-        "remaining": "Native invoke/invoke_future now carry actual argument-to-call and factory-to-Future contracts in production. Complete registered-plugin provenance and primitive inverse laws remain open; generic FnOnce laws do not prove arbitrary plugin bodies.",
+        "remaining": "Native invocation and private WorkItem/WorkReceipt now bind actual queued arguments, factory Futures and completion results in production. Registered-plugin provenance, primitive inverse laws and checked poll/panic adaptation remain open; generic FnOnce laws do not prove arbitrary plugin bodies.",
         "reviewPath": [
           {
             "file": "crates/cordis-kernel/src/async_completion.rs",
@@ -798,6 +798,11 @@
           {
             "file": "crates/cordis-kernel/src/async_completion.rs",
             "symbol": "invoke_future",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_work.rs",
+            "symbol": "run",
             "role": "execution"
           },
           {
@@ -821,8 +826,23 @@
         "id": "production-composition",
         "status": "partial",
         "scope": "One checked production invariant owns all concurrent groups, dynamic Child, admitted work, publications and drain/release decisions.",
-        "remaining": "CleanupGroups now owns all Rust/static cleanup queues, preserves other groups, preflights every retry and seals from their actual state. Root setup, child requests and the joint lifecycle/publication invariant still use ordinary host orchestration.",
+        "remaining": "CleanupGroups owns every cleanup queue. SetupWork owns queued requests, tracks issued dispatch and root completion, atomically admits Child plus inverse, and checks these with the matching group state before seal/publication. The joint lifecycle/publication invariant, actual Child allocation relation and the ordinary poll/panic adapter remain to be proved.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/setup_work.rs",
+            "symbol": "seal",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_work.rs",
+            "symbol": "enqueue_owned_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_work.rs",
+            "symbol": "complete_root",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/cleanup_groups.rs",
             "symbol": "seal",

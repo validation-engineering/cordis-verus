@@ -44,6 +44,7 @@ R2 now connects actual publication payloads, lease-selected values, awaited
 cleanup results and landed inverse/continuation decisions to production callers.
 Native call contracts also preserve actual factory arguments/results, and one
 verified container now owns all Rust/static cleanup queues, bulk retries and sealing.
+Root setup and actual Child/group dispatch receipts now participate in drain checks; Child requests and inverses are admitted atomically.
 See [R2 execution contracts](r2-execution.md) for the proved scope and review path.
 R2 remains open for the complete callback effect contract, concurrent production
 composition and whole-trace correspondence; its exit criteria are unchanged.

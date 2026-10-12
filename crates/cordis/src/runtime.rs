@@ -17,6 +17,7 @@ use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
 use cordis_kernel::cleanup_queue::completion::{CleanupPolicy, CleanupReport};
 use cordis_kernel::cleanup_queue::landing::StageReport;
 use cordis_kernel::publication::values::ValueCell;
+use cordis_kernel::setup_work::{SetupWork, WorkReceipt, WorkTicket};
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
@@ -157,6 +158,9 @@ impl Cleanups {
         Self {
             protocol: CleanupGroups::new(fresh(&NEXT_CLEANUP)),
         }
+    }
+    fn setup_work(&self) -> SetupWork<ChildRequest, GroupRequest> {
+        SetupWork::new(self.protocol.get(0).expect("root group").domain())
     }
     fn contains(&self, group: usize) -> bool {
         self.protocol.contains(group)
@@ -660,8 +664,7 @@ struct Episode {
     phase: EpisodePhase,
     values: Values,
     cleanups: Cleanups,
-    groups: Vec<GroupRequest>,
-    children: Vec<ChildRequest>,
+    work: SetupWork<ChildRequest, GroupRequest>,
     cancelled_groups: std::collections::BTreeSet<usize>,
     driver: Option<Waker>,
     static_only: bool,
@@ -669,6 +672,20 @@ struct Episode {
     external_children: Vec<static_host::StaticChildControl>,
     service_updates: Option<Arc<dyn Fn() + Send + Sync>>,
     unsupported: Option<String>,
+}
+impl Episode {
+    fn withdraw(&mut self) {
+        if self.phase != EpisodePhase::Closed {
+            self.phase = EpisodePhase::Restoring;
+            self.work.withdraw();
+        }
+    }
+    fn seal(&mut self) -> bool {
+        self.work.seal(&mut self.cleanups.protocol)
+    }
+    fn can_finish(&self, target: &[Binding]) -> bool {
+        self.work.can_finish(&self.cleanups.protocol, target)
+    }
 }
 /// Owned setup context suitable for futures. Dependency slots belong to the
 /// episode's committed providers; cloning never changes those identities.
@@ -1002,9 +1019,6 @@ impl AsyncSetup {
                 notify.clone(),
             )
         });
-        if let Some(control) = &external {
-            state.external_children.push(control.clone());
-        }
         let handle = ChildHandle {
             state: identity,
             external,
@@ -1012,16 +1026,28 @@ impl AsyncSetup {
         if !state.cleanups.contains(self.group) {
             return Err("effect group has completed".into());
         }
-        state
-            .cleanups
-            .push(self.group, CleanupAction::Child(handle.clone()));
-        let notify = state.dynamic_host.clone();
-        state.children.push(ChildRequest {
+        let request = ChildRequest {
             context: context.clone(),
             plugin,
             handle: handle.clone(),
             service,
-        });
+        };
+        let Episode { work, cleanups, .. } = &mut *state;
+        let accepted = work.enqueue_owned_child(
+            &mut cleanups.protocol,
+            self.group,
+            request,
+            CleanupAction::Child(handle.clone()),
+        );
+        if let Err(rejected) = accepted {
+            drop(state);
+            drop(rejected);
+            return Err("child request admission is closed or exhausted".into());
+        }
+        if let Some(control) = &handle.external {
+            state.external_children.push(control.clone());
+        }
+        let notify = state.dynamic_host.clone();
         let waker = state.driver.take();
         drop(state);
         if let Some(notify) = notify {
@@ -1042,15 +1068,22 @@ impl AsyncSetup {
         if !state.cleanups.contains(self.group) {
             return Err("effect group has completed".into());
         }
+        if !state.work.can_enqueue() {
+            return Err("effect request admission is closed or exhausted".into());
+        }
         let group = state.cleanups.iterator(self.bindings.clone());
         let handle = EffectHandle {
             status: Arc::new(Mutex::new(EffectStatus::default())),
         };
-        state.groups.push(GroupRequest {
+        let accepted = state.work.enqueue_group(GroupRequest {
             group,
             iterator: Box::new(effect),
             handle: handle.clone(),
         });
+        assert!(
+            accepted.is_ok(),
+            "preflighted request capacity under the episode lock"
+        );
         let waker = state.driver.take();
         drop(state);
         if let Some(waker) = waker {
@@ -1253,15 +1286,16 @@ struct Group {
 
 /// Only a queued future may be discarded on withdrawal. Once its first poll
 /// begins, the runtime owns it until it lands and can register its inverse.
+type RootFuture = Pin<Box<dyn Future<Output = WorkReceipt<CallbackResult>> + Send>>;
 enum RootSetup {
     Dormant,
-    Queued(SetupFuture),
-    Running(SetupFuture),
+    Queued(WorkTicket, RootFuture),
+    Running(WorkTicket, RootFuture),
     Done,
 }
 impl RootSetup {
     fn is_pending(&self) -> bool {
-        matches!(self, Self::Queued(_) | Self::Running(_))
+        matches!(self, Self::Queued(..) | Self::Running(..))
     }
     fn is_done(&self) -> bool {
         matches!(self, Self::Done)
@@ -1269,18 +1303,41 @@ impl RootSetup {
     fn poll(
         &mut self,
         withdrawing: bool,
+        episode: &AsyncSetup,
         cx: &mut TaskContext<'_>,
     ) -> Option<Poll<CallbackResult>> {
         match std::mem::replace(self, Self::Done) {
-            Self::Queued(_) if withdrawing => None,
-            Self::Queued(mut future) | Self::Running(mut future) => {
+            Self::Queued(ticket, future) if withdrawing => {
+                {
+                    let mut state = lock(&episode.state);
+                    state.work.withdraw();
+                    assert!(
+                        state.work.cancel_queued_root(ticket),
+                        "only an unpolled root is discarded"
+                    );
+                }
+                drop(future);
+                None
+            }
+            Self::Queued(ticket, mut future) | Self::Running(ticket, mut future) => {
+                assert!(
+                    lock(&episode.state).work.start_root(ticket),
+                    "exact admitted root"
+                );
                 Some(match poll_catching_unwind(future.as_mut(), cx) {
                     Ok(Poll::Pending) => {
-                        *self = Self::Running(future);
+                        *self = Self::Running(ticket, future);
                         Poll::Pending
                     }
-                    Ok(Poll::Ready(result)) => Poll::Ready(result),
-                    Err(panic) => Poll::Ready(Err(CallbackError::panic(panic_message(panic)))),
+                    Ok(Poll::Ready(receipt)) => {
+                        let completed = lock(&episode.state).work.complete_root(receipt);
+                        Poll::Ready(completed.ok().expect("actual root completion"))
+                    }
+                    Err(panic) => {
+                        let error = CallbackError::panic(panic_message(panic));
+                        let failed = lock(&episode.state).work.fail_root(ticket, error);
+                        Poll::Ready(Err(failed.expect("exact failed root")))
+                    }
                 })
             }
             state => {
@@ -1294,16 +1351,34 @@ fn initialize_callback(
     callback: &mut Callback,
     episode: &AsyncSetup,
 ) -> Result<RootSetup, CallbackError> {
-    catch_unwind(AssertUnwindSafe(|| match callback {
+    let item = lock(&episode.state)
+        .work
+        .issue_root(episode.clone())
+        .ok()
+        .expect("one root invocation per episode");
+    let ticket = item.ticket();
+    match catch_unwind(AssertUnwindSafe(|| match callback {
         Callback::Sync(callback) => {
-            invoke(&mut Setup { inner: episode }, callback).into_result()?;
+            let receipt = item
+                .run(|argument| invoke(&mut Setup { inner: &argument }, callback).into_result());
+            let completed = lock(&episode.state).work.complete_root(receipt);
+            completed.ok().expect("actual synchronous root result")?;
             Ok(RootSetup::Done)
         }
-        Callback::Async(callback) => Ok(RootSetup::Queued(
-            invoke(episode.clone(), callback).into_result(),
-        )),
-    }))
-    .unwrap_or_else(|panic| Err(CallbackError::panic(panic_message(panic))))
+        Callback::Async(callback) => {
+            let pending = item.start(callback);
+            Ok(RootSetup::Queued(ticket, Box::pin(pending.complete())))
+        }
+    })) {
+        Ok(result) => result,
+        Err(panic) => {
+            let error = CallbackError::panic(panic_message(panic));
+            Err(lock(&episode.state)
+                .work
+                .fail_root(ticket, error)
+                .expect("issued factory failed"))
+        }
+    }
 }
 type CompletionFuture =
     Pin<Box<dyn Future<Output = Completion<RestoreTicket, CallbackResult>> + Send>>;
@@ -1941,7 +2016,7 @@ impl Runtime {
             lock(&service.status).cancelled = true;
         }
         if let Some(episode) = &self.mounted[&id].episode {
-            lock(&episode.state).phase = EpisodePhase::Restoring;
+            lock(&episode.state).withdraw();
         }
         if self.phase(id) == Some(Phase::Inactive) {
             for child in self.kernel.children(id) {
@@ -2209,7 +2284,7 @@ impl Runtime {
     fn leave(&mut self, id: PluginId) -> Result<(), RuntimeError> {
         self.kernel.leave(id).map_err(kernel_error)?;
         if let Some(episode) = &self.mounted[&id].episode {
-            lock(&episode.state).phase = EpisodePhase::Restoring;
+            lock(&episode.state).withdraw();
         }
         // True service dependents must unwind before the owner can restore. Do
         // not add an implicit child->parent edge or await child removal here.
@@ -2273,14 +2348,15 @@ impl Runtime {
         if let Some(handler) = plugin.next_config_update.take() {
             plugin.config_update = handler;
         }
+        let cleanups = Cleanups::new();
+        let work = cleanups.setup_work();
         let mut state = Episode {
             phase: EpisodePhase::Loading,
             // Retain precisely the committed dependencies until restoration
             // finishes; unrelated services must not gain implicit Arc owners.
             values,
-            cleanups: Cleanups::new(),
-            groups: Vec::new(),
-            children: Vec::new(),
+            cleanups,
+            work,
             cancelled_groups: Default::default(),
             driver: Some(cx.waker().clone()),
             static_only: false,
@@ -2322,54 +2398,69 @@ impl Runtime {
             return Ok(false);
         };
         let (children, groups) = {
-            let mut state = lock(&episode.state);
-            (
-                std::mem::take(&mut state.children),
-                std::mem::take(&mut state.groups),
-            )
+            let state = lock(&episode.state);
+            (state.work.child_count(), state.work.group_count())
         };
-        let progress = !children.is_empty() || !groups.is_empty();
-        for request in children {
-            if request
-                .service
-                .as_ref()
-                .is_some_and(|service| lock(&service.status).cancelled)
-            {
+        // Bound this dispatch to the actual queued prefix. Reentrant admission
+        // remains visible to the next scheduler pass and prevents publication.
+        for _ in 0..children {
+            let item = lock(&episode.state)
+                .work
+                .take_child()
+                .expect("queued child");
+            let receipt = item.run(|request| self.apply_child_request(id, request));
+            let completed = lock(&episode.state).work.complete_request(receipt);
+            assert!(completed.is_ok(), "actual child dispatch completion");
+        }
+        for _ in 0..groups {
+            let item = lock(&episode.state)
+                .work
+                .take_group()
+                .expect("queued group");
+            let receipt = item.run(|request| {
+                self.mounted.get_mut(&id).unwrap().groups.insert(
+                    request.group,
+                    Group {
+                        id: request.group,
+                        iterator: Some(request.iterator),
+                        running: None,
+                        handle: request.handle,
+                    },
+                );
+            });
+            let completed = lock(&episode.state).work.complete_request(receipt);
+            assert!(completed.is_ok(), "actual group dispatch completion");
+        }
+        Ok(children != 0 || groups != 0)
+    }
+    fn apply_child_request(&mut self, id: PluginId, request: ChildRequest) {
+        if request
+            .service
+            .as_ref()
+            .is_some_and(|service| lock(&service.status).cancelled)
+        {
+            if let Some(service) = &request.service {
+                finish_service(service);
+            }
+            return;
+        }
+        let result = self.mount_inner(&request.context, Some(id), request.plugin, false);
+        match result {
+            Ok(child) => {
+                *lock(&request.handle.state) = Ok(Some(child));
+                self.mounted.get_mut(&child).unwrap().service = request.service;
+            }
+            Err(error) => {
+                let message = CallbackError::new(error);
+                *lock(&request.handle.state) = Err(message.to_string());
                 if let Some(service) = &request.service {
+                    lock(&service.status).errors.push(message);
                     finish_service(service);
-                }
-                continue;
-            }
-            let result = self.mount_inner(&request.context, Some(id), request.plugin, false);
-            match result {
-                Ok(child) => {
-                    *lock(&request.handle.state) = Ok(Some(child));
-                    self.mounted.get_mut(&child).unwrap().service = request.service;
-                }
-                Err(error) => {
-                    let message = CallbackError::new(error);
-                    *lock(&request.handle.state) = Err(message.to_string());
-                    if let Some(service) = &request.service {
-                        lock(&service.status).errors.push(message);
-                        finish_service(service);
-                    } else {
-                        self.latch(id, message);
-                    }
+                } else {
+                    self.latch(id, message);
                 }
             }
         }
-        for request in groups {
-            self.mounted.get_mut(&id).unwrap().groups.insert(
-                request.group,
-                Group {
-                    id: request.group,
-                    iterator: Some(request.iterator),
-                    running: None,
-                    handle: request.handle,
-                },
-            );
-        }
-        Ok(progress)
     }
     fn record_cleanup(
         &mut self,
@@ -2663,7 +2754,7 @@ impl Runtime {
             && owner
                 .episode
                 .as_ref()
-                .is_none_or(|episode| lock(&episode.state).groups.is_empty())
+                .is_none_or(|episode| lock(&episode.state).work.group_count() == 0)
             && !self
                 .kernel
                 .children(id)
@@ -2733,12 +2824,11 @@ impl Runtime {
                 let driver = cx.waker().clone();
                 let previous = lock(&episode.state).driver.replace(driver);
                 drop(previous);
-                let root_poll = self
-                    .mounted
-                    .get_mut(&id)
-                    .unwrap()
-                    .root_setup
-                    .poll(phase == Phase::Unloading, cx);
+                let root_poll = self.mounted.get_mut(&id).unwrap().root_setup.poll(
+                    phase == Phase::Unloading,
+                    &episode,
+                    cx,
+                );
                 match root_poll {
                     Some(Poll::Pending) => pending = true,
                     Some(Poll::Ready(result)) => {
@@ -2762,7 +2852,10 @@ impl Runtime {
                 {
                     // Do not restore any resource while any group has a setup
                     // poll outstanding: it may still rely on that resource.
-                    let in_flight = lock(&episode.state).cleanups.protocol.has_pending();
+                    let in_flight = {
+                        let state = lock(&episode.state);
+                        !state.work.is_idle() || state.cleanups.protocol.has_pending()
+                    };
                     if !in_flight {
                         if let Err(error) = self.kernel.settle_setup(id) {
                             return Poll::Ready(Err(kernel_error(error)));
@@ -2814,7 +2907,7 @@ impl Runtime {
                         }
                     } else if self.mounted[&id].root_running.is_none()
                         && self.mounted[&id].groups.is_empty()
-                        && state.cleanups.protocol.seal()
+                        && state.seal()
                     {
                         let ticket = self
                             .kernel
@@ -2861,14 +2954,14 @@ impl Runtime {
                     // Serialize the Loading -> Active boundary with registration
                     // through escaped contexts. Requests admitted during Loading
                     // are initialized before the service becomes observable.
-                    if !state.groups.is_empty() || !state.children.is_empty() {
+                    if state.work.group_count() != 0 || state.work.child_count() != 0 {
                         progress = true;
                         continue;
                     }
                     let target = self.kernel.target(id);
                     if !target
                         .as_ref()
-                        .is_some_and(|target| state.cleanups.protocol.can_finish(target))
+                        .is_some_and(|target| state.can_finish(target))
                     {
                         // The protocol rejects publication while any admitted
                         // stage remains outstanding or its target has drifted.

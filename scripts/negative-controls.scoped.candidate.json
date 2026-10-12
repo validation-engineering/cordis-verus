@@ -3570,6 +3570,58 @@
         }
       ],
       "selectionRationale": "This checked caller must derive the result from its actual input via invoke. This is a concrete callback-contract instance, not a proof of arbitrary plugin effects. Require positive, compile and exact rejection."
+    },
+    {
+      "name": "r2-drain-ignores-dispatched-requests",
+      "mutation": {
+        "file": "setup_work.rs",
+        "old": "{self.root==RootStatus::Settled && self.children.len()==0 && self.groups.len()==0 && self.issued.is_empty()}",
+        "new": "{self.root==RootStatus::Settled && self.children.len()==0 && self.groups.len()==0}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "setup_work",
+          "descendants": false,
+          "function": "cordis_negative::setup_work::SetupWork::is_idle"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::setup_work::SetupWork::is_idle",
+          "module": "setup_work",
+          "file": "setup_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn is_idle(&self)->(out:bool) ensures out==self.idle(),"
+        }
+      ],
+      "selectionRationale": "Issued work remains part of the real episode drain guard. Require a fresh selected positive, full mutant compilation and exact contract rejection; this is not whole-host or full-negative acceptance."
+    },
+    {
+      "name": "r2-cancellation-discards-running-root",
+      "mutation": {
+        "file": "setup_work.rs",
+        "old": "if !self.root_ticket(ticket) || self.root!=RootStatus::Queued || self.accepting {return false;}",
+        "new": "if !self.root_ticket(ticket) || (self.root!=RootStatus::Queued && self.root!=RootStatus::Running) || self.accepting {return false;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "setup_work",
+          "descendants": false,
+          "function": "cordis_negative::setup_work::SetupWork::cancel_queued_root"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::setup_work::SetupWork::cancel_queued_root",
+          "module": "setup_work",
+          "file": "setup_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out==(ticket.domain()==old(self).domain_id() && ticket.id()==0 && ticket.kind()==WorkKind::Root\n                && old(self).root_status()==RootStatus::Queued && !old(self).accepts()),"
+        }
+      ],
+      "selectionRationale": "Issued work remains part of the real episode drain guard. Require a fresh selected positive, full mutant compilation and exact contract rejection; this is not whole-host or full-negative acceptance."
     }
   ]
 }

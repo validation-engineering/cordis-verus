@@ -78,6 +78,7 @@ pub mod request_ledger;
 pub mod resources;
 pub mod rule_frames;
 pub mod semantics;
+pub mod setup_work;
 pub mod terminal_episode;
 pub mod termination;
 pub mod wait_guard;

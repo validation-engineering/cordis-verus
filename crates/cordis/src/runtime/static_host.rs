@@ -328,6 +328,7 @@ impl StaticPlugin {
             })
             .collect();
         let cleanups = Cleanups::new();
+        let work = cleanups.setup_work();
         let setup = AsyncSetup {
             generation,
             owner,
@@ -339,8 +340,7 @@ impl StaticPlugin {
                 phase: EpisodePhase::Loading,
                 values,
                 cleanups,
-                groups: Vec::new(),
-                children: Vec::new(),
+                work,
                 cancelled_groups: Default::default(),
                 driver: None,
                 static_only: true,
@@ -404,7 +404,7 @@ impl StaticEpisode {
         let (wake, children) = {
             let mut state = lock(&self.setup.state);
             if state.phase != EpisodePhase::Closed {
-                state.phase = EpisodePhase::Restoring;
+                state.withdraw();
             }
             (state.driver.take(), state.external_children.clone())
         };
@@ -425,35 +425,44 @@ impl StaticEpisode {
                 return Ok(Vec::new());
             }
             state.external_children.retain(|child| !child.is_removed());
-            std::mem::take(&mut state.children)
+            let mut requests = Vec::with_capacity(state.work.child_count());
+            while let Some(request) = state.work.take_child() {
+                requests.push(request);
+            }
+            requests
         };
         let mut output: Vec<StaticChildRequest> = Vec::new();
         let mut failure: Option<String> = None;
-        for request in requests {
-            let control = request.handle.external.expect("external child request");
-            if let Some(error) = &failure {
-                control.complete_mount(Err(error.clone()))?;
-                continue;
-            }
-            if control.retirement_requested() {
-                control.complete_mount(Err(CANCELLED.into()))?;
-                continue;
-            }
-            match StaticPlugin::new_inner(request.plugin) {
-                Ok(plugin) => output.push(StaticChildRequest {
-                    context: request.context,
-                    plugin,
-                    control,
-                }),
-                Err(error) => {
+        for item in requests {
+            let receipt = item.run(|request| -> Result<(), String> {
+                let control = request.handle.external.expect("external child request");
+                if let Some(error) = &failure {
                     control.complete_mount(Err(error.clone()))?;
-                    lock(&self.setup.state).unsupported = Some(error.clone());
-                    for accepted in output.drain(..) {
-                        accepted.control.complete_mount(Err(error.clone()))?;
-                    }
-                    failure = Some(error);
+                    return Ok(());
                 }
-            }
+                if control.retirement_requested() {
+                    control.complete_mount(Err(CANCELLED.into()))?;
+                    return Ok(());
+                }
+                match StaticPlugin::new_inner(request.plugin) {
+                    Ok(plugin) => output.push(StaticChildRequest {
+                        context: request.context,
+                        plugin,
+                        control,
+                    }),
+                    Err(error) => {
+                        control.complete_mount(Err(error.clone()))?;
+                        lock(&self.setup.state).unsupported = Some(error.clone());
+                        for accepted in output.drain(..) {
+                            accepted.control.complete_mount(Err(error.clone()))?;
+                        }
+                        failure = Some(error);
+                    }
+                }
+                Ok(())
+            });
+            let completed = lock(&self.setup.state).work.complete_request(receipt);
+            completed.ok().expect("actual child handoff result")?;
         }
         match failure {
             Some(error) => Err(error),
@@ -533,7 +542,7 @@ impl StaticEpisode {
                 .map_err(|error| format!("StaticCleanupRetry: {error:?}"))?;
             previous_error = progress.cleanup_error.take();
         }
-        state.phase = EpisodePhase::Restoring;
+        state.withdraw();
         progress.cleanup_running = true;
         let children = state.external_children.clone();
         drop(progress);
@@ -575,7 +584,8 @@ impl Future for StaticSetupFuture {
         let result = if let Some(result) = self.initial.take() {
             result
         } else {
-            match self.root.poll(withdrawing, cx) {
+            let setup = self.episode.setup.clone();
+            match self.root.poll(withdrawing, &setup, cx) {
                 Some(Poll::Pending) => return Poll::Pending,
                 Some(Poll::Ready(result)) => result,
                 None if withdrawing => Err(CANCELLED.into()),
@@ -611,6 +621,7 @@ impl Drop for StaticSetupFuture {
     fn drop(&mut self) {
         if !self.finished {
             self.episode.cancel();
+            lock(&self.episode.setup.state).work.abandon_root();
             lock(&self.episode.progress).abandoned =
                 Some("StaticSetupAbandoned: restoration is unconfirmed".into());
         }
@@ -705,7 +716,7 @@ impl Future for StaticCleanupFuture {
                 let (action, released, previous, notifications) = {
                     let mut state = lock(&self.episode.setup.state);
                     let action = state.cleanups.pop(0);
-                    if action.is_none() && state.cleanups.protocol.seal() {
+                    if action.is_none() && state.seal() {
                         // The verified journal includes the outstanding receipt:
                         // a failed or pending callback can never seal the episode.
                         state.phase = EpisodePhase::Closed;

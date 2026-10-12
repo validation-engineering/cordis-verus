@@ -355,3 +355,15 @@ JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验�
 编排尚未完成。当前可见键值表与保留租约值是两个不同观察。
 这些增量尚不构成整个宿主或任意回调的效果正确性证明；R2 仍在推进。
 详见[执行合同和剩余验收内容](r2-execution.zh-CN.md)（[English](r2-execution.md)）。
+
+
+`setup_work.rs` extends the production drain guard to root setup and the actual
+Child/group dispatch queues. Private work items bind each dispatched payload to
+its actual call result; asynchronous items retain the factory's actual Future.
+Taking a request does not complete it. `enqueue_owned_child` retains the real
+request and inverse atomically; `seal` checks outstanding root/dispatch work and
+every queue from the same cleanup domain. Rust Runtime and the static adapter
+use these operations. Only an unpolled root can be discarded on withdrawal;
+abandoned running work remains blocking. Ordinary poll/panic adaptation and the
+semantic relation of Child allocation, lifecycle and publication remain outside
+this local contract. R2 is still in progress.
