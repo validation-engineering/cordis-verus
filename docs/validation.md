@@ -9,7 +9,7 @@ mutation checks and paper coverage answer different questions.
 | Development record | `python3 scripts/record-development.py --offline` | Fresh development checks and source hashes; not release acceptance |
 | Release quality | `./scripts/quality.sh` | The same complete proof and runtime checks, executed once, with release recording handled separately |
 | Release record | `python3 scripts/record-verification.py --offline` | Fresh release-quality checks and `verification/v4` evidence; full negatives explicitly `not_run` |
-| Full negative regression | `python3 scripts/check-negative.py` | The unchanged baseline passes; all 129 compilable mutations produce concrete whole-crate contract rejections |
+| Full negative regression | `python3 scripts/check-negative.py` | The unchanged baseline passes; all 132 compilable mutations produce concrete whole-crate contract rejections |
 | Whole paper | `python3 scripts/check-paper-coverage.py --require-complete` | Whole-paper ledger conditions; currently fails because obligations remain open and original claims are refuted |
 
 ## Release policy
@@ -21,7 +21,7 @@ No proof obligation, contract or solver resource limit is removed by this policy
 
 Mutation tests ask a different question: whether the selected deliberate changes
 are detected by the contracts. They help maintain specifications and review
-regressions, but repeatedly verifying 129 modified copies is not an additional
+regressions, but repeatedly verifying 132 modified copies is not an additional
 proof of the released program. Full mutation regression is therefore independent
 of the normal release path. Run it when reviewing changes to contracts, mutation
 selectors, proof tooling or the toolchain, or as a periodic maintainer audit.

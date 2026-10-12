@@ -370,3 +370,13 @@ assert_eq!(report.machine.phase(0), Some(Phase::Inactive));
 旧 generation／pc 拒绝、失败原子性，以及脚本事件与成功输入前缀的完整对应。
 见 [admission tests](../crates/cordis-kernel/tests/admitted_fresh_driver.rs)
 和 [script tests](../crates/cordis-kernel/tests/admitted_script.rs)。
+
+## R1 的统一上下文审查入口
+
+`fresh::run_inspected` 和 `InspectedReport` 将实际值读取、捕获的逆操作与从空机器构造的源执行联系起来。`FreshDriver::read` 具有精确的值合同，`inverse_at` 只读返回实际保留的 receipt；不会执行清理或暴露可变日志。父组件、续体和子组件都满足完整合法载体上的明确修订合同。
+
+```sh
+cargo run -p cordis-kernel --example semantic_context --offline
+```
+
+该案例包含服务值恢复、真实 child 身份与 retire 后仍保留 provision 的失败分支。具体范围、三项语义修订、任意输入上的函数字段解释及原文边界见 [R1 审查说明](r1-semantics.zh-CN.md)（[English](r1-semantics.md)）。

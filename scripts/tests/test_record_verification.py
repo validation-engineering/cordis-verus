@@ -289,9 +289,10 @@ class CheckScriptRoutingTests(unittest.TestCase):
                         environment["CORDIS_FULL_NEGATIVE_SHARDS"] = str(shards)
                     subprocess.run(["bash", str(scripts / "check.sh")], env=environment, check=True, capture_output=True, text=True)
                     lines = trace.read_text().splitlines()
-                    self.assertEqual(len(lines), 3)
+                    self.assertEqual(len(lines), 4)
                     self.assertEqual(json.loads(lines[0]), ["scripts/check-positive.py"])
                     self.assertEqual(lines[1:], ["cargo test --workspace --all-features --locked",
+                                                "cargo run --locked -p cordis-kernel --example semantic_context",
                                                 "cargo run --locked --all-features -p cordis-verus --example demo"])
 
 

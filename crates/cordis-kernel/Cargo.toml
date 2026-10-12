@@ -10,7 +10,7 @@ description = "Executable Verus-verified Cordis lifecycle kernel"
 readme = "README.md"
 keywords = ["verus", "verification", "plugins", "lifecycle"]
 categories = ["development-tools"]
-include = ["src/**", "tests/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
+include = ["src/**", "tests/**", "examples/**", "Cargo.toml", "README.md", "LICENSE", "NOTICE"]
 publish = ["crates-io"]
 
 [dependencies]

@@ -1354,6 +1354,24 @@ def mutation_manifest():
             'if block.is_some() {',
             'if block.is_some() || i == 0 {',
         ),
+        (
+            'reified-service-read-returns-none',
+            'fresh_driver.rs',
+            '    {self.inner.read(actor,key)}',
+            '    {None}',
+        ),
+        (
+            'reified-inverse-inspection-fabricates-unit',
+            'fresh_driver.rs',
+            '    {self.inner.inverse_at(actor,index)}',
+            '    {match self.inner.inverse_at(actor,index) {Some(_)=>Some(super::Receipt {actor,inverse:super::Inverse::Unit}),None=>None}}',
+        ),
+        (
+            'typed-child-check-accepts-reserved-provision',
+            'typed_child_domain.rs',
+            '    kernel.check_insert(Some(parent),dependencies.as_slice(),provisions.as_slice())',
+            '    Ok(())',
+        ),
     ]
 
 

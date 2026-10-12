@@ -1,0 +1,675 @@
+{
+  "schema": "cordis-verus.paper-refinement-plan/v1",
+  "paper": {
+    "arxiv": "2608.25512v1",
+    "pdfSha256": "390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0"
+  },
+  "ledger": "docs/paper-obligations.json",
+  "claim": "A dependency and review inventory, not evidence of semantic refinement or a replacement for the original paper completion gate.",
+  "milestones": [
+    {
+      "id": "R0",
+      "title": "Whole-paper acceptance baseline",
+      "status": "complete",
+      "dependsOn": [],
+      "exitCriteria": [
+        "Every numbered item has exactly one primary work package; the original ledger remains authoritative.",
+        "Every package records review entry points, unresolved premises, a concrete next action and acceptance criteria.",
+        "All four integration obligations have owners and the dependency graph is acyclic."
+      ]
+    },
+    {
+      "id": "R1",
+      "title": "A consistent semantics and implementation representation",
+      "status": "complete",
+      "dependsOn": [
+        "R0"
+      ],
+      "exitCriteria": [
+        "Construct a nontrivial context interpretation and establish actual Component membership on its complete stated carrier.",
+        "Resolve total versus strict partial domains, Child installation observations and strong function-field observations.",
+        "Retain original counterexamples; identify each required revision separately from the original claim."
+      ],
+      "completionScope": "Finite strict context and indexed Component interpretation implemented by FreshDriver. Explicit revisions are recorded in r1Interpretation; original paper claims are not promoted."
+    },
+    {
+      "id": "R2",
+      "title": "Refinement of production execution",
+      "status": "in_progress",
+      "dependsOn": [
+        "R1"
+      ],
+      "exitCriteria": [
+        "Establish actual argument, outcome, continuation and inverse provenance at public managed entry points.",
+        "Compose admission, invocation, concurrent landing, drain and release without caller-supplied expected outcomes.",
+        "Classify each implementation step as an applicable paper step, an observation-preserving internal step, or a separately specified extension; prove the corresponding relation."
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "General lifecycle recovery",
+      "status": "in_progress",
+      "dependsOn": [
+        "R1"
+      ],
+      "exitCriteria": [
+        "Cover an owner that creates Child, owner publications with actual consumers, repeated episodes and interior owner Unload.",
+        "Construct the legal surviving execution and inverse definedness from real source histories.",
+        "Establish the general recovery expression, including the relation to Equation (55), for the audited component class."
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Global lifecycle properties",
+      "status": "in_progress",
+      "dependsOn": [
+        "R2",
+        "R3"
+      ],
+      "exitCriteria": [
+        "Establish the remaining preservation, ordering, name transport and legal trace-reordering results in one interpretation.",
+        "Connect boundedness, maximal lifecycle sequences and any separate host scheduling conditions to implementation or explicit environment contracts.",
+        "Prove the applicable progress and confluence claims; independently audit revisions of refuted original statements."
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Whole-chain review and delivery",
+      "status": "planned",
+      "dependsOn": [
+        "R4"
+      ],
+      "exitCriteria": [
+        "All numbered items have final original-paper audit outcomes, and all four integration obligations are discharged against their stated targets.",
+        "A frozen source version supplies complete positive verification, runtime and package checks, and accurately labelled negative-control evidence.",
+        "Declared release platforms pass artifact installation; another reviewer can reproduce the guarantee-to-code trail.",
+        "Do not describe a corrected specification as proof of every original claim, or close the original completion gate by changing its acceptance policy."
+      ]
+    }
+  ],
+  "workPackages": [
+    {
+      "id": "effects",
+      "title": "Effects, tracking and recovery",
+      "paperItems": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "milestones": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "currentCoverage": "Generic effect laws are encoded and proved; executable resource and fixed-program drivers recover concrete journals.",
+      "openGap": "Production plugin callbacks do not yet instantiate every algebraic premise; opaque cleanup reports do not prove external restoration.",
+      "nextAction": "Carry actual operation inputs, outputs and returned inverses through a checked extensible effect boundary.",
+      "premises": [
+        "Each admitted primitive must establish its stated recovery law and observation relation.",
+        "The caller-to-effect association must come from the executed call, not an expected result supplied by the caller."
+      ],
+      "acceptance": [
+        "A public executable path instantiates the laws using its actual journal.",
+        "Failure retains the real recovery payload; a mutation that substitutes the inverse is rejected by the relevant contract."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/foundations.rs",
+          "symbol": "recover",
+          "role": "contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/program.rs",
+          "symbol": "execute_and_recover",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "complete",
+          "role": "execution"
+        }
+      ]
+    },
+    {
+      "id": "context",
+      "title": "Coeffects and recursive context",
+      "paperItems": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      "milestones": [
+        "R1"
+      ],
+      "currentCoverage": "R1 completes an explicit finite reified interpretation, with a nontrivial inhabitant, actual control/value/code/journal fields, exact insertion domains and source correspondence.",
+      "openGap": "Original Definition 28 remains partial: the unrestricted recursive set/function equation is not claimed by the explicit R1-CONTEXT revision.",
+      "nextAction": "Use the frozen strict interpretation in R2/R3; continue the original recursive-context audit separately.",
+      "premises": [
+        "Existence of the required context is a proof obligation, not an assumed type equation.",
+        "All values and function fields in the stated carrier need an interpretation."
+      ],
+      "acceptance": [
+        "Provide an inhabited, nontrivial model with checked observation and editor laws.",
+        "Explain any departure from Definition 28 explicitly and keep its original status independent."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/paper_typed_context.rs",
+          "symbol": "projection_typed",
+          "role": "contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "small_editors_satisfy_laws",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/recursive_context.rs",
+          "symbol": "unrestricted_accumulator_obstruction",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "nontrivial_carrier",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "reified_representation",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "reified_insertion_domain",
+          "role": "proof"
+        }
+      ]
+    },
+    {
+      "id": "observations",
+      "title": "Operations, observations and independence",
+      "paperItems": [
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ],
+      "milestones": [
+        "R1",
+        "R3",
+        "R4"
+      ],
+      "currentCoverage": "Least iterator grammars, dependent outcomes and strict partial independence have substantial proofs. R1 adds all-input exact failure transport and declared-interface reads with arbitrary unrelated service values, plus separate admission and recovery relations.",
+      "openGap": "The explicit R1-DOMAIN revision resolves executable strict domains; original total-domain independence and its general recovery/scheduling consequences remain separate R3/R4 audit work.",
+      "nextAction": "Compose actual receipt/continuation transport through the general R3/R4 execution and reordering obligations.",
+      "premises": [
+        "Shared-key value independence must be derived from concrete primitive laws.",
+        "An equal observation must justify any claimed equality of operation domains."
+      ],
+      "acceptance": [
+        "Instantiate independence for the actual supported effect family, including nonempty shared-provider executions.",
+        "Preserve real outcomes and returned inverses through every exchange."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "operations_independent",
+          "role": "contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_components.rs",
+          "symbol": "component_core",
+          "role": "contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_components.rs",
+          "symbol": "declared_transport",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "no_single_recovery_and_admission_relation",
+          "role": "proof"
+        }
+      ]
+    },
+    {
+      "id": "components",
+      "title": "Components, Child and lifting",
+      "paperItems": [
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "milestones": [
+        "R1",
+        "R2"
+      ],
+      "currentCoverage": "R1 completes semantic parent/continuation/child membership on the full finite strict carrier, actual value/code/journal interpretation, and an executable run_inspected client that constructs its evidence from empty. Original total Component membership is not conflated with this revision.",
+      "openGap": "R2 must cover production managed callbacks and host values. Original unrestricted Gamma and total Component witnesses remain independently open in the original ledger.",
+      "nextAction": "Connect the production publication/Child/cleanup path to an applicable value and effect contract, preserving the R1 representation and explicit error domains.",
+      "premises": [
+        "Child membership quantifies every input of its stated carrier.",
+        "Kernel correspondence includes explicit identity capacity and fresh-name conditions.",
+        "Full parent membership cannot be inferred from the supplied child witness or successful-prefix grammar membership."
+      ],
+      "acceptance": [
+        "Prove the typed primitive result and exact failure domain using real component inputs and editor laws.",
+        "Connect the runtime representation and actual captured inverse without assuming insertion succeeded.",
+        "Keep items 28, 55, 56 and 57 open until their complete obligations are met."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/paper_instantiation.rs",
+          "symbol": "typed_instantiate",
+          "role": "contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "equal_observations_different_domains",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "kernel_domain",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "exercise_domain_gap",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lib.rs",
+          "symbol": "check_insert",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/ownership.rs",
+          "symbol": "land_child",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_components.rs",
+          "symbol": "member_is_component",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "root_component",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "function_correspondence",
+          "role": "proof"
+        },
+        {
+          "file": "crates/cordis-kernel/src/inspected_run.rs",
+          "symbol": "run_inspected",
+          "role": "execution"
+        }
+      ]
+    },
+    {
+      "id": "transitions",
+      "title": "State observations and lifecycle transitions",
+      "paperItems": [
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        70
+      ],
+      "milestones": [
+        "R1",
+        "R2",
+        "R4"
+      ],
+      "currentCoverage": "Kernel transitions, finite checked cleanup histories and several execution/observation bridges are present.",
+      "openGap": "Whole-context preservation, unrestricted callback provenance, multiple pending admissions and host composition remain open.",
+      "nextAction": "Compose actual invocation and request completion with landing and resource release under the common representation.",
+      "premises": [
+        "Target identity and committed provider identity remain distinct.",
+        "External callback result truth and complete invocation ancestry need explicit sources.",
+        "A host extension must have its own specification and a proved relationship to applicable paper constraints."
+      ],
+      "acceptance": [
+        "Every managed mutation has a proved transition and established caller premises.",
+        "Prove retention and stale-result rejection across concurrent finite histories.",
+        "Replay actual update, cleanup failure and retry through the public runtime."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "symbol": "execute_cleanup",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-driver/src/lib.rs",
+          "symbol": "complete",
+          "role": "host"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_observations.rs",
+          "symbol": "related",
+          "role": "contract"
+        }
+      ]
+    },
+    {
+      "id": "recovery",
+      "title": "Recovery and episode deletion",
+      "paperItems": [
+        68,
+        69,
+        79
+      ],
+      "milestones": [
+        "R3"
+      ],
+      "currentCoverage": "Concrete journals derive inverse definedness; restricted deletion constructs surviving traces; actual Mixed/Fresh scripts establish terminal value replay.",
+      "openGap": "Owner-created Child, consumers of owner provisions, interior owner Unload and the general Equation (55) correspondence remain open.",
+      "nextAction": "Extend constructive deletion first to an owner that creates a Child, then consumers and multiple episodes.",
+      "premises": [
+        "Source histories must be generated by actual execution.",
+        "Target legality, inverse success and replay equality are conclusions to prove, not supplied premises."
+      ],
+      "acceptance": [
+        "Cover each newly allowed interaction with a reachable nonempty example.",
+        "Prove general recovery and legal surviving execution for the audited component class."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/mixed_driver.rs",
+          "symbol": "run_script",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "symbol": "run_script",
+          "role": "execution"
+        }
+      ]
+    },
+    {
+      "id": "global",
+      "title": "Progress, support and canonical form",
+      "paperItems": [
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        80
+      ],
+      "milestones": [
+        "R1",
+        "R4"
+      ],
+      "currentCoverage": "Fixed-registry bounds, a real single-actor finite loop and scoped trace normalization exist; original support and unconditional completion counterexamples are retained.",
+      "openGap": "General dynamic-registry progress and arbitrary-schedule canonical/confluence results are open.",
+      "nextAction": "Transport real names, inputs and receipts through legal reorderings; connect the selected semantics to maximal lifecycle execution.",
+      "premises": [
+        "Pure lifecycle maximality differs from host fairness and unrelated host work.",
+        "Termination and finite-name/step conditions must have code or environment sources.",
+        "Original refutations of 71, 75 and 77 are not silently replaced by corrected claims."
+      ],
+      "acceptance": [
+        "Construct a legal reordered execution and prove its applicable endpoint relation.",
+        "Derive progress under stated conditions without assuming the desired final state or reverse-step legality."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "symbol": "run_until_blocked",
+          "role": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/refinement.rs",
+          "symbol": "finite_execution_refines",
+          "role": "proof"
+        }
+      ]
+    },
+    {
+      "id": "configuration",
+      "title": "Configuration entries and host interpretation",
+      "paperItems": [
+        81
+      ],
+      "milestones": [
+        "R2"
+      ],
+      "currentCoverage": "The six-field executable entry and an explicit host leaf projection are implemented.",
+      "openGap": "Parsing, module execution, tree reconciliation and persistence still have separate host obligations.",
+      "nextAction": "Connect the actual configuration transaction to the checked lifecycle protocol and describe non-leaf inputs explicitly.",
+      "premises": [
+        "URL resolution and plugin configuration validation are external adapter operations.",
+        "Whole-tree reconciliation is not implied by correctness of a single record."
+      ],
+      "acceptance": [
+        "Trace accepted configuration changes to exact registered components and their cleanup/update actions.",
+        "Retain failures and recovery inputs in a real configuration workflow."
+      ],
+      "reviewPath": [
+        {
+          "file": "crates/cordis-kernel/src/configuration_entry.rs",
+          "symbol": "bound_effect",
+          "role": "contract"
+        },
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "as_paper_entry",
+          "role": "host"
+        }
+      ]
+    }
+  ],
+  "integration": [
+    {
+      "id": "whole-lifecycle",
+      "milestones": [
+        "R1",
+        "R3",
+        "R4",
+        "R5"
+      ]
+    },
+    {
+      "id": "corrected-specification",
+      "milestones": [
+        "R1",
+        "R4",
+        "R5"
+      ]
+    },
+    {
+      "id": "executable-simulation",
+      "milestones": [
+        "R1",
+        "R2",
+        "R5"
+      ]
+    },
+    {
+      "id": "host-boundary",
+      "milestones": [
+        "R2",
+        "R4",
+        "R5"
+      ]
+    }
+  ],
+  "r1Interpretation": {
+    "profile": "finite-strict-context/v1",
+    "originalPaperEquivalent": false,
+    "carrier": "Every finite, typed, well-formed registry with the stated component interface; not only states reached by one successful trace.",
+    "executableProfile": "Validated finite FreshDriver code banks: Unit, Provide, u64 Xor and fresh Child, with actual values, continuations, inverse receipts and allocator limits.",
+    "revisions": [
+      {
+        "id": "R1-CONTEXT",
+        "paperItems": [
+          28,
+          48,
+          49,
+          50
+        ],
+        "decision": "Interpret finite code and retained receipts instead of the unrestricted recursive set/function equation.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/recursive_context.rs",
+            "symbol": "unrestricted_accumulator_obstruction",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "nontrivial_carrier",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "reified_representation",
+            "role": "proof"
+          }
+        ]
+      },
+      {
+        "id": "R1-DOMAIN",
+        "paperItems": [
+          29,
+          30,
+          48,
+          52,
+          55,
+          56,
+          57
+        ],
+        "decision": "Separate strict admission/control and declared-value observations from service recovery. Preserve real failures; prove a semantic contract for parents, continuations and children on the complete stated carrier.",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/guarded_components.rs",
+            "symbol": "component",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/guarded_components.rs",
+            "symbol": "member_is_component",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/guarded_components.rs",
+            "symbol": "declared_transport",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/guarded_components.rs",
+            "symbol": "continuation_components",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "root_component",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "reified_insertion_domain",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+            "symbol": "no_single_recovery_and_admission_relation",
+            "role": "proof"
+          }
+        ]
+      },
+      {
+        "id": "R1-FIELDS",
+        "paperItems": [
+          49,
+          78,
+          79,
+          80
+        ],
+        "decision": "Interpret executable root/current fields and retained journals as strict functions on arbitrary test states, including undefined inverse calls; do not substitute token equality or assert original Equation (54).",
+        "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "interprets",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "function_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "symbol": "value_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/inspected_run.rs",
+            "symbol": "run_inspected",
+            "role": "execution"
+          }
+        ]
+      }
+    ],
+    "remainingBoundary": "Original unrestricted Gamma and total-function witnesses stay separate. Production callback/value contracts belong to R2; general interference recovery to R3; global termination and confluence to R4."
+  }
+}

@@ -111,8 +111,10 @@ aligns payloads/wakers with records and maintains invocation ancestry. JS setup,
 cleanup, tasks and effects now register with `InvocationLedger`; exact completion,
 record reclamation and the scan of every supplied ancestor are checked as well.
 The host still supplies complete ALS ancestry and reports actual callback results;
-general RPC cycles and scheduler progress remain separate work. Next, include the
-case in the standalone Harness report and review those remaining host boundaries. This stage does not close complete F1 or
+general RPC cycles and scheduler progress remain separate work. The case now runs
+in the standalone Harness report with a fresh independent installation. This is
+maintainer-run reproduction, not external review. Next, review the remaining host
+boundaries under the [R0–R5 refinement milestones](paper-refinement-roadmap.md). This stage does not close complete F1 or
 paper-wide obligations.
 
 ## Milestones and exit criteria

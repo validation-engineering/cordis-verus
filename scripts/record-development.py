@@ -31,7 +31,7 @@ FIXED_SCRIPTS = (
     "scripts/record-development.py", "scripts/check-development.sh",
     "scripts/check.sh", "scripts/check-positive.py", "scripts/quality.sh",
     "scripts/record-verification.py", "scripts/check-paper-coverage.py",
-    "scripts/check-paper-review.py",
+    "scripts/check-paper-review.py", "scripts/check-paper-refinement.py",
     "scripts/verify.sh", "scripts/toolchain-env.sh", "scripts/install-verus.py",
     "scripts/package-check.py", "scripts/build-node.mjs", "scripts/build-node.sh",
     "scripts/check-npm-package.mjs", "scripts/sync-profile-types.mjs",

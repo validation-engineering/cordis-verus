@@ -307,8 +307,10 @@ impl FreshDriver {
         requires old(self).wf(),
         ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).insertion_enabled(parent,blueprint),
+            out.is_ok()==super::context::insertion_enabled(old(self).reified(),parent,blueprint),
             out.is_ok() ==> old(self).ack(final(self),out.unwrap(),r::Rule::Insert,None),
     {
+        proof {self.inner.reified_insertion_domain(parent,blueprint);}
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
         proof {draft.same_insertion_domain(&self.inner,parent,blueprint);}
@@ -531,7 +533,25 @@ impl FreshDriver {
         ensures out==if r::registered(self.control(),actor) {Some(self.control().fibers[actor].phase)} else {None},
     {self.inner.phase(actor)}
     pub fn retired(&self,actor:usize)->bool {self.inner.retired(actor)}
-    pub fn read(&self,actor:usize,key:Port)->Option<u64> requires self.wf(), {self.inner.read(actor,key)}
+    pub closed spec fn reified(&self)->super::context::Context {self.inner.reified()}
+    pub proof fn reified_representation(&self,bank:Seq<super::Blueprint>,source:mx::Configuration<u64,Index>)
+        requires self.wf(),self.represents(bank,source),
+        ensures super::context::interprets(self.reified(),bank,source),
+    {self.inner.reified_representation(bank,source);}
+    pub proof fn root_component(&self,actor:usize)
+        requires self.wf(),r::registered(self.control(),actor),
+        ensures crate::guarded_components::component(super::library(),programs(self.reified().bank),actor,
+            self.control().fibers[actor].dependencies.union(self.control().fibers[actor].provisions),
+            self.control().fibers[actor].provisions,self.reified().roots[actor]),
+    {self.inner.root_component(actor);}
+    pub fn read(&self,actor:usize,key:Port)->(out:Option<u64>)
+        requires self.wf(),
+        ensures out==super::context::read(self.reified(),actor,key),
+    {self.inner.read(actor,key)}
+    pub fn inverse_at(&self,actor:usize,index:usize)->(out:Option<super::Receipt>)
+        requires self.wf(),
+        ensures out==if r::registered(self.control(),actor) && index<self.journal(actor).len() {Some(self.journal(actor)[index as int])} else {None},
+    {self.inner.inverse_at(actor,index)}
     pub fn inverse_count(&self,actor:usize)->Option<usize> requires self.wf(), {self.inner.inverse_count(actor)}
 }
 
@@ -980,3 +1000,7 @@ pub mod preparation;
 
 #[path = "fresh_terminal_replay.rs"]
 pub mod terminal_replay;
+
+#[path = "inspected_run.rs"]
+pub mod inspected;
+pub use inspected::{run_inspected, InspectedReport};

@@ -42,7 +42,10 @@
 | [Architecture](architecture.md) | 纯 Rust 路径、可选 Node 宿主、构建／运行依赖、证明层次与信任边界 |
 | [Node compatibility architecture](node-compatibility-architecture.md) | 原版插件运行于 Rust 内核的长期架构、实施状态、兼容合同和交付门槛 |
 | [Semantics](semantics.md) | 实现规则、依赖与所有权、retire/remove 等关键区别 |
+| [R1 context interpretation](r1-semantics.md) · [中文](r1-semantics.zh-CN.md) | 完整载体组件合同、真实值和逆操作解释、明确语义修订与运行案例 |
 | [Refinement](refinement.md) | 已建立的桥接、真实恢复与轨迹变换及其前提 |
+| [Whole-paper milestones](paper-refinement-roadmap.md) · [中文](paper-refinement-roadmap.zh-CN.md) | R0–R5 依赖、验收与全部条目的工作映射 |
+| [Typed Child domain case](cases/typed-child-domain.md) · [中文](cases/typed-child-domain.zh-CN.md) | 完整子组件输入、预留定义域与实际 Kernel 检查的对应 |
 | [Paper coverage](paper-coverage.md) | 81 个编号条目的生成视图和 4 项整体连接义务 |
 | [Paper ledger](paper-obligations.json) | 覆盖状态、范围和证据符号的机器可读来源 |
 | [Paper audit](paper-audit.md) | 原文反例、编码模型障碍和修订结论的区别 |

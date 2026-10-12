@@ -2416,6 +2416,8 @@ pub mod paper_typed_context;
 
 pub mod paper_instantiation;
 
+pub mod typed_child_domain;
+
 pub mod mixed_foreign_restore;
 
 pub mod foreign_child_deletion;
@@ -2426,3 +2428,5 @@ pub mod paper_trace_independence;
 
 #[cfg(test)]
 mod iteration_tests;
+
+pub mod guarded_components;

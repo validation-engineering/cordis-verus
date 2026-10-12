@@ -1865,8 +1865,8 @@ impl MixedDriver {
     pub fn retired(&self,id:usize)->bool {self.kernel.retired(id)}
     pub fn read(&self,id:usize,key:Port)->(out:Option<u64>)
         requires self.wf(),
-        ensures r::registered(self.control(),id) ==> out==if self.table(id).dom().contains(key) {Some(self.table(id)[key])} else {None},
-    {if !self.registered(id) {None} else {self.tables[id].read(key)}}
+        ensures out==context::read(self.reified(),id,key),
+    {proof {self.read_interpretation(id,key);}if !self.registered(id) {None} else {self.tables[id].read(key)}}
     pub fn inverse_count(&self,id:usize)->(out:Option<usize>)
         requires self.wf(),
         ensures r::registered(self.control(),id) ==> out.is_some() && out.unwrap()==self.journal(id).len(),
@@ -2088,3 +2088,6 @@ pub mod fresh;
 #[cfg(all(test, not(verus_keep_ghost)))]
 #[path = "unload_tests.rs"]
 mod unload_tests;
+
+#[path = "reified_context.rs"]
+pub mod context;

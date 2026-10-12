@@ -90,8 +90,9 @@ native 反向请求已在真实 transport 中取得 `RequestLedger` 的完整票
 JS 工作完成。宿主仍负责捕获初始身份、维护 payload/waker 与记录对应以及 invocation
 祖先链。JS setup、cleanup、task 和 effect 已接入 `InvocationLedger`；精确结束、
 记录回收及传入祖先集合的遍历也由 Verus 检查。宿主仍提供完整 ALS 祖先链并报告实际
-回调结果；一般 RPC 等待环和调度进展仍单独推进。下一步把案例纳入独立 Harness
-报告，并审查剩余宿主边界。本阶段不关闭完整 F1
+回调结果；一般 RPC 等待环和调度进展仍单独推进。案例已纳入独立安装的 Harness
+报告，这是维护者执行的复现，不代表外部独立审查。下一步按
+[R0–R5 精化里程碑](paper-refinement-roadmap.zh-CN.md)审查剩余宿主边界。本阶段不关闭完整 F1
 或整篇义务。
 
 ## 阶段与退出条件

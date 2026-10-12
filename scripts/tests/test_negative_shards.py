@@ -673,11 +673,11 @@ class PlatformPlanTests(unittest.TestCase):
                  patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
                  patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
                 plan = SHARDS.regression_plan(include_macos=True, include_macos_intel=include_intel)
-                self.assertEqual(plan['mutationCount'], 129)
-                self.assertEqual(len(plan['negative']['include']), 88 if include_intel else 45)
-                expected = [('ubuntu-24.04', 2400, 19, 55), ('macos-15', 3600, 26, 75)]
+                self.assertEqual(plan['mutationCount'], 132)
+                self.assertEqual(len(plan['negative']['include']), 90 if include_intel else 46)
+                expected = [('ubuntu-24.04', 2400, 19, 55), ('macos-15', 3600, 27, 75)]
                 if include_intel:
-                    expected.append(('macos-15-intel', 5400, 43, 105))
+                    expected.append(('macos-15-intel', 5400, 44, 105))
                 self.assertEqual([(row['os'], row['timeout'], row['shardCount'], row['preflightMinutes'])
                                   for row in plan['preflight']['include']], expected)
                 manifest = CHECKS.mutation_manifest()
@@ -827,12 +827,12 @@ class SelectionTests(unittest.TestCase):
 
     def test_all_canonical_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
-        self.assertEqual(len(manifest), 129)
-        for count, maximum in [(19, 7), (26, 5), (43, 3)]:
+        self.assertEqual(len(manifest), 132)
+        for count, maximum in [(19, 7), (27, 5), (44, 3)]:
             with self.subTest(count=count):
                 pieces = [SHARDS.assigned(manifest, index, count) for index in range(count)]
                 flattened = [item for group in pieces for item in group]
-                self.assertEqual(len(flattened), 129)
+                self.assertEqual(len(flattened), 132)
                 self.assertEqual(set(flattened), set(manifest))
                 self.assertEqual(max(map(len, pieces)), maximum)
 

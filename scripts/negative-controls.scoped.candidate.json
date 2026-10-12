@@ -3338,6 +3338,84 @@
         }
       ],
       "selectionRationale": "The real JS wait path must use live native scope ownership and check every supplied ancestor, including after a completed nested scope. A compiled mutant and fresh matching positive proof are required; this selected experiment is not full negative acceptance."
+    },
+    {
+      "name": "typed-child-check-accepts-reserved-provision",
+      "mutation": {
+        "file": "typed_child_domain.rs",
+        "old": "    kernel.check_insert(Some(parent),dependencies.as_slice(),provisions.as_slice())",
+        "new": "    Ok(())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "typed_child_domain",
+          "descendants": false,
+          "function": "cordis_negative::typed_child_domain::check_instantiation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::typed_child_domain::check_instantiation",
+          "module": "typed_child_domain",
+          "file": "typed_child_domain.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok()==child(a,parent,name).is_some(),"
+        }
+      ],
+      "selectionRationale": "Returning success without the production check must violate the exact typed instantiation domain. Compile the mutant and prove the same positive selector first; this case does not establish full-context membership or complete negative acceptance."
+    },
+    {
+      "name": "reified-service-read-returns-none",
+      "mutation": {
+        "file": "fresh_driver.rs",
+        "old": "    {self.inner.read(actor,key)}",
+        "new": "    {None}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_driver::fresh",
+          "descendants": false,
+          "function": "cordis_negative::mixed_driver::fresh::FreshDriver::read"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_driver::fresh::FreshDriver::read",
+          "module": "mixed_driver::fresh",
+          "file": "fresh_driver.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==super::context::read(self.reified(),actor,key),"
+        }
+      ],
+      "selectionRationale": "The executable API must expose its actual reified value or captured inverse. Require a fresh matching positive proof, a complete mutant compilation and rejection of this postcondition. This is not full negative acceptance."
+    },
+    {
+      "name": "reified-inverse-inspection-fabricates-unit",
+      "mutation": {
+        "file": "fresh_driver.rs",
+        "old": "    {self.inner.inverse_at(actor,index)}",
+        "new": "    {match self.inner.inverse_at(actor,index) {Some(_)=>Some(super::Receipt {actor,inverse:super::Inverse::Unit}),None=>None}}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_driver::fresh",
+          "descendants": false,
+          "function": "cordis_negative::mixed_driver::fresh::FreshDriver::inverse_at"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_driver::fresh::FreshDriver::inverse_at",
+          "module": "mixed_driver::fresh",
+          "file": "fresh_driver.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==if r::registered(self.control(),actor) && index<self.journal(actor).len() {Some(self.journal(actor)[index as int])} else {None},"
+        }
+      ],
+      "selectionRationale": "The public executable inspection API must return its actual captured inverse even when inspection succeeds. Require a fresh matching positive proof, complete mutant compilation and exact postcondition rejection; this is not full negative acceptance."
     }
   ]
 }

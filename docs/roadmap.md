@@ -4,14 +4,16 @@
 
 产品采用、工程交付与形式化研究的统一目标见[采用与形式化计划](adoption-plan.zh-CN.md)（[English](adoption-plan.md)），包含 A01–A16 工作项、F0–F4 证明方向、M0–M3 验收以及独立安装和真实任务接入要求。本文继续保留详细的技术依赖与证明验收。
 
+整篇实施按 [R0–R5 里程碑](paper-refinement-roadmap.zh-CN.md)（[English](paper-refinement-roadmap.md)）跟踪。R0 已建立可检查基线；[工作映射](paper-refinement-map.md)覆盖全部 81 条和四项整体义务，状态仍来自原文 ledger。
+
 工作按下面的交付物推进，不承诺日期。每项范围变化都应同步合同、非空示例、负控和 ledger；原文反例保留原状态，修订定理另列前提。
 
 近期宿主阶段为[可审查的生命周期等待准入](cases/reentrant-wait.zh-CN.md)：
 实际 Verus 判断已接到 Driver/JS，覆盖 committed 传递依赖、owner 子树、旧代次和
 精确拒绝。真实 native transport 已接入 `RequestLedger`，校验完整回复票据，保留
 并发请求，按实际记录判断 job 排空和等待冲突。JS invocation 已接入受检登记／结束
-账本及传入祖先集合的完整遍历。下一步接入独立 Harness 故障报告，审查 ALS 祖先链
-完整性和实际回调结果的宿主边界；完整 F1、一般 RPC 等待环及第 73 条
+账本及传入祖先集合的完整遍历。案例已接入独立安装的 Harness 故障报告；该复现由维护者执行，
+不代表外部独立审查。下一步审查 ALS 祖先链完整性和实际回调结果的宿主边界；完整 F1、一般 RPC 等待环及第 73 条
 继续保留各自的未完成范围。
 
 ## 1. 完成可复现的验证与仓库维护
@@ -19,7 +21,7 @@
 | 工作 | 交付物 | 验收条件 |
 | --- | --- | --- |
 | 固定工具链制品来源 | 保留 Verus 锁定版本与原始校验值，建立长期可用的下载来源 | 原 rolling 资产已失效；恢复同字节制品并通过新机器安装与 CI，不绕过 SHA-256 校验 |
-| 校准 129 项负控 | 每项精确 mutation、selector、唯一锚点、工具链和源码绑定 | 正向同 selector 先通过；mutant 完整编译；出现所指函数的真实契约失败；超时／rlimit／编译失败不计通过 |
+| 校准 132 项负控 | 每项精确 mutation、selector、唯一锚点、工具链和源码绑定 | 正向同 selector 先通过；mutant 完整编译；出现所指函数的真实契约失败；超时／rlimit／编译失败不计通过 |
 | 完整发布质量 | 规范 `quality.sh`、测试、示例与独立 `.crate` 解包构建记录 | 在同一冻结源码上全部通过，保留完整日志及哈希；不得拼接不同快照冒充一次成功 |
 | 远程 CI | 实际 Linux／macOS 开发检查矩阵及失败排查 | 默认检查包含全库正向证明、测试、示例和打包，不包含全量负控；以实际 job 结果为准，开发通过不替代发布门槛 |
 | API 与维护入口 | 双语 README、文档导航、贡献／安全／发布流程 | 所有本地链接有效，最小示例可运行，版本与实际公开 API 一致 |
@@ -28,11 +30,11 @@
 
 `check-negative-scoped.py` 目前仅为实验工具。校准完成也只说明所选函数的负控有效，不能替代规范全库负控，也不是 `verification/v4` 发布证据。发布依据完整正向证明与实际运行验收；负控独立执行，见[验证政策](validation.md)。
 
-## 2. 补齐原文 Component 与严格 Child 的表示桥
+## 2. 将 R1 解释推进到生产调用
 
-从 [paper_instantiation](../crates/cordis-kernel/src/paper_instantiation.rs) 的真实 typed primitive 出发，连接完整 Component 输入 witness、实际 O-Insert／捕获 O-Retire 和观察关系。首先构造同一 typed Child 在等表观察输入上的 Some／None 边界，把已有纯 grammar 见证升级为带真实 Component 参数的精确结论。
+[R1 有限、严格部分解释](r1-semantics.zh-CN.md)已经完成父组件／续体／子组件的完整载体合同，真实服务值、迭代器和累积逆操作的表示，以及从空机器构造证据的实际运行案例。该解释单独记录三项必要修订；原文 total Gamma、原总函数 Component witness 及第 28／47／55／56／57 项的审计状态不变。
 
-验收须同时给出实际 editor、所有输入的依赖值解释、完整 child Component witness 和实际执行结果。它仍不能省略 spawning parent 的原全域 witness，也不能据此无条件反驳原文 57／73／80。随后明确原 total-context 解释与 strict partial-domain 解释的桥或必要修订，更新 52／55／56／57／65／66 的逐项范围。
+下一步 R2 将 production publication、Child 和 retryable cleanup 接入同一套可审查的实际值与效果合同。封闭同步解释器的 u64/Xor 证明不自动覆盖 JS 回调、任意宿主值或外部 I/O。完整宿主合同、异步结果及生产执行的表示仍需建立。
 
 ## 3. 从受限恢复扩展到完整生命周期
 

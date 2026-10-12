@@ -5,6 +5,16 @@ This is an experimental development checkpoint for the public
 It is not a published crate, a production-readiness claim, or a completed
 refinement of the entire paper.
 
+## R1 semantics and representation
+
+R1 is complete for the explicit [finite strict interpretation](r1-semantics.md)
+([中文](r1-semantics.zh-CN.md)): semantic parent/continuation/child membership on
+the complete stated carrier, actual value and function-field correspondence,
+and a checked executable caller with a nonempty failure/recovery case. The
+three revisions are separate from original-paper equivalence; the original
+ledger statuses and completion gate are unchanged. R2 production callback and
+host-value contracts, R3 general recovery and R4 global properties remain open.
+
 ## Verified checkpoint
 
 The [release-quality report](verification-report.json) and separate
@@ -220,14 +230,14 @@ or positive proof obligation. The new workflow must still be exercised remotely
 on its committed source before claiming cross-platform release acceptance.
 
 
-There are **129 canonical negative mutations**. A complete full-crate negative
+There are **132 canonical negative mutations**. A complete full-crate negative
 run for this source has not passed. The earlier 1,927-obligation snapshot's
 full quality run stopped on `mixed-removal-ignores-retention` after a timeout.
 Partial contract diagnostics were not accepted as a passed result.
 
 The opt-in scoped-negative checker and candidate selector manifest are
 experimental. Unit tests and selected probes do not establish a completed
-129-control calibration or a complete independent full regression. The first
+132-control calibration or a complete independent full regression. The first
 full candidate calibration accepted 11 controls, then rejected control 12
 (`begin-reuses-episode-generation`) because its real assertion failure was
 accompanied by an SMT resource-limit failure. The run is **failed**, not a
