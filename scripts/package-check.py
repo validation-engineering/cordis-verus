@@ -117,9 +117,9 @@ def main():
                 if dependency["source"] is None and not Path(dependency["manifest_path"]).resolve().is_relative_to(extracted):
                     raise RuntimeError(f"Build escaped extracted artifacts: {dependency['manifest_path']}")
             shared_target = ["--target-dir", str(ROOT / "target" / "package-check")]
-            run(["cargo", "test", "--all-targets", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
-            run(["cargo", "test", "--doc", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
-            run(["cargo", "build", "--release", "--lib", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
+            run(["cargo", "test", "--all-targets", "--all-features", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
+            run(["cargo", "test", "--doc", "--all-features", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
+            run(["cargo", "build", "--release", "--lib", "--all-features", "--locked", *network, *local_patch, *shared_target], cwd=artifact_root)
             shutil.copyfile(archive, output / archive_name)
             extracted_paths[name] = artifact_root
             assembly_paths[name] = Path(package["manifest_path"]).parent

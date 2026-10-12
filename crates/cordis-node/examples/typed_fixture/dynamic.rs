@@ -32,7 +32,10 @@ impl TypedService<Reader> for ReaderView {
         }]
     }
     fn call_sync(&self, reader: Arc<Reader>, _: &str, _: Value) -> PluginResult<Value> {
-        let current = reader.setup.get(reader.key)?;
+        let current = reader
+            .setup
+            .get(reader.key)
+            .map_err(|error| error.to_string())?;
         Ok(
             json!({"current":current.0,"original":reader.original.0,"sameArc":Arc::ptr_eq(&current,&reader.original)}),
         )
@@ -61,16 +64,16 @@ impl Manager {
         let key = self.key;
         let realm = self.setup.context().port(key).realm;
         let handle = if checked {
-            self.setup.publish_checked(
-                key,
-                DynamicValue(initial),
-                move |value, context, config| {
+            self.setup
+                .publish_checked(key, DynamicValue(initial), move |value, context, config| {
                     context.port(key).realm == realm
                         && value.0 >= config["minimum"].as_i64().unwrap_or(0)
-                },
-            )?
+                })
+                .map_err(|error| error.to_string())?
         } else {
-            self.setup.publish(key, DynamicValue(initial))?
+            self.setup
+                .publish(key, DynamicValue(initial))
+                .map_err(|error| error.to_string())?
         };
         self.handles.lock().unwrap().insert(label, handle);
         Ok(())
@@ -121,51 +124,62 @@ impl TypedService<Manager> for ManagerView {
             )?,
             "publishUnknown" => {
                 let key = ServiceKey::<DynamicValue>::new("uncatalogued-dynamic");
-                let handle = manager.setup.publish(key, DynamicValue(91))?;
+                let handle = manager
+                    .setup
+                    .publish(key, DynamicValue(91))
+                    .map_err(|error| error.to_string())?;
                 manager.handles.lock().unwrap().insert(label, handle);
             }
             "mountUnknown" => {
                 let key = ServiceKey::<DynamicValue>::new("uncatalogued-child");
                 let control = manager.control.clone();
-                manager.setup.mount(
-                    Plugin::new("uncatalogued-child", move |setup| {
-                        control.record(json!({"phase":"unknown-child:setup"}));
-                        setup.provide(key, DynamicValue(92))?;
-                        Ok(())
-                    })
-                    .provides(key),
-                )?;
+                manager
+                    .setup
+                    .mount(
+                        Plugin::new("uncatalogued-child", move |setup| {
+                            control.record(json!({"phase":"unknown-child:setup"}));
+                            setup.provide(key, DynamicValue(92))?;
+                            Ok(())
+                        })
+                        .provides(key),
+                    )
+                    .map_err(|error| error.to_string())?;
             }
             "set" => manager
                 .handle(&label)?
-                .set(DynamicValue(args[1].as_i64().ok_or("requires value")?))?,
+                .set(DynamicValue(args[1].as_i64().ok_or("requires value")?))
+                .map_err(|error| error.to_string())?,
             "dispose" => manager.handle(&label)?.dispose(),
             "status" => {
                 let handle = manager.handle(&label)?;
                 return Ok(
-                    json!({"id":handle.id().map(|id|id.to_string()),"initialized":handle.initialized(),"finished":handle.finished(),"errors":handle.errors(),"value":handle.get()?.0}),
+                    json!({"id":handle.id().map(|id|id.to_string()),"initialized":handle.initialized(),"finished":handle.finished(),"errors":handle.errors().iter().map(ToString::to_string).collect::<Vec<_>>(),"value":handle.get().map_err(|error| error.to_string())?.0}),
                 );
             }
             "mount" | "mountFailing" => {
                 let control = manager.control.clone();
                 let fail = method == "mountFailing";
-                manager.setup.mount(Plugin::new(
-                    format!("dynamic-child:{label}"),
-                    move |setup| {
-                        control.record(json!({"phase":"dynamic-child:setup","label":label}));
-                        let control = control.clone();
-                        let label = label.clone();
-                        setup.on_cleanup(move || {
-                            control.record(json!({"phase":"dynamic-child:cleanup","label":label}));
-                            if fail {
-                                Err("dynamic child inverse failed".into())
-                            } else {
-                                Ok(())
-                            }
-                        });
-                        Ok(())
-                    },
-                ))?;
+                manager
+                    .setup
+                    .mount(Plugin::new(
+                        format!("dynamic-child:{label}"),
+                        move |setup| {
+                            control.record(json!({"phase":"dynamic-child:setup","label":label}));
+                            let control = control.clone();
+                            let label = label.clone();
+                            setup.on_cleanup(move || {
+                                control
+                                    .record(json!({"phase":"dynamic-child:cleanup","label":label}));
+                                if fail {
+                                    Err("dynamic child inverse failed".into())
+                                } else {
+                                    Ok(())
+                                }
+                            });
+                            Ok(())
+                        },
+                    ))
+                    .map_err(|error| error.to_string())?;
             }
             "mountWaiting" => {
                 let control = manager.control.clone();
@@ -183,7 +197,7 @@ impl TypedService<Manager> for ManagerView {
                         control.record(json!({"phase":"dynamic-child:landed","label":label,"cancelled":cancelled,"lateRejected":late_rejected}));
                         Ok(())
                     }
-                }))?;
+                })).map_err(|error| error.to_string())?;
             }
             "mountIsolated" => {
                 let key = manager.key;
@@ -206,7 +220,7 @@ impl TypedService<Manager> for ManagerView {
                         Ok(())
                     }).requires(key).provides(reader_key))?;
                     Ok(())
-                }).provides(key))?;
+                }).provides(key)).map_err(|error| error.to_string())?;
             }
             _ => return Err("unknown dynamic manager method".into()),
         }
@@ -250,7 +264,7 @@ impl TypedService<Manager> for ManagerView {
             Err("unknown async dynamic method".into())
         };
         Box::pin(async move {
-            result?.join().await?;
+            result?.join().await.map_err(|error| error.to_string())?;
             Ok(Value::Null)
         })
     }
@@ -286,8 +300,8 @@ impl JoinResource {
                     .await
                     .err()
                     .ok_or("cyclic close join unexpectedly completed")?;
-                if error != "ReentrantServiceJoin" {
-                    return Err(error);
+                if error.message() != "ReentrantServiceJoin" {
+                    return Err(error.to_string());
                 }
                 control.record(json!({"phase":"dynamic-resource:close-join-rejected","kind":kind,"label":label}));
             }
@@ -300,7 +314,7 @@ impl PluginStream for JoinResource {
     fn next(&self, _ctx: PluginContext) -> StreamFuture {
         let handle = self.handle.clone();
         Box::pin(async move {
-            handle.join().await?;
+            handle.join().await.map_err(|error| error.to_string())?;
             Ok(Some(Value::Null))
         })
     }
@@ -318,7 +332,7 @@ impl PluginObject for JoinResource {
         }
         let handle = self.handle.clone();
         Box::pin(async move {
-            handle.join().await?;
+            handle.join().await.map_err(|error| error.to_string())?;
             Ok(Value::Null)
         })
     }

@@ -235,3 +235,19 @@ independent contract reviews, reproduced counterexamples and reuse of the method
 in other projects. Stars and downloads are context, not substitutes for those
 observations. Record the actual sample and reasons for choosing another solution;
 do not infer a market ranking or a growth target from unobserved competitor usage.
+
+## Rust API iteration: completed source implementation
+
+The three native API deliverables are implemented: typed required dependency
+inputs, an optional App/PluginHandle facade, and structured errors retained from
+callbacks to application waits. The facade includes scopes, owned children,
+snapshots, sync/async updates, complete typed recipe updates, and cleanup retry.
+Conflicting dependency configuration and changed update declarations are rejected
+before mutation. Unrelated plugin failure does not fail another waiting handle.
+See the [Rust API guide](rust-api.md) ([简体中文](rust-api.zh-CN.md)) and
+`crates/cordis/examples/managed_app.rs`. These APIs are not yet published in 0.1.0.
+
+Compile-fail checks and lifecycle/error regressions cover these ordinary Rust
+adapters. This completes the dependency-input slice of A06, not the whole A06
+configuration-preparation goal or the remaining F1/F2 proof obligations. Existing
+loader preparation remains separate; no host-wide or scheduler proof is claimed.

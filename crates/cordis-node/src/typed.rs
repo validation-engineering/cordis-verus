@@ -438,7 +438,10 @@ impl PluginInstance for Instance {
         let episode = self.episode.clone();
         let realms = self.realms.clone();
         Box::pin(async move {
-            future.ok_or("TypedSetupAlreadyStarted")?.await?;
+            future
+                .ok_or("TypedSetupAlreadyStarted")?
+                .await
+                .map_err(|error| error.to_string())?;
             ctx.cancellation().check()?;
             let supplied = episode.provided()?;
             // Validate every slot before publishing any interface.
@@ -480,7 +483,7 @@ impl PluginInstance for Instance {
             self.episode.cleanup()
         };
         Box::pin(async move {
-            future?.await?;
+            future?.await.map_err(|error| error.to_string())?;
             Ok(Value::Null)
         })
     }

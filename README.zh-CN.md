@@ -62,6 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 纯 Rust 应用无需 Node、npm 或 Verus；Cargo 直接编译已发布的 Rust 库。更多用法见[运行时指南](docs/runtime.md)和[基础示例](crates/cordis/examples/basic.rs)。
 
+当前源码还包含[尚未发布的 typed dependency API 与可选 Tokio 应用驱动](docs/rust-api.zh-CN.md)。上方示例使用已发布 crate 的接口。
+
 ### JavaScript（Node.js）
 
 准备 **Node.js 22.22+ 和 npm**，安装预编译运行时：

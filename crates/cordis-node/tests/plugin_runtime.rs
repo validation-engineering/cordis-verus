@@ -2234,7 +2234,14 @@ fn typed_child_protocol_preserves_definition_slots_allocation_and_removal() {
         )
         .unwrap();
     assert!(other.finished());
-    assert_eq!(other.errors(), vec!["native admission rejected"]);
+    assert_eq!(
+        other
+            .errors()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["native admission rejected"]
+    );
     assert!(backend.take_typed_failures().is_empty());
     let missing = cordis::ServiceKey::<AtomicUsize>::new("not in catalog");
     let failed = setup_store

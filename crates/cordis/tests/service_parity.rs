@@ -391,7 +391,7 @@ fn duplicate_dynamic_publication_reports_handle_error_without_failing_owner() {
     assert!(duplicate.finished());
     assert_eq!(duplicate.id(), None);
     assert!(block_on(duplicate.join()).is_err());
-    assert!(duplicate.errors()[0].contains("Conflict"));
+    assert!(duplicate.errors()[0].message().contains("Conflict"));
     assert_eq!(runtime.phase(owner), Some(Phase::Active));
     assert_eq!(*runtime.get(&context, key).unwrap(), 1);
     assert!(!first.finished());

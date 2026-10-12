@@ -289,7 +289,7 @@ fn cleanup_is_lifo_and_errors_do_not_skip_remaining_inverses() {
         runtime.take_cleanup_errors(),
         vec![RuntimeError::Cleanup {
             plugin: id,
-            message: "cleanup failed".into()
+            error: "cleanup failed".into()
         }]
     );
 }
@@ -432,7 +432,7 @@ fn an_undeclared_dependency_is_rejected_before_a_callback_can_use_it() {
         .unwrap();
     let error = block_on(runtime.settle()).unwrap_err();
     assert!(
-        matches!(error, RuntimeError::Setup { message, .. } if message.contains("undeclared dependency"))
+        matches!(error, RuntimeError::Setup { error: message, .. } if message.message().contains("undeclared dependency"))
     );
 }
 
@@ -1085,7 +1085,7 @@ fn panic_in_setup_poll_rolls_back_and_latches_until_explicit_restart() {
     assert_eq!(poll_once(&mut runtime), Poll::Pending);
     gate.release();
     assert!(
-        matches!(block_on(runtime.settle()), Err(RuntimeError::Setup { message, .. }) if message.contains("setup poll failed"))
+        matches!(block_on(runtime.settle()), Err(RuntimeError::Setup { error: message, .. }) if message.message().contains("setup poll failed"))
     );
     assert_eq!(cleanup.load(Ordering::SeqCst), 1);
     assert_eq!(runtime.phase(owner), Some(Phase::Inactive));
@@ -1116,7 +1116,7 @@ fn panicking_cleanup_factory_and_poll_do_not_skip_older_inverses() {
                     #[allow(unreachable_code)]
                     Ok(())
                 });
-                ctx.on_cleanup_async(|| -> std::future::Ready<Result<(), String>> {
+                ctx.on_cleanup_async(|| -> std::future::Ready<cordis::CallbackResult> {
                     panic!("cleanup factory")
                 });
                 Ok(())
@@ -1130,10 +1130,10 @@ fn panicking_cleanup_factory_and_poll_do_not_skip_older_inverses() {
     let errors = runtime.take_cleanup_errors();
     assert_eq!(errors.len(), 2);
     assert!(
-        matches!(&errors[0], RuntimeError::Cleanup { message, .. } if message.contains("factory"))
+        matches!(&errors[0], RuntimeError::Cleanup { error: message, .. } if message.message().contains("factory"))
     );
     assert!(
-        matches!(&errors[1], RuntimeError::Cleanup { message, .. } if message.contains("poll"))
+        matches!(&errors[1], RuntimeError::Cleanup { error: message, .. } if message.message().contains("poll"))
     );
 }
 
@@ -1312,7 +1312,7 @@ fn panicking_async_factory_restores_already_registered_inverse() {
             None,
             Plugin::new_async(
                 "factory-panic",
-                move |ctx| -> std::future::Ready<Result<(), String>> {
+                move |ctx| -> std::future::Ready<cordis::CallbackResult> {
                     let inverse = inverse.clone();
                     ctx.on_cleanup(move || {
                         inverse.fetch_add(1, Ordering::SeqCst);
@@ -1325,7 +1325,7 @@ fn panicking_async_factory_restores_already_registered_inverse() {
         )
         .unwrap();
     assert!(
-        matches!(block_on(runtime.settle()), Err(RuntimeError::Setup { message, .. }) if message.contains("factory failed"))
+        matches!(block_on(runtime.settle()), Err(RuntimeError::Setup { error: message, .. }) if message.message().contains("factory failed"))
     );
     assert_eq!(count.load(Ordering::SeqCst), 1);
 }
@@ -1426,7 +1426,7 @@ fn effect_cancellation_is_visible_inside_its_pending_stage() {
                 })?;
                 std::future::poll_fn(|_| {
                     if ctx.is_cancelled() {
-                        Poll::Ready(Err::<Inverse, _>(cordis::CANCELLED.to_owned()))
+                        Poll::Ready(Err::<Inverse, _>(cordis::CANCELLED.into()))
                     } else {
                         Poll::Pending
                     }

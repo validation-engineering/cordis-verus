@@ -157,11 +157,10 @@ impl Backend {
                         .declarations()
                         .injection_config
                         .clone();
-                    request.plugin.inherit_dependencies(
-                        &request.context,
-                        parent_ports,
-                        parent_config,
-                    )?;
+                    request
+                        .plugin
+                        .inherit_dependencies(&request.context, parent_ports, parent_config)
+                        .map_err(|error| error.to_string())?;
                     let declaration = request.plugin.declarations();
                     let catalog = instance.factory.mapped();
                     let mut bindings = Vec::new();

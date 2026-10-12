@@ -62,6 +62,8 @@ Run `cargo run` to print `Hello, Cordis`. `.provides()` and `.requires()` declar
 
 Pure Rust applications need no Node, npm or Verus installation; Cargo compiles the published Rust libraries directly. See the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs) for more.
 
+The current source also has an [unreleased typed dependency API and optional Tokio application driver](docs/rust-api.md). The example above uses the published crate API.
+
 ### JavaScript (Node.js)
 
 With **Node.js 22.22+ and npm**, install the precompiled runtime:

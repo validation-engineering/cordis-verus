@@ -92,15 +92,15 @@ impl Setup<'_> {
     pub fn reversible(&mut self, store: &ReversibleStore) -> Transaction {
         let transaction = store.transaction();
         let cleanup = transaction.clone();
-        self.on_cleanup(move || cleanup.rollback());
+        self.on_cleanup(move || cleanup.rollback().map_err(Into::into));
         transaction
     }
 }
 impl AsyncSetup {
-    pub fn reversible(&self, store: &ReversibleStore) -> Result<Transaction, String> {
+    pub fn reversible(&self, store: &ReversibleStore) -> Result<Transaction, crate::CallbackError> {
         let transaction = store.transaction();
         let cleanup = transaction.clone();
-        self.on_cleanup(move || cleanup.rollback())?;
+        self.on_cleanup(move || cleanup.rollback().map_err(Into::into))?;
         Ok(transaction)
     }
 }

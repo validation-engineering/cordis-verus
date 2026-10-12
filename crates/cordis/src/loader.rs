@@ -259,6 +259,10 @@ pub enum LoaderError {
         message: String,
     },
     Runtime(RuntimeError),
+    Update {
+        entry: String,
+        error: crate::CallbackError,
+    },
     /// The configuration was committed, but dependent lifecycle propagation failed.
     PostCommit {
         revision: u64,
@@ -296,6 +300,7 @@ impl fmt::Display for LoaderError {
             ),
             Self::Factory { entry, message } => write!(f, "factory at {entry}: {message}"),
             Self::Runtime(error) => write!(f, "{error}"),
+            Self::Update { entry, error } => write!(f, "configuration update at {entry}: {error}"),
             Self::PostCommit { revision, cause } => write!(f, "configuration revision {revision} committed; lifecycle propagation failed: {cause}"),
             Self::Apply {
                 cause,
@@ -314,7 +319,17 @@ impl fmt::Display for LoaderError {
         }
     }
 }
-impl std::error::Error for LoaderError {}
+impl std::error::Error for LoaderError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Config(error) => Some(error),
+            Self::Runtime(error) => Some(error),
+            Self::Update { error, .. } => Some(error),
+            Self::PostCommit { cause, .. } | Self::Apply { cause, .. } => Some(cause.as_ref()),
+            _ => None,
+        }
+    }
+}
 #[derive(Clone, PartialEq)]
 struct Signature {
     entry: Entry,
@@ -974,9 +989,9 @@ impl Loader {
                 .plan
                 .apply()
                 .await
-                .map_err(|message| LoaderError::Factory {
+                .map_err(|error| LoaderError::Update {
                     entry: update.path.clone(),
-                    message,
+                    error,
                 })?;
         }
         // Adoption only changes future setup recipes, after all reversible work
@@ -1024,9 +1039,9 @@ impl Loader {
                     .plan
                     .rollback()
                     .await
-                    .map_err(|message| LoaderError::Factory {
+                    .map_err(|error| LoaderError::Update {
                         entry: update.path.clone(),
-                        message,
+                        error,
                     })?;
             }
             self.pending.as_mut().unwrap().updates.pop();

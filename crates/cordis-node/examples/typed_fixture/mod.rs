@@ -90,7 +90,7 @@ impl TypedService<Control> for ControlAdapter {
                     .get(name)
                     .cloned()
                     .ok_or("unknown live setup")?;
-                setup.refresh()?;
+                setup.refresh().map_err(|error| error.to_string())?;
                 Ok(Value::Null)
             }
             "note" => {
@@ -232,10 +232,12 @@ fn install_inverses(
     );
     let earlier = control.clone();
     let label = counter.label.clone();
-    setup.on_cleanup(move || {
-        earlier.record(json!({"phase":"counter:earlier","label":label}));
-        Ok(())
-    })?;
+    setup
+        .on_cleanup(move || {
+            earlier.record(json!({"phase":"counter:earlier","label":label}));
+            Ok(())
+        })
+        .map_err(|error| error.to_string())?;
     let fail = config.fail_cleanup;
     let gated = config.cleanup_gate;
     setup.on_cleanup_async(move || async move {
@@ -245,7 +247,7 @@ fn install_inverses(
         }
         control.record(json!({"phase":"counter:cleanup","label":counter.label,"activation":counter.activation,"value":*counter.value.lock().unwrap()}));
         if fail { Err("typed inverse failed: FnOnce cannot be replayed".into()) } else { Ok(()) }
-    })
+    }).map_err(|error| error.to_string())
 }
 fn unsupported(setup: &AsyncSetup, key: ServiceKey<Counter>, config: &Config) -> PluginResult<()> {
     let result = match config.unsupported.as_deref() {
@@ -265,7 +267,7 @@ fn unsupported(setup: &AsyncSetup, key: ServiceKey<Counter>, config: &Config) ->
     if config.ignore_unsupported {
         Ok(())
     } else {
-        result
+        result.map_err(|error| error.to_string())
     }
 }
 fn counter_plugin(
@@ -378,10 +380,13 @@ impl TypedService<LiveControl> for LiveControlView {
         _method: &str,
         args: Value,
     ) -> PluginResult<Value> {
-        value.setup.set(
-            value.key,
-            LiveValue(args[0].as_i64().ok_or("set requires i64")?),
-        )?;
+        value
+            .setup
+            .set(
+                value.key,
+                LiveValue(args[0].as_i64().ok_or("set requires i64")?),
+            )
+            .map_err(|error| error.to_string())?;
         Ok(Value::Null)
     }
     fn call_async(
@@ -394,10 +399,13 @@ impl TypedService<LiveControl> for LiveControlView {
         Box::pin(async move {
             super::delay(1).await;
             ctx.cancellation().check()?;
-            value.setup.set(
-                value.key,
-                LiveValue(args[0].as_i64().ok_or("setAsync requires i64")?),
-            )?;
+            value
+                .setup
+                .set(
+                    value.key,
+                    LiveValue(args[0].as_i64().ok_or("setAsync requires i64")?),
+                )
+                .map_err(|error| error.to_string())?;
             Ok(Value::Null)
         })
     }
@@ -421,7 +429,10 @@ impl TypedService<LiveReader> for LiveReaderView {
         _method: &str,
         _args: Value,
     ) -> PluginResult<Value> {
-        let current = value.setup.get(value.key)?;
+        let current = value
+            .setup
+            .get(value.key)
+            .map_err(|error| error.to_string())?;
         Ok(json!({"current": current.0, "original": value.original.0,
             "sameArc": Arc::ptr_eq(&current, &value.original)}))
     }

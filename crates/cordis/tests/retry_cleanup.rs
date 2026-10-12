@@ -520,7 +520,7 @@ fn distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_succ
                         calls.lock().unwrap().push(captured.0);
                         attempt += 1;
                         if attempt == 1 {
-                            Err(format!("{} failed", captured.0))
+                            Err(format!("{} failed", captured.0).into())
                         } else {
                             Ok(())
                         }

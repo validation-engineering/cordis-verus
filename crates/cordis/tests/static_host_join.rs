@@ -46,7 +46,7 @@ fn publication() -> (ServiceHandle<u64>, StaticChildControl, StaticEpisode) {
     let handle = retained.lock().unwrap().take().unwrap();
     (handle, control, start.episode)
 }
-fn joined(handle: &ServiceHandle<u64>) -> Poll<Result<(), String>> {
+fn joined(handle: &ServiceHandle<u64>) -> Poll<cordis::CallbackResult> {
     Pin::new(&mut handle.join()).poll(&mut TaskContext::from_waker(Waker::noop()))
 }
 

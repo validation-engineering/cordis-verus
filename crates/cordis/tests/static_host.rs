@@ -169,7 +169,10 @@ fn synchronous_partial_failure_and_panic_retain_the_registered_inverse() {
         }))
         .unwrap();
         let start = definition.begin(1, 1, Context::new(), vec![]).unwrap();
-        assert!(finish(start.setup).unwrap_err().contains("setup failed"));
+        assert!(finish(start.setup)
+            .unwrap_err()
+            .to_string()
+            .contains("setup failed"));
         finish(start.episode.cleanup().unwrap()).unwrap();
         assert_eq!(cleaned.load(Ordering::SeqCst), 1);
     }
@@ -223,7 +226,10 @@ fn cancelling_an_unpolled_async_setup_does_not_enter_its_body() {
     .unwrap();
     let start = definition.begin(1, 1, Context::new(), vec![]).unwrap();
     start.episode.cancel();
-    assert_eq!(finish(start.setup).unwrap_err(), cordis::CANCELLED);
+    assert_eq!(
+        finish(start.setup).unwrap_err().to_string(),
+        cordis::CANCELLED
+    );
     assert!(!entered.load(Ordering::SeqCst));
     finish(start.episode.cleanup().unwrap()).unwrap();
 }
@@ -256,7 +262,9 @@ fn failing_once_inverse_is_sticky_and_preserves_values_and_earlier_inverses() {
     let start = definition.begin(1, 1, Context::new(), vec![]).unwrap();
     finish(start.setup).unwrap();
     assert_eq!(
-        finish(start.episode.cleanup().unwrap()).unwrap_err(),
+        finish(start.episode.cleanup().unwrap())
+            .unwrap_err()
+            .to_string(),
         "cannot replay FnOnce"
     );
     assert_eq!(
@@ -356,7 +364,7 @@ fn unsupported_operations_fail_setup_even_if_the_plugin_ignores_their_result() {
         .unwrap();
         let start = definition.begin(1, 1, Context::new(), vec![]).unwrap();
         assert_eq!(
-            finish(start.setup).unwrap_err(),
+            finish(start.setup).unwrap_err().to_string(),
             format!("UnsupportedStaticFeature: {operation}")
         );
         finish(start.episode.cleanup().unwrap()).unwrap();
@@ -417,7 +425,10 @@ fn missing_static_provision_is_a_setup_error_with_restorable_episode() {
     let mut definition =
         StaticPlugin::new(Plugin::new("missing", |_| Ok(())).provides(key)).unwrap();
     let start = definition.begin(1, 1, Context::new(), vec![]).unwrap();
-    assert!(finish(start.setup).unwrap_err().contains("has no value"));
+    assert!(finish(start.setup)
+        .unwrap_err()
+        .to_string()
+        .contains("has no value"));
     finish(start.episode.cleanup().unwrap()).unwrap();
 }
 
@@ -479,7 +490,9 @@ fn panicking_cleanup_factory_or_future_is_sticky() {
         .unwrap();
         let start = definition.begin(1, 1, Context::new(), vec![]).unwrap();
         finish(start.setup).unwrap();
-        let error = finish(start.episode.cleanup().unwrap()).unwrap_err();
+        let error = finish(start.episode.cleanup().unwrap())
+            .unwrap_err()
+            .to_string();
         assert!(error.contains("panic"));
         assert_eq!(start.episode.cleanup().err().unwrap(), error);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -643,6 +656,7 @@ fn opted_in_checked_slot_contains_predicate_panic_and_keeps_other_guards() {
         .unwrap();
     assert!(finish(start.setup)
         .unwrap_err()
+        .to_string()
         .contains("UnsupportedStaticFeature: publish"));
     finish(start.episode.cleanup().unwrap()).unwrap();
 }
@@ -903,7 +917,9 @@ fn child_cleanup_failure_keeps_parent_values_and_original_inverse() {
     finish(child_start.setup).unwrap();
     let mut cleanup = start.episode.cleanup().unwrap();
     assert!(poll(&mut cleanup).is_pending());
-    let error = finish(child_start.episode.cleanup().unwrap()).unwrap_err();
+    let error = finish(child_start.episode.cleanup().unwrap())
+        .unwrap_err()
+        .to_string();
     child.control.cleanup_failed(error);
     assert_eq!(finish(cleanup), Err("child inverse did not restore".into()));
     assert_eq!(
@@ -1083,7 +1099,14 @@ fn failed_publication_join_reports_error_without_claiming_finished_or_removal() 
     assert!(!handle.finished());
     assert!(handle.set(9).is_err());
     assert!(!child.control.is_removed());
-    assert_eq!(handle.errors(), ["consumer cannot restore"]);
+    assert_eq!(
+        handle
+            .errors()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["consumer cannot restore"]
+    );
     assert!(child.control.removed().is_err());
     assert_eq!(
         finish(start.episode.cleanup().unwrap()),
@@ -1266,7 +1289,8 @@ fn inherited_context_cannot_change_between_definition_and_episode() {
     assert_eq!(
         child
             .inherit_dependencies(&context, vec![], Default::default())
-            .unwrap_err(),
+            .unwrap_err()
+            .to_string(),
         "StaticDependenciesAlreadyInherited"
     );
     let imports = vec![

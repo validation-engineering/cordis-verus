@@ -586,16 +586,14 @@ impl TimerService {
         self.bind_async(&setup.to_async())
             .expect("live synchronous setup");
     }
-    pub fn bind_async(&self, setup: &crate::AsyncSetup) -> Result<(), String> {
+    pub fn bind_async(&self, setup: &crate::AsyncSetup) -> crate::CallbackResult {
         setup.ensure_active()?;
         let service = self.clone();
         if let Err(error) = setup.on_cleanup(move || {
             service.shutdown().map_err(|errors| {
-                errors
-                    .into_iter()
-                    .map(|error| error.to_string())
-                    .collect::<Vec<_>>()
-                    .join("; ")
+                crate::CallbackError::multiple(
+                    errors.into_iter().map(crate::CallbackError::new).collect(),
+                )
             })
         }) {
             let _ = self.shutdown();
@@ -609,7 +607,7 @@ impl TimerService {
             .push(setup.clone());
         Ok(())
     }
-    pub fn owned_async(setup: &crate::AsyncSetup) -> Result<Self, String> {
+    pub fn owned_async(setup: &crate::AsyncSetup) -> Result<Self, crate::CallbackError> {
         setup.ensure_active()?;
         let service = Self::new();
         service.bind_async(setup)?;
@@ -1176,7 +1174,7 @@ impl crate::Setup<'_> {
 }
 impl crate::AsyncSetup {
     pub fn timer(&self) -> Result<TimerService, String> {
-        TimerService::owned_async(self)
+        TimerService::owned_async(self).map_err(|error| error.to_string())
     }
     pub fn timeout(
         &self,

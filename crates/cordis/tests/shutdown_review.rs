@@ -43,7 +43,7 @@ fn shutdown_reports_existing_setup_failure_before_removing_the_plugin() {
         error.setup,
         vec![RuntimeError::Setup {
             plugin: owner,
-            message: "setup failed".into()
+            error: "setup failed".into()
         }]
     );
     assert!(error.cleanup.is_empty());
@@ -77,7 +77,7 @@ fn setup_failure_landing_during_shutdown_is_reported() {
         error.setup,
         vec![RuntimeError::Setup {
             plugin: owner,
-            message: "late setup failure".into()
+            error: "late setup failure".into()
         }]
     );
     assert!(runtime.ids().is_empty());
@@ -119,14 +119,14 @@ fn dropped_shutdown_keeps_setup_and_cleanup_failures_until_retry_finishes() {
         error.setup,
         vec![RuntimeError::Setup {
             plugin: owner,
-            message: "setup failed after cancellation".into()
+            error: "setup failed after cancellation".into()
         }]
     );
     assert_eq!(
         error.cleanup,
         vec![RuntimeError::Cleanup {
             plugin: owner,
-            message: "cleanup failed".into()
+            error: "cleanup failed".into()
         }]
     );
     assert!(runtime.ids().is_empty());

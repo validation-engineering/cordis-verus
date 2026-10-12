@@ -202,15 +202,17 @@ impl<C: ?Sized> OwnedSubscription<C> {
 impl<C: ?Sized + Send + Sync + 'static> OwnedSubscription<C> {
     /// Attach a dormant registration to an episode before accepting callbacks.
     pub(crate) fn attach(self, owner: &AsyncSetup) -> Result<Self, String> {
-        owner.ensure_active()?;
+        owner.ensure_active().map_err(|error| error.to_string())?;
         let cleanup = self.clone();
-        owner.on_cleanup_async(move || async move {
-            cleanup.drain().await;
-            Ok(())
-        })?;
+        owner
+            .on_cleanup_async(move || async move {
+                cleanup.drain().await;
+                Ok(())
+            })
+            .map_err(|error| error.to_string())?;
         if let Err(error) = owner.ensure_active() {
             self.close();
-            return Err(error);
+            return Err(error.to_string());
         }
         if !self.inner.gate.activate() {
             return Err("event owner has begun cleanup".into());

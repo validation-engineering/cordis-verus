@@ -2,6 +2,27 @@
 
 `cordis` 提供 typed service、异步初始化、effect iterator、动态子插件、事件、timer、配置树和 Rust factory 热更新。生命周期转移与 cleanup token 栈调用 `cordis-kernel` 的 Verus 实现；宿主的 future 调度、锁、payload、factory 和任意回调仍由普通 Rust 实现。具体证明义务见 [semantics.md](semantics.md)，上游对应见 [upstream-parity.md](upstream-parity.md)，配置用法见 [loader.md](loader.md)。
 
+## 开发版：typed dependencies、应用入口与结构化错误
+
+当前源码已完成这三项 Rust API 优化；尚未包含在已发布的 `cordis-verus 0.1.0`。
+完整用法、等待语义、错误处理与验证边界见 [Rust 应用 API](rust-api.zh-CN.md)
+（[English](rust-api.md)）。
+
+- `Plugin::with_dependencies` 一次生成必需依赖与 typed setup 参数，支持同步／异步、
+  可用性配置、嵌套元组，并在准入前拒绝同 key 的冲突配置。
+- 可选 Tokio `App`／`PluginHandle` 负责驱动原 Runtime，提供作用域、子插件、状态查询、
+  ready／settled、更新、退出和显式清理重试；默认库仍与 executor 无关。
+- `get`／`require` 的结构化读取错误经过 `CallbackError` 保留到 Runtime、句柄和
+  shutdown；配置更新／回滚和 effect 多项失败也保留原因。跨 Node／进程协议时仍传文本。
+
+```sh
+cargo run -p cordis-verus --features tokio --example managed_app
+```
+
+依赖描述转换为原 Plugin 声明，typed 参数读取 episode 已 committed 的 provider；应用
+命令与 poll 仍经共享 Driver／内核。适配层由类型检查和回归测试覆盖，不新增关于任意
+回调、Tokio 公平性或最终清理完成的 Verus 证明声明。
+
 ## 挂载、服务与生命周期
 
 创建 `ServiceKey::<T>::new("name")` 后，将同一个 key 传给 provider 与 consumer。名称用于诊断；再次用相同名称创建 key 会得到不同身份。`Plugin::requires(key)` 声明依赖，`Plugin::provides(key)` 声明固定服务端口。`Setup::provide` 提交 payload，`Setup::get` 读取当前 activation 已 committed 的具体 provider，返回 `Arc<T>`。子插件还可以访问 runtime 为其继承的父依赖。

@@ -292,7 +292,7 @@ pub enum ConfigUpdate {
     Apply(ConfigUpdatePlan),
 }
 
-type UpdateFuture = Pin<Box<dyn Future<Output = Result<(), String>> + Send>>;
+type UpdateFuture = Pin<Box<dyn Future<Output = crate::CallbackResult> + Send>>;
 type UndoFactory = Box<dyn FnMut() -> UpdateFuture + Send>;
 
 /// A reversible configuration update whose inverse is registered before apply.
@@ -304,15 +304,15 @@ type UndoFactory = Box<dyn FnMut() -> UpdateFuture + Send>;
 /// Neither callback runs while constructing this value.
 pub struct ConfigUpdatePlan {
     apply: Option<UpdateFuture>,
-    applied: Option<Result<(), String>>,
+    applied: Option<crate::CallbackResult>,
     started: bool,
     rollback: UndoFactory,
     restoring: Option<UpdateFuture>,
 }
 impl ConfigUpdatePlan {
     pub fn new(
-        apply: impl FnOnce() -> Result<(), String> + Send + 'static,
-        mut rollback: impl FnMut() -> Result<(), String> + Send + 'static,
+        apply: impl FnOnce() -> crate::CallbackResult + Send + 'static,
+        mut rollback: impl FnMut() -> crate::CallbackResult + Send + 'static,
     ) -> Self {
         Self::new_async(
             move || async move { apply() },
@@ -322,9 +322,9 @@ impl ConfigUpdatePlan {
     pub fn new_async<A, AF, R, RF>(apply: A, mut rollback: R) -> Self
     where
         A: FnOnce() -> AF + Send + 'static,
-        AF: Future<Output = Result<(), String>> + Send + 'static,
+        AF: Future<Output = crate::CallbackResult> + Send + 'static,
         R: FnMut() -> RF + Send + 'static,
-        RF: Future<Output = Result<(), String>> + Send + 'static,
+        RF: Future<Output = crate::CallbackResult> + Send + 'static,
     {
         Self {
             // Constructing the user's future is inside the guarded poll boundary.
@@ -335,7 +335,7 @@ impl ConfigUpdatePlan {
             restoring: None,
         }
     }
-    fn poll_apply(&mut self, cx: &mut TaskContext<'_>) -> Poll<Result<(), String>> {
+    fn poll_apply(&mut self, cx: &mut TaskContext<'_>) -> Poll<crate::CallbackResult> {
         if let Some(result) = &self.applied {
             return Poll::Ready(result.clone());
         }
@@ -343,16 +343,18 @@ impl ConfigUpdatePlan {
         let result = match poll_catching_unwind(self.apply.as_mut().unwrap().as_mut(), cx) {
             Ok(Poll::Pending) => return Poll::Pending,
             Ok(Poll::Ready(result)) => result,
-            Err(_) => Err("configuration update panicked".into()),
+            Err(_) => Err(crate::CallbackError::panic(
+                "configuration update panicked".into(),
+            )),
         };
         self.apply = None;
         self.applied = Some(result.clone());
         Poll::Ready(result)
     }
-    pub(crate) async fn apply(&mut self) -> Result<(), String> {
+    pub(crate) async fn apply(&mut self) -> crate::CallbackResult {
         poll_fn(|cx| self.poll_apply(cx)).await
     }
-    pub(crate) async fn rollback(&mut self) -> Result<(), String> {
+    pub(crate) async fn rollback(&mut self) -> crate::CallbackResult {
         if !self.started {
             return Ok(());
         }
@@ -360,14 +362,19 @@ impl ConfigUpdatePlan {
         let _ = poll_fn(|cx| self.poll_apply(cx)).await;
         if self.restoring.is_none() {
             self.restoring = Some(
-                catch_unwind(AssertUnwindSafe(|| (self.rollback)()))
-                    .map_err(|_| "configuration rollback construction panicked".to_owned())?,
+                catch_unwind(AssertUnwindSafe(|| (self.rollback)())).map_err(|_| {
+                    crate::CallbackError::panic(
+                        "configuration rollback construction panicked".into(),
+                    )
+                })?,
             );
         }
         let result = poll_fn(|cx| {
             match poll_catching_unwind(self.restoring.as_mut().unwrap().as_mut(), cx) {
                 Ok(result) => result,
-                Err(_) => Poll::Ready(Err("configuration rollback panicked".into())),
+                Err(_) => Poll::Ready(Err(crate::CallbackError::panic(
+                    "configuration rollback panicked".into(),
+                ))),
             }
         })
         .await;

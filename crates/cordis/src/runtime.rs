@@ -8,11 +8,13 @@ pub mod static_host;
 
 use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, StorageStats};
 use crate::future_support::poll_catching_unwind;
+use crate::service_error::{ServiceReadError, ServiceReadFailure};
+use crate::CallbackError;
 use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
 use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
 use cordis_kernel::cleanup_queue::CleanupQueue;
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::future::Future;
@@ -20,11 +22,11 @@ use std::marker::PhantomData;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
 use std::task::{Context as TaskContext, Poll, Waker};
 
 pub type PluginId = usize;
-pub type CallbackResult = Result<(), String>;
+pub type CallbackResult = Result<(), CallbackError>;
 /// Reserved cooperative-abort result. It is treated as cancellation only after
 /// the owner/group is cancelled; an active callback returning it still fails.
 pub const CANCELLED: &str = "owner episode cancelled";
@@ -41,7 +43,7 @@ type ConfigUpdateCallback = Box<
             AsyncSetup,
             serde_json::Value,
             serde_json::Value,
-        ) -> Result<crate::config::ConfigUpdate, String>
+        ) -> Result<crate::config::ConfigUpdate, CallbackError>
         + Send,
 >;
 
@@ -84,7 +86,7 @@ type RetryCleanup = Box<dyn FnMut() -> CleanupFuture + Send>;
 type SetupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
 type SetupCallback = Box<dyn FnMut(&mut Setup<'_>) -> CallbackResult + Send>;
 type AsyncCallback = Box<dyn FnMut(AsyncSetup) -> SetupFuture + Send>;
-type StageFuture = Pin<Box<dyn Future<Output = Result<Inverse, String>> + Send>>;
+type StageFuture = Pin<Box<dyn Future<Output = Result<Inverse, CallbackError>> + Send>>;
 type Stage = Box<dyn FnOnce(AsyncSetup) -> StageFuture + Send>;
 
 fn lock<T>(value: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -197,7 +199,7 @@ pub trait EffectIterator: Send + Unpin + 'static {
         &mut self,
         cx: &mut TaskContext<'_>,
         setup: &AsyncSetup,
-    ) -> Poll<Option<Result<Inverse, String>>>;
+    ) -> Poll<Option<Result<Inverse, CallbackError>>>;
 }
 
 /// A finite multi-stage effect. Stages run sequentially; independent Effects run
@@ -214,7 +216,7 @@ impl Effect {
     pub fn step<F, Fut>(mut self, stage: F) -> Self
     where
         F: FnOnce(AsyncSetup) -> Fut + Send + 'static,
-        Fut: Future<Output = Result<Inverse, String>> + Send + 'static,
+        Fut: Future<Output = Result<Inverse, CallbackError>> + Send + 'static,
     {
         self.stages
             .push_back(Box::new(move |setup| Box::pin(stage(setup))));
@@ -231,7 +233,7 @@ impl EffectIterator for Effect {
         &mut self,
         cx: &mut TaskContext<'_>,
         setup: &AsyncSetup,
-    ) -> Poll<Option<Result<Inverse, String>>> {
+    ) -> Poll<Option<Result<Inverse, CallbackError>>> {
         if self.running.is_none() {
             let Some(stage) = self.stages.pop_front() else {
                 return Poll::Ready(None);
@@ -253,8 +255,8 @@ struct EffectStatus {
     cancelled: bool,
     initialized: bool,
     finished: bool,
-    errors: Vec<String>,
-    terminal_error: Option<String>,
+    errors: Vec<CallbackError>,
+    terminal_error: Option<CallbackError>,
     external_child_id: Option<PluginId>,
     next_waiter: u64,
     wakers: BTreeMap<u64, Waker>,
@@ -309,7 +311,7 @@ impl EffectHandle {
     pub fn finished(&self) -> bool {
         lock(&self.status).finished
     }
-    pub fn errors(&self) -> Vec<String> {
+    pub fn errors(&self) -> Vec<CallbackError> {
         lock(&self.status).errors.clone()
     }
     pub fn join(&self) -> EffectJoin {
@@ -338,7 +340,7 @@ impl Future for EffectJoin {
                 let result = if status.errors.is_empty() {
                     Ok(())
                 } else {
-                    Err(status.errors.join("; "))
+                    Err(CallbackError::multiple(status.errors.clone()))
                 };
                 let previous = this.waiter.take().and_then(|id| status.wakers.remove(&id));
                 (Poll::Ready(result), previous)
@@ -393,6 +395,8 @@ impl ChildHandle {
 }
 
 static NEXT_KEY: AtomicU64 = AtomicU64::new(1);
+type SharedKeys = BTreeMap<(TypeId, Option<&'static str>), u64>;
+static SHARED_KEYS: LazyLock<Mutex<SharedKeys>> = LazyLock::new(|| Mutex::new(BTreeMap::new()));
 static NEXT_REALM: AtomicU64 = AtomicU64::new(1);
 static NEXT_EPISODE: AtomicU64 = AtomicU64::new(1);
 static NEXT_CLEANUP: AtomicU64 = AtomicU64::new(1);
@@ -401,10 +405,20 @@ fn fresh(counter: &AtomicU64) -> u64 {
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
         .expect("service or realm identity space exhausted")
 }
+/// A typed service identity. `new` is fresh; `of` and `named` share an identity
+/// within this linked host. Names on fresh keys are diagnostic labels only.
+/// Keys are invariant in their payload type, including function-pointer types.
+///
+/// ```compile_fail
+/// use cordis::ServiceKey;
+/// fn change_type(key: ServiceKey<fn(&str)>) -> ServiceKey<fn(&'static str)> {
+///     key
+/// }
+/// ```
 pub struct ServiceKey<T> {
     id: u64,
     name: &'static str,
-    marker: PhantomData<fn() -> T>,
+    marker: PhantomData<fn(T) -> T>,
 }
 impl<T> Copy for ServiceKey<T> {}
 impl<T> Clone for ServiceKey<T> {
@@ -430,6 +444,28 @@ impl<T> ServiceKey<T> {
     }
     pub fn name(self) -> &'static str {
         self.name
+    }
+}
+impl<T: 'static> ServiceKey<T> {
+    /// The canonical service key for this Rust type in this linked host.
+    /// This is not a cross-process or dynamic-library ABI identity.
+    pub fn of() -> Self {
+        Self::shared(None, std::any::type_name::<T>())
+    }
+    /// A canonical named instance of a service type. Unlike `new`, repeated
+    /// calls with the same type and name return the same identity.
+    pub fn named(name: &'static str) -> Self {
+        Self::shared(Some(name), name)
+    }
+    fn shared(qualifier: Option<&'static str>, name: &'static str) -> Self {
+        let id = *lock(&SHARED_KEYS)
+            .entry((TypeId::of::<T>(), qualifier))
+            .or_insert_with(|| fresh(&NEXT_KEY));
+        Self {
+            id,
+            name,
+            marker: PhantomData,
+        }
     }
 }
 #[derive(Clone, Debug, Default)]
@@ -476,6 +512,7 @@ pub struct Plugin {
     setup: Callback,
     injection_config: BTreeMap<u64, serde_json::Value>,
     config_update: Option<ConfigUpdateCallback>,
+    dependency_conflict: Option<(u64, &'static str)>,
 }
 impl Plugin {
     pub fn new(
@@ -488,6 +525,7 @@ impl Plugin {
             provisions: Vec::new(),
             injection_config: BTreeMap::new(),
             config_update: None,
+            dependency_conflict: None,
             setup: Callback::Sync(Box::new(setup)),
         }
     }
@@ -502,6 +540,7 @@ impl Plugin {
             provisions: Vec::new(),
             injection_config: BTreeMap::new(),
             config_update: None,
+            dependency_conflict: None,
             setup: Callback::Async(Box::new(move |ctx| Box::pin(setup(ctx)))),
         }
     }
@@ -518,8 +557,21 @@ impl Plugin {
         config: serde_json::Value,
     ) -> Self {
         self = self.requires(key);
+        if self
+            .injection_config
+            .get(&key.id)
+            .is_some_and(|previous| previous != &config)
+        {
+            self.dependency_conflict.get_or_insert((key.id, key.name));
+        }
         self.injection_config.insert(key.id, config);
         self
+    }
+    fn validate(&self) -> Result<(), RuntimeError> {
+        match self.dependency_conflict {
+            Some((key, service)) => Err(RuntimeError::DependencyConflict { key, service }),
+            None => Ok(()),
+        }
     }
     /// Plan a reversible in-place configuration update. Planning must not mutate
     /// resources; the loader runs the returned apply/rollback operations.
@@ -529,7 +581,7 @@ impl Plugin {
                 AsyncSetup,
                 serde_json::Value,
                 serde_json::Value,
-            ) -> Result<crate::config::ConfigUpdate, String>
+            ) -> Result<crate::config::ConfigUpdate, CallbackError>
             + Send
             + 'static,
     ) -> Self {
@@ -607,7 +659,7 @@ impl AsyncSetup {
         if state.unsupported.is_none() {
             state.unsupported = Some(message.clone());
         }
-        Err(message)
+        Err(message.into())
     }
     /// Check whether this episode still accepts new effects (Loading or Active).
     /// In-flight setup may register its inverse after cancellation, but new
@@ -643,30 +695,56 @@ impl AsyncSetup {
             Ok(())
         }
     }
-    pub fn get<T: Any + Send + Sync>(&self, key: ServiceKey<T>) -> Result<Arc<T>, String> {
-        let state = lock(&self.state);
-        Self::check_live(&state)?;
+    #[track_caller]
+    pub fn get<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+    ) -> Result<Arc<T>, ServiceReadError> {
+        self.require(key)
+    }
+    /// Read the episode-committed provider, with structured call-site errors.
+    /// Reads remain valid during restoration and reject a completed episode.
+    #[track_caller]
+    pub fn require<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+    ) -> Result<Arc<T>, ServiceReadError> {
         let port = self.context.port(key);
+        let location = std::panic::Location::caller();
+        let error = |reason, provider| ServiceReadError {
+            reason,
+            provider,
+            port,
+            location,
+            service: key.name,
+            value_type: std::any::type_name::<T>(),
+            plugin: self.owner,
+            generation: self.generation,
+        };
+        let state = lock(&self.state);
+        if state.phase == EpisodePhase::Closed {
+            return Err(error(ServiceReadFailure::ClosedEpisode, None));
+        }
         let provider = if self.provisions.contains(&port) {
             self.owner
         } else {
             self.bindings
                 .iter()
-                .find(|b| b.key == port.key && b.realm == port.realm)
-                .map(|b| b.provider)
-                .ok_or_else(|| format!("undeclared dependency: {}", key.name))?
+                .find(|binding| binding.key == port.key && binding.realm == port.realm)
+                .map(|binding| binding.provider)
+                .ok_or_else(|| error(ServiceReadFailure::Undeclared, None))?
         };
         let value = state.values.get(&(provider, port.key, port.realm)).cloned();
         drop(state);
-        value
-            .and_then(|slot| slot.get::<T>())
-            .ok_or_else(|| format!("service has no value: {}", key.name))
+        let slot = value.ok_or_else(|| error(ServiceReadFailure::MissingValue, Some(provider)))?;
+        slot.get::<T>()
+            .ok_or_else(|| error(ServiceReadFailure::TypeMismatch, Some(provider)))
     }
     pub fn provide<T: Any + Send + Sync>(
         &self,
         key: ServiceKey<T>,
         value: T,
-    ) -> Result<Arc<T>, String> {
+    ) -> Result<Arc<T>, CallbackError> {
         self.provide_inner(key, value, None)
     }
     /// Publish a declared service with a pure per-consumer availability check.
@@ -677,7 +755,7 @@ impl AsyncSetup {
         key: ServiceKey<T>,
         value: T,
         check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
-    ) -> Result<Arc<T>, String> {
+    ) -> Result<Arc<T>, CallbackError> {
         self.require_dynamic("provide_checked")?;
         self.provide_inner(key, value, Some(typed_check(check)))
     }
@@ -686,7 +764,7 @@ impl AsyncSetup {
         key: ServiceKey<T>,
         value: T,
         check: Option<ServiceCheck>,
-    ) -> Result<Arc<T>, String> {
+    ) -> Result<Arc<T>, CallbackError> {
         let value = Arc::new(value);
         self.provide_slot(key, ServiceSlot::new(value.clone(), check))?;
         Ok(value)
@@ -696,11 +774,11 @@ impl AsyncSetup {
         Self::check_live(&state)?;
         let port = self.context.port(key);
         if !self.provisions.contains(&port) {
-            return Err(format!("undeclared provision: {}", key.name));
+            return Err(format!("undeclared provision: {}", key.name).into());
         }
         let slot = (self.owner, port.key, port.realm);
         if state.values.contains_key(&slot) {
-            return Err(format!("duplicate value: {}", key.name));
+            return Err(format!("duplicate value: {}", key.name).into());
         }
         state.values.insert(slot, value);
         let waker = state.driver.take();
@@ -717,7 +795,7 @@ impl AsyncSetup {
         let port = self.context.port(key);
         let slot = (self.owner, port.key, port.realm);
         if !self.provisions.contains(&port) {
-            return Err(format!("service is not owned here: {}", key.name));
+            return Err(format!("service is not owned here: {}", key.name).into());
         }
         let slot = state
             .values
@@ -770,7 +848,7 @@ impl AsyncSetup {
         &self,
         key: ServiceKey<T>,
         value: T,
-    ) -> Result<ServiceHandle<T>, String> {
+    ) -> Result<ServiceHandle<T>, CallbackError> {
         self.publish_inner(key, value, None)
     }
     pub fn publish_checked<T: Any + Send + Sync>(
@@ -778,7 +856,7 @@ impl AsyncSetup {
         key: ServiceKey<T>,
         value: T,
         check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
-    ) -> Result<ServiceHandle<T>, String> {
+    ) -> Result<ServiceHandle<T>, CallbackError> {
         self.publish_inner(key, value, Some(typed_check(check)))
     }
     fn publish_inner<T: Any + Send + Sync>(
@@ -786,7 +864,7 @@ impl AsyncSetup {
         key: ServiceKey<T>,
         value: T,
         check: Option<ServiceCheck>,
-    ) -> Result<ServiceHandle<T>, String> {
+    ) -> Result<ServiceHandle<T>, CallbackError> {
         self.require_dynamic("publish")?;
         self.ensure_active()?;
         let slot = ServiceSlot::new(Arc::new(value), check);
@@ -851,10 +929,14 @@ impl AsyncSetup {
         }
         Ok(())
     }
-    pub fn mount(&self, plugin: Plugin) -> Result<ChildHandle, String> {
+    pub fn mount(&self, plugin: Plugin) -> Result<ChildHandle, CallbackError> {
         self.mount_in(&self.context, plugin)
     }
-    pub fn mount_in(&self, context: &Context, plugin: Plugin) -> Result<ChildHandle, String> {
+    pub fn mount_in(
+        &self,
+        context: &Context,
+        plugin: Plugin,
+    ) -> Result<ChildHandle, CallbackError> {
         self.mount_request(context, plugin, None)
     }
     fn mount_request(
@@ -862,7 +944,7 @@ impl AsyncSetup {
         context: &Context,
         plugin: Plugin,
         service: Option<EffectHandle>,
-    ) -> Result<ChildHandle, String> {
+    ) -> Result<ChildHandle, CallbackError> {
         self.require_dynamic("mount")?;
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
@@ -908,7 +990,7 @@ impl AsyncSetup {
         }
         Ok(handle)
     }
-    pub fn effect(&self, effect: impl EffectIterator) -> Result<EffectHandle, String> {
+    pub fn effect(&self, effect: impl EffectIterator) -> Result<EffectHandle, CallbackError> {
         self.require_dynamic("effect")?;
         let mut state = lock(&self.state);
         Self::check_live(&state)?;
@@ -968,10 +1050,10 @@ impl<T: Any + Send + Sync> ServiceHandle<T> {
     pub fn finished(&self) -> bool {
         self.status.finished()
     }
-    pub fn errors(&self) -> Vec<String> {
+    pub fn errors(&self) -> Vec<CallbackError> {
         self.status.errors()
     }
-    pub fn get(&self) -> Result<Arc<T>, String> {
+    pub fn get(&self) -> Result<Arc<T>, CallbackError> {
         self.slot
             .get()
             .ok_or_else(|| "service value type mismatch".into())
@@ -1027,14 +1109,26 @@ impl Setup<'_> {
     pub fn to_async(&self) -> AsyncSetup {
         self.inner.clone()
     }
-    pub fn get<T: Any + Send + Sync>(&self, key: ServiceKey<T>) -> Result<Arc<T>, String> {
+    #[track_caller]
+    pub fn get<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+    ) -> Result<Arc<T>, ServiceReadError> {
         self.inner.get(key)
+    }
+    /// Read the same committed binding as `get`, with an explicit required-read name.
+    #[track_caller]
+    pub fn require<T: Any + Send + Sync>(
+        &self,
+        key: ServiceKey<T>,
+    ) -> Result<Arc<T>, ServiceReadError> {
+        self.inner.require(key)
     }
     pub fn provide<T: Any + Send + Sync>(
         &mut self,
         key: ServiceKey<T>,
         value: T,
-    ) -> Result<Arc<T>, String> {
+    ) -> Result<Arc<T>, CallbackError> {
         self.inner.provide(key, value)
     }
     pub fn provide_checked<T: Any + Send + Sync>(
@@ -1042,14 +1136,14 @@ impl Setup<'_> {
         key: ServiceKey<T>,
         value: T,
         check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
-    ) -> Result<Arc<T>, String> {
+    ) -> Result<Arc<T>, CallbackError> {
         self.inner.provide_checked(key, value, check)
     }
     pub fn publish<T: Any + Send + Sync>(
         &mut self,
         key: ServiceKey<T>,
         value: T,
-    ) -> Result<ServiceHandle<T>, String> {
+    ) -> Result<ServiceHandle<T>, CallbackError> {
         self.inner.publish(key, value)
     }
     pub fn publish_checked<T: Any + Send + Sync>(
@@ -1057,7 +1151,7 @@ impl Setup<'_> {
         key: ServiceKey<T>,
         value: T,
         check: impl Fn(&T, &Context, &serde_json::Value) -> bool + Send + Sync + 'static,
-    ) -> Result<ServiceHandle<T>, String> {
+    ) -> Result<ServiceHandle<T>, CallbackError> {
         self.inner.publish_checked(key, value, check)
     }
     pub fn refresh(&self) -> CallbackResult {
@@ -1097,13 +1191,17 @@ impl Setup<'_> {
             .on_cleanup_retryable_async(cleanup)
             .expect("live synchronous setup");
     }
-    pub fn mount(&mut self, plugin: Plugin) -> Result<ChildHandle, String> {
+    pub fn mount(&mut self, plugin: Plugin) -> Result<ChildHandle, CallbackError> {
         self.inner.mount(plugin)
     }
-    pub fn mount_in(&mut self, context: &Context, plugin: Plugin) -> Result<ChildHandle, String> {
+    pub fn mount_in(
+        &mut self,
+        context: &Context,
+        plugin: Plugin,
+    ) -> Result<ChildHandle, CallbackError> {
         self.inner.mount_in(context, plugin)
     }
-    pub fn effect(&mut self, effect: impl EffectIterator) -> Result<EffectHandle, String> {
+    pub fn effect(&mut self, effect: impl EffectIterator) -> Result<EffectHandle, CallbackError> {
         self.inner.effect(effect)
     }
 }
@@ -1144,7 +1242,7 @@ impl RootSetup {
                         Poll::Pending
                     }
                     Ok(Poll::Ready(result)) => Poll::Ready(result),
-                    Err(panic) => Poll::Ready(Err(panic_message(panic))),
+                    Err(panic) => Poll::Ready(Err(CallbackError::panic(panic_message(panic)))),
                 })
             }
             state => {
@@ -1154,7 +1252,10 @@ impl RootSetup {
         }
     }
 }
-fn initialize_callback(callback: &mut Callback, episode: &AsyncSetup) -> Result<RootSetup, String> {
+fn initialize_callback(
+    callback: &mut Callback,
+    episode: &AsyncSetup,
+) -> Result<RootSetup, CallbackError> {
     catch_unwind(AssertUnwindSafe(|| match callback {
         Callback::Sync(callback) => {
             callback(&mut Setup { inner: episode })?;
@@ -1162,7 +1263,7 @@ fn initialize_callback(callback: &mut Callback, episode: &AsyncSetup) -> Result<
         }
         Callback::Async(callback) => Ok(RootSetup::Queued(callback(episode.clone()))),
     }))
-    .unwrap_or_else(|panic| Err(panic_message(panic)))
+    .unwrap_or_else(|panic| Err(CallbackError::panic(panic_message(panic))))
 }
 struct RunningCleanup {
     ticket: RestoreTicket,
@@ -1171,7 +1272,7 @@ struct RunningCleanup {
 }
 struct CleanupFailure {
     ticket: RestoreTicket,
-    message: String,
+    message: CallbackError,
     retry: Option<RetryCleanup>,
 }
 fn initialize_cleanup(
@@ -1194,7 +1295,7 @@ fn initialize_cleanup(
         Err(panic) => Err(CleanupFailure {
             ticket,
             retry,
-            message: panic_message(panic),
+            message: CallbackError::panic(panic_message(panic)),
         }),
     }
 }
@@ -1204,7 +1305,7 @@ fn poll_cleanup_callback(
 ) -> Poll<CallbackResult> {
     match poll_catching_unwind(future.as_mut(), cx) {
         Ok(result) => result,
-        Err(panic) => Poll::Ready(Err(panic_message(panic))),
+        Err(panic) => Poll::Ready(Err(CallbackError::panic(panic_message(panic)))),
     }
 }
 
@@ -1226,9 +1327,9 @@ struct Mounted {
     root_setup: RootSetup,
     groups: BTreeMap<usize, Group>,
     root_running: Option<RunningCleanup>,
-    cleanup_failure: Option<String>,
+    cleanup_failure: Option<CallbackError>,
     cleanup_drained: bool,
-    failed: Option<String>,
+    failed: Option<CallbackError>,
     restart: bool,
     // Children externally mounted while inactive become owner-bound on begin.
     owned: Vec<PluginId>,
@@ -1240,16 +1341,51 @@ pub enum RuntimeError {
     Retired(PluginId),
     UnloadingOwner(PluginId),
     InactiveOwner(PluginId),
-    Setup { plugin: PluginId, message: String },
-    Cleanup { plugin: PluginId, message: String },
+    IncompatibleUpdate(PluginId),
+    DependencyConflict {
+        key: u64,
+        service: &'static str,
+    },
+    Setup {
+        plugin: PluginId,
+        error: CallbackError,
+    },
+    Cleanup {
+        plugin: PluginId,
+        error: CallbackError,
+    },
     Stalled,
 }
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+        match self {
+            Self::Kernel(message) => write!(f, "kernel rejected operation: {message}"),
+            Self::UnknownPlugin(id) => write!(f, "unknown plugin {id}"),
+            Self::Retired(id) => write!(f, "plugin {id} is retired"),
+            Self::UnloadingOwner(id) => write!(f, "plugin {id} is unloading"),
+            Self::InactiveOwner(id) => write!(f, "plugin {id} has no active episode"),
+            Self::DependencyConflict { key, service } => write!(
+                f,
+                "conflicting availability inputs for service {service} (key {key})"
+            ),
+            Self::IncompatibleUpdate(id) => write!(
+                f,
+                "plugin {id} update changed service declarations or injection configuration"
+            ),
+            Self::Setup { plugin, error } => write!(f, "plugin {plugin} setup failed: {error}"),
+            Self::Cleanup { plugin, error } => write!(f, "plugin {plugin} cleanup failed: {error}"),
+            Self::Stalled => f.write_str("runtime cannot make progress"),
+        }
     }
 }
-impl std::error::Error for RuntimeError {}
+impl std::error::Error for RuntimeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Setup { error, .. } | Self::Cleanup { error, .. } => Some(error),
+            _ => None,
+        }
+    }
+}
 /// A shutdown runs every registered inverse it can, reporting both lifecycle
 /// failure and all unconsumed cleanup failures instead of silently discarding them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1288,7 +1424,7 @@ pub struct Runtime {
     values: Values,
     cleanup_errors: Vec<RuntimeError>,
     maintenance_changes: usize,
-    shutdown_failures: Option<BTreeMap<PluginId, String>>,
+    shutdown_failures: Option<BTreeMap<PluginId, CallbackError>>,
 }
 impl Default for Runtime {
     fn default() -> Self {
@@ -1341,7 +1477,7 @@ impl Runtime {
             let committed = self.committed(id);
             let mut blockers = Vec::new();
             if let Some(message) = &owner.failed {
-                blockers.push(Blocker::Failed(message.clone()));
+                blockers.push(Blocker::Failed(message.to_string()));
             }
             if phase == Phase::Inactive && !self.retired(id) {
                 let missing: Vec<_> = owner
@@ -1381,7 +1517,7 @@ impl Runtime {
                 }
             }
             if let Some(message) = &owner.cleanup_failure {
-                blockers.push(Blocker::CleanupFailed(message.clone()));
+                blockers.push(Blocker::CleanupFailed(message.to_string()));
             }
             if self.cleanup_started(id)
                 || owner.root_running.is_some()
@@ -1432,6 +1568,7 @@ impl Runtime {
         plugin: Plugin,
         register_inverse: bool,
     ) -> Result<PluginId, RuntimeError> {
+        plugin.validate()?;
         if let Some(parent) = parent {
             if !self.kernel.contains(parent) {
                 return Err(RuntimeError::UnknownPlugin(parent));
@@ -1544,7 +1681,13 @@ impl Runtime {
         self.mounted.get(&id).map(|p| &p.context)
     }
     pub fn failure(&self, id: PluginId) -> Option<&str> {
-        self.mounted.get(&id)?.failed.as_deref()
+        self.setup_error(id).map(CallbackError::message)
+    }
+    pub fn setup_error(&self, id: PluginId) -> Option<&CallbackError> {
+        self.mounted.get(&id)?.failed.as_ref()
+    }
+    pub fn cleanup_error(&self, id: PluginId) -> Option<&CallbackError> {
+        self.mounted.get(&id)?.cleanup_failure.as_ref()
     }
     pub fn committed(&self, id: PluginId) -> Vec<Binding> {
         self.kernel.committed(id)
@@ -1552,7 +1695,7 @@ impl Runtime {
     /// The retained failure that requires explicit cleanup retry. Historical
     /// attempt errors remain available through take_cleanup_errors().
     pub fn cleanup_failure(&self, id: PluginId) -> Option<&str> {
-        self.mounted.get(&id)?.cleanup_failure.as_deref()
+        self.cleanup_error(id).map(CallbackError::message)
     }
     /// Admit a fresh whole-episode attempt only after the previous callbacks
     /// settle and its Failed receipt is recorded. No user callback runs here.
@@ -1571,7 +1714,7 @@ impl Runtime {
         {
             return Err(RuntimeError::Cleanup {
                 plugin: id,
-                message: "cleanup attempt is still running or has no retained failure".into(),
+                error: "cleanup attempt is still running or has no retained failure".into(),
             });
         }
         let episode = owner
@@ -1591,7 +1734,7 @@ impl Runtime {
         {
             return Err(RuntimeError::Cleanup {
                 plugin: id,
-                message: "retained cleanup cannot be retried".into(),
+                error: "retained cleanup cannot be retried".into(),
             });
         }
         // Preflight every journal before the shared verified protocol changes.
@@ -1657,7 +1800,7 @@ impl Runtime {
             .on_cleanup(cleanup)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })
     }
     pub fn on_cleanup_async<F, Fut>(&mut self, id: PluginId, cleanup: F) -> Result<(), RuntimeError>
@@ -1669,7 +1812,7 @@ impl Runtime {
             .on_cleanup_async(cleanup)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })
     }
     pub fn on_cleanup_retryable(
@@ -1681,7 +1824,7 @@ impl Runtime {
             .on_cleanup_retryable(cleanup)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })
     }
     pub fn on_cleanup_retryable_async<F, Fut>(
@@ -1697,7 +1840,7 @@ impl Runtime {
             .on_cleanup_retryable_async(cleanup)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })
     }
     pub fn effect(
@@ -1709,7 +1852,7 @@ impl Runtime {
             .effect(effect)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })
     }
     pub fn set<T: Any + Send + Sync>(
@@ -1722,7 +1865,7 @@ impl Runtime {
             .set(key, value)
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })?;
         self.publish(id);
         Ok(())
@@ -1784,7 +1927,10 @@ impl Runtime {
             .take()
             .unwrap_or_default()
             .into_iter()
-            .map(|(plugin, message)| RuntimeError::Setup { plugin, message })
+            .map(|(plugin, message)| RuntimeError::Setup {
+                plugin,
+                error: message,
+            })
             .collect::<Vec<_>>();
         if lifecycle.is_none() && cleanup.is_empty() && setup.is_empty() {
             Ok(())
@@ -1836,6 +1982,26 @@ impl Runtime {
             .setup = Callback::Async(Box::new(move |ctx| Box::pin(setup(ctx))));
         self.restart(id)
     }
+    /// Replace a plugin recipe and restart with unchanged dependency/provision
+    /// declarations and injection configuration. Validation precedes mutation.
+    /// To change declarations, dispose and mount a new plugin instead.
+    pub fn update_plugin(&mut self, id: PluginId, plugin: Plugin) -> Result<(), RuntimeError> {
+        plugin.validate()?;
+        if self.retired(id) {
+            return Err(RuntimeError::Retired(id));
+        }
+        if !self.contains(id) {
+            return Err(RuntimeError::UnknownPlugin(id));
+        }
+        if !self.config_recipe_compatible(id, &plugin) {
+            return Err(RuntimeError::IncompatibleUpdate(id));
+        }
+        let mounted = self.mounted.get_mut(&id).unwrap();
+        mounted.name = plugin.name;
+        mounted.setup = plugin.setup;
+        mounted.next_config_update = Some(plugin.config_update);
+        self.restart(id)
+    }
     /// Ask a live plugin to plan an in-place update without applying it.
     pub fn prepare_config_update(
         &mut self,
@@ -1851,13 +2017,16 @@ impl Runtime {
             return Ok(crate::config::ConfigUpdate::Restart);
         };
         catch_unwind(AssertUnwindSafe(|| handler(context, previous, next)))
-            .unwrap_or_else(|panic| Err(panic_message(panic)))
+            .unwrap_or_else(|panic| Err(CallbackError::panic(panic_message(panic))))
             .map_err(|message| RuntimeError::Setup {
                 plugin: id,
-                message,
+                error: message,
             })
     }
     pub(crate) fn config_recipe_compatible(&self, id: PluginId, plugin: &Plugin) -> bool {
+        if plugin.validate().is_err() {
+            return false;
+        }
         let Some(mounted) = self.mounted.get(&id) else {
             return false;
         };
@@ -1885,7 +2054,7 @@ impl Runtime {
             if !self.config_recipe_compatible(*id, plugin) {
                 return Err(RuntimeError::Setup {
                     plugin: *id,
-                    message: "in-place update changed service declarations".into(),
+                    error: "in-place update changed service declarations".into(),
                 });
             }
         }
@@ -2005,7 +2174,7 @@ impl Runtime {
         }
         false
     }
-    fn latch(&mut self, id: PluginId, message: String) {
+    fn latch(&mut self, id: PluginId, message: CallbackError) {
         if let Some(failures) = &mut self.shutdown_failures {
             failures.entry(id).or_insert_with(|| message.clone());
         }
@@ -2118,8 +2287,8 @@ impl Runtime {
                     self.mounted.get_mut(&child).unwrap().service = request.service;
                 }
                 Err(error) => {
-                    let message = error.to_string();
-                    *lock(&request.handle.state) = Err(message.clone());
+                    let message = CallbackError::new(error);
+                    *lock(&request.handle.state) = Err(message.to_string());
                     if let Some(service) = &request.service {
                         lock(&service.status).errors.push(message);
                         finish_service(service);
@@ -2142,13 +2311,18 @@ impl Runtime {
         }
         Ok(progress)
     }
-    fn record_cleanup(&mut self, id: PluginId, group: Option<&EffectHandle>, message: String) {
+    fn record_cleanup(
+        &mut self,
+        id: PluginId,
+        group: Option<&EffectHandle>,
+        message: CallbackError,
+    ) {
         if let Some(handle) = group {
             lock(&handle.status).errors.push(message.clone());
         }
         self.cleanup_errors.push(RuntimeError::Cleanup {
             plugin: id,
-            message,
+            error: message,
         });
     }
     fn finish_callback(
@@ -2217,7 +2391,7 @@ impl Runtime {
                 match action {
                     CleanupAction::Child(child) => {
                         let result = child.id().map_or(Ok(()), |child| {
-                            self.dispose(child).map_err(|error| error.to_string())
+                            self.dispose(child).map_err(CallbackError::new)
                         });
                         self.finish_callback(id, group, handle, ticket, result, None);
                     }
@@ -2334,7 +2508,7 @@ impl Runtime {
                                 .unwrap()
                                 .protocol
                                 .end());
-                            if !(cancelled && message == CANCELLED) {
+                            if !(cancelled && message.is_cancelled()) {
                                 lock(&group.handle.status).errors.push(message.clone());
                                 self.latch(id, message);
                             }
@@ -2358,8 +2532,8 @@ impl Runtime {
                                 .unwrap()
                                 .protocol
                                 .end());
-                            let message = panic_message(panic);
-                            if !(cancelled && message == CANCELLED) {
+                            let message = CallbackError::panic(panic_message(panic));
+                            if !(cancelled && message.is_cancelled()) {
                                 lock(&group.handle.status).errors.push(message.clone());
                                 self.latch(id, message);
                             }
@@ -2408,7 +2582,42 @@ impl Runtime {
         }
         (progress, pending)
     }
-    fn poll_settle(&mut self, cx: &mut TaskContext<'_>) -> Poll<Result<(), RuntimeError>> {
+    pub(crate) fn settled_result(&self, id: PluginId) -> Option<Result<(), RuntimeError>> {
+        let Some(owner) = self.mounted.get(&id) else {
+            return Some(Ok(()));
+        };
+        let ready = matches!(self.phase(id), Some(Phase::Inactive | Phase::Active))
+            && !self.retired(id)
+            && !owner.restart
+            && !owner.root_setup.is_pending()
+            && owner
+                .groups
+                .values()
+                .all(|group| group.iterator.is_none() && !lock(&group.handle.status).cancelled)
+            && owner
+                .episode
+                .as_ref()
+                .is_none_or(|episode| lock(&episode.state).groups.is_empty())
+            && !self
+                .kernel
+                .children(id)
+                .iter()
+                .any(|child| self.retired(*child));
+        if ready {
+            return Some(match &owner.failed {
+                Some(message) => Err(RuntimeError::Setup {
+                    plugin: id,
+                    error: message.clone(),
+                }),
+                None => Ok(()),
+            });
+        }
+        None
+    }
+    pub(crate) fn poll_settle(
+        &mut self,
+        cx: &mut TaskContext<'_>,
+    ) -> Poll<Result<(), RuntimeError>> {
         for _ in 0..1024 {
             if self.maintenance_changes >= 256 {
                 self.compact();
@@ -2469,7 +2678,7 @@ impl Runtime {
                     Some(Poll::Ready(result)) => {
                         progress = true;
                         if let Err(message) = result {
-                            if !(phase == Phase::Unloading && message == CANCELLED) {
+                            if !(phase == Phase::Unloading && message.is_cancelled()) {
                                 self.latch(id, message);
                             }
                         }
@@ -2620,7 +2829,10 @@ impl Runtime {
                         .copied();
                     if let Some(port) = missing {
                         drop(state);
-                        self.latch(id, format!("declared service {} has no value", port.key));
+                        self.latch(
+                            id,
+                            format!("declared service {} has no value", port.key).into(),
+                        );
                         progress = true;
                     } else {
                         if let Err(error) = self.kernel.settle_setup(id) {
@@ -2692,7 +2904,7 @@ impl Runtime {
             {
                 return Poll::Ready(Err(RuntimeError::Cleanup {
                     plugin: id,
-                    message: owner.cleanup_failure.clone().unwrap(),
+                    error: owner.cleanup_failure.clone().unwrap(),
                 }));
             }
             if pending {
@@ -2713,7 +2925,7 @@ impl Runtime {
             {
                 return Poll::Ready(Err(RuntimeError::Setup {
                     plugin: id,
-                    message: plugin.failed.clone().unwrap(),
+                    error: plugin.failed.clone().unwrap(),
                 }));
             }
             return Poll::Ready(Ok(()));
@@ -2743,37 +2955,8 @@ impl Future for Join<'_> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Self::Output> {
         let driven = self.runtime.poll_settle(cx);
         let id = self.id;
-        let Some(owner) = self.runtime.mounted.get(&id) else {
-            return Poll::Ready(Ok(()));
-        };
-        let ready = matches!(
-            self.runtime.phase(id),
-            Some(Phase::Inactive | Phase::Active)
-        ) && !self.runtime.retired(id)
-            && !owner.restart
-            && !owner.root_setup.is_pending()
-            && owner
-                .groups
-                .values()
-                .all(|group| group.iterator.is_none() && !lock(&group.handle.status).cancelled)
-            && owner
-                .episode
-                .as_ref()
-                .is_none_or(|episode| lock(&episode.state).groups.is_empty())
-            && !self
-                .runtime
-                .kernel
-                .children(id)
-                .iter()
-                .any(|child| self.runtime.retired(*child));
-        if ready {
-            return Poll::Ready(match &owner.failed {
-                Some(message) => Err(RuntimeError::Setup {
-                    plugin: id,
-                    message: message.clone(),
-                }),
-                None => Ok(()),
-            });
+        if let Some(result) = self.runtime.settled_result(id) {
+            return Poll::Ready(result);
         }
         match driven {
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),

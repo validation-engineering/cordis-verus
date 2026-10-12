@@ -130,6 +130,7 @@ impl StaticPlugin {
         Self::new_inner(plugin)
     }
     fn new_inner(plugin: Plugin) -> Result<Self, String> {
+        plugin.validate().map_err(|error| error.to_string())?;
         if plugin.config_update.is_some() {
             return Err("UnsupportedStaticFeature: config_update".into());
         }
@@ -384,7 +385,7 @@ struct StaticProgress {
     setup_landed: bool,
     abandoned: Option<String>,
     cleanup_running: bool,
-    cleanup_error: Option<String>,
+    cleanup_error: Option<CallbackError>,
 }
 #[derive(Clone)]
 pub struct StaticEpisode {
@@ -470,7 +471,7 @@ impl StaticEpisode {
     }
     pub fn provided(&self) -> Result<Vec<(Port, TypedSlot)>, String> {
         let state = lock(&self.setup.state);
-        AsyncSetup::check_live(&state)?;
+        AsyncSetup::check_live(&state).map_err(|error| error.to_string())?;
         Ok(self
             .setup
             .provisions
@@ -513,7 +514,7 @@ impl StaticEpisode {
         }
         if !retry {
             if let Some(error) = &progress.cleanup_error {
-                return Err(error.clone());
+                return Err(error.to_string());
             }
         }
         if !progress.setup_landed {
@@ -522,6 +523,7 @@ impl StaticEpisode {
         if progress.cleanup_running {
             return Err("StaticCleanupStillRunning".into());
         }
+        let mut previous_error = None;
         if retry {
             if progress.cleanup_error.is_none()
                 || !state.cleanups.get(&0).is_some_and(Cleanups::can_retry)
@@ -535,13 +537,14 @@ impl StaticEpisode {
                 .protocol
                 .retry()
                 .map_err(|error| format!("StaticCleanupRetry: {error:?}"))?;
-            progress.cleanup_error = None;
+            previous_error = progress.cleanup_error.take();
         }
         state.phase = EpisodePhase::Restoring;
         progress.cleanup_running = true;
         let children = state.external_children.clone();
         drop(progress);
         drop(state);
+        drop(previous_error);
         for child in children {
             child.request_retirement();
         }
@@ -589,7 +592,7 @@ impl Future for StaticSetupFuture {
             let mut state = lock(&self.episode.setup.state);
             let mut result = result;
             if let Some(error) = &state.unsupported {
-                result = Err(error.clone());
+                result = Err(error.clone().into());
             }
             if result.is_ok() && state.phase != EpisodePhase::Restoring {
                 if let Some(port) = self.episode.setup.provisions.iter().find(|port| {
@@ -597,7 +600,7 @@ impl Future for StaticSetupFuture {
                         .values
                         .contains_key(&(self.episode.setup.owner, port.key, port.realm))
                 }) {
-                    result = Err(format!("declared service {} has no value", port.key));
+                    result = Err(format!("declared service {} has no value", port.key).into());
                 } else {
                     state.phase = EpisodePhase::Active;
                 }
@@ -626,13 +629,14 @@ struct StaticCleanupFuture {
     finished: bool,
 }
 impl StaticCleanupFuture {
-    fn fail(&mut self, error: String) -> Poll<CallbackResult> {
+    fn fail(&mut self, error: CallbackError) -> Poll<CallbackResult> {
         let previous = lock(&self.episode.setup.state).driver.take();
         drop(previous);
         let mut progress = lock(&self.episode.progress);
         progress.cleanup_running = false;
-        progress.cleanup_error = Some(error.clone());
+        let previous = progress.cleanup_error.replace(error.clone());
         drop(progress);
+        drop(previous);
         self.finished = true;
         Poll::Ready(Err(error))
     }
@@ -868,7 +872,7 @@ impl StaticChildControl {
     /// once a graph node exists, acknowledge its ID and retire/remove it normally.
     /// An allocation that races cancellation
     /// still receives its real ID and must then be retired; it is not discarded.
-    pub fn complete_mount(&self, result: Result<PluginId, String>) -> CallbackResult {
+    pub fn complete_mount(&self, result: Result<PluginId, String>) -> Result<(), String> {
         let assigned_id = result.as_ref().ok().copied();
         let (wake, service, error, notify) = {
             let mut state = lock(&self.0);
@@ -907,7 +911,7 @@ impl StaticChildControl {
             }
             if let Some(error) = error {
                 if error != CANCELLED {
-                    lock(&service.status).errors.push(error);
+                    lock(&service.status).errors.push(error.into());
                 }
                 finish_service(&service);
             }
@@ -918,7 +922,7 @@ impl StaticChildControl {
         Ok(())
     }
     /// Mark a service child initialized only after native setup activation.
-    pub fn mark_initialized(&self) -> CallbackResult {
+    pub fn mark_initialized(&self) -> Result<(), String> {
         let service = {
             let state = lock(&self.0);
             if !state.assigned || state.removed || lock(&state.identity).is_err() {
@@ -964,8 +968,12 @@ impl StaticChildControl {
         };
         if let Some(service) = service {
             let mut state = lock(&service.status);
-            if !state.errors.contains(&error) {
-                state.errors.push(error);
+            if !state
+                .errors
+                .iter()
+                .any(|existing| existing.message() == error)
+            {
+                state.errors.push(error.into());
             }
         }
     }
@@ -989,7 +997,7 @@ impl StaticChildControl {
             let waiters = {
                 let mut status = lock(&service.status);
                 status.cancelled = true;
-                status.terminal_error.get_or_insert(error);
+                status.terminal_error.get_or_insert(error.into());
                 std::mem::take(&mut status.wakers)
             };
             wake_waiters(waiters);
@@ -1000,7 +1008,7 @@ impl StaticChildControl {
     }
     /// Acknowledge actual registry removal. A previously failed inverse cannot
     /// be turned into success by calling this method.
-    pub fn removed(&self) -> CallbackResult {
+    pub fn removed(&self) -> Result<(), String> {
         let (wake, notify, service) = {
             let mut state = lock(&self.0);
             if let Some(error) = &state.cleanup_error {
@@ -1037,7 +1045,7 @@ impl StaticChildControl {
         let (result, previous) = {
             let mut state = lock(&self.0);
             if let Some(error) = &state.cleanup_error {
-                return Poll::Ready(Err(error.clone()));
+                return Poll::Ready(Err(error.clone().into()));
             }
             if state.removed {
                 return Poll::Ready(Ok(()));

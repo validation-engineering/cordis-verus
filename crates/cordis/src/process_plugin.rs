@@ -167,7 +167,7 @@ impl ProcessPlugin {
         Plugin::new(name, move |setup| {
             let client = self.spawn().map_err(|error| error.to_string())?;
             let cleanup = client.clone();
-            setup.on_cleanup(move || cleanup.shutdown().map_err(|error| error.to_string()));
+            setup.on_cleanup(move || cleanup.shutdown().map_err(crate::CallbackError::new));
             setup.provide(key, client)?;
             Ok(())
         })
