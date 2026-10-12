@@ -8,9 +8,9 @@
 
 cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rust 实现 [Cordis](https://github.com/cordiverse/cordis) 生命周期：插件声明服务与依赖，运行时协调激活、提供者变化和清理。同一份内核源码接受 [Verus](https://github.com/verus-lang/verus) 验证，并编译进入应用。
 
-你可以构建原生 Rust 插件系统，也可以通过可选的 Node 宿主运行支持范围内的原版 Cordis 插件，将 Rust 与 JavaScript 组合使用。配套项目 [Cordis Harness](https://github.com/validation-engineering/cordis-harness) 在这个运行时上运行官方 DeepSeek Harness 工作流。
+你可以构建原生 Rust 插件系统，也可以通过可选的 Node 宿主运行支持范围内的原版 Cordis 插件，将 Rust 与 JavaScript 组合使用。配套项目 [Harness Verus](https://github.com/validation-engineering/harness-verus) 在这个运行时上运行官方 DeepSeek Harness 工作流。
 
-**实验性、尚未达到 1.0。** API 仍在演进。Node 运行时可从 npm 安装，Rust 库通过 crates.io 使用；GitHub Releases 同时保留预编译归档和验证证据。
+**实验性、尚未达到 1.0。** API 仍在演进。Rust 库通过 crates.io 使用，可选的 Node 运行时可从 npm 安装；GitHub Releases 同时保留预编译归档和验证证据。
 
 ## 为什么使用 cordis-verus
 
@@ -19,6 +19,50 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 - **Rust 中的 Cordis 功能。** 组合类型化服务、异步插件与具有明确所有者的资源。原版插件接口、上游测试和官方 Harness 工作流为功能对齐提供具体目标。
 
 ## 快速开始
+
+### Rust
+
+准备 **Rust 1.98.1+ 和 Cargo**，创建应用并从 crates.io 添加依赖：
+
+```sh
+cargo new hello-cordis
+cd hello-cordis
+cargo add cordis-verus --rename cordis
+cargo add tokio --features macros,rt
+```
+
+将 `src/main.rs` 替换为：
+
+```rust
+use cordis::{Context, Plugin, Runtime, ServiceKey};
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut runtime = Runtime::new();
+    let context = Context::new();
+    let greeting = ServiceKey::<String>::new("greeting");
+
+    runtime.mount(&context, None, Plugin::new("provider", move |ctx| {
+        ctx.provide(greeting, "Hello, Cordis".to_owned())?;
+        Ok(())
+    }).provides(greeting))?;
+
+    runtime.mount(&context, None, Plugin::new("consumer", move |ctx| {
+        println!("{}", ctx.get(greeting)?);
+        Ok(())
+    }).requires(greeting))?;
+
+    runtime.settle().await?;
+    runtime.shutdown().await?;
+    Ok(())
+}
+```
+
+运行 `cargo run`，输出 `Hello, Cordis`。`.provides()` 和 `.requires()` 声明类型化服务与依赖；`settle().await` 驱动初始化，`shutdown().await` 等待插件清理并报告错误。示例使用 Tokio 驱动异步生命周期，应用也可以使用已有的 executor。
+
+纯 Rust 应用无需 Node、npm 或 Verus；Cargo 直接编译已发布的 Rust 库。更多用法见[运行时指南](docs/runtime.md)和[基础示例](crates/cordis/examples/basic.rs)。
+
+### JavaScript（Node.js）
 
 准备 **Node.js 22.22+ 和 npm**，安装预编译运行时：
 
@@ -43,8 +87,6 @@ try {
 ```
 
 运行 `node app.mjs`，输出 `Hello, Cordis`。支持 Linux x64（GNU libc）、macOS Apple Silicon / Intel 和 Windows x64，无需 Rust 编译器、Verus 或源码检出。原版插件导入、Loader/Harness 包和 GitHub/离线安装见[安装指南](docs/native-distribution.zh-CN.md)。
-
-**纯 Rust 应用**可用 `cargo add cordis-verus --rename cordis` 添加库。Node 为可选依赖；Cargo 编译 Rust 依赖时无需运行 Verus。用法见[运行时指南](docs/runtime.md)和[基础示例](crates/cordis/examples/basic.rs)。
 
 ## 架构
 
@@ -92,7 +134,7 @@ Verus 在开发阶段检查内核，已编译应用无需运行验证器。完�
 | 编写 Rust 插件 | [运行时指南](docs/runtime.md) · [示例](crates/cordis/examples) |
 | 使用原版插件或混合 Rust/JS | [Node 兼容](docs/node-compatibility.md) · [Rust 插件适配器](docs/rust-node-plugins.md) |
 | 解释生命周期等待 | [宿主诊断](docs/host-diagnostics.zh-CN.md) |
-| 构建 agent 应用 | [Cordis Harness](https://github.com/validation-engineering/cordis-harness) |
+| 构建 agent 应用 | [Harness Verus](https://github.com/validation-engineering/harness-verus) |
 | 审查证明或复现检查 | [论文审查](docs/paper-review-guide.zh-CN.md) · [验证说明](docs/validation.md) |
 
 配置、模块重载等进阶主题见[文档导航](docs/README.md)。欢迎中英文贡献；开发环境见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题报告见 [SECURITY.md](SECURITY.md)。

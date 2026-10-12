@@ -8,9 +8,9 @@ See [package boundaries](docs/package-boundaries.md) for the optional DeepSeek C
 
 cordis-verus brings formal methods into a working plugin runtime. It implements [Cordis](https://github.com/cordiverse/cordis) lifecycles in Rust: plugins declare services and dependencies, and the runtime coordinates activation, provider changes and cleanup. The same kernel source is verified by [Verus](https://github.com/verus-lang/verus) and compiled into the application.
 
-Build native Rust plugin systems, or use the optional Node host to run supported original Cordis plugins and compose Rust and JavaScript together. The companion [Cordis Harness](https://github.com/validation-engineering/cordis-harness) runs official DeepSeek Harness workflows on this runtime.
+Build native Rust plugin systems, or use the optional Node host to run supported original Cordis plugins and compose Rust and JavaScript together. The companion [Harness Verus](https://github.com/validation-engineering/harness-verus) runs official DeepSeek Harness workflows on this runtime.
 
-**Experimental, pre-1.0.** APIs are evolving. Install the Node runtime from npm or use the Rust libraries from crates.io. Precompiled archives and validation evidence are also available in GitHub Releases.
+**Experimental, pre-1.0.** APIs are evolving. Use the Rust libraries from crates.io or install the optional Node runtime from npm. Precompiled archives and validation evidence are also available in GitHub Releases.
 
 ## Why cordis-verus
 
@@ -19,6 +19,50 @@ Build native Rust plugin systems, or use the optional Node host to run supported
 - **Cordis functionality in Rust.** Compose typed services, asynchronous plugins and owned resources. Original plugin interfaces, upstream tests and official Harness workflows provide concrete targets for functional alignment.
 
 ## Quick start
+
+### Rust
+
+With **Rust 1.98.1+ and Cargo**, create an application and add the published crates:
+
+```sh
+cargo new hello-cordis
+cd hello-cordis
+cargo add cordis-verus --rename cordis
+cargo add tokio --features macros,rt
+```
+
+Replace `src/main.rs` with:
+
+```rust
+use cordis::{Context, Plugin, Runtime, ServiceKey};
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut runtime = Runtime::new();
+    let context = Context::new();
+    let greeting = ServiceKey::<String>::new("greeting");
+
+    runtime.mount(&context, None, Plugin::new("provider", move |ctx| {
+        ctx.provide(greeting, "Hello, Cordis".to_owned())?;
+        Ok(())
+    }).provides(greeting))?;
+
+    runtime.mount(&context, None, Plugin::new("consumer", move |ctx| {
+        println!("{}", ctx.get(greeting)?);
+        Ok(())
+    }).requires(greeting))?;
+
+    runtime.settle().await?;
+    runtime.shutdown().await?;
+    Ok(())
+}
+```
+
+Run `cargo run` to print `Hello, Cordis`. `.provides()` and `.requires()` declare typed services and dependencies; `settle().await` drives initialization, and `shutdown().await` waits for plugin cleanup and reports errors. This example uses Tokio to drive the asynchronous lifecycle; applications can also use their existing executor.
+
+Pure Rust applications need no Node, npm or Verus installation; Cargo compiles the published Rust libraries directly. See the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs) for more.
+
+### JavaScript (Node.js)
 
 With **Node.js 22.22+ and npm**, install the precompiled runtime:
 
@@ -43,8 +87,6 @@ try {
 ```
 
 Run `node app.mjs` to print `Hello, Cordis`. Linux x64 (GNU libc), macOS Apple Silicon / Intel and Windows x64 are supported. No Rust compiler, Verus or source checkout is needed. The [installation guide](docs/native-distribution.md) covers original plugin imports, Loader/Harness packages and GitHub/offline installation.
-
-For a **pure Rust application**, add the library with `cargo add cordis-verus --rename cordis`. Node is optional; Cargo compiles the Rust dependencies without running Verus. Start with the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs).
 
 ## Architecture
 
@@ -92,7 +134,7 @@ See the [roadmap](docs/roadmap.md) for acceptance criteria and the [paper ledger
 | Write Rust plugins | [Runtime guide](docs/runtime.md) · [Examples](crates/cordis/examples) |
 | Use original plugins or mix Rust and JS | [Node compatibility](docs/node-compatibility.md) · [Rust plugin adapters](docs/rust-node-plugins.md) |
 | Diagnose lifecycle waits | [Host diagnostics](docs/host-diagnostics.md) |
-| Build an agent application | [Cordis Harness](https://github.com/validation-engineering/cordis-harness) |
+| Build an agent application | [Harness Verus](https://github.com/validation-engineering/harness-verus) |
 | Review proofs or reproduce checks | [Paper review](docs/paper-review-guide.md) · [Validation](docs/validation.md) |
 
 The [documentation index](docs/README.md) includes configuration, module reloads and other advanced topics. English and Chinese contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and [SECURITY.md](SECURITY.md) for vulnerability reporting.
