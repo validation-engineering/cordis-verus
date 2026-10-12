@@ -2,12 +2,13 @@
 
 [简体中文](rust-api.zh-CN.md)
 
-This API is implemented in the current source checkout and is **not yet included
-in the published `cordis-verus 0.1.0`**. It provides typed dependency inputs, an
+Available in **`cordis-verus 0.2.0`**, this API provides typed dependency inputs, an
 optional application driver, and structured callback errors. Rust applications
 need neither Node.js nor Verus installed to execute the library.
 
-Run the complete example from the checkout:
+Add the library with `cargo add cordis-verus@0.2.0 --rename cordis --features tokio`.
+The `tokio` feature is optional; typed dependencies and structured errors are
+available with default features. Run the complete example from the checkout:
 
 ```sh
 cargo run -p cordis-verus --features tokio --example managed_app
@@ -163,6 +164,22 @@ text views, while `setup_error()` / `cleanup_error()` return the structured
 Runtime cause. Node and process protocol boundaries still transport error text;
 Rust error types are not serialized across them. Explicitly converting an error
 to a string in application code also discards its cause.
+
+## Migrate from 0.1
+
+- `CallbackResult` now uses `CallbackError`. Replace `Err(String)` with
+  `Err(message.into())`; for an existing `Result<(), String>`, use
+  `.map_err(Into::into)`. Use `.map_err(CallbackError::new)` to keep a library
+  error's original type and source chain.
+- `Setup::get` / `AsyncSetup::get` now return `ServiceReadError`. Prefer `?`
+  inside callbacks. Call `.to_string()` only at an intentional text boundary.
+- Match `RuntimeError::Setup { plugin, error }`, `RuntimeError::Cleanup { plugin,
+  error }`, and `LoaderError::Update { entry, error }`; the old `message` field
+  is replaced by a structured cause. Configuration update and rollback callbacks
+  also use `CallbackResult`.
+- Existing `Runtime`, `Plugin::new`, `.requires()` and fresh `ServiceKey::new`
+  remain available. Choose canonical `of()` / `named()` explicitly when keys
+  should be shared; enable feature `tokio` only when using `App`.
 
 ## Connection to the verified kernel
 

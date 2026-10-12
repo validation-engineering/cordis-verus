@@ -27,42 +27,38 @@ With **Rust 1.98.1+ and Cargo**, create an application and add the published cra
 ```sh
 cargo new hello-cordis
 cd hello-cordis
-cargo add cordis-verus --rename cordis
+cargo add cordis-verus@0.2.0 --rename cordis --features tokio
 cargo add tokio --features macros,rt
 ```
 
 Replace `src/main.rs` with:
 
 ```rust
-use cordis::{Context, Plugin, Runtime, ServiceKey};
+use cordis::{App, Plugin, ServiceKey};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut runtime = Runtime::new();
-    let context = Context::new();
-    let greeting = ServiceKey::<String>::new("greeting");
+    let app = App::new()?;
+    let greeting = ServiceKey::<String>::of();
 
-    runtime.mount(&context, None, Plugin::new("provider", move |ctx| {
+    app.plugin(Plugin::new("provider", move |ctx| {
         ctx.provide(greeting, "Hello, Cordis".to_owned())?;
         Ok(())
-    }).provides(greeting))?;
+    }).provides(greeting)).await?;
 
-    runtime.mount(&context, None, Plugin::new("consumer", move |ctx| {
-        println!("{}", ctx.get(greeting)?);
-        Ok(())
-    }).requires(greeting))?;
-
-    runtime.settle().await?;
-    runtime.shutdown().await?;
+    let consumer = app.plugin(
+        Plugin::with_dependencies("consumer", greeting)
+            .setup(|_, text| { println!("{text}"); Ok(()) }),
+    ).await?;
+    consumer.ready().await?;
+    app.shutdown().await?;
     Ok(())
 }
 ```
 
-Run `cargo run` to print `Hello, Cordis`. `.provides()` and `.requires()` declare typed services and dependencies; `settle().await` drives initialization, and `shutdown().await` waits for plugin cleanup and reports errors. This example uses Tokio to drive the asynchronous lifecycle; applications can also use their existing executor.
+Run `cargo run` to print `Hello, Cordis`. The dependency key declares what the consumer needs and supplies its typed setup parameter. `ready().await` waits for activation; `shutdown().await` waits for cleanup and reports errors.
 
-Pure Rust applications need no Node, npm or Verus installation; Cargo compiles the published Rust libraries directly. See the [runtime guide](docs/runtime.md) and [basic example](crates/cordis/examples/basic.rs) for more.
-
-The current source also has an [unreleased typed dependency API and optional Tokio application driver](docs/rust-api.md). The example above uses the published crate API.
+The optional `tokio` feature supplies the application driver and plugin handles. Pure Rust applications need no Node, npm or Verus installation. The [Rust API guide](docs/rust-api.md) covers updates, scoped plugins and structured errors; the [manual Runtime](docs/runtime.md) remains available for other executors.
 
 ### JavaScript (Node.js)
 

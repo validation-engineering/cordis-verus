@@ -14,7 +14,7 @@ npm install @validation-engineering/cordis-loader @validation-engineering/cordis
 
 Use Node.js 22.22+. The package already contains all four native libraries and selects the current platform at runtime. No install scripts or local compilation are required. Pure Rust applications do not need Node.
 For original Cordis imports, run `node --import @validation-engineering/cordis/register app.mjs`; use `@validation-engineering/cordis-compat-deepseek/register` for Harness plugins.
-Both profiles use the same native kernel. The `cordis-harness` package is the profile adapter; the complete application lives in the separate Cordis Harness repository.
+Both profiles use the same native kernel. The `cordis-compat-deepseek` package is the profile adapter; the complete application lives in the separate Harness Verus repository.
 
 Historical `v0.1.0-preview.1` assets retain the `@cordis-verus/compat-*` names. Do not mix the old and new release families within one application.
 
@@ -23,8 +23,8 @@ Historical `v0.1.0-preview.1` assets retain the `@cordis-verus/compat-*` names. 
 Install **Node.js 22.22+ with npm**, then run:
 
 ```sh
-curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0/install-cordis.mjs
-node install-cordis.mjs --release v0.1.0 --project my-cordis-app
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.2.0/install-cordis.mjs
+node install-cordis.mjs --release v0.2.0 --project my-cordis-app
 cd my-cordis-app
 npm start
 ```

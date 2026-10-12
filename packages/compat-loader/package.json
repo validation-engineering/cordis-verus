@@ -1,6 +1,6 @@
 {
   "name": "@validation-engineering/cordis-loader",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Experimental JSON module loader over the native Cordis facade",
   "engines": {
@@ -29,7 +29,7 @@
     }
   },
   "peerDependencies": {
-    "@validation-engineering/cordis": "0.1.1"
+    "@validation-engineering/cordis": "0.2.0"
   },
   "license": "MIT",
   "publishConfig": {

@@ -2,10 +2,11 @@
 
 [English](rust-api.md)
 
-这些接口已在当前源码实现，**尚未包含在已发布的 `cordis-verus 0.1.0` 中**。
-本轮完成 typed 依赖输入、可选应用驱动和结构化回调错误三部分。
+**`cordis-verus 0.2.0`** 提供 typed 依赖输入、可选应用驱动和结构化回调错误。
 执行 Rust 应用不需要安装 Node.js 或 Verus。
 
+通过 `cargo add cordis-verus@0.2.0 --rename cordis --features tokio` 添加依赖。
+`tokio` feature 为可选项；默认 features 已包含 typed 依赖和结构化错误。
 在源码目录运行完整示例：
 
 ```sh
@@ -144,6 +145,19 @@ committed provider 和调用位置。分类为 `Undeclared`、`ClosedEpisode`、
 `failure()` / `cleanup_failure()` 保留文本视图；Runtime 的 `setup_error()` /
 `cleanup_error()` 返回结构化原因。Node 与进程协议边界仍传输错误文本，Rust 错误类型
 不会跨这些协议序列化。应用代码显式转成字符串也会丢失原因。
+
+## 从 0.1 迁移
+
+- `CallbackResult` 改为使用 `CallbackError`。将 `Err(String)` 改为
+  `Err(message.into())`；已有的 `Result<(), String>` 可使用 `.map_err(Into::into)`。
+  若需保留外部库错误的类型和 source 链，使用 `.map_err(CallbackError::new)`。
+- `Setup::get` / `AsyncSetup::get` 现在返回 `ServiceReadError`。回调中优先使用 `?`；
+  只在明确的文本边界调用 `.to_string()`。
+- 匹配 `RuntimeError::Setup { plugin, error }`、`RuntimeError::Cleanup { plugin,
+  error }` 与 `LoaderError::Update { entry, error }`；原 `message` 字段替换为结构化原因。
+  配置更新和回滚回调也使用 `CallbackResult`。
+- 原有 `Runtime`、`Plugin::new`、`.requires()` 和独立身份的 `ServiceKey::new` 仍可使用。
+  需要共享 key 身份时显式选择 `of()` / `named()`；使用 `App` 时才需启用 `tokio` feature。
 
 ## 与已验证内核的对应关系
 

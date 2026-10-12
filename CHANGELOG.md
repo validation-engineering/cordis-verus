@@ -2,6 +2,31 @@
 
 Changes are recorded before release. Runtime previews are distributed through GitHub Releases.
 
+## 0.2.0 — 2026-10-12
+
+- Declare required services once with `Plugin::with_dependencies`: typed setup
+  inputs resolve from the same episode-committed bindings used for admission.
+  Add canonical service keys and reject conflicting dependency configuration.
+- Add an optional Tokio `App` driver and application-bound `PluginHandle` for
+  readiness, updates, scoped/owned plugins, cleanup retry and explicit shutdown.
+  The manual Runtime and default crate features remain executor independent.
+- Preserve structured service-read, callback and cleanup causes, including
+  original external errors and multiple effect failures. **Breaking Rust API:**
+  `CallbackResult` uses `CallbackError`; `get` returns `ServiceReadError`;
+  Runtime/Loader error variants expose `error` instead of `message`.
+  See the [migration guide](docs/rust-api.md#migrate-from-01).
+- Test optional Rust features in workspace and extracted-package acceptance.
+  Kernel proof contracts are unchanged; the host adapters and Tokio scheduling
+  remain outside the verified kernel boundary.
+- Coordinate Rust crates at 0.2.0 and Node core at 0.2.0. Loader 0.2.1 and
+  DeepSeek Cordis compatibility 0.1.1 select the matching native core.
+
+## 0.1.1 — 2026-10-11
+
+- Rename the DeepSeek Cordis profile to `@validation-engineering/cordis-compat-deepseek`;
+  keep the separate Harness Verus application distinct from the runtime adapter.
+- Publish Node core 0.1.1, Loader 0.2.0 and DeepSeek compatibility 0.1.0.
+
 ## 0.1.0 — 2026-10-11
 
 - Public npm packages under `@validation-engineering`: `cordis`, `cordis-loader` and `cordis-harness`.

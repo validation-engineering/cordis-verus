@@ -11,7 +11,7 @@ readme = "README.md"
 publish = ["crates-io"]
 
 [dependencies]
-cordis-kernel = { path = "../cordis-kernel", version = "=0.1.0" }
+cordis-kernel = { path = "../cordis-kernel", version = "=0.2.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

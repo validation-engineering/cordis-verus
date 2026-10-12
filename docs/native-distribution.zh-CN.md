@@ -14,7 +14,7 @@ npm install @validation-engineering/cordis-loader @validation-engineering/cordis
 
 准备 Node.js 22.22+。npm 包自带四个平台的原生库，运行时自动选择当前平台；不使用安装脚本，也不需要本机编译。仅运行纯 Rust 应用无需 Node。
 原版 Cordis 插件使用 `node --import @validation-engineering/cordis/register app.mjs`；Harness 插件使用 `@validation-engineering/cordis-compat-deepseek/register`。
-两个 profile 共用原生内核，`cordis-harness` 包是兼容适配层，完整应用在独立的 Cordis Harness 仓库。
+两个 profile 共用原生内核，`cordis-compat-deepseek` 包是兼容适配层，完整应用在独立的 Harness Verus 仓库。
 
 历史 `v0.1.0-preview.1` 的产物仍保留 `@cordis-verus/compat-*` 包名；不要在同一个应用中混用新旧发布系列。
 
@@ -23,8 +23,8 @@ npm install @validation-engineering/cordis-loader @validation-engineering/cordis
 准备 **Node.js 22.22+ 和 npm**，然后运行：
 
 ```sh
-curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.1.0/install-cordis.mjs
-node install-cordis.mjs --release v0.1.0 --project my-cordis-app
+curl -fLO https://github.com/validation-engineering/cordis-verus/releases/download/v0.2.0/install-cordis.mjs
+node install-cordis.mjs --release v0.2.0 --project my-cordis-app
 cd my-cordis-app
 npm start
 ```

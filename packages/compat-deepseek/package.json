@@ -1,6 +1,6 @@
 {
   "name": "@validation-engineering/cordis-compat-deepseek",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Compatibility with @deepseek-ai/cordis over the Rust/Verus Cordis runtime; not the DeepSeek Harness application",
   "engines": {
@@ -15,7 +15,7 @@
     "./register": "./register.js"
   },
   "peerDependencies": {
-    "@validation-engineering/cordis": "0.1.1"
+    "@validation-engineering/cordis": "0.2.0"
   },
   "license": "MIT",
   "publishConfig": {

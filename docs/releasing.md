@@ -49,7 +49,7 @@ paper copies, and build outputs must not appear in them.
    reporting before announcing a release. Review the selected MIT license and
    upstream attribution. Configure branch protection for all quality jobs.
 2. Review known limitations, issue backlog, dependency advisories, and proof
-   assumptions. Do not describe 0.1 as audited, production-proven, or a complete
+   assumptions. Do not describe 0.x as audited, production-proven, or a complete
    paper implementation. All four release platforms must actually pass runtime and installation checks:
    Linux x64, macOS Apple Silicon / Intel, and Windows x64. The complete positive
    proof runs once on Linux and must bind the same source bytes as every host record.
@@ -191,7 +191,7 @@ Verify a fresh Rust consumer with the actual registry dependency:
 
 ```toml
 [dependencies]
-cordis = { package = "cordis-verus", version = "0.1.0" }
+cordis = { package = "cordis-verus", version = "0.2.0" }
 ```
 
 This is a library dependency, not a `cargo install` CLI. Rust consumers compile

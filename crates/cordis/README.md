@@ -10,7 +10,7 @@ Add the host library (the dependency alias preserves `use cordis::...`):
 
 ```toml
 [dependencies]
-cordis = { package = "cordis-verus", version = "0.1.0" }
+cordis = { package = "cordis-verus", version = "0.2.0" }
 ```
 
 ```rust
@@ -23,7 +23,7 @@ let _plugin = runtime.mount(&Context::new(), None, Plugin::new("hello", |ctx| {
 })).unwrap();
 ```
 
-The current source also includes an **unreleased** Rust convenience API:
+Declare dependencies and typed setup parameters together:
 
 ```rust
 use cordis::{Plugin, ServiceKey};
@@ -65,9 +65,9 @@ These ordinary Rust adapters are tested; the kernel proofs do not automatically
 prove them, Tokio fairness, arbitrary callbacks or eventual cleanup completion.
 
 Run `cargo run -p cordis-verus --features tokio --example managed_app` from the
-source checkout. This convenience API is not included in the published 0.1.0.
+source checkout. These APIs are available in `cordis-verus 0.2.0`.
 
-Version 0.1 is experimental. APIs may change in a 0.x minor release. This is a
+Version 0.2 is experimental. APIs may change in a 0.x minor release. This is a
 Rust interface, not a TypeScript plugin loader, and does not run DeepSeek Harness.
 The host adapter is behavior-tested; its arbitrary callbacks, futures, file I/O,
 and synchronization are not covered by the kernel's formal proofs.

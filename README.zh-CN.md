@@ -27,42 +27,38 @@ cordis-verus 将形式化方法落实到实际运行的插件系统。它用 Rus
 ```sh
 cargo new hello-cordis
 cd hello-cordis
-cargo add cordis-verus --rename cordis
+cargo add cordis-verus@0.2.0 --rename cordis --features tokio
 cargo add tokio --features macros,rt
 ```
 
 将 `src/main.rs` 替换为：
 
 ```rust
-use cordis::{Context, Plugin, Runtime, ServiceKey};
+use cordis::{App, Plugin, ServiceKey};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut runtime = Runtime::new();
-    let context = Context::new();
-    let greeting = ServiceKey::<String>::new("greeting");
+    let app = App::new()?;
+    let greeting = ServiceKey::<String>::of();
 
-    runtime.mount(&context, None, Plugin::new("provider", move |ctx| {
+    app.plugin(Plugin::new("provider", move |ctx| {
         ctx.provide(greeting, "Hello, Cordis".to_owned())?;
         Ok(())
-    }).provides(greeting))?;
+    }).provides(greeting)).await?;
 
-    runtime.mount(&context, None, Plugin::new("consumer", move |ctx| {
-        println!("{}", ctx.get(greeting)?);
-        Ok(())
-    }).requires(greeting))?;
-
-    runtime.settle().await?;
-    runtime.shutdown().await?;
+    let consumer = app.plugin(
+        Plugin::with_dependencies("consumer", greeting)
+            .setup(|_, text| { println!("{text}"); Ok(()) }),
+    ).await?;
+    consumer.ready().await?;
+    app.shutdown().await?;
     Ok(())
 }
 ```
 
-运行 `cargo run`，输出 `Hello, Cordis`。`.provides()` 和 `.requires()` 声明类型化服务与依赖；`settle().await` 驱动初始化，`shutdown().await` 等待插件清理并报告错误。示例使用 Tokio 驱动异步生命周期，应用也可以使用已有的 executor。
+运行 `cargo run`，输出 `Hello, Cordis`。依赖 key 同时声明消费者的需求，并提供类型化的 setup 参数。`ready().await` 等待激活；`shutdown().await` 等待清理并报告错误。
 
-纯 Rust 应用无需 Node、npm 或 Verus；Cargo 直接编译已发布的 Rust 库。更多用法见[运行时指南](docs/runtime.md)和[基础示例](crates/cordis/examples/basic.rs)。
-
-当前源码还包含[尚未发布的 typed dependency API 与可选 Tokio 应用驱动](docs/rust-api.zh-CN.md)。上方示例使用已发布 crate 的接口。
+可选的 `tokio` feature 提供应用驱动和插件句柄。纯 Rust 应用无需 Node、npm 或 Verus。[Rust API 指南](docs/rust-api.zh-CN.md) 介绍更新、作用域插件与结构化错误；使用其他 executor 时仍可使用[手动 Runtime](docs/runtime.md)。
 
 ### JavaScript（Node.js）
 
