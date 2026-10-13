@@ -152,7 +152,7 @@ Mixed/Fresh 公共 `unload` 现有精确成功合同：`unload_enabled = kernel.
 
 该模块单独使用锁定工具链的 `--no-cheating --compile` 检查得到 **5 verified, 0 errors**，没有 `assume`、`external_body` 或跳过的 callback 实现。集成验证以整个内核的最新运行结果为准。
 
-Rust 外层把 callback 存为 `Vec<Option<CleanupAction>>`，每个效果组使用一个已验证 `StageProtocol`，内部以 `EffectStack` 登记 callback token；清理时按 pop 顺序取得 callback，等待当前 inverse 完成后才取组内下一个。独立效果组可以同时 Pending，恢复前先等该 episode 所有在途初始化 stage 落地。`StageProtocol` 证明新 stage 的 target admission、在途 stage 的落地资格和 inverse 入栈，以及 settled 前禁止 pop。token 到 callback 的映射、索引不重复以及 future 的 poll 是普通 Rust 协议，以外层测试检查。`EffectStack` 本身允许重复 token，保证的是每次 pop 取走最后一次登记的一项，不证明每个整数值只能出现一次。也不证明取出的 callback 是有效 inverse、一定完成或不会 panic。
+Rust Runtime 和静态 typed 宿主现通过 `CleanupGroups<CleanupAction>` 持有全部效果组；每个 `CleanupQueue` 将实际载荷、stage 协议和恢复日志一起持有。清理时取走真实 inverse，等待其完成后再取组内下一个；独立组仍可同时 Pending，episode 恢复前需等待全部在途初始化 stage 落地。token 到载荷的映射、当前尝试身份、失败保留与整体排空已由可执行合同验证。Future 的轮询、panic 捕获和任意回调的外部效果仍是普通 Rust 边界。底层 `EffectStack` 仍允许重复整数 token，其局部合同是每次 pop 取走最后一次登记的一项；生产队列的身份分配与载荷对应是其上的额外合同，不等于任意 inverse 都正确、必然完成或不会 panic。
 
 ## 可逆资源与效果代数
 
@@ -343,27 +343,29 @@ JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验�
 仍有载荷。执行器调用后选择返回哪个工厂、回调真实性与外部效果仍属于宿主连接，
 不因容器证明而变成任意逆操作定理。详见[清理协议](cleanup-protocol.zh-CN.md)。
 
-## R2 生产载荷与实际完成结果
+## R2 生产执行合同
 
-实际 publication 的泛型载荷、旧租约读取、替换和清理释放现在通过
-`PublicationStore` 的可执行合同关联；生产 Rust 异步清理通过原生 Verus
-`await_completion` 保存实际等待结果，`land_result` 从实际 inverse 与取消状态
-决定后续动作。原生 `invoke`／`invoke_future` 直接调用实际 callback，并保留其
-真实返回值或 Future；插件效果律仍是独立义务。`CleanupGroups` 持有 Rust／静态
-宿主的全部清理队列，整体重试先检查全部失败，关闭时检查未落地 stage、已交付
-凭据和实际载荷并关闭注册。根 setup、Child 请求和生命周期／publication 的统一
-编排尚未完成。当前可见键值表与保留租约值是两个不同观察。
-这些增量尚不构成整个宿主或任意回调的效果正确性证明；R2 仍在推进。
+实际 publication 的泛型载荷、旧租约读取、替换和清理释放通过 `PublicationStore`
+关联；原生异步完成保留实际 Future 输出，`land_result` 从实际 inverse 与取消
+状态决定后续动作。当前可见键值表与保留租约值是两个不同观察。
+
+`SetupWork` 与 `CleanupGroups` 持有根 setup、真实 Child／效果组请求和全部
+清理队列。`begin_execution` 将二者绑定到真实生命周期动作；Finish、失败、整体
+重试和 Unload 使用同一批实际 owner。释放从被接受的清理结果推导 `Succeeded`
+或 `Drained`，不能由宿主任意选择。已派发请求、未落地 stage 或保留失败仍然阻塞；
+已开始的根 Future 不能冒充尚未轮询的工作被直接丢弃。
+
+`register_plugin` 负责原生插件与动态 Child 的真实登记，解析 realm 并继承父插件
+在内核中的实际依赖，保存真实回调。根调用准入绑定当前 setup 动作、代次和回调
+版本；`RegisteredPlugin::call` 直接调用登记的 `FnMut`，`WorkReceipt::dispatch`
+保留其实际同步结果或 Future。Child inverse 使用登记产生的域／父插件／ID 身份
+执行退休。实际共享句柄中的 `ChildSlot` 由 `register_child_slot` 一次性写入真实
+登记身份；旧 episode 和重复请求被拒绝。`retire_child_slot` 自行读取身份，若先于
+分配执行，则关闭 Pending 槽，阻止迟到请求创建无人清理的 Child。退休不等于
+资源恢复结束，显式回调替换也不等于论文中的效果步骤。
+
+这些合同已经用于真实 Rust／Node 路径中各自对应的入口，不能把原生登记合同
+自动推广到外部宿主。任意插件的效果／inverse 律、普通 `Mounted` map 与共享
+Child 句柄别名／同步、publication／context 的联合不变式、poll／panic 适配，
+以及整条生产轨迹到 R1 的对应仍未完成。R2 保持推进状态，原验收标准不变。
 详见[执行合同和剩余验收内容](r2-execution.zh-CN.md)（[English](r2-execution.md)）。
-
-
-`setup_work.rs` extends the production drain guard to root setup and the actual
-Child/group dispatch queues. Private work items bind each dispatched payload to
-its actual call result; asynchronous items retain the factory's actual Future.
-Taking a request does not complete it. `enqueue_owned_child` retains the real
-request and inverse atomically; `seal` checks outstanding root/dispatch work and
-every queue from the same cleanup domain. Rust Runtime and the static adapter
-use these operations. Only an unpolled root can be discarded on withdrawal;
-abandoned running work remains blocking. Ordinary poll/panic adaptation and the
-semantic relation of Child allocation, lifecycle and publication remain outside
-this local contract. R2 is still in progress.

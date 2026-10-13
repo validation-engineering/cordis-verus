@@ -204,6 +204,7 @@ impl<T> CleanupQueue<T> {
         self.in_flight=false;
         Ok(())
     }
+    pub fn is_issued(&self)->(out:bool) ensures out==self.issued(), {self.in_flight}
     pub fn can_retry(&self)->(out:bool)
         requires self.wf(),ensures out==self.retry_enabled(),
     {

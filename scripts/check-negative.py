@@ -1381,8 +1381,8 @@ def mutation_manifest():
         (
             'r2-cleanup-future-forges-success',
             'cleanup_completion.rs',
-            'Ok(self.accept_result(ticket,result,retry,policy))',
-            'Ok(self.accept_result(ticket,Ok(()),retry,policy))',
+            'let (ticket,result)=completion.into_parts();\n        Ok(self.accept_result(ticket,result,retry,policy))',
+            'let (ticket,result)=completion.into_parts();\n        Ok(self.accept_result(ticket,Ok(()),retry,policy))',
         ),
         (
             'r2-stage-keeps-cancelled-continuation',
@@ -1419,6 +1419,67 @@ def mutation_manifest():
             'setup_work.rs',
             'if !self.root_ticket(ticket) || self.root!=RootStatus::Queued || self.accepting {return false;}',
             'if !self.root_ticket(ticket) || (self.root!=RootStatus::Queued && self.root!=RootStatus::Running) || self.accepting {return false;}',
+        ),
+        (
+            'r2-execution-ignores-bound-origin',
+            'execution_lifecycle.rs',
+            'groups.lifecycle_ticket()==Some(ticket) && ticket.domain==self.domain() && ticket.id==id',
+            'ticket.domain==self.domain() && ticket.id==id',
+        ),
+        (
+            'r2-execution-forges-restoration-success',
+            'execution_lifecycle.rs',
+            'let outcome=if groups.has_consumed_failure() {CleanupOutcome::Drained} else {CleanupOutcome::Succeeded};',
+            'let outcome=CleanupOutcome::Succeeded;',
+        ),
+
+        (
+            'r2-registration-loses-isolated-realm',
+            'plugin_registration.rs',
+            'Port {key,realm:match realms.get(&key) {Some(realm)=>*realm,None=>0}}',
+            'Port {key,realm:0}',
+        ),
+        (
+            'r2-registration-forgets-actual-dependencies',
+            'plugin_registration.rs',
+            'Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies,provisions,revision:0,payload:definition.payload})',
+            'Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies:Vec::new(),provisions,revision:0,payload:definition.payload})',
+        ),
+        (
+            'r2-registered-call-ignores-recipe-revision',
+            'plugin_registration.rs',
+            'if invocation.domain!=self.domain || invocation.id!=self.id || invocation.revision!=self.revision {return Err(invocation);}',
+            'if invocation.domain!=self.domain || invocation.id!=self.id {return Err(invocation);}',
+        ),
+        (
+            'r2-child-inverse-ignores-runtime-domain',
+            'plugin_registration.rs',
+            'if child.domain!=self.domain() {return Err(Error::InvalidState);}',
+            'if false {return Err(Error::InvalidState);}',
+        ),
+        (
+            'r2-child-slot-overwrites-assignment',
+            'child_slot.rs',
+            'if !slot.pending() || slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {',
+            'if slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {',
+        ),
+        (
+            'r2-child-slot-accepts-obsolete-episode',
+            'child_slot.rs',
+            'if !slot.pending() || slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {',
+            'if !slot.pending() || slot.domain!=self.domain() {',
+        ),
+        (
+            'r2-child-slot-drops-pending-inverse',
+            'child_slot.rs',
+            'if slot.pending() {slot.status=ChildStatus::Cancelled;}',
+            'if false {slot.status=ChildStatus::Cancelled;}',
+        ),
+        (
+            'r2-child-slot-allocates-after-parent-unload',
+            'child_slot.rs',
+            'if phase!=Some(Phase::Loading) && phase!=Some(Phase::Active) {return Err((Error::InvalidState,definition));}',
+            'if false {return Err((Error::InvalidState,definition));}',
         ),
     ]
 

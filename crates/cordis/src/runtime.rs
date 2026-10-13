@@ -10,14 +10,18 @@ use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, S
 use crate::future_support::poll_catching_unwind;
 use crate::service_error::{ServiceReadError, ServiceReadFailure};
 use crate::CallbackError;
-use cordis_driver::shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
+use cordis_driver::shared::{Decision, HostStatus, LifecycleDriver};
 use cordis_kernel::async_completion::{invoke, invoke_future, Completion};
 use cordis_kernel::cleanup_groups::CleanupGroups;
 use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
 use cordis_kernel::cleanup_queue::completion::{CleanupPolicy, CleanupReport};
 use cordis_kernel::cleanup_queue::landing::StageReport;
+use cordis_kernel::lifecycle_state::registration::child::ChildSlot;
+use cordis_kernel::lifecycle_state::registration::{
+    ChildIdentity, PluginDefinition, RegisteredPlugin,
+};
 use cordis_kernel::publication::values::ValueCell;
-use cordis_kernel::setup_work::{SetupWork, WorkReceipt, WorkTicket};
+use cordis_kernel::setup_work::{RootDispatch, RootOutput, SetupWork, WorkReceipt, WorkTicket};
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
 use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
@@ -89,8 +93,6 @@ type CleanupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
 type Cleanup = Box<dyn FnOnce() -> CleanupFuture + Send>;
 type RetryCleanup = Box<dyn FnMut() -> CleanupFuture + Send>;
 type SetupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
-type SetupCallback = Box<dyn FnMut(&mut Setup<'_>) -> CallbackResult + Send>;
-type AsyncCallback = Box<dyn FnMut(AsyncSetup) -> SetupFuture + Send>;
 type StageFuture = Pin<Box<dyn Future<Output = Result<Inverse, CallbackError>> + Send>>;
 type Stage = Box<dyn FnOnce(AsyncSetup) -> StageFuture + Send>;
 
@@ -195,18 +197,24 @@ impl Cleanups {
             .pop(group)
             .expect("live cleanup group and available attempt identity")
     }
-    fn complete(
+    #[allow(clippy::type_complexity)]
+    fn complete_result(
         &mut self,
         group: usize,
         ticket: RestoreTicket,
-        outcome: RestoreOutcome,
+        result: CallbackResult,
         retry: Option<RetryCleanup>,
-    ) -> Result<(), Option<CleanupAction>> {
-        self.protocol.complete(
+        policy: CleanupPolicy,
+    ) -> Result<
+        CleanupReport<CallbackError, CleanupAction>,
+        (RestoreTicket, CallbackResult, Option<CleanupAction>),
+    > {
+        self.protocol.complete_result(
             group,
             ticket,
-            outcome,
+            result,
             retry.map(|retry| CleanupAction::Callback(CleanupCallback::Retryable(retry))),
+            policy,
         )
     }
     fn complete_reply(
@@ -425,18 +433,38 @@ impl Drop for EffectJoin {
     }
 }
 
+enum ChildRecord {
+    Native(ChildSlot<String>),
+    External(Result<Option<PluginId>, String>),
+}
+impl ChildRecord {
+    fn id(&self) -> Option<PluginId> {
+        match self {
+            Self::Native(slot) => slot.identity().map(|child| child.id()),
+            Self::External(result) => result.as_ref().ok().copied().flatten(),
+        }
+    }
+    fn error(&self) -> Option<&String> {
+        match self {
+            Self::Native(slot) => slot.error(),
+            Self::External(result) => result.as_ref().err(),
+        }
+    }
+}
+type ChildState = Arc<Mutex<ChildRecord>>;
+
 /// A child request becomes an ID after the current callback's poll returns.
 #[derive(Clone)]
 pub struct ChildHandle {
-    state: Arc<Mutex<Result<Option<PluginId>, String>>>,
+    state: ChildState,
     external: Option<static_host::StaticChildControl>,
 }
 impl ChildHandle {
     pub fn id(&self) -> Option<PluginId> {
-        lock(&self.state).as_ref().ok().copied().flatten()
+        lock(&self.state).id()
     }
     pub fn error(&self) -> Option<String> {
-        lock(&self.state).as_ref().err().cloned()
+        lock(&self.state).error().cloned()
     }
 }
 
@@ -547,9 +575,19 @@ impl Context {
     }
 }
 
-enum Callback {
-    Sync(SetupCallback),
-    Async(AsyncCallback),
+type RootReply = RootOutput<CallbackResult, SetupFuture>;
+type Callback = Box<dyn FnMut(AsyncSetup) -> RootReply + Send>;
+fn sync_recipe(
+    mut setup: impl FnMut(&mut Setup<'_>) -> CallbackResult + Send + 'static,
+) -> Callback {
+    Box::new(move |argument| RootOutput::Ready(setup(&mut Setup { inner: &argument })))
+}
+fn async_recipe<F, Fut>(mut setup: F) -> Callback
+where
+    F: FnMut(AsyncSetup) -> Fut + Send + 'static,
+    Fut: Future<Output = CallbackResult> + Send + 'static,
+{
+    Box::new(move |argument| RootOutput::Pending(Box::pin(setup(argument))))
 }
 pub struct Plugin {
     name: String,
@@ -572,10 +610,10 @@ impl Plugin {
             injection_config: BTreeMap::new(),
             config_update: None,
             dependency_conflict: None,
-            setup: Callback::Sync(Box::new(setup)),
+            setup: sync_recipe(setup),
         }
     }
-    pub fn new_async<F, Fut>(name: impl Into<String>, mut setup: F) -> Self
+    pub fn new_async<F, Fut>(name: impl Into<String>, setup: F) -> Self
     where
         F: FnMut(AsyncSetup) -> Fut + Send + 'static,
         Fut: Future<Output = CallbackResult> + Send + 'static,
@@ -587,7 +625,7 @@ impl Plugin {
             injection_config: BTreeMap::new(),
             config_update: None,
             dependency_conflict: None,
-            setup: Callback::Async(Box::new(move |ctx| Box::pin(setup(ctx)))),
+            setup: async_recipe(setup),
         }
     }
     pub fn requires<T>(mut self, key: ServiceKey<T>) -> Self {
@@ -1009,7 +1047,10 @@ impl AsyncSetup {
         if state.phase == EpisodePhase::Restoring || state.cancelled_groups.contains(&self.group) {
             return Err(CANCELLED.into());
         }
-        let identity = Arc::new(Mutex::new(Ok(None)));
+        let identity = Arc::new(Mutex::new(match ChildSlot::from_work(&state.work) {
+            Some(slot) => ChildRecord::Native(slot),
+            None => ChildRecord::External(Ok(None)),
+        }));
         let external = state.dynamic_host.as_ref().map(|notify| {
             static_host::StaticChildControl::new(
                 self.owner,
@@ -1357,20 +1398,25 @@ fn initialize_callback(
         .ok()
         .expect("one root invocation per episode");
     let ticket = item.ticket();
-    match catch_unwind(AssertUnwindSafe(|| match callback {
-        Callback::Sync(callback) => {
-            let receipt = item
-                .run(|argument| invoke(&mut Setup { inner: &argument }, callback).into_result());
-            let completed = lock(&episode.state).work.complete_root(receipt);
-            completed.ok().expect("actual synchronous root result")?;
-            Ok(RootSetup::Done)
-        }
-        Callback::Async(callback) => {
-            let pending = item.start(callback);
-            Ok(RootSetup::Queued(ticket, Box::pin(pending.complete())))
-        }
-    })) {
-        Ok(result) => result,
+    let result = catch_unwind(AssertUnwindSafe(|| item.run(callback)));
+    initialize_reply(episode, ticket, result)
+}
+fn initialize_reply(
+    episode: &AsyncSetup,
+    ticket: WorkTicket,
+    result: std::thread::Result<WorkReceipt<RootReply>>,
+) -> Result<RootSetup, CallbackError> {
+    match result {
+        Ok(reply) => match reply.dispatch() {
+            RootDispatch::Ready(receipt) => {
+                let completed = lock(&episode.state).work.complete_root(receipt);
+                completed.ok().expect("actual synchronous root result")?;
+                Ok(RootSetup::Done)
+            }
+            RootDispatch::Pending(pending) => {
+                Ok(RootSetup::Queued(ticket, Box::pin(pending.complete())))
+            }
+        },
         Err(panic) => {
             let error = CallbackError::panic(panic_message(panic));
             Err(lock(&episode.state)
@@ -1458,7 +1504,6 @@ fn poll_cleanup_callback(
 
 struct Mounted {
     next_config_update: Option<Option<ConfigUpdateCallback>>,
-    anchor: Port,
     service: Option<EffectHandle>,
     injection_config: BTreeMap<u64, serde_json::Value>,
     config_update: Option<ConfigUpdateCallback>,
@@ -1467,19 +1512,16 @@ struct Mounted {
     name: String,
     parent: Option<PluginId>,
     context: Context,
-    dependencies: Vec<Port>,
-    provisions: Vec<Port>,
-    setup: Callback,
+    registration: RegisteredPlugin<Callback>,
     episode: Option<AsyncSetup>,
     root_setup: RootSetup,
     groups: BTreeMap<usize, Group>,
     root_running: Option<RunningCleanup>,
     cleanup_failure: Option<CallbackError>,
-    cleanup_drained: bool,
     failed: Option<CallbackError>,
     restart: bool,
     // Children externally mounted while inactive become owner-bound on begin.
-    owned: Vec<PluginId>,
+    owned: Vec<ChildIdentity>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeError {
@@ -1628,7 +1670,8 @@ impl Runtime {
             }
             if phase == Phase::Inactive && !self.retired(id) {
                 let missing: Vec<_> = owner
-                    .dependencies
+                    .registration
+                    .dependencies()
                     .iter()
                     .copied()
                     .filter(|port| self.kernel.resolve(*port).is_none())
@@ -1688,8 +1731,8 @@ impl Runtime {
                 phase,
                 retired: self.retired(id),
                 restoring: self.cleanup_started(id),
-                dependencies: owner.dependencies.clone(),
-                provisions: owner.provisions.clone(),
+                dependencies: owner.registration.dependencies().to_vec(),
+                provisions: owner.registration.provisions().to_vec(),
                 committed,
                 target,
                 blockers,
@@ -1706,7 +1749,8 @@ impl Runtime {
         parent: Option<PluginId>,
         plugin: Plugin,
     ) -> Result<PluginId, RuntimeError> {
-        self.mount_inner(context, parent, plugin, true)
+        self.mount_inner(context, parent, plugin, true, None)
+            .map(|(id, _)| id)
     }
     fn mount_inner(
         &mut self,
@@ -1714,7 +1758,8 @@ impl Runtime {
         parent: Option<PluginId>,
         plugin: Plugin,
         register_inverse: bool,
-    ) -> Result<PluginId, RuntimeError> {
+        child_slot: Option<&ChildState>,
+    ) -> Result<(PluginId, Option<ChildIdentity>), RuntimeError> {
         plugin.validate()?;
         if let Some(parent) = parent {
             if !self.kernel.contains(parent) {
@@ -1727,47 +1772,39 @@ impl Runtime {
                 return Err(RuntimeError::UnloadingOwner(parent));
             }
         }
-        let port = |key| Port {
-            key,
-            realm: context.realms.get(&key).copied().unwrap_or(0),
-        };
         let declared_dependencies = plugin.dependencies.clone();
         let declared_injection_config = plugin.injection_config.clone();
         let mut injection_config = parent
             .map(|parent| self.mounted[&parent].injection_config.clone())
             .unwrap_or_default();
         injection_config.extend(plugin.injection_config);
-        let mut dependencies: Vec<_> = plugin.dependencies.into_iter().map(port).collect();
-        let provisions: Vec<_> = plugin.provisions.into_iter().map(port).collect();
-        // Inherit the parent's *actual ports*, including realms. This adds real
-        // kernel dependencies, so a child cannot outlive a captured dependency.
-        // A child's own provision is omitted: ownership is not a service cycle.
-        if let Some(parent) = parent {
-            for dependency in &self.mounted[&parent].dependencies {
-                // Keep the inherited provider alive, and also resolve the key
-                // in the child's realm when it has explicitly isolated it.
-                for inherited in [*dependency, port(dependency.key)] {
-                    if !provisions.contains(&inherited) && !dependencies.contains(&inherited) {
-                        dependencies.push(inherited);
-                    }
-                }
-            }
-        }
         let anchor = Port {
             key: fresh(&NEXT_KEY),
             realm: 0,
         };
-        let mut kernel_provisions = provisions.clone();
-        kernel_provisions.push(anchor);
-        let id = self
-            .kernel
-            .insert(parent, dependencies.clone(), kernel_provisions)
-            .map_err(kernel_error)?;
+        let definition =
+            PluginDefinition::new(plugin.dependencies, plugin.provisions, plugin.setup);
+        // Only the checked allocator can resolve a native shared Child slot.
+        // Return rejected recipes out of its mutex before dropping captures.
+        let registration = if let Some(shared) = child_slot {
+            let mut record = lock(shared);
+            match &mut *record {
+                ChildRecord::Native(slot) if parent == Some(slot.parent_id()) => self
+                    .kernel
+                    .register_child_slot(slot, &context.realms, anchor, definition),
+                _ => Err((KernelError::InvalidState, definition)),
+            }
+        } else {
+            self.kernel
+                .register_plugin(parent, &context.realms, anchor, definition)
+        };
+        let registration = registration.map_err(|(error, _)| kernel_error(error))?;
+        let id = registration.id();
+        let child = registration.child_identity();
         self.mounted.insert(
             id,
             Mounted {
                 next_config_update: None,
-                anchor,
                 service: None,
                 injection_config,
                 config_update: plugin.config_update,
@@ -1776,15 +1813,12 @@ impl Runtime {
                 name: plugin.name,
                 parent,
                 context: context.clone(),
-                dependencies,
-                provisions,
-                setup: plugin.setup,
+                registration,
                 episode: None,
                 root_setup: RootSetup::Dormant,
                 groups: BTreeMap::new(),
                 root_running: None,
                 cleanup_failure: None,
-                cleanup_drained: false,
                 failed: None,
                 restart: false,
                 owned: Vec::new(),
@@ -1797,16 +1831,18 @@ impl Runtime {
                     lock(&episode.state).cleanups.push(
                         0,
                         CleanupAction::Child(ChildHandle {
-                            state: Arc::new(Mutex::new(Ok(Some(id)))),
+                            state: Arc::new(Mutex::new(ChildRecord::Native(
+                                ChildSlot::from_identity(child.expect("registered child")),
+                            ))),
                             external: None,
                         }),
                     );
                 } else {
-                    owner.owned.push(id);
+                    owner.owned.push(child.expect("registered child"));
                 }
             }
         }
-        Ok(id)
+        Ok((id, child))
     }
     pub fn phase(&self, id: PluginId) -> Option<Phase> {
         self.kernel.phase(id)
@@ -1875,12 +1911,10 @@ impl Runtime {
                 error: "retained cleanup cannot be retried".into(),
             });
         }
-        // Preflight every journal before the shared verified protocol changes.
-        self.kernel.retry_cleanup(id).map_err(kernel_error)?;
-        assert!(
-            state.cleanups.protocol.retry_all(),
-            "preflighted every live queue"
-        );
+        let Episode { work, cleanups, .. } = &mut *state;
+        self.kernel
+            .retry_execution(id, work, &mut cleanups.protocol)
+            .map_err(kernel_error)?;
         self.mounted.get_mut(&id).unwrap().cleanup_failure = None;
         let wake = state.driver.take();
         drop(state);
@@ -2012,6 +2046,9 @@ impl Runtime {
             return Ok(());
         }
         self.kernel.retire(id).map_err(kernel_error)?;
+        self.after_retirement(id)
+    }
+    fn after_retirement(&mut self, id: PluginId) -> Result<(), RuntimeError> {
         if let Some(service) = &self.mounted[&id].service {
             lock(&service.status).cancelled = true;
         }
@@ -2097,13 +2134,17 @@ impl Runtime {
         if self.kernel.retired(id) {
             return Err(RuntimeError::Retired(id));
         }
-        self.mounted
+        let previous = self
+            .mounted
             .get_mut(&id)
             .ok_or(RuntimeError::UnknownPlugin(id))?
-            .setup = Callback::Sync(Box::new(setup));
+            .registration
+            .replace(sync_recipe(setup))
+            .map_err(|_| kernel_error(KernelError::Capacity))?;
+        drop(previous);
         self.restart(id)
     }
-    pub fn update_async<F, Fut>(&mut self, id: PluginId, mut setup: F) -> Result<(), RuntimeError>
+    pub fn update_async<F, Fut>(&mut self, id: PluginId, setup: F) -> Result<(), RuntimeError>
     where
         F: FnMut(AsyncSetup) -> Fut + Send + 'static,
         Fut: Future<Output = CallbackResult> + Send + 'static,
@@ -2111,10 +2152,14 @@ impl Runtime {
         if self.kernel.retired(id) {
             return Err(RuntimeError::Retired(id));
         }
-        self.mounted
+        let previous = self
+            .mounted
             .get_mut(&id)
             .ok_or(RuntimeError::UnknownPlugin(id))?
-            .setup = Callback::Async(Box::new(move |ctx| Box::pin(setup(ctx))));
+            .registration
+            .replace(async_recipe(setup))
+            .map_err(|_| kernel_error(KernelError::Capacity))?;
+        drop(previous);
         self.restart(id)
     }
     /// Replace a plugin recipe and restart with unchanged dependency/provision
@@ -2132,8 +2177,12 @@ impl Runtime {
             return Err(RuntimeError::IncompatibleUpdate(id));
         }
         let mounted = self.mounted.get_mut(&id).unwrap();
+        let previous = mounted
+            .registration
+            .replace(plugin.setup)
+            .map_err(|_| kernel_error(KernelError::Capacity))?;
         mounted.name = plugin.name;
-        mounted.setup = plugin.setup;
+        drop(previous);
         mounted.next_config_update = Some(plugin.config_update);
         self.restart(id)
     }
@@ -2174,7 +2223,7 @@ impl Runtime {
             })
             .collect();
         mounted.declared_dependencies == plugin.dependencies
-            && mounted.provisions == provisions
+            && mounted.registration.provisions() == provisions
             && mounted.declared_injection_config == plugin.injection_config
     }
     /// Adopt accepted configurations atomically after validating every target.
@@ -2193,11 +2242,27 @@ impl Runtime {
                 });
             }
         }
+        let mut counts = BTreeMap::<PluginId, u64>::new();
+        for (id, _) in &recipes {
+            let count = counts.entry(*id).or_default();
+            *count = count
+                .checked_add(1)
+                .ok_or_else(|| kernel_error(KernelError::Capacity))?;
+        }
+        for (id, count) in counts {
+            if !self.mounted[&id].registration.can_replace_count(count) {
+                return Err(kernel_error(KernelError::Capacity));
+            }
+        }
         let mut previous = Vec::new();
         for (id, plugin) in recipes {
             let mounted = self.mounted.get_mut(&id).unwrap();
             mounted.name = plugin.name;
-            let setup = std::mem::replace(&mut mounted.setup, plugin.setup);
+            let setup = mounted
+                .registration
+                .replace(plugin.setup)
+                .ok()
+                .expect("preflighted recipe revisions");
             let handler = mounted.next_config_update.replace(plugin.config_update);
             previous.push((setup, handler));
         }
@@ -2239,7 +2304,7 @@ impl Runtime {
             if self
                 .mounted
                 .get(&binding.provider)
-                .is_some_and(|provider| provider.anchor.key == binding.key)
+                .is_some_and(|provider| provider.registration.anchor().key == binding.key)
             {
                 return true;
             }
@@ -2335,7 +2400,13 @@ impl Runtime {
             }
         }
     }
-    fn start(&mut self, id: PluginId, cx: &mut TaskContext<'_>) {
+    fn start(
+        &mut self,
+        id: PluginId,
+        cx: &mut TaskContext<'_>,
+        work: SetupWork<ChildRequest, GroupRequest>,
+        protocol: CleanupGroups<CleanupAction>,
+    ) {
         let bindings = self.kernel.committed(id);
         let values = bindings
             .iter()
@@ -2348,8 +2419,7 @@ impl Runtime {
         if let Some(handler) = plugin.next_config_update.take() {
             plugin.config_update = handler;
         }
-        let cleanups = Cleanups::new();
-        let work = cleanups.setup_work();
+        let cleanups = Cleanups { protocol };
         let mut state = Episode {
             phase: EpisodePhase::Loading,
             // Retain precisely the committed dependencies until restoration
@@ -2369,7 +2439,9 @@ impl Runtime {
             state.cleanups.push(
                 0,
                 CleanupAction::Child(ChildHandle {
-                    state: Arc::new(Mutex::new(Ok(Some(child)))),
+                    state: Arc::new(Mutex::new(ChildRecord::Native(ChildSlot::from_identity(
+                        child,
+                    )))),
                     external: None,
                 }),
             );
@@ -2379,16 +2451,32 @@ impl Runtime {
             owner: id,
             context: plugin.context.clone(),
             bindings,
-            provisions: plugin.provisions.clone(),
-            anchor: plugin.anchor,
+            provisions: plugin.registration.provisions().to_vec(),
+            anchor: plugin.registration.anchor(),
             state: Arc::new(Mutex::new(state)),
             group: 0,
         };
         plugin.cleanup_failure = None;
-        plugin.cleanup_drained = false;
         plugin.episode = Some(episode.clone());
         plugin.root_setup = RootSetup::Done;
-        match initialize_callback(&mut plugin.setup, &episode) {
+        let invocation = self
+            .kernel
+            .admit_registered_root(
+                &plugin.registration,
+                &mut lock(&episode.state).work,
+                episode.clone(),
+            )
+            .ok()
+            .expect("registered recipe and admitted episode");
+        let ticket = invocation.ticket();
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            plugin
+                .registration
+                .call(invocation)
+                .ok()
+                .expect("unchanged registered recipe")
+        }));
+        match initialize_reply(&episode, ticket, result) {
             Ok(root) => plugin.root_setup = root,
             Err(message) => self.latch(id, message),
         }
@@ -2444,15 +2532,25 @@ impl Runtime {
             }
             return;
         }
-        let result = self.mount_inner(&request.context, Some(id), request.plugin, false);
+        let result = self.mount_inner(
+            &request.context,
+            Some(id),
+            request.plugin,
+            false,
+            Some(&request.handle.state),
+        );
         match result {
-            Ok(child) => {
-                *lock(&request.handle.state) = Ok(Some(child));
+            Ok((child, _)) => {
                 self.mounted.get_mut(&child).unwrap().service = request.service;
             }
             Err(error) => {
                 let message = CallbackError::new(error);
-                *lock(&request.handle.state) = Err(message.to_string());
+                {
+                    let mut record = lock(&request.handle.state);
+                    if let ChildRecord::Native(slot) = &mut *record {
+                        let _ = slot.reject(message.to_string());
+                    }
+                }
                 if let Some(service) = &request.service {
                     lock(&service.status).errors.push(message);
                     finish_service(service);
@@ -2485,35 +2583,30 @@ impl Runtime {
         result: CallbackResult,
         retry: Option<RetryCleanup>,
     ) {
-        let outcome = match &result {
-            Ok(()) => RestoreOutcome::Succeeded,
-            Err(_) if retry.is_some() => RestoreOutcome::Failed,
-            Err(_) => RestoreOutcome::Drained,
-        };
-        // Never drop a callback factory (which may own arbitrary user values)
-        // under the episode mutex, including on a successful retry.
-        let retained = if outcome == RestoreOutcome::Failed {
-            retry
-        } else {
-            drop(retry);
-            None
-        };
         let episode = self.mounted[&id].episode.as_ref().unwrap().clone();
-        let completed = lock(&episode.state)
-            .cleanups
-            .complete(group, ticket, outcome, retained);
-        // Rejected payloads, like successful factories, must be dropped only
-        // after releasing the episode lock; user Drop may reenter registration.
-        assert!(completed.is_ok(), "exact issued restoration receipt");
-        if let Err(message) = result {
-            if outcome == RestoreOutcome::Failed {
+        let completed = lock(&episode.state).cleanups.complete_result(
+            group,
+            ticket,
+            result,
+            retry,
+            CleanupPolicy::DrainConsumed,
+        );
+        let report = match completed {
+            Ok(report) => report,
+            Err(rejected) => {
+                drop(rejected);
+                panic!("exact issued restoration receipt");
+            }
+        };
+        // User factories leave the bookkeeping lock before they are dropped.
+        drop(report.discarded);
+        if let Err(message) = report.result {
+            if report.outcome == RestoreOutcome::Failed {
                 self.mounted
                     .get_mut(&id)
                     .unwrap()
                     .cleanup_failure
                     .get_or_insert_with(|| message.clone());
-            } else {
-                self.mounted.get_mut(&id).unwrap().cleanup_drained = true;
             }
             self.record_cleanup(id, handle, message);
         }
@@ -2549,8 +2642,6 @@ impl Runtime {
                     .unwrap()
                     .cleanup_failure
                     .get_or_insert_with(|| message.clone());
-            } else {
-                self.mounted.get_mut(&id).unwrap().cleanup_drained = true;
             }
             self.record_cleanup(id, handle, message);
         }
@@ -2573,9 +2664,25 @@ impl Runtime {
                 progress = true;
                 match action {
                     CleanupAction::Child(child) => {
-                        let result = child.id().map_or(Ok(()), |child| {
-                            self.dispose(child).map_err(CallbackError::new)
-                        });
+                        let retired = {
+                            let mut record = lock(&child.state);
+                            match &mut *record {
+                                ChildRecord::Native(slot) => self
+                                    .kernel
+                                    .retire_child_slot(slot)
+                                    .map_err(|error| CallbackError::new(kernel_error(error))),
+                                ChildRecord::External(_) => {
+                                    Err("ExternalChildInNativeRuntime".into())
+                                }
+                            }
+                        };
+                        let result = match retired {
+                            Ok(Some(identity)) if self.contains(identity.id()) => self
+                                .after_retirement(identity.id())
+                                .map_err(CallbackError::new),
+                            Ok(_) => Ok(()),
+                            Err(error) => Err(error),
+                        };
                         self.finish_callback(id, group, handle, ticket, result, None);
                     }
                     CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
@@ -2852,12 +2959,12 @@ impl Runtime {
                 {
                     // Do not restore any resource while any group has a setup
                     // poll outstanding: it may still rely on that resource.
-                    let in_flight = {
-                        let state = lock(&episode.state);
-                        !state.work.is_idle() || state.cleanups.protocol.has_pending()
-                    };
-                    if !in_flight {
-                        if let Err(error) = self.kernel.settle_setup(id) {
+                    let state = lock(&episode.state);
+                    if state.work.is_idle() && !state.cleanups.protocol.has_pending() {
+                        if let Err(error) =
+                            self.kernel
+                                .settle_execution(id, &state.work, &state.cleanups.protocol)
+                        {
                             return Poll::Ready(Err(kernel_error(error)));
                         }
                         match self.kernel.begin_cleanup(id) {
@@ -2896,35 +3003,26 @@ impl Runtime {
                             .values()
                             .all(|group| group.running.is_none() && group.iterator.is_none());
                     if retained_failure && callbacks_idle {
-                        if let Some(ticket) = self.kernel.pending_action(id).cloned() {
-                            if let Err(error) = self
-                                .kernel
-                                .complete_cleanup(&ticket, CleanupOutcome::Failed)
-                            {
+                        if self.kernel.pending_action(id).is_some() {
+                            if let Err(error) = self.kernel.fail_execution(
+                                id,
+                                &state.work,
+                                &state.cleanups.protocol,
+                            ) {
                                 return Poll::Ready(Err(kernel_error(error)));
                             }
                             progress = true;
                         }
                     } else if self.mounted[&id].root_running.is_none()
                         && self.mounted[&id].groups.is_empty()
-                        && state.seal()
+                        && state.work.is_idle()
+                        && state.cleanups.protocol.can_seal()
                     {
-                        let ticket = self
-                            .kernel
-                            .pending_action(id)
-                            .cloned()
-                            .expect("restoration owns its cleanup action");
-                        // Only consumed FnOnce failures use Drained. Retained
-                        // retryable failures cannot reach this empty-journal path.
-                        let outcome = if self.mounted[&id].cleanup_drained {
-                            CleanupOutcome::Drained
-                        } else {
-                            CleanupOutcome::Succeeded
-                        };
-                        if let Err(error) = self.kernel.complete_cleanup(&ticket, outcome) {
-                            return Poll::Ready(Err(kernel_error(error)));
-                        }
-                        if let Err(error) = self.kernel.finish_cleanup(id) {
+                        let Episode { work, cleanups, .. } = &mut *state;
+                        if let Err(error) =
+                            self.kernel
+                                .release_execution(id, work, &mut cleanups.protocol)
+                        {
                             return Poll::Ready(Err(kernel_error(error)));
                         }
                         self.maintenance_changes += 1;
@@ -2973,7 +3071,8 @@ impl Runtime {
                         continue;
                     }
                     let missing = self.mounted[&id]
-                        .provisions
+                        .registration
+                        .provisions()
                         .iter()
                         .find(|port| !state.values.contains_key(&(id, port.key, port.realm)))
                         .copied();
@@ -2985,10 +3084,9 @@ impl Runtime {
                         );
                         progress = true;
                     } else {
-                        if let Err(error) = self.kernel.settle_setup(id) {
-                            return Poll::Ready(Err(kernel_error(error)));
-                        }
-                        let finished = self.kernel.finish(id);
+                        let finished =
+                            self.kernel
+                                .finish_execution(id, &state.work, &state.cleanups.protocol);
                         if finished.is_ok() {
                             state.phase = EpisodePhase::Active;
                         }
@@ -3036,12 +3134,12 @@ impl Runtime {
                 {
                     continue;
                 }
-                match self.kernel.begin(id) {
-                    Ok(()) => {}
+                let (work, cleanups) = match self.kernel.begin_execution(id, fresh(&NEXT_CLEANUP)) {
+                    Ok(owners) => owners,
                     Err(KernelError::MissingDependency) => continue,
                     Err(error) => return Poll::Ready(Err(kernel_error(error))),
-                }
-                self.start(id, cx);
+                };
+                self.start(id, cx, work, cleanups);
                 progress = true;
             }
             if progress {
@@ -3184,8 +3282,16 @@ mod setup_cancellation_tests {
             // Stop at the driver's real Begin/start boundary, before the next
             // pass may poll the returned future. This makes both cancellation
             // schedules explicit without relying on the driver's loop budget.
-            runtime.kernel.begin(owner).unwrap();
-            runtime.start(owner, &mut TaskContext::from_waker(Waker::noop()));
+            let (work, cleanups) = runtime
+                .kernel
+                .begin_execution(owner, fresh(&NEXT_CLEANUP))
+                .unwrap();
+            runtime.start(
+                owner,
+                &mut TaskContext::from_waker(Waker::noop()),
+                work,
+                cleanups,
+            );
             Self {
                 runtime,
                 owner,

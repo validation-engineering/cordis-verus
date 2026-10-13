@@ -110,6 +110,58 @@ impl LifecycleDriver {
     ) -> Result<usize, Error> {
         self.state.insert(parent, dependencies, provisions)
     }
+    pub fn register_plugin<T>(
+        &mut self,
+        parent: Option<usize>,
+        realms: &BTreeMap<u64, u64>,
+        anchor: Port,
+        definition: cordis_kernel::lifecycle_state::registration::PluginDefinition<T>,
+    ) -> Result<
+        cordis_kernel::lifecycle_state::registration::RegisteredPlugin<T>,
+        (
+            Error,
+            cordis_kernel::lifecycle_state::registration::PluginDefinition<T>,
+        ),
+    > {
+        self.state
+            .register_plugin(parent, realms, anchor, definition)
+    }
+    pub fn register_child_slot<T, E>(
+        &mut self,
+        slot: &mut cordis_kernel::lifecycle_state::registration::child::ChildSlot<E>,
+        realms: &BTreeMap<u64, u64>,
+        anchor: Port,
+        definition: cordis_kernel::lifecycle_state::registration::PluginDefinition<T>,
+    ) -> Result<
+        cordis_kernel::lifecycle_state::registration::RegisteredPlugin<T>,
+        (
+            Error,
+            cordis_kernel::lifecycle_state::registration::PluginDefinition<T>,
+        ),
+    > {
+        self.state
+            .register_child_slot(slot, realms, anchor, definition)
+    }
+    pub fn retire_child_slot<E>(
+        &mut self,
+        slot: &mut cordis_kernel::lifecycle_state::registration::child::ChildSlot<E>,
+    ) -> Result<Option<cordis_kernel::lifecycle_state::registration::ChildIdentity>, Error> {
+        self.state.retire_child_slot(slot)
+    }
+    pub fn admit_registered_root<T, C, G, A>(
+        &self,
+        plugin: &cordis_kernel::lifecycle_state::registration::RegisteredPlugin<T>,
+        work: &mut cordis_kernel::setup_work::SetupWork<C, G>,
+        argument: A,
+    ) -> Result<cordis_kernel::lifecycle_state::registration::RegisteredInvocation<A>, A> {
+        self.state.admit_registered_root(plugin, work, argument)
+    }
+    pub fn retire_child(
+        &mut self,
+        child: cordis_kernel::lifecycle_state::registration::ChildIdentity,
+    ) -> Result<(), Error> {
+        self.state.retire_child(child)
+    }
     pub fn declare_provision(&mut self, id: usize, port: Port) -> Result<(), Error> {
         self.state.declare_provision(id, port)
     }
@@ -133,6 +185,79 @@ impl LifecycleDriver {
         let ticket = self.state.begin(id)?;
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
+    }
+    /// Admit a native episode together with its bound work and cleanup owners.
+    #[allow(clippy::type_complexity)]
+    pub fn begin_execution<C, G, T>(
+        &mut self,
+        id: usize,
+        cleanup_domain: u64,
+    ) -> Result<
+        (
+            cordis_kernel::setup_work::SetupWork<C, G>,
+            cordis_kernel::cleanup_groups::CleanupGroups<T>,
+        ),
+        Error,
+    > {
+        let owners = self.state.begin_execution(id, cleanup_domain)?;
+        let ticket = owners
+            .0
+            .lifecycle_ticket()
+            .expect("admitted episode origin");
+        self.pending_views.insert(id, host_ticket(ticket));
+        Ok(owners)
+    }
+    pub fn settle_execution<C, G, T>(
+        &mut self,
+        id: usize,
+        work: &cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &cordis_kernel::cleanup_groups::CleanupGroups<T>,
+    ) -> Result<(), Error> {
+        self.state.settle_execution(id, work, groups)?;
+        self.pending_views.remove(&id);
+        Ok(())
+    }
+    pub fn finish_execution<C, G, T>(
+        &mut self,
+        id: usize,
+        work: &cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &cordis_kernel::cleanup_groups::CleanupGroups<T>,
+    ) -> Result<(), Error> {
+        let result = self.state.finish_execution(id, work, groups);
+        if self.state.pending(id).is_none() {
+            self.pending_views.remove(&id);
+        }
+        result
+    }
+    pub fn fail_execution<C, G, T>(
+        &mut self,
+        id: usize,
+        work: &cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &cordis_kernel::cleanup_groups::CleanupGroups<T>,
+    ) -> Result<(), Error> {
+        self.state.fail_execution(id, work, groups)?;
+        self.pending_views.remove(&id);
+        Ok(())
+    }
+    pub fn retry_execution<C, G, T>(
+        &mut self,
+        id: usize,
+        work: &cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &mut cordis_kernel::cleanup_groups::CleanupGroups<T>,
+    ) -> Result<ActionTicket, Error> {
+        let ticket = host_ticket(self.state.retry_execution(id, work, groups)?);
+        self.pending_views.insert(id, ticket.clone());
+        Ok(ticket)
+    }
+    pub fn release_execution<C, G, T>(
+        &mut self,
+        id: usize,
+        work: &mut cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &mut cordis_kernel::cleanup_groups::CleanupGroups<T>,
+    ) -> Result<CleanupOutcome, Error> {
+        let outcome = self.state.release_execution(id, work, groups)?;
+        self.pending_views.remove(&id);
+        Ok(outcome)
     }
     pub fn pending_action(&self, id: usize) -> Option<&ActionTicket> {
         self.pending_views.get(&id)

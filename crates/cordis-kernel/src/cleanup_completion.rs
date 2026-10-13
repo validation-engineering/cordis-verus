@@ -50,6 +50,22 @@ impl<T> CleanupQueue<T> {
         CleanupReport {result,outcome:selected,discarded}
     }
 
+    /// Synchronous adapter results use the same outcome policy as Futures.
+    /// The caller still owns the obligation to execute the actual operation.
+    #[allow(clippy::type_complexity)]
+    pub fn complete_result<E>(&mut self,ticket:RestoreTicket,result:Result<(),E>,retry:Option<T>,policy:CleanupPolicy)
+        ->(out:Result<CleanupReport<E,T>,(RestoreTicket,Result<(),E>,Option<T>)>)
+        requires old(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+            out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(ticket) && !old(self).protocol().failed_spec()),
+            out.is_err() ==> final(self).same(old(self)) && out->Err_0==(ticket,result,retry),
+            out.is_ok() ==> out->Ok_0.result==result && out->Ok_0.outcome==outcome(result,retry,policy)
+                && out->Ok_0.discarded==if result.is_ok() {retry} else {None} && !final(self).issued(),
+    {
+        if !self.reply_pending(ticket) {return Err((ticket,result,retry));}
+        Ok(self.accept_result(ticket,result,retry,policy))
+    }
+
     /// A real Future's output and the captured request arrive as one owned
     /// value. Rejection returns both the completion and retry payload unchanged.
     #[allow(clippy::type_complexity)]

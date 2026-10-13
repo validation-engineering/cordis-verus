@@ -742,7 +742,7 @@
         "id": "awaited-results",
         "status": "complete",
         "scope": "Native async output/origin pairing and completion from the actual returned Result, retaining both host failure policies.",
-        "remaining": "This does not prove factory-to-Future association, external I/O truth or eventual return.",
+        "remaining": "Native factory/Future/result transport does not prove external I/O truth, poll/panic adaptation or eventual return. Native registered FnMut provenance is now checked separately.",
         "reviewPath": [
           {
             "file": "crates/cordis-kernel/src/async_completion.rs",
@@ -788,8 +788,38 @@
         "id": "invocation-effect-origin",
         "status": "partial",
         "scope": "Establish actual argument, executed operation, result, continuation and inverse laws for extensible managed plugin entry points.",
-        "remaining": "Native invocation and private WorkItem/WorkReceipt now bind actual queued arguments, factory Futures and completion results in production. Registered-plugin provenance, primitive inverse laws and checked poll/panic adaptation remain open; generic FnOnce laws do not prove arbitrary plugin bodies.",
+        "remaining": "Native registration now owns the actual recipe and resolved interface. Root admission checks current lifecycle action/generation and recipe revision; direct stored FnMut invocation and Ready/Pending dispatch preserve real arguments, results and Futures. Concrete plugin effect/inverse laws and checked poll/panic adaptation remain open; native call laws do not prove arbitrary plugin bodies.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/child_slot.rs",
+            "symbol": "register_child_slot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/child_slot.rs",
+            "symbol": "retire_child_slot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "register_plugin",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "call",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "admit_registered_root",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_work.rs",
+            "symbol": "dispatch",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/async_completion.rs",
             "symbol": "invoke",
@@ -826,8 +856,58 @@
         "id": "production-composition",
         "status": "partial",
         "scope": "One checked production invariant owns all concurrent groups, dynamic Child, admitted work, publications and drain/release decisions.",
-        "remaining": "CleanupGroups owns every cleanup queue. SetupWork owns queued requests, tracks issued dispatch and root completion, atomically admits Child plus inverse, and checks these with the matching group state before seal/publication. The joint lifecycle/publication invariant, actual Child allocation relation and the ordinary poll/panic adapter remain to be proved.",
+        "remaining": "Begin constructs bound work/group owners; native Finish, failure, atomic retry and Unload inspect them and derive release outcomes. Real Child registration now resolves authoritative parent dependencies and realm ports; its private inverse identity checks domain/parent on retirement. The real shared Child slot is now assigned once from actual registration, checks the original parent generation and closes pending allocation when its inverse runs first. The ordinary Mounted map, shared Child handle aliasing/synchronization, publication values, poll/panic adaptation, external adapters and full host observation still need a joint semantic invariant.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/child_slot.rs",
+            "symbol": "register_child_slot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/child_slot.rs",
+            "symbol": "retire_child_slot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "register_plugin",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "retire_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "mount_inner",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution_lifecycle.rs",
+            "symbol": "release_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution_lifecycle.rs",
+            "symbol": "retry_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution_lifecycle.rs",
+            "symbol": "fail_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution_lifecycle.rs",
+            "symbol": "finish_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution_lifecycle.rs",
+            "symbol": "begin_execution",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/setup_work.rs",
             "symbol": "seal",
@@ -874,8 +954,33 @@
         "id": "complete-step-classification",
         "status": "partial",
         "scope": "Classify the complete production trace against R1 and explicitly specified host extensions.",
-        "remaining": "Control wrappers, visible payload updates and accumulator projections have local contracts; the unified trace correspondence and all extensions remain to be proved.",
+        "remaining": "Native composed Begin/Finish/Unload, resolved real registration and Child retirement prove their paper control steps; visible payload updates and accumulator projections also have local contracts. This is not the full R1 context interpretation: shared production-state correspondence, complete trace classification and all extensions remain to be proved.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/child_slot.rs",
+            "symbol": "register_child_slot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/child_slot.rs",
+            "symbol": "retire_child_slot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "registration_enabled",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "registered_dependencies",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution_lifecycle.rs",
+            "symbol": "release_execution",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/lifecycle_state.rs",
             "symbol": "insert",

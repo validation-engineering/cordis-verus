@@ -140,7 +140,7 @@ impl LifecycleState {
             final(self).control().unchanged(&old(self).control()),
             final(self).protocol().history_preserved(&old(self).protocol()),
             final(self).protocol().no_new_release(&old(self).protocol()),
-            out.is_ok() ==> !final(self).protocol().recorded(ticket),
+            out.is_ok() ==> !final(self).protocol().recorded(ticket) && !final(self).protocol().outstanding(ticket.id),
     {self.actions.complete_setup(ticket)}
 
     pub fn complete_cleanup(&mut self,ticket:ActionTicket,outcome:CleanupOutcome)->(out:Result<(),ActionError>)
@@ -231,7 +231,8 @@ impl LifecycleState {
         ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
             out.is_ok()==(!old(self).protocol().blocked_spec(id) && old(self).control().iteration_enabled(id)),
             out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Finish),
+            out.is_ok() ==> final(self).control().phase_of(id)==Some(Phase::Active)
+                && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Finish),
     {proof {self.actions.same_reflexive();} if self.actions.blocked(id) {proof {reveal(Kernel::unchanged);} return Err(Error::InvalidState);} self.kernel.finish(id)}
 
     pub fn remove(&mut self,id:usize)->(out:Result<(),Error>)
@@ -308,3 +309,9 @@ impl LifecycleState {
 
 #[path = "cleanup_protocol.rs"]
 pub mod cleanup;
+
+#[path = "execution_lifecycle.rs"]
+pub mod execution;
+
+#[path = "plugin_registration.rs"]
+pub mod registration;

@@ -672,22 +672,22 @@ impl StaticCleanupFuture {
         result: CallbackResult,
         retry: Option<RetryCleanup>,
     ) -> CallbackResult {
-        let outcome = if result.is_ok() {
-            RestoreOutcome::Succeeded
-        } else {
-            RestoreOutcome::Failed
+        let completed = lock(&self.episode.setup.state).cleanups.complete_result(
+            0,
+            ticket,
+            result,
+            retry,
+            CleanupPolicy::RetainFailure,
+        );
+        let report = match completed {
+            Ok(report) => report,
+            Err(rejected) => {
+                drop(rejected);
+                panic!("exact issued restoration receipt");
+            }
         };
-        let retained = if result.is_err() {
-            retry
-        } else {
-            drop(retry);
-            None
-        };
-        let completed = lock(&self.episode.setup.state)
-            .cleanups
-            .complete(0, ticket, outcome, retained);
-        assert!(completed.is_ok(), "exact issued restoration receipt");
-        result
+        drop(report.discarded);
+        report.result
     }
 }
 impl Future for StaticCleanupFuture {
@@ -822,7 +822,7 @@ impl StaticChildRequest {
 struct StaticChildProgress {
     owner: PluginId,
     generation: u64,
-    identity: Arc<Mutex<Result<Option<PluginId>, String>>>,
+    identity: ChildState,
     assigned: bool,
     retiring: bool,
     removed: bool,
@@ -841,7 +841,7 @@ impl StaticChildControl {
     pub(super) fn new(
         owner: PluginId,
         generation: u64,
-        identity: Arc<Mutex<Result<Option<PluginId>, String>>>,
+        identity: ChildState,
         service: Option<EffectHandle>,
         notify: Arc<dyn Fn() + Send + Sync>,
     ) -> Self {
@@ -865,11 +865,7 @@ impl StaticChildControl {
         lock(&self.0).generation
     }
     pub fn id(&self) -> Option<PluginId> {
-        lock(&lock(&self.0).identity)
-            .as_ref()
-            .ok()
-            .copied()
-            .flatten()
+        lock(&lock(&self.0).identity).id()
     }
     pub fn retirement_requested(&self) -> bool {
         let state = lock(&self.0);
@@ -903,7 +899,7 @@ impl StaticChildControl {
             if error.is_some() {
                 state.removed = true;
             }
-            *lock(&state.identity) = result.map(Some);
+            *lock(&state.identity) = ChildRecord::External(result.map(Some));
             let notify = if error.is_some() {
                 state.notify.take()
             } else {
@@ -944,7 +940,7 @@ impl StaticChildControl {
     pub fn mark_initialized(&self) -> Result<(), String> {
         let service = {
             let state = lock(&self.0);
-            if !state.assigned || state.removed || lock(&state.identity).is_err() {
+            if !state.assigned || state.removed || lock(&state.identity).error().is_some() {
                 return Err("StaticChildNotMounted".into());
             }
             state.service.clone()
@@ -1033,14 +1029,7 @@ impl StaticChildControl {
             if let Some(error) = &state.cleanup_error {
                 return Err(error.clone());
             }
-            if !state.assigned
-                || lock(&state.identity)
-                    .as_ref()
-                    .ok()
-                    .copied()
-                    .flatten()
-                    .is_none()
-            {
+            if !state.assigned || lock(&state.identity).id().is_none() {
                 return Err("StaticChildNotMounted".into());
             }
             state.removed = true;

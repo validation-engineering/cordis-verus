@@ -2,6 +2,9 @@
 //! the actual queues, including issued callbacks, failures and pending stages.
 //! Sealing accepts no caller-supplied drain flag, and queues cannot be mutably
 //! borrowed. Only live queues occupy storage; identities are never reused.
+#[cfg(verus_keep_ghost)]
+use crate::action_ledger::ActionKind;
+use crate::action_ledger::ActionTicket;
 use crate::async_completion::Completion;
 use crate::cleanup_journal::{RestoreError, RestoreOutcome, RestoreTicket};
 use crate::cleanup_queue::completion::{CleanupPolicy, CleanupReport};
@@ -21,6 +24,8 @@ pub struct CleanupGroups<T> {
     next:usize,
     last_domain:u64,
     sealed:bool,
+    consumed_failure:bool,
+    lifecycle:Option<ActionTicket>,
 }
 
 pub open spec fn drained<T>(queue:CleanupQueue<T>)->bool {
@@ -29,13 +34,21 @@ pub open spec fn drained<T>(queue:CleanupQueue<T>)->bool {
 }
 
 impl<T> CleanupGroups<T> {
+    pub closed spec fn origin(&self)->Option<ActionTicket> {self.lifecycle}
+    pub fn lifecycle_ticket(&self)->(out:Option<ActionTicket>) ensures out==self.origin(), {self.lifecycle}
     pub closed spec fn queues(&self)->Map<usize,CleanupQueue<T>> {self.entries@}
     pub closed spec fn domain_ids(&self)->Map<usize,u64> {self.domains@}
     pub closed spec fn next_id(&self)->usize {self.next}
     pub closed spec fn last_domain(&self)->u64 {self.last_domain}
     pub closed spec fn closed(&self)->bool {self.sealed}
+    /// Sticky evidence that an accepted cleanup was consumed after failure.
+    /// Removing a completed group must not erase this distinction.
+    pub closed spec fn drained_failure(&self)->bool {self.consumed_failure}
+    pub fn has_consumed_failure(&self)->(out:bool) ensures out==self.drained_failure(),
+    {self.consumed_failure}
     pub open spec fn live(&self,id:usize)->bool {self.queues().contains_key(id)}
     pub open spec fn wf(&self)->bool {
+        &&& self.origin().is_some() ==> self.origin().unwrap().kind==ActionKind::Setup
         &&& self.queues().dom().subset_of(self.domain_ids().dom())
         &&& forall|id:usize| #[trigger] self.domain_ids().contains_key(id) ==>
             id<self.next_id() && self.domain_ids()[id]<=self.last_domain()
@@ -45,7 +58,7 @@ impl<T> CleanupGroups<T> {
             && self.queues()[id].protocol().domain_id()==self.domain_ids()[id] && !self.closed()
     }
     pub open spec fn frame(&self,prior:&Self,id:usize)->bool {
-        self.next_id()==prior.next_id() && self.last_domain()==prior.last_domain() && self.closed()==prior.closed()
+        self.origin()==prior.origin() && self.next_id()==prior.next_id() && self.last_domain()==prior.last_domain() && self.closed()==prior.closed()
             && forall|other:usize| #![trigger self.queues().contains_key(other)] #![trigger self.queues()[other]] other!=id ==>
                 self.queues().contains_key(other)==prior.queues().contains_key(other)
                 && (self.queues().contains_key(other) ==> self.queues()[other]==prior.queues()[other])
@@ -58,6 +71,9 @@ impl<T> CleanupGroups<T> {
     pub open spec fn any_pending(&self)->bool {
         exists|id:usize| #[trigger] self.queues().contains_key(id) && self.queues()[id].protocol().stage().pending()
     }
+    pub open spec fn any_issued(&self)->bool {
+        exists|id:usize| #[trigger] self.queues().contains_key(id) && self.queues()[id].issued()
+    }
     pub open spec fn any_failed(&self)->bool {
         exists|id:usize| #[trigger] self.queues().contains_key(id) && self.queues()[id].protocol().failed_spec()
     }
@@ -66,12 +82,19 @@ impl<T> CleanupGroups<T> {
             && self.queues()[id].protocol().failed_spec() ==> self.queues()[id].retry_enabled()
     }
     pub fn new(root_domain:u64)->(out:Self)
-        ensures out.wf(),!out.closed(),out.queues().dom()==set![0usize],out.next_id()==1,
+        ensures out.wf(),out.origin().is_none(),!out.closed(),!out.drained_failure(),out.queues().dom()==set![0usize],out.next_id()==1,
             out.queues()[0].slots().len()==0,out.domain_ids()==map![0usize=>root_domain],out.last_domain()==root_domain,
     {
         let mut entries=BTreeMap::new();entries.insert(0, CleanupQueue::scope(root_domain));
         let mut domains=BTreeMap::new();domains.insert(0,root_domain);
-        Self {entries,domains,next:1,last_domain:root_domain,sealed:false}
+        Self {entries,domains,next:1,last_domain:root_domain,sealed:false,consumed_failure:false,lifecycle:None}
+    }
+    pub(crate) fn for_lifecycle(ticket:ActionTicket,root_domain:u64)->(out:Self)
+        requires ticket.kind==ActionKind::Setup,
+        ensures out.wf(),out.origin()==Some(ticket),!out.closed(),!out.drained_failure(),
+            out.queues().dom()==set![0usize],out.domain_ids()==map![0usize=>root_domain],
+    {
+        let mut out=Self::new(root_domain);out.lifecycle=Some(ticket);out
     }
     pub fn contains(&self,id:usize)->(out:bool) ensures out==self.live(id),
     {self.entries.contains_key(&id)}
@@ -100,7 +123,7 @@ impl<T> CleanupGroups<T> {
     }
     fn take(&mut self,id:usize)->(out:CleanupQueue<T>)
         requires old(self).wf(),old(self).live(id),
-        ensures final(self).wf(),final(self).frame(old(self),id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),
             final(self).domain_ids()==old(self).domain_ids(),final(self).queues()==old(self).queues().remove(id),
             out==old(self).queues()[id],out.wf(),
             out.protocol().domain_id()==final(self).domain_ids()[id],!final(self).closed(),
@@ -112,7 +135,7 @@ impl<T> CleanupGroups<T> {
     fn put(&mut self,id:usize,queue:CleanupQueue<T>)
         requires old(self).wf(),!old(self).closed(),old(self).domain_ids().contains_key(id),
             !old(self).live(id),queue.wf(),queue.protocol().domain_id()==old(self).domain_ids()[id],
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
             final(self).queues()==old(self).queues().insert(id,queue),
     {
         let ghost prior=*self;
@@ -123,7 +146,7 @@ impl<T> CleanupGroups<T> {
     /// high-water mark rejects reuse without retaining each removed queue.
     pub fn add_iterator(&mut self,domain:u64,committed:Vec<Binding>)->(out:Result<usize,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),
             out.is_ok()==(!old(self).closed() && domain>old(self).last_domain() && old(self).next_id()<usize::MAX),
             out.is_err() ==> *final(self)==*old(self),
             out.is_ok() ==> out->Ok_0==old(self).next_id() && final(self).next_id()==old(self).next_id()+1
@@ -142,7 +165,7 @@ impl<T> CleanupGroups<T> {
     }
     pub fn register(&mut self,id:usize,payload:T)->(out:Result<usize,T>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==payload,
             out.is_ok() ==> final(self).live(id)
                 && out->Ok_0==old(self).queues()[id].slots().len()
@@ -153,14 +176,14 @@ impl<T> CleanupGroups<T> {
     }
     pub fn admit(&mut self,id:usize,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out ==> old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out ==> old(self).live(id),
             final(self).live(id)==old(self).live(id),
     {
         if !self.contains(id) {return false;}
         let mut queue=self.take(id);let out=queue.admit(target);self.put(id,queue);out
     }
     pub fn cancel(&mut self,id:usize)
-        requires old(self).wf(),ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
+        requires old(self).wf(),ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
             final(self).live(id)==old(self).live(id),
     {
         if !self.contains(id) {return;}
@@ -169,7 +192,7 @@ impl<T> CleanupGroups<T> {
     pub fn land_result<E>(&mut self,id:usize,result:Result<Option<T>,E>)
         ->(out:Result<StageReport<E>,Result<Option<T>,E>>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_ok()==(old(self).live(id) && old(self).queues()[id].protocol().stage().pending()),
             out.is_err() ==> out->Err_0==result,
             out.is_ok() && result.is_ok() && result->Ok_0.is_some() ==>
@@ -183,7 +206,7 @@ impl<T> CleanupGroups<T> {
     }
     pub fn pop(&mut self,id:usize)->(out:Result<Option<(RestoreTicket,T)>,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_ok() && out->Ok_0.is_some() ==> old(self).live(id)
                 && final(self).queues()[id].issued()
                 && final(self).queues()[id].protocol().selected()==Some(out->Ok_0.unwrap().0)
@@ -194,18 +217,20 @@ impl<T> CleanupGroups<T> {
     }
     pub fn complete(&mut self,id:usize,ticket:RestoreTicket,outcome:RestoreOutcome,retry:Option<T>)->(out:Result<(),Option<T>>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && outcome==RestoreOutcome::Drained)),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_ok()==(old(self).live(id) && old(self).queues()[id].completion_enabled(ticket,outcome,retry)),
             out.is_err() ==> out->Err_0==retry,
     {
         if !self.contains(id) {return Err(retry);}
-        let mut queue=self.take(id);let out=queue.complete(ticket,outcome,retry);self.put(id,queue);out
+        let mut queue=self.take(id);let out=queue.complete(ticket,outcome,retry);self.put(id,queue);
+        if out.is_ok() && outcome==RestoreOutcome::Drained {self.consumed_failure=true;}
+        out
     }
     #[allow(clippy::type_complexity)]
     pub fn complete_future<E>(&mut self,id:usize,completion:Completion<RestoreTicket,Result<(),E>>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(Completion<RestoreTicket,Result<(),E>>,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_err() ==> out->Err_0==(completion,retry),
             out.is_ok() ==> old(self).live(id) && out->Ok_0.result==completion.result()
                 && old(self).queues()[id].issued()
@@ -213,22 +238,40 @@ impl<T> CleanupGroups<T> {
                 && !final(self).queues()[id].issued(),
     {
         if !self.contains(id) {return Err((completion,retry));}
-        let mut queue=self.take(id);let out=queue.complete_future(completion,retry,policy);self.put(id,queue);out
+        let mut queue=self.take(id);let out=queue.complete_future(completion,retry,policy);self.put(id,queue);
+        if let Ok(report)=&out {if report.outcome==RestoreOutcome::Drained {self.consumed_failure=true;}}
+        out
     }
     #[allow(clippy::type_complexity)]
     pub fn complete_failure<E>(&mut self,id:usize,ticket:RestoreTicket,error:E,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(RestoreTicket,E,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_err() ==> out->Err_0==(ticket,error,retry),
             out.is_ok() ==> out->Ok_0.result==Err(error) && out->Ok_0.outcome!=RestoreOutcome::Succeeded,
     {
         if !self.contains(id) {return Err((ticket,error,retry));}
-        let mut queue=self.take(id);let out=queue.complete_failure(ticket,error,retry,policy);self.put(id,queue);out
+        let mut queue=self.take(id);let out=queue.complete_failure(ticket,error,retry,policy);self.put(id,queue);
+        if let Ok(report)=&out {if report.outcome==RestoreOutcome::Drained {self.consumed_failure=true;}}
+        out
+    }
+    #[allow(clippy::type_complexity)]
+    pub fn complete_result<E>(&mut self,id:usize,ticket:RestoreTicket,result:Result<(),E>,retry:Option<T>,policy:CleanupPolicy)
+        ->(out:Result<CleanupReport<E,T>,(RestoreTicket,Result<(),E>,Option<T>)>)
+        requires old(self).wf(),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+            final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),
+            out.is_err() ==> out->Err_0==(ticket,result,retry),
+            out.is_ok() ==> out->Ok_0.result==result && out->Ok_0.outcome==crate::cleanup_queue::completion::outcome(result,retry,policy),
+    {
+        if !self.contains(id) {return Err((ticket,result,retry));}
+        let mut queue=self.take(id);let out=queue.complete_result(ticket,result,retry,policy);self.put(id,queue);
+        if let Ok(report)=&out {if report.outcome==RestoreOutcome::Drained {self.consumed_failure=true;}}
+        out
     }
     pub fn retry(&mut self,id:usize)->(out:Result<RestoreTicket,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_ok()==(old(self).live(id) && old(self).queues()[id].retry_enabled()),
             out.is_ok() ==> !final(self).queues()[id].protocol().failed_spec(),
     {
@@ -246,6 +289,21 @@ impl<T> CleanupGroups<T> {
         {
             assert(ids@.to_set().contains(ids@[i as int]));assert(self.live(ids@[i as int]));
             if self.entries.get(&ids[i]).unwrap().is_pending() {return true;}
+            i+=1;
+        }
+        false
+    }
+    pub fn has_issued(&self)->(out:bool)
+        requires self.wf(),ensures out==self.any_issued(),
+    {
+        let ids=self.active_ids();let mut i=0;
+        while i<ids.len()
+            invariant self.wf(),ids@.to_set()==self.queues().dom(),i<=ids.len(),
+                forall|j:int| 0<=j<i ==> !self.queues()[#[trigger] ids@[j]].issued(),
+            decreases ids.len()-i,
+        {
+            assert(ids@.to_set().contains(ids@[i as int]));assert(self.live(ids@[i as int]));
+            if self.entries.get(&ids[i]).unwrap().is_issued() {return true;}
             i+=1;
         }
         false
@@ -284,7 +342,7 @@ impl<T> CleanupGroups<T> {
     }
     pub fn retry_all(&mut self)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),out==old(self).retries_ready(),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),out==old(self).retries_ready(),
             final(self).domain_ids()==old(self).domain_ids(),final(self).closed()==old(self).closed(),
             final(self).queues().dom()==old(self).queues().dom(),
             final(self).next_id()==old(self).next_id(),final(self).last_domain()==old(self).last_domain(),
@@ -297,6 +355,7 @@ impl<T> CleanupGroups<T> {
             invariant self.wf(),prior.retries_ready(),ids@.no_duplicates(),ids@.to_set()==self.queues().dom(),
                 self.domain_ids()==prior.domain_ids(),self.closed()==prior.closed(),
                 self.next_id()==prior.next_id(),self.last_domain()==prior.last_domain(),
+                self.drained_failure()==prior.drained_failure(),self.origin()==prior.origin(),
                 self.queues().dom()==prior.queues().dom(),i<=ids.len(),
                 forall|j:int| i<=j<ids.len() ==> self.queues()[#[trigger] ids@[j]]==prior.queues()[ids@[j]],
                 forall|j:int| 0<=j<i ==> !self.queues()[#[trigger] ids@[j]].protocol().failed_spec(),
@@ -350,7 +409,7 @@ impl<T> CleanupGroups<T> {
     /// Failed/issued receipts also prevent removal. Only live metadata remains.
     pub fn remove(&mut self,id:usize)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).frame(old(self),id),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),
             out==(old(self).live(id) && drained(old(self).queues()[id])),
             out ==> final(self).queues()==old(self).queues().remove(id)
                 && final(self).domain_ids()==old(self).domain_ids().remove(id)
@@ -367,7 +426,7 @@ impl<T> CleanupGroups<T> {
     /// There is no host-supplied manifest from which a group could be omitted.
     pub fn seal(&mut self)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),out==old(self).all_drained(),out ==> final(self).closed(),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),out==old(self).all_drained(),out ==> final(self).closed(),
             final(self).next_id()==old(self).next_id(),final(self).last_domain()==old(self).last_domain(),
             out ==> final(self).queues()==Map::empty() && final(self).domain_ids()==Map::empty(),
             !out ==> *final(self)==*old(self),

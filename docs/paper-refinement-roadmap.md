@@ -44,7 +44,13 @@ R2 now connects actual publication payloads, lease-selected values, awaited
 cleanup results and landed inverse/continuation decisions to production callers.
 Native call contracts also preserve actual factory arguments/results, and one
 verified container now owns all Rust/static cleanup queues, bulk retries and sealing.
-Root setup and actual Child/group dispatch receipts now participate in drain checks; Child requests and inverses are admitted atomically.
+Root setup and actual Child/group dispatch receipts participate in bound lifecycle
+admission, failure, retry and release; Child requests and inverses are admitted
+atomically. Native registration now resolves authoritative parent/realm ports,
+stores the actual recipe, and directly invokes that `FnMut` after checking the
+current setup action and recipe revision. Child retirement uses the identity
+produced by real allocation. Its shared native slot permits one assignment in
+the originating episode and closes pending allocation when its inverse runs first.
 See [R2 execution contracts](r2-execution.md) for the proved scope and review path.
 R2 remains open for the complete callback effect contract, concurrent production
 composition and whole-trace correspondence; its exit criteria are unchanged.

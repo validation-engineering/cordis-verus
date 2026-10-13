@@ -3447,8 +3447,8 @@
       "name": "r2-cleanup-future-forges-success",
       "mutation": {
         "file": "cleanup_completion.rs",
-        "old": "Ok(self.accept_result(ticket,result,retry,policy))",
-        "new": "Ok(self.accept_result(ticket,Ok(()),retry,policy))"
+        "old": "let (ticket,result)=completion.into_parts();\n        Ok(self.accept_result(ticket,result,retry,policy))",
+        "new": "let (ticket,result)=completion.into_parts();\n        Ok(self.accept_result(ticket,Ok(()),retry,policy))"
       },
       "targets": [
         {
@@ -3622,6 +3622,256 @@
         }
       ],
       "selectionRationale": "Issued work remains part of the real episode drain guard. Require a fresh selected positive, full mutant compilation and exact contract rejection; this is not whole-host or full-negative acceptance."
+    },
+    {
+      "name": "r2-execution-ignores-bound-origin",
+      "mutation": {
+        "file": "execution_lifecycle.rs",
+        "old": "groups.lifecycle_ticket()==Some(ticket) && ticket.domain==self.domain() && ticket.id==id",
+        "new": "ticket.domain==self.domain() && ticket.id==id"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::execution",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::matches_execution",
+          "module": "lifecycle_state::execution",
+          "file": "execution_lifecycle.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==self.execution_matches(id,work,groups),"
+        }
+      ],
+      "selectionRationale": "The production lifecycle composition must use the bound work/group origin and derive the release outcome from accepted cleanup results. Require a fresh selected positive, complete mutant compilation and exact contract rejection; this does not establish whole-host refinement."
+    },
+    {
+      "name": "r2-execution-forges-restoration-success",
+      "mutation": {
+        "file": "execution_lifecycle.rs",
+        "old": "let outcome=if groups.has_consumed_failure() {CleanupOutcome::Drained} else {CleanupOutcome::Succeeded};",
+        "new": "let outcome=CleanupOutcome::Succeeded;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::execution",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::release_execution",
+          "module": "lifecycle_state::execution",
+          "file": "execution_lifecycle.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> old(self).execution_matches(id,old(work),old(groups)) && old(work).idle() && old(groups).all_drained()"
+        }
+      ],
+      "selectionRationale": "The production lifecycle composition must use the bound work/group origin and derive the release outcome from accepted cleanup results. Require a fresh selected positive, complete mutant compilation and exact contract rejection; this does not establish whole-host refinement."
+    },
+    {
+      "name": "r2-registration-loses-isolated-realm",
+      "mutation": {
+        "file": "plugin_registration.rs",
+        "old": "Port {key,realm:match realms.get(&key) {Some(realm)=>*realm,None=>0}}",
+        "new": "Port {key,realm:0}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::registration::resolve",
+          "module": "lifecycle_state::registration",
+          "file": "plugin_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==resolved(realms@,key),"
+        }
+      ],
+      "selectionRationale": "The actual runtime registration path must preserve resolved dependencies, invoke only its admitted recipe revision and retire a Child only in its owning runtime. Require a fresh selected positive, complete mutant compilation and rejection of the named contract; this is not whole-host semantic refinement."
+    },
+    {
+      "name": "r2-registration-forgets-actual-dependencies",
+      "mutation": {
+        "file": "plugin_registration.rs",
+        "old": "Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies,provisions,revision:0,payload:definition.payload})",
+        "new": "Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies:Vec::new(),provisions,revision:0,payload:definition.payload})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::register_plugin",
+          "module": "lifecycle_state::registration",
+          "file": "plugin_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {"
+        }
+      ],
+      "selectionRationale": "The actual runtime registration path must preserve resolved dependencies, invoke only its admitted recipe revision and retire a Child only in its owning runtime. Require a fresh selected positive, complete mutant compilation and rejection of the named contract; this is not whole-host semantic refinement."
+    },
+    {
+      "name": "r2-registered-call-ignores-recipe-revision",
+      "mutation": {
+        "file": "plugin_registration.rs",
+        "old": "if invocation.domain!=self.domain || invocation.id!=self.id || invocation.revision!=self.revision {return Err(invocation);}",
+        "new": "if invocation.domain!=self.domain || invocation.id!=self.id {return Err(invocation);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::registration::RegisteredPlugin::call",
+          "module": "lifecycle_state::registration",
+          "file": "plugin_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(invocation.domain_id()==old(self).domain_id() && invocation.owner()==old(self).owner()"
+        }
+      ],
+      "selectionRationale": "The actual runtime registration path must preserve resolved dependencies, invoke only its admitted recipe revision and retire a Child only in its owning runtime. Require a fresh selected positive, complete mutant compilation and rejection of the named contract; this is not whole-host semantic refinement."
+    },
+    {
+      "name": "r2-child-inverse-ignores-runtime-domain",
+      "mutation": {
+        "file": "plugin_registration.rs",
+        "old": "if child.domain!=self.domain() {return Err(Error::InvalidState);}",
+        "new": "if false {return Err(Error::InvalidState);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::retire_child",
+          "module": "lifecycle_state::registration",
+          "file": "plugin_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> child.domain_id()==old(self).protocol().domain_id()"
+        }
+      ],
+      "selectionRationale": "The actual runtime registration path must preserve resolved dependencies, invoke only its admitted recipe revision and retire a Child only in its owning runtime. Require a fresh selected positive, complete mutant compilation and rejection of the named contract; this is not whole-host semantic refinement."
+    },
+    {
+      "name": "r2-child-slot-overwrites-assignment",
+      "mutation": {
+        "file": "child_slot.rs",
+        "old": "if !slot.pending() || slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {",
+        "new": "if slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::register_child_slot",
+          "module": "lifecycle_state::registration::child",
+          "file": "child_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(slot).state() is Pending && old(slot).domain_id()==old(self).protocol().domain_id()"
+        }
+      ],
+      "selectionRationale": "A real native Child shared slot must be assigned once in its originating episode; consuming a pending inverse must prohibit later allocation. Require a fresh selected positive, full mutant compilation, and exact contract rejection. Ordinary Arc aliasing and Mutex synchronization remain host boundaries."
+    },
+    {
+      "name": "r2-child-slot-accepts-obsolete-episode",
+      "mutation": {
+        "file": "child_slot.rs",
+        "old": "if !slot.pending() || slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {",
+        "new": "if !slot.pending() || slot.domain!=self.domain() {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::register_child_slot",
+          "module": "lifecycle_state::registration::child",
+          "file": "child_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(slot).state() is Pending && old(slot).domain_id()==old(self).protocol().domain_id()"
+        }
+      ],
+      "selectionRationale": "A real native Child shared slot must be assigned once in its originating episode; consuming a pending inverse must prohibit later allocation. Require a fresh selected positive, full mutant compilation, and exact contract rejection. Ordinary Arc aliasing and Mutex synchronization remain host boundaries."
+    },
+    {
+      "name": "r2-child-slot-drops-pending-inverse",
+      "mutation": {
+        "file": "child_slot.rs",
+        "old": "if slot.pending() {slot.status=ChildStatus::Cancelled;}",
+        "new": "if false {slot.status=ChildStatus::Cancelled;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::retire_child_slot",
+          "module": "lifecycle_state::registration::child",
+          "file": "child_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> old(slot).domain_id()==old(self).protocol().domain_id()"
+        }
+      ],
+      "selectionRationale": "A real native Child shared slot must be assigned once in its originating episode; consuming a pending inverse must prohibit later allocation. Require a fresh selected positive, full mutant compilation, and exact contract rejection. Ordinary Arc aliasing and Mutex synchronization remain host boundaries."
+    },
+    {
+      "name": "r2-child-slot-allocates-after-parent-unload",
+      "mutation": {
+        "file": "child_slot.rs",
+        "old": "if phase!=Some(Phase::Loading) && phase!=Some(Phase::Active) {return Err((Error::InvalidState,definition));}",
+        "new": "if false {return Err((Error::InvalidState,definition));}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::register_child_slot",
+          "module": "lifecycle_state::registration::child",
+          "file": "child_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(slot).state() is Pending && old(slot).domain_id()==old(self).protocol().domain_id()"
+        }
+      ],
+      "selectionRationale": "Generation equality cannot admit an old request between parent Unload and the next Begin. Require fresh selected positive, complete mutant compilation and exact live-parent contract rejection."
     }
   ]
 }
