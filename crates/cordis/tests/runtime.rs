@@ -1777,3 +1777,148 @@ fn effect_wakers_may_reenter_their_handle_without_locking_deadlock() {
         assert!(reenter.calls.load(Ordering::SeqCst) >= 2);
     });
 }
+
+#[test]
+fn native_child_allocation_failure_remains_visible_through_cloned_handles() {
+    let mut runtime = Runtime::new();
+    let key = ServiceKey::<u32>::new("conflicting-child-publication");
+    let stored = Arc::new(Mutex::new(None));
+    let output = stored.clone();
+    let parent = runtime
+        .mount(
+            &Context::new(),
+            None,
+            Plugin::new("parent", move |ctx| {
+                ctx.provide(key, 1)?;
+                let child = ctx.mount(
+                    Plugin::new("conflicting child", move |ctx| {
+                        ctx.provide(key, 2)?;
+                        Ok(())
+                    })
+                    .provides(key),
+                )?;
+                *output.lock().unwrap() = Some(child);
+                Ok(())
+            })
+            .provides(key),
+        )
+        .unwrap();
+    assert!(block_on(runtime.settle()).is_err());
+    let child = stored.lock().unwrap().clone().unwrap();
+    let error = child.error().expect("actual pre-allocation failure");
+    assert!(!error.is_empty());
+    assert_eq!(child.id(), None);
+    assert_eq!(runtime.ids(), vec![parent]);
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            let child = child.clone();
+            let error = error.clone();
+            scope.spawn(move || {
+                for _ in 0..100 {
+                    assert_eq!(child.id(), None);
+                    assert_eq!(child.error(), Some(error.clone()));
+                }
+            });
+        }
+    });
+}
+
+#[test]
+fn native_child_handles_keep_identity_during_concurrent_observation_and_removal() {
+    let mut runtime = Runtime::new();
+    let stored = Arc::new(Mutex::new(None));
+    let output = stored.clone();
+    let parent = runtime
+        .mount(
+            &Context::new(),
+            None,
+            Plugin::new("parent", move |ctx| {
+                *output.lock().unwrap() = Some(ctx.mount(Plugin::new("child", |_| Ok(())))?);
+                Ok(())
+            }),
+        )
+        .unwrap();
+    block_on(runtime.settle()).unwrap();
+    let child = stored.lock().unwrap().clone().unwrap();
+    let id = child.id().unwrap();
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            let child = child.clone();
+            scope.spawn(move || {
+                for _ in 0..1000 {
+                    assert_eq!(child.id(), Some(id));
+                    assert!(child.error().is_none());
+                }
+            });
+        }
+        runtime.dispose(parent).unwrap();
+        block_on(runtime.settle()).unwrap();
+    });
+    assert!(runtime.ids().is_empty());
+    assert_eq!(child.id(), Some(id));
+}
+
+#[test]
+fn cancelled_effect_context_rejects_acquisition_but_collects_its_late_inverse() {
+    run_bounded(|| {
+        let mut runtime = Runtime::new();
+        let owner = runtime
+            .mount(&Context::new(), None, Plugin::new("owner", |_| Ok(())))
+            .unwrap();
+        block_on(runtime.settle()).unwrap();
+        let gate = Arc::new(Gate::default());
+        let wait = gate.clone();
+        let captured = Arc::new(Mutex::new(None));
+        let capture = captured.clone();
+        let restored = Arc::new(AtomicUsize::new(0));
+        let restore = restored.clone();
+        let next = Arc::new(AtomicUsize::new(0));
+        let next_call = next.clone();
+        let effect = runtime
+            .effect(
+                owner,
+                cordis::Effect::new()
+                    .step(move |setup| {
+                        *capture.lock().unwrap() = Some(setup.clone());
+                        async move {
+                            WaitGate(wait).await;
+                            assert!(setup.is_cancelled());
+                            assert!(setup.effect(cordis::Effect::new()).is_err());
+                            assert!(setup.mount(Plugin::new("late child", |_| Ok(()))).is_err());
+                            let immediate = restore.clone();
+                            setup.on_cleanup(move || {
+                                immediate.fetch_add(1, Ordering::SeqCst);
+                                Ok(())
+                            })?;
+                            Ok(cordis::Inverse::new(move || {
+                                restore.fetch_add(10, Ordering::SeqCst);
+                                Ok(())
+                            }))
+                        }
+                    })
+                    .step(move |_| async move {
+                        next_call.fetch_add(1, Ordering::SeqCst);
+                        Ok(cordis::Inverse::empty())
+                    }),
+            )
+            .unwrap();
+        assert_eq!(poll_once(&mut runtime), Poll::Pending);
+        effect.cancel();
+        assert_eq!(poll_once(&mut runtime), Poll::Pending);
+        assert!(captured.lock().unwrap().as_ref().unwrap().is_cancelled());
+        assert!(!effect.finished());
+        gate.release();
+        block_on(runtime.settle()).unwrap();
+        block_on(effect.join()).unwrap();
+        assert_eq!(restored.load(Ordering::SeqCst), 11);
+        assert_eq!(next.load(Ordering::SeqCst), 0);
+        assert_eq!(runtime.phase(owner), Some(Phase::Active));
+        assert!(captured
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .ensure_active()
+            .is_err());
+    });
+}

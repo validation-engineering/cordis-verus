@@ -742,7 +742,7 @@
         "id": "awaited-results",
         "status": "complete",
         "scope": "Native async output/origin pairing and completion from the actual returned Result, retaining both host failure policies.",
-        "remaining": "Native factory/Future/result transport does not prove external I/O truth, poll/panic adaptation or eventual return. Native registered FnMut provenance is now checked separately.",
+        "remaining": "Native Future/result transport and actual Poll normalization do not prove external I/O truth, polling/panic capture or eventual return. Native registered FnMut provenance is checked separately.",
         "reviewPath": [
           {
             "file": "crates/cordis-kernel/src/async_completion.rs",
@@ -763,6 +763,16 @@
             "file": "crates/cordis/src/runtime/static_host.rs",
             "symbol": "complete_reply",
             "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/poll_result.rs",
+            "symbol": "normalize_poll",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/poll_result.rs",
+            "symbol": "normalize_effect_poll",
+            "role": "execution"
           }
         ]
       },
@@ -788,8 +798,38 @@
         "id": "invocation-effect-origin",
         "status": "partial",
         "scope": "Establish actual argument, executed operation, result, continuation and inverse laws for extensible managed plugin entry points.",
-        "remaining": "Native registration now owns the actual recipe and resolved interface. Root admission checks current lifecycle action/generation and recipe revision; direct stored FnMut invocation and Ready/Pending dispatch preserve real arguments, results and Futures. Concrete plugin effect/inverse laws and checked poll/panic adaptation remain open; native call laws do not prove arbitrary plugin bodies.",
+        "remaining": "Effect requests now allocate the actual cleanup group and queue the real iterator atomically; EffectRun transports the actual stored payload, arguments and results through private per-poll receipts. Landing checks lifecycle/group/domain and current attempt before retaining the actual inverse and selecting continuation. Cancellation queries and nested acquisition now read the actual stage state, with no host shadow set. NativeHost now retains the actual registration and opaque host value in the same checked owner as the lifecycle graph; a stored recipe cannot be moved to another key by host bookkeeping. Root admission checks current lifecycle action/generation and recipe revision; direct stored FnMut invocation and Ready/Pending dispatch preserve real arguments, results and Futures. Actual root/effect/cleanup Poll normalization is now checked, including actual inverse mapping and failure-only panic conversion. Concrete plugin effect/inverse laws remain open; native call and normalization laws do not prove arbitrary plugin bodies or panic capture. Concrete ReversibleValue operations and finite ValuePrograms now execute actual arithmetic/comparison, select continuations from actual outcomes, prove strict inverse laws and full-carrier Component membership, and register every actual inverse before returning through Setup. Ordinary arbitrary callback bodies remain outside this result. Admitted roots now retain their lifecycle ticket, and actual stored callback invocation rechecks pending action, generation, Loading phase and retirement; local work withdrawal rejects new admission. This closes delayed-call revocation, not arbitrary callback effect laws.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "enqueue_effect",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "activate",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "admit",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "call",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "land",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "call",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/child_slot.rs",
             "symbol": "register_child_slot",
@@ -849,6 +889,36 @@
             "file": "crates/cordis/src/runtime.rs",
             "symbol": "initialize_callback",
             "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/poll_result.rs",
+            "symbol": "normalize_effect_poll",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value.rs",
+            "symbol": "primitive_theory",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value.rs",
+            "symbol": "forward",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/value_program.rs",
+            "symbol": "component",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/value_program.rs",
+            "symbol": "run_value_program",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/plugin_registration.rs",
+            "symbol": "accepts_root_invocation",
+            "role": "execution"
           }
         ]
       },
@@ -856,8 +926,123 @@
         "id": "production-composition",
         "status": "partial",
         "scope": "One checked production invariant owns all concurrent groups, dynamic Child, admitted work, publications and drain/release decisions.",
-        "remaining": "Begin constructs bound work/group owners; native Finish, failure, atomic retry and Unload inspect them and derive release outcomes. Real Child registration now resolves authoritative parent dependencies and realm ports; its private inverse identity checks domain/parent on retirement. The real shared Child slot is now assigned once from actual registration, checks the original parent generation and closes pending allocation when its inverse runs first. The ordinary Mounted map, shared Child handle aliasing/synchronization, publication values, poll/panic adaptation, external adapters and full host observation still need a joint semantic invariant.",
+        "remaining": "Effect requests now allocate the actual cleanup group and queue the real iterator atomically; EffectRun transports the actual stored payload, arguments and results through private per-poll receipts. Landing checks lifecycle/group/domain and current attempt before retaining the actual inverse and selecting continuation. Cancellation queries and nested acquisition now read the actual stage state, with no host shadow set. Begin constructs bound work/group owners; native Finish, failure, atomic retry and Unload inspect them and derive release outcomes. Real Child registration now resolves authoritative parent dependencies and realm ports; its private inverse identity checks domain/parent on retirement. The real shared Child slot is now assigned once from actual registration, checks the original parent generation and closes pending allocation when its inverse runs first. Native Begin now creates one bound service-value owner, captures every available committed slot from the actual registry, and composes complete-value Finish and drain-gated Unload with actual publication and retained payload transfer. NativeHost now owns the actual lifecycle graph and registration/host entries, preserving exact registry membership and the domain/owner/parent/interface association through every exposed mutation, including Child insertion and actual Remove. Its host borrow cannot change registrations; updates and root calls select the real stored recipe. The native queued request and retained inverse now share one checked SharedChild constructed by enqueue_native_child. Its vstd lock invariant binds the real slot to the episode; persistent terminal witnesses prove observations cannot disagree and cancellation excludes later assignment. Actual registration has an exact success condition under that lock. Other shared/opaque host bookkeeping semantics, interior-mutability/availability semantics, poll/panic adaptation, external adapters and full host observation still need a joint semantic invariant. Execution now owns actual SetupWork, all cleanup queues, native values, initialization state, live EffectRun payloads and checked-out identities. Managed Begin/Finish/Unload compose values and phase; direct retirement/restart compose acquisition withdrawal. Stored or checked-out runners block release; only drained retirement consumes the actual checkout. Complete semantic observation of opaque payloads, other shared host bookkeeping and its R1 correspondence remain open. ReversibleValue additionally owns its real scalar/depth state and ghost history under a verified vstd lock. The production cleanup dispatcher selects, restores and acknowledges the actual stored inverse atomically; interference retains it in its original slot. This joint value/queue contract does not replace the outstanding whole-host state interpretation. NativeRuntime now owns the real NativeHost and NativeServices together. Its joint invariant connects registered membership, current episode generation, complete declared slot tables and retention through Unloading; actual Runtime callers cannot substitute an independent store. Shared episode/mutex state, slot interiors, arbitrary function fields and Node publication versions still need the complete joint R1 interpretation. Native Begin now records immutable erased provenance from the actual control, committed bindings, provider generations and published slots. All executable Execution mutations preserve that capture; open imports equal the original snapshot, Finish carries it into publication, and Unload returns exactly those original imports. The actual value owner also records and checks the cleanup/work domain, rejecting substitution of another queue even under colliding lifecycle tickets. Numeric domain allocation and shared mutex/owner identity remain explicit boundaries; this does not close the complete R1 interpretation. NativeRuntime now retains the actual Begin-issued setup/work identity for every non-Inactive plugin, binds publication identity to it, and checks all managed boundaries against it. Only successful Unload removes the record. Shared adapter mutex semantics and deliberate full numeric identity collisions remain outside this result.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "enqueue_effect",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "activate",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "admit",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "call",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/effect_work.rs",
+            "symbol": "land",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/shared_child.rs",
+            "symbol": "inv",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/shared_child.rs",
+            "symbol": "enqueue_native_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/shared_child.rs",
+            "symbol": "register_shared_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/shared_child.rs",
+            "symbol": "retire_shared_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/shared_child.rs",
+            "symbol": "terminal_agrees",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/shared_child.rs",
+            "symbol": "cancellation_precludes_assignment",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "wf",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "host_mut",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "register",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "register_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "remove",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "call",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/native.rs",
+            "symbol": "register_plugin",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "begin_native_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "capture_native_values",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "read",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "finish_native_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "release_native_execution",
+            "role": "execution"
+          },
           {
             "file": "crates/cordis-kernel/src/child_slot.rs",
             "symbol": "register_child_slot",
@@ -947,6 +1132,111 @@
             "file": "crates/cordis/src/runtime.rs",
             "symbol": "poll_settle",
             "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "wf",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "take_effect",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "retire_effect",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "seal_external",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "begin_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "finish_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "withdraw_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "release_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value.rs",
+            "symbol": "inv",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+            "symbol": "dispatch",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "dispatch_cleanup",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "apply_value",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_runtime.rs",
+            "symbol": "linked",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_runtime.rs",
+            "symbol": "wf",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_runtime.rs",
+            "symbol": "finish_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "matches_provisions",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_capture.rs",
+            "symbol": "wf",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_capture.rs",
+            "symbol": "dependency",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "capture_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_owner.rs",
+            "symbol": "matches",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_runtime.rs",
+            "symbol": "owns_execution",
+            "role": "contract"
           }
         ]
       },
@@ -954,8 +1244,18 @@
         "id": "complete-step-classification",
         "status": "partial",
         "scope": "Classify the complete production trace against R1 and explicitly specified host extensions.",
-        "remaining": "Native composed Begin/Finish/Unload, resolved real registration and Child retirement prove their paper control steps; visible payload updates and accumulator projections also have local contracts. This is not the full R1 context interpretation: shared production-state correspondence, complete trace classification and all extensions remain to be proved.",
+        "remaining": "Native composed Begin/Finish/Unload, resolved real registration and Child retirement prove their paper control steps; visible payload updates and accumulator projections also have local contracts. Native service admission, complete-value publication and actual release now compose those control steps; NativeEpisode::provide proves its actual owned-table coeffects::put projection. NativeHost preserves the registration/interface correspondence across its real control transitions and recipe/host mutations. The shared native Child entry points now compose actual Insert/Retire with synchronized slot observations and persistent terminal agreement. This is not the full R1 context interpretation: shared production-state correspondence, complete trace classification and all extensions remain to be proved. Managed publication, withdrawal and release now compose the actual phase/work/value owner with their control transitions; this does not establish the missing whole-context function interpretation or trace theorem. Reversible value histories now classify every actual write, inverse and rejected attempt; finite programs construct a contiguous dependent-grammar trace from actual execution, including failed prefixes. This is a complete trace for that production subpath, not the full native/Node host trace or recursive R1 context. LifecycleState now retains an actual ghost control history from empty to its current state. Every base mutation appends a paper control step, exact dynamic-interface/restart extension, or observation-preserving internal step; extension-free histories yield the strict paper-control execution. This covers the real shared native/Node control owner, while the joint interpretation of values, callback/function fields, publication versions and cleanup remains open. NativeRuntime now retains a continuous joint history of actual control and retained publication tables. Its independent relation adds exactly the current provider table at Finish, removes exactly that table at Unload and preserves every other table. Observation-preserving calls retain the history. The control projection has strict paper execution only without the explicit Restart extension. This closes the native registry/slot-history composition, not the complete R1 context or native/Node trace. Native Begin now records immutable erased provenance from the actual control, committed bindings, provider generations and published slots. All executable Execution mutations preserve that capture; open imports equal the original snapshot, Finish carries it into publication, and Unload returns exactly those original imports. The actual value owner also records and checks the cleanup/work domain, rejecting substitution of another queue even under colliding lifecycle tickets. Numeric domain allocation and shared mutex/owner identity remain explicit boundaries; this does not close the complete R1 interpretation. The continuous native projection now also contains actual issued-owner records. Induction derives every retained owner from a successful Begin and proves that it remains fixed until Unload. This projection still does not interpret arbitrary function fields, slot interiors or the whole Node/native context.",
         "reviewPath": [
+          {
+            "file": "crates/cordis-kernel/src/native_host.rs",
+            "symbol": "recipe_matches",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_values.rs",
+            "symbol": "owned_table",
+            "role": "contract"
+          },
           {
             "file": "crates/cordis-kernel/src/child_slot.rs",
             "symbol": "register_child_slot",
@@ -999,6 +1299,96 @@
           {
             "file": "crates/cordis-kernel/src/publication_projection.rs",
             "symbol": "visible_frame",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "finish_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "withdraw_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/managed_native.rs",
+            "symbol": "release_managed_execution",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value.rs",
+            "symbol": "history_interpretation",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/value_program.rs",
+            "symbol": "source_execution",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/value_program.rs",
+            "symbol": "run",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/control_history.rs",
+            "symbol": "control_history_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/control_history.rs",
+            "symbol": "strict_paper_trace",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/control_history.rs",
+            "symbol": "record_control",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_runtime.rs",
+            "symbol": "history_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_runtime.rs",
+            "symbol": "transition",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_history.rs",
+            "symbol": "step",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_history.rs",
+            "symbol": "correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_capture.rs",
+            "symbol": "wf",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_capture.rs",
+            "symbol": "dependency",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "capture_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_history.rs",
+            "symbol": "owner_has_begin",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/native_history.rs",
+            "symbol": "owner_retained",
             "role": "proof"
           }
         ]

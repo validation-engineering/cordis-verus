@@ -18,9 +18,11 @@ pub mod deletion;
 pub mod dependent_grammar;
 pub mod dependent_lift;
 pub mod driver;
+pub mod effect_work;
 pub mod effects;
 pub mod entangled;
 pub mod episode;
+pub mod execution;
 pub mod foundations;
 pub mod fresh_recovery;
 pub mod global;
@@ -60,6 +62,7 @@ pub mod paper_counterexamples;
 pub mod partial_domains;
 pub mod partial_independence;
 pub mod permutation;
+pub mod poll_result;
 pub mod preservation;
 pub mod program;
 pub mod program_normal_form;
@@ -76,6 +79,7 @@ pub mod recursive_context;
 pub mod refinement;
 pub mod request_ledger;
 pub mod resources;
+pub mod reversible_value;
 pub mod rule_frames;
 pub mod semantics;
 pub mod setup_work;
@@ -1148,6 +1152,9 @@ impl Kernel {
             final(self).same_control(old(self)),
             final(self).same_bindings(old(self)),
             r.is_ok() ==> final(self).declares_provision(owner, port),
+            r.is_ok() ==> old(self).registered(owner) && !old(self).is_retired(owner),
+            r.is_ok() ==> old(self).phase_of(owner)!=Some(Phase::Unloading),
+            r.is_ok() ==> final(self).other_interfaces_preserved(old(self),owner,port),
             r.is_err() ==> final(self).unchanged(old(self)),
     {
         if !self.contains(owner) { return Err(Error::Unknown); }
@@ -1159,7 +1166,8 @@ impl Kernel {
         let mut i = 0;
         while i < self.declarations.len()
             invariant i <= self.declarations.len(), self.wf(), self == old(self),
-                owner < self.nodes.len(),
+                owner < self.nodes.len(),self.nodes[owner as int].present,!self.nodes[owner as int].retired,
+                self.nodes[owner as int].phase!=Phase::Unloading,
                 forall|j: int| 0 <= j < i && self.declarations[j].provides
                     && self.nodes[self.declarations[j].owner as int].present
                     && self.declarations[j].port == port ==> self.declarations[j].owner == owner,
@@ -1168,7 +1176,10 @@ impl Kernel {
             let declaration = self.declarations[i];
             if declaration.provides && declaration.port == port
                 && self.nodes[declaration.owner].present {
-                if declaration.owner == owner { return Ok(()); }
+                if declaration.owner == owner {
+                    proof {assert(self.other_interfaces_preserved(old(self),owner,port));}
+                    return Ok(());
+                }
                 return Err(Error::Conflict);
             }
             i += 1;
@@ -1189,6 +1200,20 @@ impl Kernel {
                 if a < previous.len() && b < previous.len() {
                     assert(previous[a] == self.declarations[a]);
                     assert(previous[b] == self.declarations[b]);
+                }
+            }
+        }
+        proof {
+            assert forall|n:usize,p:Port,provides:bool| !(provides && n==owner && p==port)
+                implies Self::declares(self.declarations@,n,p,provides)==Self::declares(old(self).declarations@,n,p,provides) by {
+                assert(previous==old(self).declarations@);
+                if Self::declares(self.declarations@,n,p,provides) {
+                    let j=choose|j:int| 0<=j<self.declarations.len() && self.declarations[j].owner==n && self.declarations[j].port==p && self.declarations[j].provides==provides;
+                    assert(j<previous.len());assert(previous[j]==self.declarations[j]);
+                }
+                if Self::declares(previous,n,p,provides) {
+                    let j=choose|j:int| 0<=j<previous.len() && previous[j].owner==n && previous[j].port==p && previous[j].provides==provides;
+                    assert(previous[j]==self.declarations[j]);
                 }
             }
         }
@@ -1238,7 +1263,9 @@ impl Kernel {
             r.is_err() ==> final(self).unchanged(old(self)),
             r.is_ok() ==> final(self).provision_released_from(old(self), owner, port)
                 && !final(self).declares_provision(owner, port),
-            r.is_ok() ==> final(self).other_interfaces_preserved(old(self), owner, port),
+            r.is_ok() ==> final(self).other_interfaces_preserved(old(self), owner, port) && old(self).registered(owner)
+                && forall|n:usize,b:Binding| #[trigger] old(self).binding_recorded(n,b)
+                    ==> b.provider!=owner || b.key!=port.key || b.realm!=port.realm,
     {
         if !self.contains(owner) { return Err(Error::Unknown); }
         let mut k = 0;
@@ -1356,7 +1383,8 @@ impl Kernel {
         ensures final(self).wf(), final(self).generations_preserved(old(self)),
             final(self).same_control(old(self)), final(self).same_bindings(old(self)),
             r.is_err() ==> final(self).unchanged(old(self)),
-            r.is_ok() ==> final(self).pending_dependencies_configured(old(self), id, dependencies@),
+            r.is_ok() ==> final(self).pending_dependencies_configured(old(self), id, dependencies@)
+                && old(self).registered(id) && !old(self).is_retired(id) && old(self).phase_of(id)==Some(Phase::Inactive),
     {
         if !self.contains(id) { return Err(Error::Unknown); }
         if self.nodes[id].retired { return Err(Error::Retired); }

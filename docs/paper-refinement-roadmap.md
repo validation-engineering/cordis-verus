@@ -51,9 +51,21 @@ stores the actual recipe, and directly invokes that `FnMut` after checking the
 current setup action and recipe revision. Child retirement uses the identity
 produced by real allocation. Its shared native slot permits one assignment in
 the originating episode and closes pending allocation when its inverse runs first.
-See [R2 execution contracts](r2-execution.md) for the proved scope and review path.
-R2 remains open for the complete callback effect contract, concurrent production
-composition and whole-trace correspondence; its exit criteria are unchanged.
+Native service values now join actual Begin/Finish/Unload: complete committed
+imports, complete-value publication and drain-gated payload transfer are checked
+in the production path. NativeHost now owns actual registration/host entries
+and the lifecycle graph together, preserving their membership and resolved
+interfaces through insertion, update, borrowing and removal. Shared native Child
+requests and inverses are now constructed together, with verified slot synchronization
+and persistent terminal agreement excluding allocation after cancellation. See [R2 execution contracts](r2-execution.md) for the proved scope and review path.
+Effect requests now allocate their actual cleanup group atomically, and private poll
+receipts bind actual iterator payloads/results to that group and current attempt.
+Cancellation and nested acquisition read the actual stage state.
+Execution now owns the actual work, native values, phase, runners and checkout
+records. Managed publication, direct withdrawal and release compose these states;
+actual Poll normalization is verified. R2 remains open for concrete plugin effect
+laws, the complete production-state interpretation and whole-trace correspondence;
+its exit criteria are unchanged.
 
 R3 then expands in three work packages: owner-created Child, consumers of owner
 publications, and repeated episodes/interior owner Unload. R4 follows with legal
@@ -99,3 +111,32 @@ must still inspect semantic correspondence and the actual calling path.
 The product/adoption milestones in the [adoption plan](adoption-plan.md) continue
 independently. Independent users and maintainers provide adoption evidence;
 maintainer-run clean installations do not establish external adoption.
+
+The reversible-value production path now proves concrete operation/inverse laws,
+all-carrier membership for finite programs, actual value-state interpretation and
+whole program/source traces. It uses the normal Runtime cleanup owner, including
+failure retention and retry. This does not close the complete host-state and
+native/Node trace obligations. See the [case and review path](cases/reversible-values.md).
+
+The shared production lifecycle owner now maintains a continuous ghost control history from empty to its actual state, classifying paper steps, internal steps and exact extensions. This closes the control-history link, while the joint R1 interpretation remains open.
+
+The native Runtime now also uses one checked owner for actual registrations and
+published slots, with a continuous joint control/publication history. Complete
+Active publication, retention during Unloading and owner-local release are
+invariants across the real entry points. Shared episodes, slot interiors,
+function meanings and Node versions remain outside this joint observation;
+R2 remains in progress. See [the review path](r2-execution.md#joint-native-registry-and-publication-history).
+
+Begin provenance is now preserved through the production episode, publication and
+release contracts. Captured imports retain their original provider slots across
+withdrawal and retry, and mismatched work domains are rejected. The snapshot is
+erased and does not retain extra runtime values. See [the contracts and remaining
+shared-owner boundary](r2-execution.md#begin-provenance-through-publication-and-release).
+
+The production owner registry now retains each Begin-issued setup/work identity
+until successful Unload and checks every managed boundary against it. Delayed
+root invocation revalidates the live episode immediately before the stored
+callback runs. Continuous-history induction establishes the Begin origin and
+retention of those owner records. Shared adapter locks, arbitrary function
+semantics and the complete Node/native R1 interpretation remain open; see the
+[R2 ownership contract](r2-execution.md#issued-episode-ownership-and-delayed-root-calls).

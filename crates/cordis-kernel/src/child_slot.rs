@@ -71,7 +71,7 @@ impl LifecycleState {
     pub fn register_child_slot<T,E>(&mut self,slot:&mut ChildSlot<E>,realms:&BTreeMap<u64,u64>,anchor:Port,definition:PluginDefinition<T>)
         ->(out:Result<RegisteredPlugin<T>,(Error,PluginDefinition<T>)>)
         requires old(self).wf(),old(slot).wf(),
-        ensures final(self).wf(),final(slot).wf(),final(slot).same_origin(old(slot)),
+        ensures final(self).control().generations_preserved(&old(self).control()), final(self).wf(),final(slot).wf(),final(slot).same_origin(old(slot)),
             final(self).protocol().same(&old(self).protocol()),
             out.is_ok()==(old(slot).state() is Pending && old(slot).domain_id()==old(self).protocol().domain_id()
                 && old(slot).episode()==old(self).control().generation_of(old(slot).owner())
@@ -86,9 +86,15 @@ impl LifecycleState {
                 &&& final(slot).state()->Assigned_0.child()==plugin.owner()
                 &&& plugin.domain_id()==old(slot).domain_id() && plugin.parent_id()==Some(old(slot).owner())
                 &&& plugin.owner()==old(self).control().next_id() && plugin.payload()==definition.payload()
+                &&& plugin.anchor_port()==anchor && plugin.version()==0
+                &&& final(self).control().paper().fibers[plugin.owner()].parent==plugin.parent_id()
+                &&& (forall|p:Port| #[trigger] final(self).control().paper().fibers[plugin.owner()].dependencies.contains(p)==plugin.dependencies_spec().contains(p))
+                &&& (forall|p:Port| #[trigger] final(self).control().paper().fibers[plugin.owner()].provisions.contains(p)==(plugin.provisions_spec().contains(p) || p==anchor))
                 &&& crate::refinement::step(old(self).control().paper(),final(self).control().paper(),plugin.owner(),crate::refinement::Rule::Insert)
             },
     {
+        proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
+
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if !slot.pending() || slot.domain!=self.domain() || slot.generation!=self.kernel.episode_generation(slot.parent) {
             return Err((Error::InvalidState,definition));
@@ -108,7 +114,7 @@ impl LifecycleState {
     /// request cannot allocate an unowned child after that inverse was consumed.
     pub fn retire_child_slot<E>(&mut self,slot:&mut ChildSlot<E>)->(out:Result<Option<ChildIdentity>,Error>)
         requires old(self).wf(),old(slot).wf(),
-        ensures final(self).wf(),final(slot).wf(),final(slot).same_origin(old(slot)),
+        ensures out.is_ok() && out->Ok_0.is_none() ==> final(self).same(old(self)), final(self).control().generations_preserved(&old(self).control()), final(self).wf(),final(slot).wf(),final(slot).same_origin(old(slot)),
             final(self).protocol().same(&old(self).protocol()),
             out.is_err() ==> final(self).same(old(self)) && *final(slot)==*old(slot),
             out.is_ok() ==> old(slot).domain_id()==old(self).protocol().domain_id()
@@ -125,6 +131,8 @@ impl LifecycleState {
                     &&& if old(slot).state() is Pending {final(slot).state() is Cancelled} else {*final(slot)==*old(slot)}
                 }),
     {
+        proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
+
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if slot.domain!=self.domain() {return Err(Error::InvalidState);}
         match slot.identity() {

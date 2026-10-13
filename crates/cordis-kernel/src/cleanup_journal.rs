@@ -71,6 +71,8 @@ impl CleanupJournal {
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
+            out==final(self).stage().pending(),
+            out==(old(self).stage().pending() || (!old(self).stage().settled() && !old(self).stage().cancellation() && target.is_some() && crate::episode::binding_set(target.unwrap()@)==crate::episode::binding_set(old(self).stage().committed_view()))),
     {self.stages.admit(target)}
     pub fn end(&mut self)->(out:bool)
         requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
@@ -83,11 +85,14 @@ impl CleanupJournal {
     pub fn cancel(&mut self)
         requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
+            final(self).stage().cancellation(),final(self).stage().pending()==old(self).stage().pending(),
     {self.stages.cancel();}
     pub fn domain(&self)->(out:u64) ensures out==self.domain_id(), {self.domain}
     pub fn is_settled(&self)->(out:bool)
         ensures out==self.stage().settled(),
     {self.stages.is_settled()}
+    pub fn is_cancelled(&self)->(out:bool) ensures out==self.stage().cancellation(),
+    {self.stages.is_cancelled()}
     pub fn is_pending(&self)->(out:bool)
         ensures out==self.stage().pending(),
     {self.stages.is_pending()}

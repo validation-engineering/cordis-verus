@@ -35,7 +35,7 @@ impl LifecycleState {
     pub fn begin_execution<C,G,T>(&mut self,id:usize,cleanup_domain:u64)
         ->(out:Result<(SetupWork<C,G>,CleanupGroups<T>),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_ok()==(old(self).protocol().admission_enabled(id) && old(self).control().begin_enabled(id)),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> out->Ok_0.0.wf() && out->Ok_0.1.wf()
@@ -53,7 +53,7 @@ impl LifecycleState {
     /// before its setup action can be acknowledged, including on withdrawal.
     pub fn settle_execution<C,G,T>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&CleanupGroups<T>)->(out:Result<(),Error>)
         requires old(self).wf(),work.wf(),groups.wf(),
-        ensures final(self).wf(),final(self).control().unchanged(&old(self).control()),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).control().unchanged(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> old(self).execution_matches(id,work,groups) && work.idle() && !groups.any_pending()
                 && !final(self).protocol().outstanding(id),
@@ -76,13 +76,15 @@ impl LifecycleState {
     /// change the kernel or make services Active.
     pub fn finish_execution<C,G,T>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&CleanupGroups<T>)->(out:Result<(),Error>)
         requires old(self).wf(),work.wf(),groups.wf(),
-        ensures final(self).wf(),
+        ensures final(self).control().generations_preserved(&old(self).control()), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_err() ==> final(self).control().unchanged(&old(self).control()),
             out.is_ok() ==> old(self).execution_matches(id,work,groups) && work.idle() && !work.failed()
                 && !groups.any_pending() && !groups.any_failed()
                 && final(self).control().phase_of(id)==Some(Phase::Active)
                 && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Finish),
     {
+        proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
+
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if !self.matches_execution(id,work,groups) {return Err(Error::InvalidState);}
         let target=match self.kernel.target(id) {Some(target)=>target,None=>return Err(Error::Changed)};
@@ -90,13 +92,16 @@ impl LifecycleState {
         let ghost prior=self.control();
         self.settle_execution(id,work,groups)?;
         proof {self.kernel.unchanged_observations(&prior);}
-        self.finish(id)
+        let ghost settled=self.protocol();
+        let out=self.finish(id);
+        proof {self.protocol().same_observations(&settled);}
+        out
     }
 
     /// Report a real retained failure, never a caller-selected success.
     pub fn fail_execution<C,G,T>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&CleanupGroups<T>)->(out:Result<(),Error>)
         requires old(self).wf(),work.wf(),groups.wf(),
-        ensures final(self).wf(),final(self).control().unchanged(&old(self).control()),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).control().unchanged(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> old(self).execution_matches(id,work,groups) && groups.any_failed()
                 && work.idle() && !groups.any_pending() && !groups.any_issued()
@@ -116,7 +121,7 @@ impl LifecycleState {
     /// A preflight failure cannot consume a lifecycle action or another group.
     pub fn retry_execution<C,G,T>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&mut CleanupGroups<T>)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),work.wf(),old(groups).wf(),
-        ensures final(self).wf(),final(groups).wf(),final(self).control().unchanged(&old(self).control()),
+        ensures final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(groups).wf(),final(self).control().unchanged(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)) && *final(groups)==*old(groups),
             out.is_ok() ==> old(self).execution_matches(id,work,old(groups)) && old(groups).retries_ready()
                 && !final(groups).any_failed() && final(self).protocol().cleanup_reply_enabled(out->Ok_0)
@@ -138,7 +143,7 @@ impl LifecycleState {
     pub fn release_execution<C,G,T>(&mut self,id:usize,work:&mut SetupWork<C,G>,groups:&mut CleanupGroups<T>)
         ->(out:Result<CleanupOutcome,Error>)
         requires old(self).wf(),old(work).wf(),old(groups).wf(),
-        ensures final(self).wf(),final(work).wf(),final(groups).wf(),
+        ensures final(self).control().generations_preserved(&old(self).control()), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(work).wf(),final(groups).wf(),
             out.is_err() ==> final(self).same(old(self)) && *final(work)==*old(work) && *final(groups)==*old(groups),
             out.is_ok() ==> old(self).execution_matches(id,old(work),old(groups)) && old(work).idle() && old(groups).all_drained()
                 && old(self).control().is_restoring(id)
@@ -148,6 +153,8 @@ impl LifecycleState {
                 && !final(self).protocol().blocked_spec(id)
                 && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Unload),
     {
+        proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
+
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if !self.matches_execution(id,work,groups) || !work.is_idle() || !groups.can_seal()
             || !self.kernel.cleanup_started(id) {return Err(Error::InvalidState);}

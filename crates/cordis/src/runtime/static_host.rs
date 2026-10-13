@@ -328,7 +328,6 @@ impl StaticPlugin {
             })
             .collect();
         let cleanups = Cleanups::new();
-        let work = cleanups.setup_work();
         let setup = AsyncSetup {
             generation,
             owner,
@@ -337,11 +336,8 @@ impl StaticPlugin {
             provisions,
             anchor: anchor.unwrap_or(Port { key: 0, realm: 0 }),
             state: Arc::new(Mutex::new(Episode {
-                phase: EpisodePhase::Loading,
-                values,
+                values: EpisodeValues(values),
                 cleanups,
-                work,
-                cancelled_groups: Default::default(),
                 driver: None,
                 static_only: true,
                 dynamic_host: anchor.and(service_updates.clone()),
@@ -398,12 +394,12 @@ impl StaticEpisode {
         self.setup.generation
     }
     pub fn is_closed(&self) -> bool {
-        lock(&self.setup.state).phase == EpisodePhase::Closed
+        lock(&self.setup.state).phase() == EpisodePhase::Closed
     }
     pub fn cancel(&self) {
         let (wake, children) = {
             let mut state = lock(&self.setup.state);
-            if state.phase != EpisodePhase::Closed {
+            if state.phase() != EpisodePhase::Closed {
                 state.withdraw();
             }
             (state.driver.take(), state.external_children.clone())
@@ -425,8 +421,8 @@ impl StaticEpisode {
                 return Ok(Vec::new());
             }
             state.external_children.retain(|child| !child.is_removed());
-            let mut requests = Vec::with_capacity(state.work.child_count());
-            while let Some(request) = state.work.take_child() {
+            let mut requests = Vec::with_capacity(state.cleanups.protocol.child_count());
+            while let Some(request) = state.cleanups.protocol.take_child() {
                 requests.push(request);
             }
             requests
@@ -435,6 +431,9 @@ impl StaticEpisode {
         let mut failure: Option<String> = None;
         for item in requests {
             let receipt = item.run(|request| -> Result<(), String> {
+                let ChildDispatch::External(request) = request else {
+                    return Err("NativeChildInStaticHost".into());
+                };
                 let control = request.handle.external.expect("external child request");
                 if let Some(error) = &failure {
                     control.complete_mount(Err(error.clone()))?;
@@ -461,7 +460,10 @@ impl StaticEpisode {
                 }
                 Ok(())
             });
-            let completed = lock(&self.setup.state).work.complete_request(receipt);
+            let completed = lock(&self.setup.state)
+                .cleanups
+                .protocol
+                .complete_request(receipt);
             completed.ok().expect("actual child handoff result")?;
         }
         match failure {
@@ -486,7 +488,7 @@ impl StaticEpisode {
             .filter_map(|port| {
                 state
                     .values
-                    .get(&(self.setup.owner, port.key, port.realm))
+                    .own(self.setup.owner, *port)
                     .map(|slot| (*port, TypedSlot(slot.clone())))
             })
             .collect())
@@ -504,7 +506,7 @@ impl StaticEpisode {
     pub fn can_retry_cleanup(&self) -> bool {
         let state = lock(&self.setup.state);
         let progress = lock(&self.progress);
-        state.phase != EpisodePhase::Closed
+        state.phase() != EpisodePhase::Closed
             && progress.abandoned.is_none()
             && progress.cleanup_error.is_some()
             && !progress.cleanup_running
@@ -513,7 +515,7 @@ impl StaticEpisode {
     fn start_cleanup(&self, retry: bool) -> Result<StaticFuture, String> {
         let mut state = lock(&self.setup.state);
         let mut progress = lock(&self.progress);
-        if state.phase == EpisodePhase::Closed {
+        if state.phase() == EpisodePhase::Closed {
             return Err("StaticEpisodeClosed".into());
         }
         if let Some(error) = &progress.abandoned {
@@ -576,7 +578,7 @@ impl Future for StaticSetupFuture {
         let (withdrawing, previous) = {
             let mut state = lock(&self.episode.setup.state);
             (
-                state.phase == EpisodePhase::Restoring,
+                state.phase() == EpisodePhase::Restoring,
                 state.driver.replace(wake),
             )
         };
@@ -598,15 +600,20 @@ impl Future for StaticSetupFuture {
             if let Some(error) = &state.unsupported {
                 result = Err(error.clone().into());
             }
-            if result.is_ok() && state.phase != EpisodePhase::Restoring {
-                if let Some(port) = self.episode.setup.provisions.iter().find(|port| {
-                    !state
-                        .values
-                        .contains_key(&(self.episode.setup.owner, port.key, port.realm))
-                }) {
+            if result.is_ok() && state.phase() != EpisodePhase::Restoring {
+                if let Some(port) = self
+                    .episode
+                    .setup
+                    .provisions
+                    .iter()
+                    .find(|port| state.own(self.episode.setup.owner, **port).is_none())
+                {
                     result = Err(format!("declared service {} has no value", port.key).into());
                 } else {
-                    state.phase = EpisodePhase::Active;
+                    assert!(
+                        state.cleanups.protocol.activate_external(),
+                        "completed external setup"
+                    );
                 }
             }
             lock(&self.episode.progress).setup_landed = true;
@@ -621,7 +628,10 @@ impl Drop for StaticSetupFuture {
     fn drop(&mut self) {
         if !self.finished {
             self.episode.cancel();
-            lock(&self.episode.setup.state).work.abandon_root();
+            lock(&self.episode.setup.state)
+                .cleanups
+                .protocol
+                .abandon_root();
             lock(&self.episode.progress).abandoned =
                 Some("StaticSetupAbandoned: restoration is unconfirmed".into());
         }
@@ -719,7 +729,6 @@ impl Future for StaticCleanupFuture {
                     if action.is_none() && state.seal() {
                         // The verified journal includes the outstanding receipt:
                         // a failed or pending callback can never seal the episode.
-                        state.phase = EpisodePhase::Closed;
                         (
                             None,
                             Some(std::mem::take(&mut state.values)),
@@ -742,10 +751,22 @@ impl Future for StaticCleanupFuture {
                     drop(released);
                     return Poll::Ready(Ok(()));
                 }
-                let Some((ticket, action)) = action else {
+                let Some(dispatch) = action else {
                     return self.fail("StaticCleanupUnsettled".into());
                 };
+                let (ticket, action) = match dispatch {
+                    CleanupDispatch::Value { completion, .. } => {
+                        if let Err(error) = completion.report.result {
+                            return self.fail(value_error(error));
+                        }
+                        continue;
+                    }
+                    CleanupDispatch::Host { ticket, action } => (ticket, action),
+                };
                 match action {
+                    CleanupAction::Value(_) => {
+                        unreachable!("value inverse runs inside the checked dispatcher")
+                    }
                     CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
                         Ok(future) => self.running = Some(future),
                         Err(failure) => {
@@ -758,7 +779,12 @@ impl Future for StaticCleanupFuture {
                             return self.fail(error);
                         }
                     },
-                    CleanupAction::Child(handle) => {
+                    CleanupAction::Native(_) => {
+                        self.complete_callback(ticket, Err("NativeChildInStaticHost".into()), None)
+                            .unwrap_err();
+                        return self.fail("NativeChildInStaticHost".into());
+                    }
+                    CleanupAction::External(handle) => {
                         let Some(child) = handle.external else {
                             self.complete_callback(
                                 ticket,
@@ -865,7 +891,7 @@ impl StaticChildControl {
         lock(&self.0).generation
     }
     pub fn id(&self) -> Option<PluginId> {
-        lock(&lock(&self.0).identity).id()
+        lock(&self.0).identity.id()
     }
     pub fn retirement_requested(&self) -> bool {
         let state = lock(&self.0);
@@ -894,12 +920,18 @@ impl StaticChildControl {
             if state.assigned {
                 return Err("StaticChildAlreadyAssigned".into());
             }
+            if !matches!(state.identity, ChildState::External(_)) {
+                return Err("NativeChildInStaticHost".into());
+            }
             state.assigned = true;
             let error = result.as_ref().err().cloned();
             if error.is_some() {
                 state.removed = true;
             }
-            *lock(&state.identity) = ChildRecord::External(result.map(Some));
+            let ChildState::External(identity) = &state.identity else {
+                return Err("NativeChildInStaticHost".into());
+            };
+            *lock(identity) = result.map(Some);
             let notify = if error.is_some() {
                 state.notify.take()
             } else {
@@ -940,7 +972,7 @@ impl StaticChildControl {
     pub fn mark_initialized(&self) -> Result<(), String> {
         let service = {
             let state = lock(&self.0);
-            if !state.assigned || state.removed || lock(&state.identity).error().is_some() {
+            if !state.assigned || state.removed || state.identity.error().is_some() {
                 return Err("StaticChildNotMounted".into());
             }
             state.service.clone()
@@ -1029,7 +1061,7 @@ impl StaticChildControl {
             if let Some(error) = &state.cleanup_error {
                 return Err(error.clone());
             }
-            if !state.assigned || lock(&state.identity).id().is_none() {
+            if !state.assigned || state.identity.id().is_none() {
                 return Err("StaticChildNotMounted".into());
             }
             state.removed = true;

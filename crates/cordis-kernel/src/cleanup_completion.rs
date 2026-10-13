@@ -111,4 +111,87 @@ impl<T> CleanupQueue<T> {
     }
 }
 
+pub struct ValueCleanupReport<C,X> {
+    pub report:CleanupReport<crate::reversible_value::ValueError,crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>>,
+    pub restored:Option<crate::reversible_value::Snapshot>,
+}
+impl<C,X> ValueCleanupReport<C,X> {
+    pub open spec fn corresponds(&self,inverse:crate::reversible_value::Inverse)->bool {
+        &&& self.report.result.is_ok()==self.restored.is_some()
+        &&& self.report.outcome==if self.restored.is_some() {RestoreOutcome::Succeeded} else {RestoreOutcome::Failed}
+        &&& self.report.discarded.is_none()
+        &&& self.restored.is_some() ==> self.restored.unwrap().certified() && self.restored.unwrap().state()==inverse.state().before
+    }
+}
+impl<C,X> CleanupQueue<crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>> {
+    /// The callback result is derived here from the real guarded write. A
+    /// wrong/stale ticket is rejected before that write can execute.
+    pub(crate) fn restore_value(&mut self,ticket:RestoreTicket,inverse:crate::reversible_value::Inverse)
+        ->(out:Result<ValueCleanupReport<C,X>,(RestoreTicket,crate::reversible_value::Inverse)>)
+        requires old(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+            out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(ticket) && !old(self).protocol().failed_spec()),
+            out.is_err() ==> final(self).same(old(self)) && out->Err_0==(ticket,inverse),
+            out.is_ok() ==> out->Ok_0.corresponds(inverse) && !final(self).issued()
+                && final(self).slots()==old(self).slots().update(ticket.token as int,if out->Ok_0.restored.is_some() {None}
+                    else {Some(crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse))})
+                && final(self).protocol().failed_spec()==out->Ok_0.restored.is_none(),
+    {
+        if !self.reply_pending(ticket) {return Err((ticket,inverse));}
+        match inverse.restore() {
+            Ok(snapshot)=>{
+                let report=self.accept_result(ticket,Ok(()),None,CleanupPolicy::RetainFailure);
+                Ok(ValueCleanupReport {report,restored:Some(snapshot)})
+            },
+            Err(inverse)=>{
+                let report=self.accept_result(ticket,Err(crate::reversible_value::ValueError::Interference),
+                    Some(crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse)),CleanupPolicy::RetainFailure);
+                Ok(ValueCleanupReport {report,restored:None})
+            },
+        }
+    }
+}
+
+pub enum CleanupDispatch<C,X> {
+    Host {ticket:RestoreTicket,action:crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>},
+    Value {ticket:RestoreTicket,completion:ValueCleanupReport<C,X>},
+}
+impl<C,X> CleanupDispatch<C,X> {
+    pub open spec fn from_slot(&self,slots:Seq<Option<crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>>>)->bool {
+        match self {
+            Self::Host {ticket,action}=>ticket.token<slots.len() && slots[ticket.token as int]==Some(*action)
+                && !(*action is Value),
+            Self::Value {ticket,completion}=>ticket.token<slots.len() && slots[ticket.token as int].is_some()
+                && slots[ticket.token as int].unwrap() is Value && completion.corresponds(slots[ticket.token as int].unwrap()->Value_0),
+        }
+    }
+}
+impl<C,X> CleanupQueue<crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>> {
+    /// Select, execute and acknowledge the actual stored inverse in one checked
+    /// call. Ordinary host code cannot replace it between these operations.
+    pub fn dispatch(&mut self)->(out:Result<Option<CleanupDispatch<C,X>>,crate::cleanup_journal::RestoreError>)
+        requires old(self).wf(),
+        ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().from_slot(old(self).slots()),
+            out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Value ==> {
+                let report=out->Ok_0.unwrap();let ticket=report->Value_ticket;let completion=report->Value_completion;
+                &&& final(self).slots()==old(self).slots().update(ticket.token as int,
+                    if completion.restored.is_some() {None} else {old(self).slots()[ticket.token as int]})
+                &&& final(self).protocol().failed_spec()==completion.restored.is_none()
+            },
+    {
+        let ghost before=*self;
+        let (ticket,action)=match self.pop()? {None=>return Ok(None),Some(pair)=>pair};
+        match action {
+            crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse)=>{
+                let completion=match self.restore_value(ticket,inverse) {Ok(report)=>report,Err(_)=>{assert(false);return Err(crate::cleanup_journal::RestoreError::InvalidState);}};
+                assert(self.slots()==before.slots().update(ticket.token as int,
+                    if completion.restored.is_some() {None} else {before.slots()[ticket.token as int]}));
+                Ok(Some(CleanupDispatch::Value {ticket,completion}))
+            },
+            action=>Ok(Some(CleanupDispatch::Host {ticket,action})),
+        }
+    }
+}
+
 }

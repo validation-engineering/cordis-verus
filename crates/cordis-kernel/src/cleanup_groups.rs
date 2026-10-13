@@ -163,9 +163,20 @@ impl<T> CleanupGroups<T> {
         self.domains.insert(id,domain);
         Ok(id)
     }
+    /// Acquisition uses the actual stage state, not a host-maintained shadow set.
+    /// A cancelled pending stage may still land and register its inverse.
+    pub open spec fn acquisition_open(&self,id:usize)->bool {
+        self.live(id) && !self.queues()[id].protocol().stage().cancellation()
+    }
+    pub fn accepts_acquisition(&self,id:usize)->(out:bool)
+        ensures out==self.acquisition_open(id),
+    {match self.entries.get(&id) {Some(queue)=>!queue.is_cancelled(),None=>false}}
+    pub fn can_add_iterator(&self,domain:u64)->(out:bool)
+        ensures out==(!self.closed() && domain>self.last_domain() && self.next_id()<usize::MAX),
+    {!self.sealed && domain>self.last_domain && self.next<usize::MAX}
     pub fn register(&mut self,id:usize,payload:T)->(out:Result<usize,T>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
+        ensures final(self).queues().dom()==old(self).queues().dom(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==payload,
             out.is_ok() ==> final(self).live(id)
                 && out->Ok_0==old(self).queues()[id].slots().len()
@@ -174,10 +185,18 @@ impl<T> CleanupGroups<T> {
         if !self.contains(id) {return Err(payload);}
         let mut queue=self.take(id);let token=queue.register(payload);self.put(id,queue);Ok(token)
     }
+    pub open spec fn poll_enabled(&self,id:usize,target:Option<&[Binding]>)->bool {
+        self.live(id) && (self.queues()[id].protocol().stage().pending()
+            || (!self.queues()[id].protocol().stage().settled() && !self.queues()[id].protocol().stage().cancellation()
+                && target.is_some() && crate::episode::binding_set(target.unwrap()@)
+                    ==crate::episode::binding_set(self.queues()[id].protocol().stage().committed_view())))
+    }
     pub fn admit(&mut self,id:usize,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),
         ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out ==> old(self).live(id),
             final(self).live(id)==old(self).live(id),
+            out ==> final(self).queues()[id].protocol().stage().pending(),
+            out==old(self).poll_enabled(id,target),
     {
         if !self.contains(id) {return false;}
         let mut queue=self.take(id);let out=queue.admit(target);self.put(id,queue);out
@@ -185,6 +204,8 @@ impl<T> CleanupGroups<T> {
     pub fn cancel(&mut self,id:usize)
         requires old(self).wf(),ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
             final(self).live(id)==old(self).live(id),
+            old(self).live(id) ==> final(self).queues()[id].protocol().stage().cancellation()
+                && final(self).queues()[id].protocol().stage().pending()==old(self).queues()[id].protocol().stage().pending(),
     {
         if !self.contains(id) {return;}
         let mut queue=self.take(id);queue.cancel();self.put(id,queue);
@@ -197,6 +218,7 @@ impl<T> CleanupGroups<T> {
             out.is_err() ==> out->Err_0==result,
             out.is_ok() && result.is_ok() && result->Ok_0.is_some() ==>
                 final(self).queues()[id].slots()==old(self).queues()[id].slots().push(result->Ok_0),
+            out.is_ok() ==> out->Ok_0.error==match result {Err(error)=>Some(error),_=>None},
             out.is_ok() ==> !final(self).queues()[id].protocol().stage().pending()
                 && out->Ok_0.continue_iteration==(result.is_ok() && result->Ok_0.is_some()
                     && !old(self).queues()[id].protocol().stage().cancellation()),
@@ -446,4 +468,23 @@ impl<T> CleanupGroups<T> {
         self.entries=BTreeMap::new();self.domains=BTreeMap::new();self.sealed=true;true
     }
 }
+impl<C,X> CleanupGroups<crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>> {
+    pub fn dispatch(&mut self,id:usize)->(out:Result<Option<crate::cleanup_queue::completion::CleanupDispatch<C,X>>,RestoreError>)
+        requires old(self).wf(),
+        ensures final(self).wf(),final(self).origin()==old(self).origin(),final(self).frame(old(self),id),
+            final(self).domain_ids()==old(self).domain_ids(),final(self).queues().dom()==old(self).queues().dom(),
+            final(self).drained_failure()==old(self).drained_failure(),
+            out.is_ok() && out->Ok_0.is_some() ==> old(self).live(id) && out->Ok_0.unwrap().from_slot(old(self).queues()[id].slots()),
+            out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Value ==> {
+                let report=out->Ok_0.unwrap();let ticket=report->Value_ticket;let completion=report->Value_completion;
+                &&& final(self).queues()[id].slots()==old(self).queues()[id].slots().update(ticket.token as int,
+                    if completion.restored.is_some() {None} else {old(self).queues()[id].slots()[ticket.token as int]})
+                &&& final(self).queues()[id].protocol().failed_spec()==completion.restored.is_none()
+            },
+    {
+        if !self.contains(id) {return Err(RestoreError::InvalidState);}
+        let mut queue=self.take(id);let out=queue.dispatch();self.put(id,queue);out
+    }
+}
+
 }

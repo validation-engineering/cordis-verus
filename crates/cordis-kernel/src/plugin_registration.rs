@@ -2,7 +2,7 @@
 //! The stored callback is opaque, but it cannot be replaced by a different
 //! recipe between root admission and invocation without rejecting the call.
 use super::LifecycleState;
-use crate::action_ledger::ActionKind;
+use crate::action_ledger::{ActionKind, ActionTicket};
 #[cfg(verus_keep_ghost)]
 use crate::distinct_ports;
 use crate::setup_work::{SetupWork, WorkItem, WorkReceipt, WorkTicket};
@@ -176,12 +176,14 @@ impl ChildIdentity {
     pub closed spec fn child(&self)->usize {self.id}
     pub fn id(&self)->(out:usize) ensures out==self.child(), {self.id}
 }
-pub struct RegisteredInvocation<A> {domain:u64,id:usize,revision:u64,item:WorkItem<A>}
+pub struct RegisteredInvocation<A> {domain:u64,id:usize,revision:u64,lifecycle:ActionTicket,item:WorkItem<A>}
 impl<A> RegisteredInvocation<A> {
     pub closed spec fn domain_id(&self)->u64 {self.domain}
     pub closed spec fn owner(&self)->usize {self.id}
     pub closed spec fn version(&self)->u64 {self.revision}
     pub closed spec fn work(&self)->WorkItem<A> {self.item}
+    pub closed spec fn lifecycle(&self)->ActionTicket {self.lifecycle}
+    pub fn lifecycle_ticket(&self)->(out:ActionTicket) ensures out==self.lifecycle(), {self.lifecycle}
     pub fn ticket(&self)->(out:WorkTicket) ensures out==self.work().origin(), {self.item.ticket()}
 }
 impl<T> RegisteredPlugin<T> {
@@ -198,9 +200,12 @@ impl<T> RegisteredPlugin<T> {
             && self.anchor_port()==prior.anchor_port() && self.dependencies_spec()==prior.dependencies_spec()
             && self.provisions_spec()==prior.provisions_spec()
     }
+    pub fn domain_id_exec(&self)->(out:u64) ensures out==self.domain_id(), {self.domain}
     pub fn id(&self)->(out:usize) ensures out==self.owner(), {self.id}
+    pub fn parent(&self)->(out:Option<usize>) ensures out==self.parent_id(), {self.parent}
     pub fn anchor(&self)->(out:Port) ensures out==self.anchor_port(), {self.anchor}
     pub fn dependencies(&self)->(out:&[Port]) ensures out@==self.dependencies_spec(), {self.dependencies.as_slice()}
+    pub fn provisions_vec(&self)->(out:Vec<Port>) ensures out@==self.provisions_spec(), {self.provisions.clone()}
     pub fn provisions(&self)->(out:&[Port]) ensures out@==self.provisions_spec(), {self.provisions.as_slice()}
     pub fn child_identity(&self)->(out:Option<ChildIdentity>)
         ensures out.is_some()==self.parent_id().is_some(),out.is_some() ==> out.unwrap().domain_id()==self.domain_id()
@@ -248,6 +253,22 @@ pub open spec fn registered_dependencies(state:crate::refinement::State,parent:O
                 || exists|q:Port| state.fibers[parent.unwrap()].dependencies.contains(q) && resolved(realms,q.key)==p))
 }
 impl LifecycleState {
+    /// Revalidate a not-yet-executed root against the live lifecycle, rather
+    /// than treating its earlier admission as permission for a later episode.
+    pub open spec fn root_invocation_enabled(&self,ticket:ActionTicket)->bool {
+        ticket.domain==self.protocol().domain_id() && ticket.kind==ActionKind::Setup
+            && self.control().generation_of(ticket.id)==Some(ticket.generation)
+            && self.protocol().recorded(ticket) && self.control().phase_of(ticket.id)==Some(Phase::Loading)
+            && !self.control().is_retired(ticket.id)
+    }
+    pub fn accepts_root_invocation(&self,ticket:ActionTicket)->(out:bool)
+        requires self.wf(), ensures out==self.root_invocation_enabled(ticket),
+    {
+        ticket.domain==self.domain() && ticket.kind==ActionKind::Setup
+            && self.kernel.episode_generation(ticket.id)==Some(ticket.generation)
+            && self.actions.pending_matches(ticket) && self.kernel.phase(ticket.id)==Some(Phase::Loading)
+            && !self.kernel.retired(ticket.id)
+    }
     /// Exact registration domain, including the host's stricter parent policy.
     /// Dependency availability is checked at Begin, not registration.
     pub open spec fn registration_enabled<T>(&self,parent:Option<usize>,realms:Map<u64,u64>,anchor:Port,definition:&PluginDefinition<T>)->bool {
@@ -264,7 +285,7 @@ impl LifecycleState {
     pub fn register_plugin<T>(&mut self,parent:Option<usize>,realms:&BTreeMap<u64,u64>,anchor:Port,definition:PluginDefinition<T>)
         ->(out:Result<RegisteredPlugin<T>,(Error,PluginDefinition<T>)>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).protocol().same(&old(self).protocol()),
+        ensures final(self).control().generations_preserved(&old(self).control()), final(self).wf(),final(self).protocol().same(&old(self).protocol()),
             out.is_ok()==old(self).registration_enabled(parent,realms@,anchor,&definition),
             out.is_err() ==> final(self).same(old(self)) && out->Err_0.1==definition,
             out.is_ok() ==> {
@@ -279,6 +300,8 @@ impl LifecycleState {
                 &&& forall|p:Port| #[trigger] final(self).control().paper().fibers[plugin.owner()].provisions.contains(p)==(plugin.provisions_spec().contains(p) || p==anchor)
             },
     {
+        proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
+
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if let Some(id)=parent {
             if !self.kernel.contains(id) {return Err((Error::Unknown,definition));}
@@ -344,9 +367,11 @@ impl LifecycleState {
     pub fn admit_registered_root<T,C,G,A>(&self,plugin:&RegisteredPlugin<T>,work:&mut SetupWork<C,G>,argument:A)
         ->(out:Result<RegisteredInvocation<A>,A>)
         requires self.wf(),old(work).wf(),
-        ensures final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
+        ensures final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
             out.is_ok() ==> out->Ok_0.domain_id()==plugin.domain_id() && out->Ok_0.owner()==plugin.owner()
                 && out->Ok_0.version()==plugin.version() && out->Ok_0.work().value()==argument
+                && out->Ok_0.lifecycle()==old(work).origin().unwrap()
+                && self.root_invocation_enabled(out->Ok_0.lifecycle()) && old(work).accepts()
                 && old(work).origin().is_some() && old(work).origin().unwrap().id==plugin.owner()
                 && old(work).origin().unwrap().domain==self.protocol().domain_id()
                 && self.control().generation_of(plugin.owner())==Some(old(work).origin().unwrap().generation)
@@ -357,9 +382,9 @@ impl LifecycleState {
         let ticket=match work.lifecycle_ticket() {Some(ticket)=>ticket,None=>return Err(argument)};
         if plugin.domain!=self.domain() || ticket.domain!=plugin.domain || ticket.id!=plugin.id
             || ticket.kind!=ActionKind::Setup || self.kernel.episode_generation(plugin.id)!=Some(ticket.generation)
-            || self.pending(plugin.id)!=Some(ticket) {return Err(argument);}
+            || !self.accepts_root_invocation(ticket) || !work.accepting_now() {return Err(argument);}
         match work.issue_root(argument) {
-            Ok(item)=>Ok(RegisteredInvocation {domain:plugin.domain,id:plugin.id,revision:plugin.revision,item}),
+            Ok(item)=>Ok(RegisteredInvocation {domain:plugin.domain,id:plugin.id,revision:plugin.revision,lifecycle:ticket,item}),
             Err(argument)=>Err(argument),
         }
     }
@@ -368,7 +393,7 @@ impl LifecycleState {
     /// Already removed children are an idempotent stutter, not a new release.
     pub fn retire_child(&mut self,child:ChildIdentity)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).control().generations_preserved(&old(self).control()), final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             final(self).protocol().same(&old(self).protocol()),
             out.is_ok() ==> child.domain_id()==old(self).protocol().domain_id()
                 && (if old(self).control().registered(child.child()) {
@@ -376,6 +401,8 @@ impl LifecycleState {
                         && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),child.child(),crate::refinement::Rule::Retire)
                 } else {final(self).same(old(self))}),
     {
+        proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
+
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if child.domain!=self.domain() {return Err(Error::InvalidState);}
         if !self.kernel.contains(child.id) {return Ok(());}
@@ -388,3 +415,6 @@ impl LifecycleState {
 
 #[path = "child_slot.rs"]
 pub mod child;
+
+#[path = "shared_child.rs"]
+pub mod shared_child;

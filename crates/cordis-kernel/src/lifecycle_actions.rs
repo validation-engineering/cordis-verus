@@ -171,6 +171,18 @@ impl LifecycleActions {
             out.is_none() == !self.outstanding(id),
     { self.ledger.pending(id) }
 
+    /// Exact ticket membership, using the ledger's unique pending owner.
+    pub fn pending_matches(&self,ticket:ActionTicket)->(out:bool)
+        requires self.wf(),ensures out==self.recorded(ticket),
+    {
+        let pending=self.ledger.pending(ticket.id);
+        proof {if self.recorded(ticket) {
+            assert(self.ledger.outstanding(ticket.id));
+            self.ledger.recorded_owner_unique(ticket,pending.unwrap());
+        }}
+        pending==Some(ticket)
+    }
+
     fn cleanup_index(&self, id: usize) -> (out: Option<usize>)
         ensures out.is_some() ==> out.unwrap() < self.cleanups.len()
                 && self.cleanups[out.unwrap() as int].ticket.id == id,
@@ -245,7 +257,7 @@ impl LifecycleActions {
 
     pub fn begin(&mut self, kernel: &mut Kernel, id: usize) -> (out: Result<ActionTicket, Error>)
         requires old(self).wf(), old(kernel).wf(),
-        ensures final(self).wf(), final(kernel).wf(),
+        ensures (forall|n:usize| n!=id ==> final(kernel).generation_of(n)==old(kernel).generation_of(n)), final(self).wf(), final(kernel).wf(),
             out.is_ok() == (old(self).admission_enabled(id) && old(kernel).begin_enabled(id)),
             out.is_err() ==> final(self).same(old(self)) && final(kernel).unchanged(old(kernel)),
             out.is_ok() ==> out.unwrap().kind == ActionKind::Setup
@@ -273,7 +285,7 @@ impl LifecycleActions {
 
     pub fn begin_cleanup(&mut self, kernel: &mut Kernel, id: usize) -> (out: Result<ActionTicket, Error>)
         requires old(self).wf(), old(kernel).wf(),
-        ensures final(self).wf(), final(kernel).wf(),
+        ensures final(kernel).generations_preserved(old(kernel)), final(self).wf(), final(kernel).wf(),
             out.is_ok() == (old(self).admission_enabled(id) && old(kernel).cleanup_enabled(id)),
             final(kernel).same_bindings(old(kernel)),
             final(kernel).paper() == old(kernel).paper(),
@@ -287,6 +299,8 @@ impl LifecycleActions {
             final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
             out.is_ok() ==> out.unwrap().domain==old(self).domain_id() && out.unwrap().action==old(self).next_id(),
     {
+        proof {reveal(Kernel::generations_preserved);reveal(Kernel::unchanged);}
+
         proof {
             reveal(Kernel::unchanged);
             reveal(Kernel::same_bindings);
@@ -516,7 +530,7 @@ impl LifecycleActions {
     /// verified function. Failure cannot change any kernel state or commitments.
     pub fn finish_cleanup(&mut self, kernel: &mut Kernel, id: usize) -> (out: Result<(), Error>)
         requires old(self).wf(), old(kernel).wf(),
-        ensures final(self).wf(), final(kernel).wf(),
+        ensures final(kernel).generations_preserved(old(kernel)), final(self).wf(), final(kernel).wf(),
             out.is_ok() == old(self).finish_enabled(old(kernel), id),
             out.is_err() ==> final(self).same(old(self)) && final(kernel).unchanged(old(kernel))
                 && final(kernel).same_bindings(old(kernel)),
@@ -526,6 +540,8 @@ impl LifecycleActions {
             final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
             final(kernel).commitments_frame(old(kernel),id),
     {
+        proof {reveal(Kernel::generations_preserved);reveal(Kernel::unchanged);}
+
         proof {
             reveal(Kernel::unchanged);
             reveal(Kernel::same_bindings);

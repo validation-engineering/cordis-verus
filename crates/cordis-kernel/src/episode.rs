@@ -319,6 +319,8 @@ impl StageProtocol {
         self.inverses.pop()
     }
 
+    pub fn is_cancelled(&self)->(out:bool) ensures out==self.cancellation(),
+    {self.cancelled}
     pub fn is_pending(&self) -> (pending: bool)
         ensures pending == self.pending(),
     { self.in_flight }

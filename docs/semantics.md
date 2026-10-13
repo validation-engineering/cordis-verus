@@ -364,8 +364,111 @@ JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验�
 分配执行，则关闭 Pending 槽，阻止迟到请求创建无人清理的 Child。退休不等于
 资源恢复结束，显式回调替换也不等于论文中的效果步骤。
 
+原生 `enqueue_native_child` 现直接构造同一 `SharedChild` 的请求与 inverse，
+拒绝时不修改两个队列。实际槽位于私有 vstd 读写锁中；登记／拒绝／退休在独占
+访问下执行，观察使用共享访问。真实终态生成持久资源凭据，证明同一槽的两个
+终态观察一致，因此真实取消观察排除后续分配成功。`register_shared_child` 的
+成功条件也直接读取该锁内状态和真实注册表。这个连接属于 R2 的 Child 生产合同，
+不是完整 R1 context 解释或整条轨迹的证明。它使用固定 vstd 和 Arc 合同；自旋锁
+不承诺公平、无饥饿或全局无死锁。锁内只存标量状态，诊断文本、回调、其他宿主锁
+和 panic 适配仍在边界之外，详见 [R2 文档](r2-execution.zh-CN.md)。
+
+`NativeServices` 与 `NativeEpisode` 现由真实 `begin_native_execution`、
+`finish_native_execution`、`release_native_execution` 接到 Runtime。Begin 创建唯一
+的本次值 owner，并从实际发布表精确捕获全部可用 committed 槽；Finish 要求声明值
+完整并发布真实槽。全局读取检查当前 Active provider 与代次，episode 清理读取
+保留的绑定槽。Unloading 时新调用不可见，保留失败仍阻塞转移；成功排空才关闭值
+访问并返回实际持有／导入／发布载荷，在记账锁外析构。`provide` 的局部表更新
+连接到 §3.4 的 `coeffects::put`。`Arc` referent 克隆不解释内部可变内容，也不证明
+Mutex 同步或用户 availability 回调；已经交给用户的 Arc 不会被撤销。
+
+`NativeHost` 现把真实生命周期与登记／宿主对象 map 放在同一受验证状态中。
+其成员集合恰好等于控制投影的 registered 集合，保存的回调与实际域、ID、父插件
+和端口声明一致；注册、动态 Child 分配、回调更新、可变宿主借用和 Remove 均保持
+对应。宿主只能借出不透明记账字段，不能借出可变登记或内核。Remove 返回实际
+被移除的对象供锁外析构，Unload 不删除回调；枚举只扫描存活条目。
+
+`enqueue_effect` 现原子创建清理组并排队实际迭代器；`EffectRun` 持有实际载荷，
+为每次准入分配递增身份，从实际调用结果构造私有收据，按生命周期／组／域与
+当前尝试检查落地。取消后的实际 inverse 先收集，再停止 continuation。
+Runtime 不再另存取消集合，嵌套 effect／Child 准入读取同一清理 stage 状态。
+
+`Execution` 现共同持有实际工作、清理组、原生值、phase 与 runner 集合，
+借出记录阻止把暂时空的 map 当成排空。只有消费真实 runner 且队列已排空才能
+移除，返回的载荷在锁外析构。`NativeHost` 的 managed 入口组合实际发布与 Active、
+直接撤回与关闭准入、排空释放与 Closed。root、effect 与 cleanup 的实际 Poll
+转换现经过验证，捕获 panic 只能转为失败；实际轮询和捕获机制仍是普通 Rust。
+
 这些合同已经用于真实 Rust／Node 路径中各自对应的入口，不能把原生登记合同
-自动推广到外部宿主。任意插件的效果／inverse 律、普通 `Mounted` map 与共享
-Child 句柄别名／同步、publication／context 的联合不变式、poll／panic 适配，
+自动推广到外部宿主。任意插件的效果／inverse 律、不透明宿主字段的语义与共享
+其他共享状态、完整 publication／context 观察的联合不变式、poll／panic 捕获机制，
 以及整条生产轨迹到 R1 的对应仍未完成。R2 保持推进状态，原验收标准不变。
 详见[执行合同和剩余验收内容](r2-execution.zh-CN.md)（[English](r2-execution.md)）。
+
+### 具有真实效果律的可逆服务值
+
+`ReversibleValue` 是普通 Runtime 和静态宿主可用的明确验证类型。替换、检查
+溢出的加法、异或和比较交换由真实内核代码执行；结果决定 continuation，真实
+inverse 在返回插件前进入原清理组。值锁中的 `(value, depth)` 同时解释实际
+前／后态和严格 inverse 定义域；再次写入相同值仍会阻塞早先的清理。
+
+清理 dispatcher 在受验证代码内选择、执行、确认该 inverse。失败保留原槽位和
+对象，只有恢复实际成功才报告 Succeeded。有限程序的成功前缀也完整保存 inverse。
+全载体 Component 成员证明、实际历史分类与连续程序轨迹，连接到 R1 所用的
+dependent grammar。ghost 历史会被擦除。
+
+这不是任意 `Any` 值、JS 对象或完整递归宿主 context 的语义证明，原有三条 R2
+退出条件保持不变。审查和复现见[可逆服务值案例](cases/reversible-values.zh-CN.md)
+（[English](cases/reversible-values.md)）。
+
+
+### 来自实际生命周期的连续控制历史
+
+`LifecycleState` 的 ghost 历史从空状态开始，与当前真实 Kernel 控制观察一致。
+注册、Begin／Finish、退出、清理后 Unload、Remove 和动态接口修改直接维护
+这份历史；每一步属于适用的论文控制规则、保持该观察的内部步骤，或明确的
+Restart／动态接口扩展。没有扩展的历史可推出严格的有限论文控制执行。
+这里已经覆盖原生和 Node 共同的控制 owner，但没有把该投影当作包含服务值、
+回调函数、publication 版本和逆操作的完整 context。整条联合解释仍是 R2
+验收义务，详见 [R2 执行合同](r2-execution.zh-CN.md)。
+
+### 原生注册／发布联合边界（R2）
+
+真实 `Runtime` 已通过 `NativeDriver` 使用 `NativeRuntime`，其内部同时拥有
+`NativeHost` 与 `NativeServices`。不变量要求每个 Active 注册实例拥有完整的
+当前代次发布表；保留的发布只能属于注册中的 Active／Unloading provider。
+Finish 校验真实 episode 声明，Unload 在排空后只转移本实例的发布；其他实例、
+失败重试、压缩与 recipe 更新均保持对应。普通宿主不再单独传入服务表。
+
+`native_history.rs` 独立定义真实控制与保留发布表的联合步骤关系；
+`NativeRuntime::history_correspondence` 连接从空状态至当前观察的连续历史。
+没有 Restart 扩展时才推出严格论文控制执行。这里的发布值是实际共享槽，
+不是 `Arc` 内部状态或任意回调的数学含义；共享 episode mutex、Node 多版本发布
+与完整 R1 context 的组合仍开放。完整审查及复现见 [R2 合同](r2-execution.zh-CN.md)。
+
+### 原生 Begin 来源保持（R2）
+
+`NativeEpisode` 的 ghost `Capture` 来自实际 Begin 构造器，记录当时的控制状态、
+committed bindings、provider 代次、发布槽与 imports。所有 `Execution` 修改保留
+同一份 capture；未关闭时 imports 等于最初捕获的表，Finish 的 publication 携带
+同一来源，Unload 返还原 imports 后清空 owner。工作域是实际保存和检查的 `u64`，
+用于拒绝来自不同队列的发布／释放；快照本身擦除，不增加 `Arc` 引用数。
+
+这没有证明共享 Mutex 的调度，也没有认证刻意复用所有 domain 编号的独立宿主对象。
+普通宿主的唯一 domain 分配边界仍保留。来源快照、共享 owner、函数含义与 Node
+多版本状态尚未组成完整 R1 context。见 [R2 来源审查路径](r2-execution.zh-CN.md#从-begin-保留至发布和释放的来源)。
+
+
+### Begin 分配的执行归属与根调用撤销（R2）
+
+`NativeRuntime` 的真实归属表将每个 Loading／Active／Unloading 插件对应到 Begin
+分配的 setup 票据与工作域，并约束发布值的来源；Inactive／已移除插件无归属记录。
+全部 managed 入口检查此记录，失败与重试保持它，成功 Unload 删除它。连续历史也
+记录这张表，证明所有记录来自成功 Begin，且在其 Unload 前保持。
+
+根调用凭据保留准入时的生命周期票据；执行前重新核对 pending setup、generation、
+Loading 与退休状态。尚未调用的旧根工作不能跨撤销或重启执行，本地工作撤销也拒绝
+新准入。已执行回调的完成仍按原协议处理。上述检查属于现有控制步的实现细化及
+保持观察的内部检查；不证明抢占、Mutex 调度或任意回调效果。数字身份全部碰撞的
+独立原始宿主、Node 多版本状态和完整 R1 context 仍是未关闭边界。详见
+[R2 归属审查](r2-execution.zh-CN.md#begin-分配的-episode-归属与延迟根调用)。

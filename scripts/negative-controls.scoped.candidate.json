@@ -3340,32 +3340,6 @@
       "selectionRationale": "The real JS wait path must use live native scope ownership and check every supplied ancestor, including after a completed nested scope. A compiled mutant and fresh matching positive proof are required; this selected experiment is not full negative acceptance."
     },
     {
-      "name": "typed-child-check-accepts-reserved-provision",
-      "mutation": {
-        "file": "typed_child_domain.rs",
-        "old": "    kernel.check_insert(Some(parent),dependencies.as_slice(),provisions.as_slice())",
-        "new": "    Ok(())"
-      },
-      "targets": [
-        {
-          "kind": "module",
-          "path": "typed_child_domain",
-          "descendants": false,
-          "function": "cordis_negative::typed_child_domain::check_instantiation"
-        }
-      ],
-      "expectedFailures": [
-        {
-          "function": "cordis_negative::typed_child_domain::check_instantiation",
-          "module": "typed_child_domain",
-          "file": "typed_child_domain.rs",
-          "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "ensures out.is_ok()==child(a,parent,name).is_some(),"
-        }
-      ],
-      "selectionRationale": "Returning success without the production check must violate the exact typed instantiation domain. Compile the mutant and prove the same positive selector first; this case does not establish full-context membership or complete negative acceptance."
-    },
-    {
       "name": "reified-service-read-returns-none",
       "mutation": {
         "file": "fresh_driver.rs",
@@ -3416,6 +3390,32 @@
         }
       ],
       "selectionRationale": "The public executable inspection API must return its actual captured inverse even when inspection succeeds. Require a fresh matching positive proof, complete mutant compilation and exact postcondition rejection; this is not full negative acceptance."
+    },
+    {
+      "name": "typed-child-check-accepts-reserved-provision",
+      "mutation": {
+        "file": "typed_child_domain.rs",
+        "old": "    kernel.check_insert(Some(parent),dependencies.as_slice(),provisions.as_slice())",
+        "new": "    Ok(())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "typed_child_domain",
+          "descendants": false,
+          "function": "cordis_negative::typed_child_domain::check_instantiation"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::typed_child_domain::check_instantiation",
+          "module": "typed_child_domain",
+          "file": "typed_child_domain.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok()==child(a,parent,name).is_some(),"
+        }
+      ],
+      "selectionRationale": "Returning success without the production check must violate the exact typed instantiation domain. Compile the mutant and prove the same positive selector first; this case does not establish full-context membership or complete negative acceptance."
     },
     {
       "name": "r2-publication-value-read-returns-none",
@@ -3872,6 +3872,1006 @@
         }
       ],
       "selectionRationale": "Generation equality cannot admit an old request between parent Unload and the next Begin. Require fresh selected positive, complete mutant compilation and exact live-parent contract rejection."
+    },
+    {
+      "name": "r2-native-values-stale-generation",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "if state.kernel().episode_generation(provider)!=Some(entry.origin.generation) {return None;}",
+        "new": "if false {return None;}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::NativeServices::retained",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_some()==self.available(state,provider,port),"
+        }
+      ],
+      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance."
+    },
+    {
+      "name": "r2-native-values-omit-imports",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "NativeEpisode {origin:ticket,work_domain:work.domain(),provisions,bindings,owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}",
+        "new": "NativeEpisode {origin:ticket,work_domain:work.domain(),provisions,bindings,owned:BTreeMap::new(),imports:BTreeMap::new(),closed:false,capture:Ghost(capture)}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::capture_native_values",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.wf() && !out.closed() && out.owned()==Map::empty()"
+        }
+      ],
+      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance."
+    },
+    {
+      "name": "r2-native-values-incomplete-finish",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "if !self.native_values_match(id,store,values,work) || values.missing().is_some() || store.entries.contains_key(&id) {return Err(Error::InvalidState);}",
+        "new": "if !self.native_values_match(id,store,values,work) || store.entries.contains_key(&id) {return Err(Error::InvalidState);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::finish_native_execution",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> values.domain_id()==work.domain_id() && old(self).execution_matches(id,work,groups) && values.complete() && !values.closed() && Some(values.origin())==work.origin()"
+        }
+      ],
+      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance."
+    },
+    {
+      "name": "r2-native-values-substitute-publication",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "store.entries.insert(id,NativePublication {origin:values.origin,values:values.owned.clone(),capture:Ghost(values.capture())});Ok(())",
+        "new": "store.entries.insert(id,NativePublication {origin:values.origin,values:BTreeMap::new(),capture:Ghost(values.capture())});Ok(())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::finish_native_execution",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> values.domain_id()==work.domain_id() && old(self).execution_matches(id,work,groups) && values.complete() && !values.closed() && Some(values.origin())==work.origin()"
+        }
+      ],
+      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance."
+    },
+    {
+      "name": "r2-native-values-release-other-episode",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "if let Some(entry)=store.entries.get(&id) {if entry.origin!=values.origin {return Err(Error::InvalidState);}}",
+        "new": "if let Some(_entry)=store.entries.get(&id) {if false {return Err(Error::InvalidState);}}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::release_native_execution",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> old(values).domain_id()==old(work).domain_id() && Some(old(values).origin())==old(work).origin() && old(values).origin().id==id"
+        }
+      ],
+      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance."
+    },
+    {
+      "name": "r2-native-host-hides-registration",
+      "mutation": {
+        "file": "native_host.rs",
+        "old": "{match self.entries.get(&id) {Some(entry)=>Some(&entry.registration),None=>None}}",
+        "new": "{None}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::registration",
+          "module": "lifecycle_state::native",
+          "file": "native_host.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_some()==self.entries().contains_key(id),out.is_some() ==> *out.unwrap()==self.entries()[id].recipe(),"
+        }
+      ],
+      "selectionRationale": "The actual native registry must preserve registration presence, the identity of a borrowed host, and the target of a recipe replacement. Require fresh selected positives, whole mutant compilation and the exact failed contract. Scoped development evidence does not imply full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-native-host-borrows-other-owner",
+      "mutation": {
+        "file": "native_host.rs",
+        "old": "match self.entries.get_mut(&id) {Some(entry)=>Some(&mut entry.host),None=>None}",
+        "new": "match self.entries.get_mut(&(id ^ 1)) {Some(entry)=>Some(&mut entry.host),None=>None}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::host_mut",
+          "module": "lifecycle_state::native",
+          "file": "native_host.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "match out {"
+        }
+      ],
+      "selectionRationale": "The actual native registry must preserve registration presence, the identity of a borrowed host, and the target of a recipe replacement. Require fresh selected positives, whole mutant compilation and the exact failed contract. Scoped development evidence does not imply full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-native-host-replaces-other-owner",
+      "mutation": {
+        "file": "native_host.rs",
+        "old": "let out=match self.entries.get_mut(&id) {\n            Some(entry)=>match entry.registration.replace(payload)",
+        "new": "let out=match self.entries.get_mut(&(id ^ 1)) {\n            Some(entry)=>match entry.registration.replace(payload)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::replace",
+          "module": "lifecycle_state::native",
+          "file": "native_host.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).entries().contains_key(id) && old(self).entries()[id].recipe().version()<u64::MAX),"
+        }
+      ],
+      "selectionRationale": "The actual native registry must preserve registration presence, the identity of a borrowed host, and the target of a recipe replacement. Require fresh selected positives, whole mutant compilation and the exact failed contract. Scoped development evidence does not imply full negative or R2 acceptance."
+    },
+    {
+      "name": "r2-shared-child-splits-request-inverse",
+      "mutation": {
+        "file": "shared_child.rs",
+        "old": "let request=ChildDispatch::Native(NativeChildRequest {payload,child:child.clone()});",
+        "new": "let request=ChildDispatch::Native(NativeChildRequest {payload,child:SharedChild::from_work(self).unwrap()});"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::shared_child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::setup_work::SetupWork::enqueue_native_child",
+          "module": "lifecycle_state::registration::shared_child",
+          "file": "shared_child.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let child=out->Ok_0.0;let token=out->Ok_0.1;"
+        }
+      ],
+      "selectionRationale": "The actual shared Child request and inverse must use the same verified lock; registration must implement its exact admission condition and retirement must actually close pending allocation. Require a fresh selected positive, full mutant compilation and the named executable postcondition rejection. This is scoped development evidence, not complete R2 or negative-regression acceptance."
+    },
+    {
+      "name": "r2-shared-child-rejects-valid-registration",
+      "mutation": {
+        "file": "shared_child.rs",
+        "old": "let result=self.register_child(&mut cell.slot,realms,anchor,definition,host);",
+        "new": "let result=Err((Error::InvalidState,definition,host));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::shared_child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::register_shared_child",
+          "module": "lifecycle_state::registration::shared_child",
+          "file": "shared_child.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.result.is_ok()==(out.before.state() is Pending && child.domain_id()==old(self).state().protocol().domain_id()"
+        }
+      ],
+      "selectionRationale": "The actual shared Child request and inverse must use the same verified lock; registration must implement its exact admission condition and retirement must actually close pending allocation. Require a fresh selected positive, full mutant compilation and the named executable postcondition rejection. This is scoped development evidence, not complete R2 or negative-regression acceptance."
+    },
+    {
+      "name": "r2-shared-child-forges-retirement",
+      "mutation": {
+        "file": "shared_child.rs",
+        "old": "let result=self.retire_child_slot(&mut cell.slot);",
+        "new": "let result=Ok(None);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::shared_child",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::retire_shared_child",
+          "module": "lifecycle_state::registration::shared_child",
+          "file": "shared_child.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.result.is_ok() ==> !(out.after.state() is Pending)"
+        }
+      ],
+      "selectionRationale": "The actual shared Child request and inverse must use the same verified lock; registration must implement its exact admission condition and retirement must actually close pending allocation. Require a fresh selected positive, full mutant compilation and the named executable postcondition rejection. This is scoped development evidence, not complete R2 or negative-regression acceptance."
+    },
+    {
+      "name": "r2-effect-wrong-request-group",
+      "mutation": {
+        "file": "effect_work.rs",
+        "old": "let identity=EffectIdentity {origin:self.lifecycle_ticket(),group:id,domain};",
+        "new": "let identity=EffectIdentity {origin:self.lifecycle_ticket(),group:source,domain};"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effect_work",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::setup_work::SetupWork::enqueue_effect",
+          "module": "effect_work",
+          "file": "effect_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let id=out->Ok_0;let request=final(self).group_requests().last().value();"
+        }
+      ],
+      "selectionRationale": "Mutate the actual effect request or poll landing used by Runtime. Require a fresh selected positive, complete mutant compilation and rejection of this exact named postcondition."
+    },
+    {
+      "name": "r2-effect-ignores-cancelled-source",
+      "mutation": {
+        "file": "effect_work.rs",
+        "old": "|| !self.can_enqueue() || !groups.accepts_acquisition(source) || !groups.can_add_iterator(domain)",
+        "new": "|| !self.can_enqueue() || false || !groups.can_add_iterator(domain)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effect_work",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::setup_work::SetupWork::enqueue_effect",
+          "module": "effect_work",
+          "file": "effect_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).owns(old(groups)) && old(self).origin()==old(groups).origin()"
+        }
+      ],
+      "selectionRationale": "Mutate the actual effect request or poll landing used by Runtime. Require a fresh selected positive, complete mutant compilation and rejection of this exact named postcondition."
+    },
+    {
+      "name": "r2-effect-accepts-wrong-poll",
+      "mutation": {
+        "file": "effect_work.rs",
+        "old": "self.current!=Some(reply.serial)",
+        "new": "false"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effect_work",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::effect_work::EffectRun::land",
+          "module": "effect_work",
+          "file": "effect_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).called() && old(self).current()==Some(reply.serial())"
+        }
+      ],
+      "selectionRationale": "Mutate the actual effect request or poll landing used by Runtime. Require a fresh selected positive, complete mutant compilation and rejection of this exact named postcondition."
+    },
+    {
+      "name": "r2-effect-drops-actual-inverse",
+      "mutation": {
+        "file": "effect_work.rs",
+        "old": "groups.land_result(self.identity.group,result)",
+        "new": "groups.land_result(self.identity.group,match result {Ok(_)=>Ok(None),Err(error)=>Err(error)})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effect_work",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::effect_work::EffectRun::land",
+          "module": "effect_work",
+          "file": "effect_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> final(self).current().is_none() && !final(self).called() && match reply.result() {"
+        }
+      ],
+      "selectionRationale": "Mutate the actual effect request or poll landing used by Runtime. Require a fresh selected positive, complete mutant compilation and rejection of this exact named postcondition."
+    },
+    {
+      "name": "r2-owner-forgets-checkout",
+      "mutation": {
+        "file": "execution.rs",
+        "old": "if out.is_some() {self.checked_out.insert(id,());}",
+        "new": "if out.is_some() {}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "execution",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::take_effect",
+          "module": "execution",
+          "file": "execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "final(self).checked_out()==if out.is_some() {old(self).checked_out().insert(id,())} else {old(self).checked_out()},"
+        }
+      ],
+      "selectionRationale": "Mutate the production execution owner or actual poll normalization. Require a fresh selected positive, complete mutant compilation, and rejection at this specific contract; compilation failure does not count."
+    },
+    {
+      "name": "r2-owner-accepts-foreign-return",
+      "mutation": {
+        "file": "execution.rs",
+        "old": "if !self.checked_out.contains_key(&id) || self.effects.contains_key(&id) || !run.belongs(&self.groups) {return Err(run);}",
+        "new": "if !self.checked_out.contains_key(&id) || self.effects.contains_key(&id) {return Err(run);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "execution",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::put_effect",
+          "module": "execution",
+          "file": "execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn put_effect(&mut self,run:EffectRun<G>)->(out:Result<(),EffectRun<G>>)\n        requires old(self).wf(),run.wf(),ensures final(self).wf(),"
+        }
+      ],
+      "selectionRationale": "Removing the origin/domain check permits a foreign runner into the actual map and violates Execution::wf. Require fresh selected positive verification, whole mutant compilation, and this exact invariant postcondition rejection."
+    },
+    {
+      "name": "r2-owner-misses-active-transition",
+      "mutation": {
+        "file": "managed_native.rs",
+        "old": "execution.initialized=true;",
+        "new": "// Negative: omit the actual local Active transition."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::managed",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::finish_managed_execution",
+          "module": "lifecycle_state::native::managed",
+          "file": "managed_native.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> old(self).state().execution_matches(id,&old(execution).work_state(),&old(execution).cleanup_state())"
+        }
+      ],
+      "selectionRationale": "Mutate the production execution owner or actual poll normalization. Require a fresh selected positive, complete mutant compilation, and rejection at this specific contract; compilation failure does not count."
+    },
+    {
+      "name": "r2-owner-retires-live-queue",
+      "mutation": {
+        "file": "execution.rs",
+        "old": "if !self.groups.remove(id) {return Err(run);}",
+        "new": "// Negative: return the runner while its queue remains live."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "execution",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::retire_effect",
+          "module": "execution",
+          "file": "execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0==run.payload() && !final(self).cleanup_state().live(run.identity().group_id())"
+        }
+      ],
+      "selectionRationale": "Mutate the production execution owner or actual poll normalization. Require a fresh selected positive, complete mutant compilation, and rejection at this specific contract; compilation failure does not count."
+    },
+    {
+      "name": "r2-poll-pending-is-complete",
+      "mutation": {
+        "file": "poll_result.rs",
+        "old": "Poll::Pending=>EffectOutput::Pending,",
+        "new": "Poll::Pending=>EffectOutput::Ready(Ok(None)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "poll_result",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::poll_result::normalize_effect_poll",
+          "module": "poll_result",
+          "file": "poll_result.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures match actual {\n        Ok(Poll::Pending)=>out is Pending,"
+        }
+      ],
+      "selectionRationale": "Mutate the production execution owner or actual poll normalization. Require a fresh selected positive, complete mutant compilation, and rejection at this specific contract; compilation failure does not count."
+    },
+    {
+      "name": "r2-poll-discards-returned-inverse",
+      "mutation": {
+        "file": "poll_result.rs",
+        "old": "Poll::Ready(Ok(Some(Ok(inverse))))=>EffectOutput::Ready(Ok(Some(map_inverse(inverse)))),",
+        "new": "Poll::Ready(Ok(Some(Ok(inverse))))=>{let _discarded=map_inverse(inverse);EffectOutput::Ready(Ok(None))},"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "poll_result",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::poll_result::normalize_effect_poll",
+          "module": "poll_result",
+          "file": "poll_result.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures match actual {\n        Ok(Poll::Pending)=>out is Pending,"
+        }
+      ],
+      "selectionRationale": "Mutate the production execution owner or actual poll normalization. Require a fresh selected positive, complete mutant compilation, and rejection at this specific contract; compilation failure does not count."
+    },
+    {
+      "name": "r2-value-ignores-result-branch",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "        if outcome.matched {self.matched} else {self.unmatched}\n",
+        "new": "        self.matched\n"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Branch::select",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn select(&self,outcome:Outcome)->(out:Option<usize>) ensures out==self.selected(outcome)"
+        }
+      ],
+      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+    },
+    {
+      "name": "r2-value-ignores-inverse-depth",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "if before!=self.state.after {",
+        "new": "if before.value!=self.state.after.value {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Inverse::restore",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "proof {cell.record(before,Event::Restore {inverse:self.state,before,after:cell.state});}"
+        }
+      ],
+      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+    },
+    {
+      "name": "r2-value-forgets-actual-inverse",
+      "mutation": {
+        "file": "execution.rs",
+        "old": "        let registered=self.register(id,ChildCleanup::Value(applied.inverse));\n        let token=match registered {Ok(token)=>token,Err(_)=>{assert(false);return Err(crate::reversible_value::ValueError::Closed);}};\n        Ok(ValueAdmission {outcome:applied.outcome,next:applied.next,token})",
+        "new": "        Ok(ValueAdmission {outcome:applied.outcome,next:applied.next,token:0})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "execution",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::apply_value",
+          "module": "execution",
+          "file": "execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)"
+        }
+      ],
+      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+    },
+    {
+      "name": "r2-value-confirms-failed-restore",
+      "mutation": {
+        "file": "cleanup_completion.rs",
+        "old": "let report=self.accept_result(ticket,Err(crate::reversible_value::ValueError::Interference),",
+        "new": "let report=self.accept_result(ticket,Ok(()),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue::completion",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::restore_value",
+          "module": "cleanup_queue::completion",
+          "file": "cleanup_completion.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.corresponds(inverse) && !final(self).issued()"
+        }
+      ],
+      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+    },
+    {
+      "name": "r2-value-program-skips-continuation",
+      "mutation": {
+        "file": "value_program.rs",
+        "old": "current=forward.next;outcomes.push(forward.outcome);",
+        "new": "current=None;outcomes.push(forward.outcome);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::program",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::ReversibleValue::run",
+          "module": "reversible_value::program",
+          "file": "value_program.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "prefix(program.code(),points,outcomes@),points.last().state==cell.state,points.last().next==current"
+        }
+      ],
+      "selectionRationale": "Skip the actual outcome-selected continuation while leaving the ghost/source path unchanged. Require a compiling mutant rejected by the invariant connecting the actual interpreter position to its source trace."
+    },
+    {
+      "name": "r2-history-forgets-actual-step",
+      "mutation": {
+        "file": "control_history.rs",
+        "old": "self.history=Ghost(self.history@.append(self.control().paper(),label));",
+        "new": "self.history=Ghost(self.history@);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::history",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::record_control",
+          "module": "lifecycle_state::history",
+          "file": "control_history.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),final(self).control()==old(self).control(),final(self).protocol()==old(self).protocol(),"
+        }
+      ],
+      "selectionRationale": "Require the actual lifecycle source history to record the real state change and preserve the supplied operation arguments; selected positive verification, whole-mutant compilation and exact contract rejection are required."
+    },
+    {
+      "name": "r2-history-misattributes-declaration",
+      "mutation": {
+        "file": "lifecycle_state.rs",
+        "old": "let out=self.kernel.declare_provision(id,port);",
+        "new": "let out=self.kernel.declare_provision(id,Port {key:port.key ^ 1,realm:port.realm});"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::declare_provision",
+          "module": "lifecycle_state",
+          "file": "lifecycle_state.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "            let label=if out.is_ok() {Label::Declare {actor:id,port}} else {Label::Internal};\n            reveal(Kernel::unchanged);reveal(Kernel::commitments_frame);if out.is_ok() {self.kernel.interface_history(&prior,label);} else {self.kernel.unchanged_observations(&prior);}"
+        }
+      ],
+      "selectionRationale": "Require the actual lifecycle source history to record the real state change and preserve the supplied operation arguments; selected positive verification, whole-mutant compilation and exact contract rejection are required."
+    },
+    {
+      "name": "r2-native-accepts-wrong-interface",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "if !values.matches_provisions(recipe.provisions()) {return Err(Error::InvalidState);}",
+        "new": "if false {return Err(Error::InvalidState);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::finish_managed_execution",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.linked(id));assert(prior.linked(id));self.generation_step(&prior,id,Rule::Finish);self.transition(&prior,id,Rule::Finish);"
+        }
+      ],
+      "selectionRationale": "Require the actual native aggregate to preserve its joint registry/publication invariant and continuous history. A fresh selected positive proof, whole-mutant compilation and exact named contract rejection are required."
+    },
+    {
+      "name": "r2-native-release-drops-other-values",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "let out=self.host.release_managed_execution(id,&mut self.services,execution);",
+        "new": "let out=self.host.release_managed_execution(id,&mut self.services,execution);if out.is_ok() {self.services=NativeServices::new(self.host.lifecycle().domain());}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));self.generation_step(&prior,id,Rule::Unload);self.transition(&prior,id,Rule::Unload);}"
+        }
+      ],
+      "selectionRationale": "Require the actual native aggregate to preserve its joint registry/publication invariant and continuous history. A fresh selected positive proof, whole-mutant compilation and exact named contract rejection are required."
+    },
+    {
+      "name": "r2-native-history-forgets-publication",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "self.history=Ghost(next);",
+        "new": "self.history=Ghost(self.execution_history());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::transition",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.execution_history().states.last()==self.observation());"
+        }
+      ],
+      "selectionRationale": "Require the actual native aggregate to preserve its joint registry/publication invariant and continuous history. A fresh selected positive proof, whole-mutant compilation and exact named contract rejection are required."
+    },
+    {
+      "name": "r2-capture-accepts-foreign-work",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "&& values.work_domain==work.domain() && !values.closed}",
+        "new": "&& !values.closed}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::native_values_match",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==(store.domain_id()==self.protocol().domain_id() && Some(values.origin())==work.origin()"
+        }
+      ],
+      "selectionRationale": "Tie actual native values to their Begin capture and work domain through publication and release. Require a fresh scoped positive proof, whole-mutant compilation and rejection by the named contract."
+    },
+    {
+      "name": "r2-capture-forgets-begin-sources",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "sources:capture::sources(store.entries())",
+        "new": "sources:Map::empty()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::capture_native_values",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "capture.imports[key]==capture.sources[key.0].values[(key.1,key.2)] by {"
+        }
+      ],
+      "selectionRationale": "Tie actual native values to their Begin capture and work domain through publication and release. Require a fresh scoped positive proof, whole-mutant compilation and rejection by the named contract."
+    },
+    {
+      "name": "r2-capture-rebases-on-finish",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "values:values.owned.clone(),capture:Ghost(values.capture())",
+        "new": "values:values.owned.clone(),capture:Ghost(Capture {origin:values.capture().origin,work_domain:values.capture().work_domain,control:self.control(),provisions:values.capture().provisions,bindings:values.capture().bindings,imports:values.capture().imports,sources:values.capture().sources})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::finish_native_execution",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).control().generations_preserved(&old(self).control()), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(store).wf(),final(store).domain_id()==old(store).domain_id(),"
+        }
+      ],
+      "selectionRationale": "Tie actual native values to their Begin capture and work domain through publication and release. Require a fresh scoped positive proof, whole-mutant compilation and rejection by the named contract."
+    },
+    {
+      "name": "r2-root-call-skips-live-episode",
+      "mutation": {
+        "file": "native_host.rs",
+        "old": "if invocation.lifecycle_ticket().id!=id || !self.lifecycle.accepts_root_invocation(invocation.lifecycle_ticket()) {return Err(invocation);}",
+        "new": "// Negative: execute without revalidating the admitted lifecycle."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::NativeHost::call",
+          "module": "lifecycle_state::native",
+          "file": "native_host.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).entries().contains_key(id) && invocation.owner()==id"
+        }
+      ],
+      "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
+    },
+    {
+      "name": "r2-root-admission-ignores-withdrawal",
+      "mutation": {
+        "file": "plugin_registration.rs",
+        "old": "|| !self.accepts_root_invocation(ticket) || !work.accepting_now() {return Err(argument);}",
+        "new": "|| !self.accepts_root_invocation(ticket) {return Err(argument);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::admit_registered_root",
+          "module": "lifecycle_state::registration",
+          "file": "plugin_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.domain_id()==plugin.domain_id() && out->Ok_0.owner()==plugin.owner()"
+        }
+      ],
+      "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
+    },
+    {
+      "name": "r2-issued-owner-ignores-work-domain",
+      "mutation": {
+        "file": "native_owner.rs",
+        "old": "execution.lifecycle_ticket()==Some(self.origin) && execution.work().domain()==self.work_domain",
+        "new": "execution.lifecycle_ticket()==Some(self.origin)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::owner",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::owner::EpisodeOwner::matches",
+          "module": "lifecycle_state::native::runtime::owner",
+          "file": "native_owner.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==self.owns(execution),"
+        }
+      ],
+      "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
+    },
+    {
+      "name": "r2-native-begin-forgets-owner",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "self.owners.insert(id,EpisodeOwner {origin:execution.lifecycle_ticket().unwrap(),work_domain:domain});",
+        "new": "let _ = execution;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::begin_managed_execution",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));assert(!prior.publications().entries().contains_key(id));self.transition(&prior,id,Rule::Begin);}"
+        }
+      ],
+      "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
+    },
+    {
+      "name": "r2-native-unload-keeps-owner",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "if out.is_ok() {self.owners.remove(&id);}",
+        "new": "// Negative: retain an owner after its episode has unloaded."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));self.generation_step(&prior,id,Rule::Unload);self.transition(&prior,id,Rule::Unload);} else {self.state().control().unchanged_observations(&prior.state().control());self.unchanged(&prior);}"
+        }
+      ],
+      "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
+    },
+    {
+      "name": "r2-native-finish-skips-issued-owner",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "if !self.matches_execution(id,execution) {return Err(Error::InvalidState);}\n        let ghost prior=*self;\n        let recipe=",
+        "new": "let ghost prior=*self;\n        let recipe="
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::finish_managed_execution",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.linked(id));assert(prior.linked(id));self.generation_step(&prior,id,Rule::Finish);self.transition(&prior,id,Rule::Finish);"
+        }
+      ],
+      "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
     }
   ]
 }

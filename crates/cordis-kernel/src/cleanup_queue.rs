@@ -237,6 +237,8 @@ impl<T> CleanupQueue<T> {
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),
+            out==final(self).protocol().stage().pending(),
+            out==(old(self).protocol().stage().pending() || (!old(self).protocol().stage().settled() && !old(self).protocol().stage().cancellation() && target.is_some() && crate::episode::binding_set(target.unwrap()@)==crate::episode::binding_set(old(self).protocol().stage().committed_view()))),
     {self.journal.admit(target)}
     pub fn end(&mut self)->(out:bool)
         requires old(self).wf(),ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
@@ -248,6 +250,7 @@ impl<T> CleanupQueue<T> {
     pub fn cancel(&mut self)
         requires old(self).wf(),ensures final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),
+            final(self).protocol().stage().cancellation(),final(self).protocol().stage().pending()==old(self).protocol().stage().pending(),
     {self.journal.cancel();}
     pub fn domain(&self)->(out:u64)
         ensures out==self.protocol().domain_id(),
@@ -255,6 +258,8 @@ impl<T> CleanupQueue<T> {
     pub fn is_settled(&self)->(out:bool)
         ensures out==self.protocol().stage().settled(),
     {self.journal.is_settled()}
+    pub fn is_cancelled(&self)->(out:bool) ensures out==self.protocol().stage().cancellation(),
+    {self.journal.is_cancelled()}
     pub fn is_pending(&self)->(out:bool)
         ensures out==self.protocol().stage().pending(),
     {self.journal.is_pending()}

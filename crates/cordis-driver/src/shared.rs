@@ -53,9 +53,7 @@ impl Deref for LifecycleDriver {
 }
 impl LifecycleDriver {
     pub fn new() -> Result<Self, DriverError> {
-        let domain = NEXT_DOMAIN
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
-            .map_err(|_| DriverError::new("Capacity", "domain identity exhausted"))?;
+        let domain = allocate_domain()?;
         Ok(Self {
             state: LifecycleState::new(domain),
             pending_views: BTreeMap::new(),
@@ -67,40 +65,10 @@ impl LifecycleDriver {
     /// Decide using current kernel facts. Hosts must recompute availability
     /// after callbacks; a prior decision is not a capability to mutate state.
     pub fn decision(&self, id: usize, status: HostStatus) -> Option<Decision> {
-        match self.phase(id)? {
-            Phase::Loading | Phase::Active
-                if !self.coherent(id, status.restart) || !status.available || status.failed =>
-            {
-                Some(Decision::Withdraw)
-            }
-            Phase::Unloading if !self.cleanup_started(id) && !self.state.blocked(id) => {
-                Some(Decision::BeginCleanup)
-            }
-            Phase::Inactive
-                if self.retired(id) && self.children(id).is_empty() && !self.state.blocked(id) =>
-            {
-                Some(Decision::Remove)
-            }
-            Phase::Inactive
-                if !self.retired(id)
-                    && !status.failed
-                    && status.available
-                    && !self.state.blocked(id)
-                    && self.target(id).is_some()
-                    && !self.children(id).iter().any(|child| self.retired(*child)) =>
-            {
-                Some(Decision::Begin)
-            }
-            _ => None,
-        }
+        decision(&self.state, id, status)
     }
     pub fn coherent(&self, id: usize, restart: bool) -> bool {
-        !self.retired(id)
-            && !restart
-            && self.target(id).is_some_and(|target| {
-                cordis_kernel::episode::same_bindings(&target, &self.committed(id))
-            })
-            && (self.phase(id) != Some(Phase::Loading) || self.check_iteration(id).is_ok())
+        coherent(self.state.kernel(), id, restart)
     }
     pub fn insert(
         &mut self,
@@ -258,6 +226,70 @@ impl LifecycleDriver {
         let outcome = self.state.release_execution(id, work, groups)?;
         self.pending_views.remove(&id);
         Ok(outcome)
+    }
+    #[allow(clippy::type_complexity)]
+    pub fn begin_native_execution<T, C, G, I, R>(
+        &mut self,
+        store: &cordis_kernel::lifecycle_state::services::NativeServices<T>,
+        registration: &cordis_kernel::lifecycle_state::registration::RegisteredPlugin<R>,
+        cleanup_domain: u64,
+    ) -> Result<
+        (
+            cordis_kernel::setup_work::SetupWork<C, G>,
+            cordis_kernel::cleanup_groups::CleanupGroups<I>,
+            cordis_kernel::lifecycle_state::services::NativeEpisode<T>,
+        ),
+        Error,
+    > {
+        let owners = self
+            .state
+            .begin_native_execution(store, registration, cleanup_domain)?;
+        self.pending_views
+            .insert(registration.id(), host_ticket(owners.2.ticket()));
+        Ok(owners)
+    }
+    pub fn native_value<'a, T>(
+        &self,
+        store: &'a cordis_kernel::lifecycle_state::services::NativeServices<T>,
+        port: Port,
+    ) -> Option<&'a std::sync::Arc<T>> {
+        store.visible(&self.state, port)
+    }
+    pub fn finish_native_execution<T, C, G, I>(
+        &mut self,
+        id: usize,
+        store: &mut cordis_kernel::lifecycle_state::services::NativeServices<T>,
+        values: &cordis_kernel::lifecycle_state::services::NativeEpisode<T>,
+        work: &cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &cordis_kernel::cleanup_groups::CleanupGroups<I>,
+    ) -> Result<(), Error> {
+        let result = self
+            .state
+            .finish_native_execution(id, store, values, work, groups);
+        if self.state.pending(id).is_none() {
+            self.pending_views.remove(&id);
+        }
+        result
+    }
+    pub fn release_native_execution<T, C, G, I>(
+        &mut self,
+        id: usize,
+        store: &mut cordis_kernel::lifecycle_state::services::NativeServices<T>,
+        values: &mut cordis_kernel::lifecycle_state::services::NativeEpisode<T>,
+        work: &mut cordis_kernel::setup_work::SetupWork<C, G>,
+        groups: &mut cordis_kernel::cleanup_groups::CleanupGroups<I>,
+    ) -> Result<
+        (
+            CleanupOutcome,
+            cordis_kernel::lifecycle_state::services::ReleasedNativeValues<T>,
+        ),
+        Error,
+    > {
+        let result = self
+            .state
+            .release_native_execution(id, store, values, work, groups)?;
+        self.pending_views.remove(&id);
+        Ok(result)
     }
     pub fn pending_action(&self, id: usize) -> Option<&ActionTicket> {
         self.pending_views.get(&id)
@@ -505,3 +537,53 @@ fn host_ticket(ticket: KernelActionTicket) -> ActionTicket {
         },
     }
 }
+
+fn allocate_domain() -> Result<u64, DriverError> {
+    let domain = NEXT_DOMAIN
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .map_err(|_| DriverError::new("Capacity", "domain identity exhausted"))?;
+    Ok(domain)
+}
+fn decision(state: &LifecycleState, id: usize, status: HostStatus) -> Option<Decision> {
+    let kernel = state.kernel();
+    match kernel.phase(id)? {
+        Phase::Loading | Phase::Active
+            if !coherent(kernel, id, status.restart) || !status.available || status.failed =>
+        {
+            Some(Decision::Withdraw)
+        }
+        Phase::Unloading if !kernel.cleanup_started(id) && !state.blocked(id) => {
+            Some(Decision::BeginCleanup)
+        }
+        Phase::Inactive
+            if kernel.retired(id) && kernel.children(id).is_empty() && !state.blocked(id) =>
+        {
+            Some(Decision::Remove)
+        }
+        Phase::Inactive
+            if !kernel.retired(id)
+                && !status.failed
+                && status.available
+                && !state.blocked(id)
+                && kernel.target(id).is_some()
+                && !kernel
+                    .children(id)
+                    .iter()
+                    .any(|child| kernel.retired(*child)) =>
+        {
+            Some(Decision::Begin)
+        }
+        _ => None,
+    }
+}
+fn coherent(kernel: &Kernel, id: usize, restart: bool) -> bool {
+    !kernel.retired(id)
+        && !restart
+        && kernel.target(id).is_some_and(|target| {
+            cordis_kernel::episode::same_bindings(&target, &kernel.committed(id))
+        })
+        && (kernel.phase(id) != Some(Phase::Loading) || kernel.check_iteration(id).is_ok())
+}
+
+#[path = "native.rs"]
+pub mod native;
