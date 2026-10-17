@@ -12,6 +12,14 @@ module.exports = {...native,
         commands.push(JSON.parse(input).op);
         return target.command(input);
       };
+      if (key === 'objectCommand' || key === 'resolveObject') return (input,...args) => {
+        commands.push(JSON.parse(input).op);
+        return target[key](input,...args);
+      };
+      if (key === 'completeAction') return (...args) => {
+        commands.push('complete');
+        return target.completeAction(...args);
+      };
       // Preserve the native receiver for every current and future binding
       // method, including opaque invocation paths; observe only JSON commands.
       const value = Reflect.get(target,key,target);

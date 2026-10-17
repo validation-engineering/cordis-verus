@@ -16,7 +16,7 @@ fn decimal<T: std::str::FromStr>(value: String, label: &str) -> Result<T> {
         .map_err(|_| Error::new(Status::InvalidArg, format!("Invalid {label}")))
 }
 impl NativeDriver {
-    fn scope_command<T>(
+    pub(crate) fn scope_command<T>(
         &self,
         call: impl FnOnce(&mut Driver) -> std::result::Result<T, DriverError>,
     ) -> Result<T> {

@@ -4,6 +4,7 @@
 //! separate, explicitly described JSON DTO service boundary. Neither command
 //! path invokes JavaScript while holding a Driver or executor borrow.
 
+mod bridge;
 mod interop;
 mod invocation;
 pub mod plugin;
@@ -18,6 +19,8 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 #[napi]
 pub struct NativeDriver {
     driver: RefCell<Driver>,
+    objects: bridge::Objects,
+    host_mode: Cell<bool>,
     faulted: Cell<bool>,
     backend: RefCell<plugin::Backend>,
     wake: interop::WakeSlot,
@@ -56,6 +59,7 @@ impl NativeDriver {
     /// Submit one metadata command. No plugin value is serialized by this API.
     #[napi]
     pub fn command(&self, input: String) -> Result<String> {
+        self.check_host_command(&input)?;
         if self.faulted.get() {
             return Err(Error::new(
                 Status::GenericFailure,
@@ -114,7 +118,7 @@ impl Drop for NativeDriver {
 #[napi]
 pub fn binding_info() -> String {
     concat!(
-        "{\"abi\":1,\"scopeProtocol\":2,\"package\":\"cordis-node\",",
+        "{\"abi\":1,\"scopeProtocol\":2,\"hostProtocol\":1,\"package\":\"cordis-node\",",
         "\"version\":\"",
         env!("CARGO_PKG_VERSION"),
         "\",",

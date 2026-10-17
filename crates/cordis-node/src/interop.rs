@@ -175,8 +175,11 @@ impl NativeDriver {
     pub fn with_factories(registry: FactoryRegistry) -> Result<Self> {
         let driver = cordis_driver::Driver::new().map_err(plugin_error)?;
         let (backend, wake) = backend(driver.domain(), registry);
+        let objects = RefCell::new(driver.host_bridge());
         Ok(Self {
             driver: RefCell::new(driver),
+            objects,
+            host_mode: std::cell::Cell::new(false),
             faulted: std::cell::Cell::new(false),
             backend,
             wake,
@@ -422,21 +425,14 @@ impl NativeDriver {
                         .map_err(|_| "ReentrantRustAction")?
                         .typed_import_ports(&factory, &ports)?;
                     for (name, port) in required {
-                        let binding = driver
-                            .resolve(port, Some(ticket.id), Some(ticket.generation))
+                        let selection = driver
+                            .select_host_import(port, ticket.id, ticket.generation)
                             .map_err(|e| e.to_string())?
                             .ok_or("TypedImportUnavailable")?;
                         imports.push(ResolvedImport {
                             name,
                             port,
-                            owner: identity(
-                                binding["owner"].as_str().ok_or("InvalidPublication")?,
-                            )?,
-                            publication: identity(
-                                binding["publication"]
-                                    .as_str()
-                                    .ok_or("InvalidPublication")?,
-                            )?,
+                            selection,
                         });
                     }
                 }

@@ -1,5 +1,7 @@
 # Stored functions and dynamic service resolution
 
+Current R2 status is defined by [package 5 acceptance](r2-acceptance.md): managed-production/v1 is complete. Earlier checkpoints below retain their original evidence and scope.
+
 [简体中文](r2-function-semantics.zh-CN.md) · [R2 progress](r2-execution.md) · [Rust API](rust-api.md)
 
 The first R2 function package now also supports **mixed scalar and typed

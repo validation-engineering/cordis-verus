@@ -345,6 +345,8 @@ JS/FFI 仍是边界。Rust Runtime 和静态 typed 宿主实际使用经过验�
 
 ## R2 生产执行合同
 
+当前完成范围与三条退出条件的审查见[第 5 包验收](r2-acceptance.zh-CN.md)：managed-production/v1 已完成，原论文整体审计、R3／R4 及适配器边界仍分别保留。以下子节是实施过程的历史检查点，其中的“尚未完成”描述其当时状态；当前范围以上述验收页为准。
+
 实际 publication 的泛型载荷、旧租约读取、替换和清理释放通过 `PublicationStore`
 关联；原生异步完成保留实际 Future 输出，`land_result` 从实际 inverse 与取消
 状态决定后续动作。当前可见键值表与保留租约值是两个不同观察。

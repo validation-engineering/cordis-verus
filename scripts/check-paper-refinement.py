@@ -17,6 +17,11 @@ LEDGER = Path('docs/paper-obligations.json')
 VIEW = Path('docs/paper-refinement-map.md')
 MILESTONES = ('R0', 'R1', 'R2', 'R3', 'R4', 'R5')
 OBLIGATIONS = {'whole-lifecycle', 'corrected-specification', 'executable-simulation', 'host-boundary'}
+R2_EXIT_CRITERIA = [
+    'Establish actual argument, outcome, continuation and inverse provenance at public managed entry points.',
+    'Compose admission, invocation, concurrent landing, drain and release without caller-supplied expected outcomes.',
+    'Classify each implementation step as an applicable paper step, an observation-preserving internal step, or a separately specified extension; prove the corresponding relation.',
+]
 ROLES = {
     'proof': r'\bproof\s+fn\s+',
     'contract': r'\b(?:open\s+|closed\s+)?spec\s+fn\s+',
@@ -147,9 +152,30 @@ def validate(data, ledger, root=ROOT):
         require(bool(item.get('reviewPath')), 'Missing R2 source review path')
         for evidence in item['reviewPath']:
             review_evidence(evidence, root, item['id'])
+    require(milestones[2]['exitCriteria'] == R2_EXIT_CRITERIA, 'R2 original exit criteria must not be weakened')
     if milestones[2]['status'] == 'complete':
         require(all(w['status'] == 'complete' for w in work),
                 'R2 cannot complete from local payload/result contracts while whole-host obligations remain open')
+        scope = data.get('r2Acceptance', {})
+        require(scope.get('profile') == 'managed-production/v1' and scope.get('originalPaperEquivalent') is False,
+                'R2 completion requires an explicit production interpretation')
+        require(bool(milestones[2].get('completionScope')), 'Missing R2 completion scope')
+        for field in ('carrier', 'environment', 'reproduce', 'evidence'):
+            require(isinstance(scope.get(field), str) and scope[field].strip(), f'Missing R2 acceptance {field}')
+        texts(scope.get('boundaries'), 'R2 acceptance boundaries')
+        criteria = scope.get('criteria', [])
+        require([c.get('id') for c in criteria] == ['arguments-and-effects', 'production-composition', 'step-classification']
+                and [c.get('exitCriterion') for c in criteria] == milestones[2]['exitCriteria'],
+                'R2 acceptance must retain all original exit criteria')
+        require(sorted(w for c in criteria for w in c.get('workItems', [])) == sorted(required_r2),
+                'R2 acceptance must cover every work item exactly once')
+        for criterion in criteria:
+            require(bool(criterion.get('reviewPath')), 'Missing R2 criterion review path')
+            for evidence in criterion['reviewPath']:
+                review_evidence(evidence, root, criterion['id'])
+        require(scope.get('runtimePaths') == ['crates/cordis/examples/r2_production.rs', 'tests/node-compat/r2-acceptance.test.mjs']
+                and all((root / path).is_file() for path in scope['runtimePaths']), 'Missing R2 production scenarios')
+        texts(scope.get('selectedNegativeControls'), 'R2 selected negative controls')
     if milestones[-1]['status'] == 'complete':
         require(all(i['status'] not in {'missing', 'partial'} for i in ledger['items']), 'R5 cannot complete while original-paper audit outcomes remain open')
         require(all(i['status'] == 'proved' for i in ledger['integrationObligations']), 'R5 cannot complete while integration obligations remain open')
@@ -174,6 +200,9 @@ def render(data, ledger):
         lines += ['- ' + r['id'] + ': ' + r['decision'] for r in interpretation['revisions']]
         lines += ['', 'Remaining boundary: ' + interpretation['remainingBoundary']]
     owners = {}
+    if data['milestones'][2]['status'] == 'complete':
+        lines += ['', 'R2 completion scope: ' + data['milestones'][2]['completionScope'], '',
+                  'See [R2 acceptance](r2-acceptance.md) for all three criteria, explicit boundaries and reproducible evidence.', '']
     lines += ['', '## R2 execution progress', '', data['r2Execution']['claim'], '',
               '[Execution contracts and boundaries](r2-execution.md) · [执行合同与边界（中文）](r2-execution.zh-CN.md)', '',
               '| Work item | Status | Scope | Remaining boundary |', '| --- | --- | --- | --- |']

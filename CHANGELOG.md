@@ -4,6 +4,31 @@ Changes are recorded before release. Runtime previews are distributed through Gi
 
 ## Unreleased
 
+- Complete R2 `managed-production/v1` acceptance with real Loader/managed-Child
+  failure, retry, reconstruction and source-save evidence, and Node dynamic
+  publication/reference/old-ticket rejection. Add a reproducible source-bound
+  acceptance command with 12 strict selected controls; preserve original paper
+  audit outcomes and explicit adapter boundaries.
+
+- Compose actual native, Node and configuration production traces. Distinguish
+  complete recorded-state stutters from control-only stutters, retain checked
+  reference mutation histories, and tie every ready configuration allocation to
+  its real Insert and parent. Include bilingual review paths and four strict
+  negative controls. See [R2 package 4](docs/r2-production-composition.md);
+  combined R2 acceptance remains a separate gate.
+
+- R2 configuration interpretation now uses checked module/scope bindings, cached schema normalization, immutable recovery recipes, complete keyed three-way merging and full include-source round trips. Native group roots use the verified empty service program. See [the scope and reproduction](docs/r2-configuration-semantics.md).
+
+- Connect actual Node objects, Fibers and callback recipes to a checked native
+  reference owner. Retain exact pending-ticket claims through setup/cleanup,
+  reject stale dispatch and early release, and preserve in-flight callback
+  selection across HMR. Typed imports now carry sealed real lookup results;
+  static declarations/realms and supplied Arc slots are assembled together.
+  Shared Rust Episode access checks its actual execution identity. Include
+  bilingual review documentation and strict negative controls. This completes
+  the host reference/dispatch association package; full R2 configuration and
+  production-step refinement remain in progress.
+
 - Add `Plugin::native_function` for stored root/Child bodies that mix verified
   scalar effects and typed service replacement. The actual interpreter binds
   declarations and installed arguments, follows real outcomes, explains

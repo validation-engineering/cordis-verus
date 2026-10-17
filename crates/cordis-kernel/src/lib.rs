@@ -2550,3 +2550,14 @@ pub mod configuration_tree;
 pub mod configuration_expansion;
 
 pub mod configuration_planning;
+
+pub mod host_context;
+pub mod static_values;
+
+pub mod configuration_data;
+
+pub mod configuration_binding;
+
+pub mod configuration_schema;
+
+pub mod configuration_module;

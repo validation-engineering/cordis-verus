@@ -1683,10 +1683,23 @@ def mutation_manifest():
         ('r2-issued-protocol-allows-ticket-revival', 'episode_execution.rs', '&& ticket==(RestoreTicket {domain:a.domain,attempt:a.next,token:a.selected.unwrap().token})\n            && ticket.attempt>a.selected.unwrap().attempt', '&& ((ticket==(RestoreTicket {domain:a.domain,attempt:a.next,token:a.selected.unwrap().token})\n            && ticket.attempt>a.selected.unwrap().attempt) || ticket==a.selected.unwrap())'),
         ('r2-checkout-loses-status-link', 'execution.rs', 'let out=self.effects.remove(&id);if out.is_some() {self.checked_out.insert(id,());}out', 'let out=self.effects.remove(&id);self.statuses=BTreeMap::new();if out.is_some() {self.checked_out.insert(id,());}out'),
         ('r2-status-observation-invents-allocation', 'host_status.rs', 'birth:Ghost(self.birth@)', 'birth:Ghost(self.member.events().len())'),
+        ('r2-host-object-substitution', 'node_bridge.rs', 'self.objects.get(&key.id())', 'self.objects.get(&self.next)'),
+        ('r2-host-dispatch-ignores-ticket', 'node_bridge.rs', 'if !node.state().pending_matches(ticket) {return Err(BridgeError::Stale);}', 'if false {return Err(BridgeError::Stale);}'),
+        ('r2-host-drops-retained-object', 'node_bridge.rs', 'if node.store().contains_handle(id) {return Err(BridgeError::Retained);}', 'if false {return Err(BridgeError::Retained);}'),
+        ('r2-static-writes-foreign-owner', 'static_values.rs', 'if owner!=self.context.owner || !contains(&self.context.provisions,port)', 'if false || !contains(&self.context.provisions,port)'),
+        ('r2-shared-episode-ignores-domain', 'host_context.rs', '{self.origin==execution.lifecycle_ticket() && self.domain==execution.work().domain()}', '{self.origin==execution.lifecycle_ticket()}'),
         ('r2-managed-return-omits-effects', 'managed_root.rs', 'Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(_report.receipt_witnesses())),', 'Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),'),
         ('r2-managed-drops-continuation', 'managed_function.rs', 'pc=step.next;append_step::<E,T,M>', 'pc=None;append_step::<E,T,M>'),
         ('r2-managed-forges-read-rejection', 'value_slot.rs', 'let error=ReadError::NotReversible {provider};', 'let error=ReadError::Native(NativeReadError {reason:crate::lifecycle_state::services::NativeValueError::Closed,provider:None});'),
         ('r2-managed-payload-forgets-earlier-causes', 'payload_inverse.rs', 'journal.join_receipts::<(int,bool)>(Tracked(causes),Tracked(None))', 'journal.join_receipts::<(int,bool)>(Tracked(&Map::tracked_empty()),Tracked(None))'),
+        ('r2-config-roundtrip-accepts-changed-tree', 'configuration_data.rs', 'if !expected.equals(expanded) {return Err(payload);}', 'if false && !expected.equals(expanded) {return Err(payload);}'),
+        ('r2-config-merge-drops-disk-edit', 'configuration_data.rs', 'value:copy_optional(theirs),proof', 'value:copy_optional(ours),proof'),
+        ('r2-config-skips-default', 'configuration_schema.rs', 'Some(v)=>Some(v),None=>field.default.as_ref()', 'Some(v)=>Some(v),None=>None'),
+        ('r2-config-module-ignores-intercept', 'configuration_module.rs', 'Some(patch)=>data::apply(&raw,patch),None=>raw.copy()', 'Some(_patch)=>raw.copy(),None=>raw.copy()'),
+        ('r2-native-confuses-control-stutter', 'native_production.rs', 'if c::at(frames,index as nat)==c::at(frames,(index+1) as nat) {Kind::Internal}', 'if control(frames,index as nat,key)==control(frames,(index+1) as nat,key) {Kind::Internal}'),
+        ('r2-node-confuses-control-stutter', 'node_production.rs', 'if b.same(a) {Kind::Internal}', 'if a.control.control().paper()==b.control.control().paper() {Kind::Internal}'),
+        ('r2-host-finishes-pending-claim', 'node_bridge.rs', 'if node.state().pending_matches(call.ticket) {return Err(BridgeError::Busy);}', 'if false {return Err(BridgeError::Busy);}'),
+        ('r2-config-substitutes-insert-origin', 'configuration_runtime.rs', 'insertion=self.history_positions()[at+1];', 'insertion=self.history_positions()[at];'),
     ]
 
 

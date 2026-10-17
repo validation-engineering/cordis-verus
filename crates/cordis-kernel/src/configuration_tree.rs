@@ -195,7 +195,23 @@ impl<T> Tree<T> {
             && self@[i].allocation_spec().unwrap().parent_id()==self.parent_for(i as usize,self.root_id())
             && (self@[i].parent_index().is_some() ==> self.parent_for(i as usize,self.root_id()).is_some())
     }
-    pub fn ready(&self)->(out:bool) requires self.wf(), ensures out==self.complete(),
+    /// The actual group/child tree elaborates to distinct native Insert events,
+    /// preserving each enabled entry's owner and current parent. This is an
+    /// administrative extension, not an invented atomic callback/effect step.
+    pub open spec fn elaborated(&self)->bool {
+        forall|i:int|0<=i<self@.len() && (#[trigger] self@[i]).enabled_spec() ==> {
+            let allocation=self@[i].allocation_spec().unwrap();
+            &&& self@[i].allocation_spec().is_some() && allocation.wf()
+            &&& allocation.parent_id()==self.parent_for(i as usize,self.root_id())
+            &&& allocation.snapshot().events()[allocation.insertion() as int].event.change==
+                (crate::reversible_value::joint::Change::Native {actor:allocation.owner(),rule:crate::refinement::Rule::Insert})
+            &&& forall|j:int|0<=j<self@.len() && j!=i && self@[j].enabled_spec() ==> self@[j].identity()!=Some(allocation.owner())
+        }
+    }
+    pub proof fn elaboration(&self)
+        requires self.wf(),self.complete(),ensures self.elaborated(),
+    {}
+    pub fn ready(&self)->(out:bool) requires self.wf(), ensures out==self.complete(),out ==> self.elaborated(),
     {
         let mut i=0;
         while i<self.nodes.len()
@@ -213,7 +229,7 @@ impl<T> Tree<T> {
             }
             i+=1;
         }
-        true
+        proof {self.elaboration();}true
     }
 }
 impl<T> Default for Tree<T> {

@@ -699,3 +699,31 @@ fn paper_leaf_projection_requires_resolution_and_preserves_raw_configuration() {
         .as_paper_entry(|_| Some("module://worker-v1"))
         .is_none());
 }
+
+#[test]
+fn intercepted_enum_objects_compare_by_key_after_new_fields_are_added() {
+    let seen = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let captured = seen.clone();
+    let expected = json!({"a":1,"z":{"a":2,"z":3}});
+    let mut registry = FactoryRegistry::new();
+    registry.register(
+        "enum",
+        Schema::Enum(vec![expected.clone()]),
+        move |config, _| {
+            captured.lock().unwrap().push(config.clone());
+            Ok(Plugin::new("enum", |_| Ok(())))
+        },
+    );
+    let mut entry = Entry::plugin("enum", "enum", json!({"z":{"z":3}}));
+    entry
+        .intercept
+        .insert("enum".into(), json!({"a":1,"z":{"a":2}}));
+    let tree = ConfigTree {
+        entries: vec![entry],
+    };
+    let mut loader = Loader::new(Context::new(), registry);
+    run(loader.apply(tree.clone())).unwrap();
+    assert_eq!(*seen.lock().unwrap(), vec![expected]);
+    assert_eq!(loader.tree(), &tree);
+    run(loader.dispose()).unwrap();
+}

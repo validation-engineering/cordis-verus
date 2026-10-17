@@ -1,7 +1,7 @@
 //! Schema checking and immutable, typed context extension for Rust plugins.
 //!
-//! These are host-side facilities. Their validators and interceptors are not
-//! part of the Verus lifecycle proof.
+//! Structural schemas, defaults and recursive overlays execute in the verified
+//! kernel. Serde conversion, typed metadata and external callbacks are adapters.
 
 use crate::future_support::poll_catching_unwind;
 use crate::Context;
@@ -111,88 +111,105 @@ impl Schema {
         self.validate_at(value, "$")
     }
     fn validate_at(&self, value: &Value, path: &str) -> Result<Value, ConfigError> {
-        let invalid = |message| ConfigError::new(path, message);
-        match self {
-            Self::Any => {}
-            Self::Boolean if !value.is_boolean() => return Err(invalid("expected boolean")),
-            Self::String if !value.is_string() => return Err(invalid("expected string")),
-            Self::Integer { min, max } => {
-                let n = value
-                    .as_i64()
-                    .ok_or_else(|| invalid("expected signed 64-bit integer"))?;
-                if min.is_some_and(|min| n < min) || max.is_some_and(|max| n > max) {
-                    return Err(invalid("integer is outside the permitted range"));
+        self.compile().validate_at(value, path)
+    }
+    pub(crate) fn compile(&self) -> CompiledSchema {
+        use cordis_kernel::configuration_schema as checked;
+        fn lower(schema: &Schema) -> checked::Schema {
+            match schema {
+                Schema::Any => checked::Schema::Any,
+                Schema::Boolean => checked::Schema::Boolean,
+                Schema::String => checked::Schema::String,
+                Schema::Integer { min, max } => checked::Schema::Integer {
+                    min: *min,
+                    max: *max,
+                },
+                Schema::Number { min, max } => checked::Schema::Number {
+                    low: min
+                        .filter(|n| !n.is_nan())
+                        .map(crate::config_data::number_rank),
+                    high: max
+                        .filter(|n| !n.is_nan())
+                        .map(crate::config_data::number_rank),
+                },
+                Schema::Enum(values) => {
+                    checked::Schema::Enum(values.iter().map(crate::config_data::encode).collect())
                 }
+                Schema::Array(inner) => checked::Schema::Array(Box::new(lower(inner))),
+                Schema::Nullable(inner) => checked::Schema::Nullable(Box::new(lower(inner))),
+                Schema::Object {
+                    fields,
+                    allow_unknown,
+                } => checked::Schema::Object {
+                    fields: fields
+                        .iter()
+                        .map(|(name, field)| checked::Field {
+                            name: name.clone(),
+                            schema: lower(&field.schema),
+                            required: field.required,
+                            default: field.default.as_ref().map(crate::config_data::encode),
+                        })
+                        .collect(),
+                    allow_unknown: *allow_unknown,
+                },
             }
-            Self::Number { min, max } => {
-                let n = value.as_f64().ok_or_else(|| invalid("expected number"))?;
-                if min.is_some_and(|min| n < min) || max.is_some_and(|max| n > max) {
-                    return Err(invalid("number is outside the permitted range"));
-                }
-            }
-            Self::Enum(values) if !values.contains(value) => {
-                return Err(invalid("value is not an allowed enum member"));
-            }
-            Self::Array(schema) => {
-                let values = value.as_array().ok_or_else(|| invalid("expected array"))?;
-                return values
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| schema.validate_at(v, &format!("{path}[{i}]")))
-                    .collect::<Result<Vec<_>, _>>()
-                    .map(Value::Array);
-            }
-            Self::Object {
-                fields,
-                allow_unknown,
-            } => {
-                let object = value
-                    .as_object()
-                    .ok_or_else(|| invalid("expected object"))?;
-                if !allow_unknown {
-                    if let Some(key) = object.keys().find(|key| !fields.contains_key(*key)) {
-                        return Err(ConfigError::new(format!("{path}.{key}"), "unknown field"));
-                    }
-                }
-                let mut result = object.clone();
-                for (key, field) in fields {
-                    let field_path = format!("{path}.{key}");
-                    match object.get(key).or(field.default.as_ref()) {
-                        Some(value) => {
-                            result
-                                .insert(key.clone(), field.schema.validate_at(value, &field_path)?);
-                        }
-                        None if field.required => {
-                            return Err(ConfigError::new(field_path, "required field is missing"));
-                        }
-                        None => {}
-                    }
-                }
-                return Ok(Value::Object(result));
-            }
-            Self::Nullable(schema) if !value.is_null() => return schema.validate_at(value, path),
-            _ => {}
         }
-        Ok(value.clone())
+        CompiledSchema(Arc::new(lower(self)))
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct CompiledSchema(Arc<cordis_kernel::configuration_schema::Schema>);
+impl CompiledSchema {
+    pub(crate) fn checked(&self) -> Arc<cordis_kernel::configuration_schema::Schema> {
+        self.0.clone()
+    }
+    fn validate_at(&self, value: &Value, path: &str) -> Result<Value, ConfigError> {
+        self.0
+            .validate(&crate::config_data::encode(value))
+            .map(crate::config_data::decode)
+            .map_err(|failure| ConfigError::schema(failure, path))
+    }
+}
+
+impl ConfigError {
+    pub(crate) fn schema(
+        failure: cordis_kernel::configuration_schema::Failure,
+        path: &str,
+    ) -> Self {
+        use cordis_kernel::configuration_schema::{Part, Reason};
+        let mut path = path.to_owned();
+        for part in failure.path {
+            match part {
+                Part::Field(name) => {
+                    path.push('.');
+                    path.push_str(&name);
+                }
+                Part::Index(index) => path.push_str(&format!("[{index}]")),
+            }
+        }
+        ConfigError::new(
+            path,
+            match failure.reason {
+                Reason::Boolean => "expected boolean",
+                Reason::String => "expected string",
+                Reason::Integer => "expected signed 64-bit integer",
+                Reason::Number => "expected number",
+                Reason::Range => "number is outside the permitted range",
+                Reason::Enum => "value is not an allowed enum member",
+                Reason::Array => "expected array",
+                Reason::Object => "expected object",
+                Reason::Unknown => "unknown field",
+                Reason::Required => "required field is missing",
+            },
+        )
     }
 }
 
 /// Object fields merge recursively. Arrays, scalars and null replace a value.
 /// Null is a value, not an implicit delete operation.
 pub fn merge(base: &Value, patch: &Value) -> Value {
-    match (base, patch) {
-        (Value::Object(base), Value::Object(patch)) => {
-            let mut result = base.clone();
-            for (key, value) in patch {
-                let next = result
-                    .get(key)
-                    .map_or_else(|| value.clone(), |old| merge(old, value));
-                result.insert(key.clone(), next);
-            }
-            Value::Object(result)
-        }
-        _ => patch.clone(),
-    }
+    crate::config_data::overlay(base, patch)
 }
 
 /// Rust's equivalent of context extension and scoped configuration interception.
@@ -201,9 +218,9 @@ pub fn merge(base: &Value, patch: &Value) -> Value {
 pub struct ConfigScope {
     context: Context,
     typed: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
-    metadata: Map<String, Value>,
-    interceptors: BTreeMap<String, Value>,
-    injections: BTreeMap<String, Value>,
+    metadata: cordis_kernel::configuration_binding::Modules<Value>,
+    interceptors: cordis_kernel::configuration_binding::Modules<Value>,
+    injections: cordis_kernel::configuration_binding::Modules<Value>,
 }
 
 impl ConfigScope {
@@ -211,9 +228,9 @@ impl ConfigScope {
         Self {
             context,
             typed: HashMap::new(),
-            metadata: Map::new(),
-            interceptors: BTreeMap::new(),
-            injections: BTreeMap::new(),
+            metadata: cordis_kernel::configuration_binding::Modules::new(),
+            interceptors: cordis_kernel::configuration_binding::Modules::new(),
+            injections: cordis_kernel::configuration_binding::Modules::new(),
         }
     }
     pub fn context(&self) -> &Context {
@@ -234,11 +251,16 @@ impl ConfigScope {
     }
     pub fn extend_json(&self, metadata: &Map<String, Value>) -> Self {
         let mut next = self.clone();
-        next.metadata.extend(metadata.clone());
+        next.metadata.extend(
+            metadata
+                .iter()
+                .map(|(key, value)| (key.clone(), Arc::new(value.clone())))
+                .collect(),
+        );
         next
     }
     pub fn json_metadata(&self, name: &str) -> Option<&Value> {
-        self.metadata.get(name)
+        self.metadata.get(name).map(Arc::as_ref)
     }
     /// Child interception overrides inherited interception field by field.
     /// The resulting patch overrides the plugin's supplied config, before schema validation.
@@ -249,17 +271,37 @@ impl ConfigScope {
             .interceptors
             .get(&name)
             .map_or_else(|| patch.clone(), |old| merge(old, &patch));
-        next.interceptors.insert(name, patch);
+        next.interceptors.insert(name, Arc::new(patch));
         next
     }
     /// Configuration attached to this consumer's required service declaration.
     pub fn injection(&self, service: &str) -> Option<&Value> {
-        self.injections.get(service)
+        self.injections.get(service).map(Arc::as_ref)
     }
     pub(crate) fn with_injections(&self, injections: &BTreeMap<String, Value>) -> Self {
         let mut next = self.clone();
-        next.injections = injections.clone();
+        next.injections.extend(
+            injections
+                .iter()
+                .map(|(name, value)| (name.clone(), Arc::new(value.clone())))
+                .collect(),
+        );
         next
+    }
+    pub(crate) fn injections(&self) -> BTreeMap<String, Value> {
+        self.injections
+            .names()
+            .iter()
+            .map(|name| {
+                (
+                    name.clone(),
+                    self.injection(name).expect("checked scope key").clone(),
+                )
+            })
+            .collect()
+    }
+    pub(crate) fn interception(&self, plugin: &str) -> Option<&Value> {
+        self.interceptors.get(plugin).map(Arc::as_ref)
     }
     pub fn resolve(&self, plugin: &str, config: &Value) -> Value {
         self.interceptors

@@ -1,6 +1,16 @@
 # R2: Node protocol execution history
 
+Current R2 status is defined by [package 5 acceptance](r2-acceptance.md): managed-production/v1 is complete. Earlier checkpoints below retain their original evidence and scope.
+
+## Historical implementation and verification checkpoints
+
 [简体中文](r2-node-execution.zh-CN.md) · [Execution contracts](r2-execution.md)
+
+The [host composition package](r2-host-composition.md) now owns the actual
+Node-API weak references, Fiber bindings and retained callback recipes in a
+checked `Bridge`. Typed imports carry real sealed lookup results. This closes
+the reference association gap described by earlier checkpoints; JS object
+interiors and complete production-step refinement remain explicit boundaries.
 
 The production Node driver now owns one checked `NodeRuntime` containing its
 actual lifecycle state, publication handles and versions, leases, availability
@@ -330,8 +340,9 @@ predicate and I/O truth, JS scheduling, Fiber effects/Child bodies, HMR module
 behavior still require their own connection. Profile selection, mount/seal admission,
 notification retry selection, parent/interface state and declaration reconciliation
 now belong to the checked owner. The returned
-handle batch now comes from the checked owner; JSON encoding, delivery to the JS
-map and actual object deletion remain ordinary adapter operations. Actual scope receipts and publication selection now belong to the
+handle batch now comes from the checked owner. Reference removal additionally
+checks the real publication/Fiber/claim tables in `Bridge`; JSON delivery, JS
+retention-root deletion and garbage collection remain adapter/runtime operations. Actual scope receipts and publication selection now belong to the
 checked owner; JavaScript still supplies callback dispatch and ALS parent selection.
 The native path preserves that selected parent; it does not prove complete JS
 causal ancestry or callback termination. The registry-derived manifest does not prove destruction of

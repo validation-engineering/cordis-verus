@@ -24,3 +24,5 @@ pub use runtime::*;
 pub mod app;
 #[cfg(feature = "tokio")]
 pub use app::{App, AppError, PluginHandle};
+
+mod config_data;

@@ -524,3 +524,26 @@ fn save_plan_cannot_be_reused_after_revision_aba_or_on_another_runtime() {
     assert_eq!(files.read("root.json")[0]["config"]["n"], 2);
     files.no_temporary_files();
 }
+
+#[test]
+fn keyed_merge_reports_literal_marker_names_and_nested_children_correctly() {
+    let files = Files::new();
+    files.write(
+        "root.json",
+        json!([{"id":"<entries>","children":[{"id":"child","config":{"<entries>":{"n":1}}}]}]),
+    );
+    let mut loader = files.loader("root.json");
+    edit(&mut loader, "<entries>/child", "<entries>", json!({"n":2}));
+    files.write(
+        "root.json",
+        json!([{"id":"<entries>","children":[{"id":"child","config":{"<entries>":{"n":3}}}]}]),
+    );
+    assert!(
+        matches!(loader.save().unwrap_err().kind, SaveErrorKind::Conflict(ref paths) if paths == &["$/<entries>/child/config/<entries>/n"])
+    );
+    assert_eq!(
+        files.read("root.json")[0]["children"][0]["config"]["<entries>"]["n"],
+        3
+    );
+    files.no_temporary_files();
+}

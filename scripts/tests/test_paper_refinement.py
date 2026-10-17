@@ -71,7 +71,29 @@ class PaperRefinementTests(unittest.TestCase):
 
     def test_r2_cannot_complete_from_local_payload_and_result_contracts(self):
         self.plan['milestones'][2]['status'] = 'complete'
+        next(w for w in self.plan['r2Execution']['workItems'] if w['id'] == 'production-composition')['status'] = 'partial'
         with self.assertRaisesRegex(ValueError, 'whole-host obligations remain open'):
+            checker.validate(self.plan, self.ledger)
+
+    def test_r2_cannot_complete_by_claiming_original_equivalence(self):
+        self.plan['r2Acceptance']['originalPaperEquivalent'] = True
+        with self.assertRaisesRegex(ValueError, 'explicit production interpretation'):
+            checker.validate(self.plan, self.ledger)
+
+    def test_r2_cannot_drop_or_rewrite_an_acceptance_criterion(self):
+        self.plan['r2Acceptance']['criteria'][2]['exitCriterion'] = 'Only classify successful calls'
+        with self.assertRaisesRegex(ValueError, 'original exit criteria'):
+            checker.validate(self.plan, self.ledger)
+
+    def test_r2_cannot_rewrite_the_original_criterion_and_its_review_together(self):
+        self.plan['milestones'][2]['exitCriteria'][2] = 'Only test successful traces'
+        self.plan['r2Acceptance']['criteria'][2]['exitCriterion'] = 'Only test successful traces'
+        with self.assertRaisesRegex(ValueError, 'original exit criteria must not be weakened'):
+            checker.validate(self.plan, self.ledger)
+
+    def test_r2_acceptance_cannot_omit_real_production_paths(self):
+        self.plan['r2Acceptance']['runtimePaths'].pop()
+        with self.assertRaisesRegex(ValueError, 'production scenarios'):
             checker.validate(self.plan, self.ledger)
 
     def test_r2_cannot_omit_the_unified_composition_obligation(self):

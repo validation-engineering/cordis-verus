@@ -66,6 +66,10 @@ impl LifecycleState {
         ensures out==self.protocol().blocked_spec(id),
     {self.actions.blocked(id)}
 
+    pub fn pending_matches(&self,ticket:ActionTicket)->(out:bool)
+        requires self.wf(),ensures out==self.protocol().recorded(ticket),
+    {self.actions.pending_matches(ticket)}
+
     pub fn pending(&self,id:usize)->(out:Option<ActionTicket>)
         ensures out.is_some() ==> self.protocol().recorded(out.unwrap()) && out.unwrap().id==id,
             out.is_none()==!self.protocol().outstanding(id),

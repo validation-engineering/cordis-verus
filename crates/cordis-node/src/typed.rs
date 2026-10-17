@@ -329,8 +329,7 @@ pub(super) struct Mount {
 pub(crate) struct ResolvedImport {
     pub name: String,
     pub port: cordis_driver::ServicePort,
-    pub owner: usize,
-    pub publication: usize,
+    pub selection: cordis_driver::HostSelection,
 }
 pub(super) struct Instance {
     episode: StaticEpisode,
@@ -598,6 +597,17 @@ impl Backend {
             }
         }
         for resolved in &resolved {
+            if resolved.selection.domain() != self.transport.lock().unwrap().ledger.domain()
+                || resolved.selection.consumer() != Some(id)
+                || resolved.selection.generation() != Some(generation)
+                || resolved.selection.port()
+                    != (Port {
+                        key: resolved.port.key,
+                        realm: resolved.port.realm,
+                    })
+            {
+                return Err("TypedImportSelectionMismatch".into());
+            }
             let binding = factory
                 .mapped()
                 .into_iter()
@@ -611,9 +621,9 @@ impl Backend {
                 .sessions
                 .values()
                 .find(|s| {
-                    s.id == resolved.owner
+                    s.id == resolved.selection.owner()
                         && s.publications.get(&binding.name)
-                            == Some(&(resolved.publication, resolved.port))
+                            == Some(&(resolved.selection.publication().0, resolved.port))
                 })
                 .ok_or("TypedProviderRequired")?;
             let typed = provider.typed.as_ref().ok_or("TypedProviderRequired")?;
@@ -631,7 +641,7 @@ impl Backend {
                     key: binding.key,
                     realm,
                 },
-                provider: resolved.owner,
+                provider: resolved.selection.owner(),
                 slot: typed.slot(binding.key, binding.type_id, resolved.port.realm)?,
             });
             dependencies.push((binding, resolved.port, realm));

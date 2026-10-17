@@ -34,7 +34,7 @@
 
 [R1 有限、严格部分解释](r1-semantics.zh-CN.md)已经完成父组件／续体／子组件的完整载体合同，真实服务值、迭代器和累积逆操作的表示，以及从空机器构造证据的实际运行案例。该解释单独记录三项必要修订；原文 total Gamma、原总函数 Component witness 及第 28／47／55／56／57 项的审计状态不变。
 
-下一步 R2 将 production publication、Child 和 retryable cleanup 接入同一套可审查的实际值与效果合同。封闭同步解释器的 u64/Xor 证明不自动覆盖 JS 回调、任意宿主值或外部 I/O。完整宿主合同、异步结果及生产执行的表示仍需建立。
+R2 的 production publication、Child、可重试清理与实际值／效果合同现已在 [managed-production/v1 范围](r2-acceptance.zh-CN.md)内完成统一验收。受验证函数与宿主协议不自动覆盖任意 JS 回调、对象内部或外部 I/O；下一步推进 R3 的一般恢复与 R4 的整体生命周期性质。
 
 ## 3. 从受限恢复扩展到完整生命周期
 

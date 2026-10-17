@@ -1,11 +1,23 @@
 # R2: production execution contracts
 
+Current R2 status is defined by [package 5 acceptance](r2-acceptance.md): managed-production/v1 is complete. Earlier checkpoints below retain their original evidence and scope.
+
+## Historical implementation and verification checkpoints
+
+The [fourth production package](r2-production-composition.md) composes actual native/Node trajectories, bridge mutation histories and typed configuration/source projections. Package 5 retains the combined R2 acceptance gate.
+
 [简体中文](r2-execution.zh-CN.md) · [Paper milestones](paper-refinement-roadmap.md)
 
 R2 connects the paper's constraints to production managed calls. **R2 remains
 in progress.** The contracts below run in the Rust and Node adapters; they close
 payload, registration and result-transfer gaps, but do not yet establish whole-host semantic
 refinement or Component membership for arbitrary plugin callbacks.
+
+The [second host/Node package](r2-host-composition.md) connects actual weak
+Node-API references, Fiber bindings and callback claims to the checked owner;
+static typed imports and shared Episode access now check their real association.
+The [third configuration package](r2-configuration-semantics.md) supplies the native configuration-data/binding interpretation and complete source round trips. Production-step composition for the checked carriers is documented in package 4; combined R2 acceptance remains open. The linked development record is the current source-bound evidence; older
+checkpoint counts below do not carry forward to changed source.
 
 ## Current closure status
 

@@ -487,4 +487,54 @@ impl History {
     }
 }
 
+/// A sealed result from a real service lookup. Static typed embeddings carry
+/// this value instead of decoding provider/publication IDs from JSON again.
+#[allow(dead_code)]
+pub struct Selected {domain:u64,port:Port,consumer:Option<usize>,generation:Option<u64>,read:Read,origin:Ghost<History>}
+impl Selected {
+    pub closed spec fn domain_id(&self)->u64 {self.domain}
+    pub fn domain(&self)->(out:u64) ensures out==self.domain_id(), {self.domain}
+    pub closed spec fn read_spec(&self)->Read {self.read}
+    pub closed spec fn origin(&self)->History {self.origin@}
+    pub open spec fn certified(&self)->bool {
+        self.origin().valid() && self.origin().events.len()>0
+            && self.origin().states.last().control.protocol().domain_id()==self.domain_id()
+            && valid_read(self.origin().states.last(),self.read_spec())
+            && self.origin().events.last()==(Event::Read {port:self.port_spec(),consumer:self.consumer_spec(),generation:self.generation_spec(),out:Ok(Some(self.read_spec()))})
+    }
+    pub closed spec fn port_spec(&self)->Port {self.port}
+    pub closed spec fn consumer_spec(&self)->Option<usize> {self.consumer}
+    pub closed spec fn generation_spec(&self)->Option<u64> {self.generation}
+    pub fn owner(&self)->(out:usize) ensures out==self.read_spec().owner, {self.read.owner}
+    pub fn publication(&self)->(out:PublicationId) ensures out==self.read_spec().publication, {self.read.publication}
+    pub fn value(&self)->(out:u64) ensures out==self.read_spec().value, {self.read.value}
+    pub fn port(&self)->(out:Port) ensures out==self.port_spec(), {self.port}
+    pub fn consumer(&self)->(out:Option<usize>) ensures out==self.consumer_spec(), {self.consumer}
+    pub fn generation(&self)->(out:Option<u64>) ensures out==self.generation_spec(), {self.generation}
+    pub proof fn interpretation(&self)
+        requires self.certified(),
+        ensures result(self.origin().states[self.origin().events.len()-1],self.port_spec(),self.consumer_spec(),self.generation_spec())==Ok(Some(self.read_spec())),
+    {
+        let i=self.origin().events.len()-1;
+        assert(history::step(self.origin().states[i],self.origin().states[i+1],self.origin().events[i]));
+        reveal(history::operation);
+    }
+}
+impl NodeRuntime {
+    pub fn select(&mut self,port:Port,consumer:Option<usize>,generation:Option<u64>)->(out:Result<Option<Selected>,ReadError>)
+        requires old(self).wf(),ensures final(self).wf(),final(self).observation()==old(self).observation(),
+            out.is_ok() && out->Ok_0.is_some() ==> {
+                let selected=out->Ok_0.unwrap();
+                selected.certified() && selected.origin()==final(self).history() && selected.port_spec()==port
+                    && selected.consumer_spec()==consumer && selected.generation_spec()==generation
+                    && result(old(self).observation(),port,consumer,generation)==Ok(Some(selected.read_spec()))
+            },
+    {
+        match self.resolve(port,consumer,generation) {
+            Err(error)=>Err(error),Ok(None)=>Ok(None),
+            Ok(Some(read))=>Ok(Some(Selected {domain:self.state().domain(),port,consumer,generation,read,origin:Ghost(self.history())})),
+        }
+    }
+}
+
 }

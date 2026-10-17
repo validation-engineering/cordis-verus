@@ -17,8 +17,12 @@ use crate::Phase;
 use crate::{Error, Port};
 use std::collections::{BTreeMap, BTreeSet};
 use vstd::prelude::*;
+#[path = "node_bridge.rs"]
+pub mod bridge;
 #[path = "node_history.rs"]
 pub mod history;
+#[path = "node_production.rs"]
+pub mod production;
 use history::History;
 #[path = "node_policy.rs"]
 pub mod policy;
@@ -103,7 +107,8 @@ impl NodeRuntime {
     {self.checks.current(ticket,&self.control,&self.store)}
     pub fn snapshot(&self)->(out:Snapshot)
         requires self.wf(),ensures out.certified(),out.history()==self.history(),out.history().states.last()==self.observation(),
-    {Snapshot {history:Ghost(self.history@)}}
+            production::interpreted(out.history()),
+    {proof {self.history().production_trace();}Snapshot {history:Ghost(self.history@)}}
     proof fn record(tracked &mut self,before:Observation,event:Event)
         requires old(self).observation().wf(),old(self).history().valid(),old(self).history().states.last()==before,
             history::step(before,old(self).observation(),event),
@@ -502,35 +507,10 @@ impl NodeRuntime {
         ensures final(self).observation().wf(),history::operation(old(self).observation(),final(self).observation(),Event::Episode {command,out}),
             final(self).history()==old(self).history(),final(self).control==old(self).control,final(self).store==old(self).store,
     {
+        let ghost before=self.observation();
+        let out=episode::apply(&mut self.episodes,&self.control,command,Ghost(before));
         proof {self.scopes.unchanged_reflexive();reveal(history::operation);}
-        let id=command.id();
-        if !self.episodes.contains_key(&id) || !self.control.kernel().contains(id) {return Err(EpisodeError::Unknown);}
-        let phase=self.control.kernel().phase(id);let retired=self.control.kernel().retired(id);
-        let generation=self.control.kernel().episode_generation(id);
-        match command {
-            EpisodeCommand::Prepare {..}=>{
-                if retired || phase!=Some(Phase::Inactive) || generation!=Some(0) {return Err(EpisodeError::Closed);}
-                self.episodes.get_mut(&id).unwrap().prepared=true;
-            },
-            EpisodeCommand::Restart {..}=>{
-                if retired {return Err(EpisodeError::Retired);}
-                let e=self.episodes.get_mut(&id).unwrap();e.failed=None;e.restart=phase!=Some(Phase::Inactive);
-            },
-            EpisodeCommand::Fail {generation:expected,error,..}=>{
-                if generation!=Some(expected) {return Err(EpisodeError::Stale);}
-                if retired || (phase!=Some(Phase::Loading) && phase!=Some(Phase::Active)) {return Err(EpisodeError::Closed);}
-                let e=self.episodes.get_mut(&id).unwrap();if e.failed.is_none() {e.failed=Some(error);}
-            },
-            EpisodeCommand::Seal {sealed,..}=>{
-                if phase!=Some(Phase::Inactive) || generation!=Some(0) {return Err(EpisodeError::Closed);}
-                self.episodes.get_mut(&id).unwrap().sealed=sealed;
-            },
-            EpisodeCommand::NotifyRetry {..}=>{
-                if self.episodes.get(&id).unwrap().cleanup_failed {return Err(EpisodeError::Closed);}
-                self.episodes.get_mut(&id).unwrap().failed=None;
-            },
-        }
-        Ok(())
+        out
     }
     pub fn request_check(&mut self,consumer:usize,port:Port)->(out:Result<Option<CheckAction>,CheckError>)
         requires old(self).wf(),

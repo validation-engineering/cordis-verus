@@ -1,5 +1,6 @@
 //! Declarative JSON trees, include files and explicit Rust factory HMR.
-//! These host operations are behavior-tested, not Verus-proved callbacks.
+//! Planning, configuration interpretation and transaction protocols call the
+//! verified kernel. Arbitrary module callback bodies remain host boundaries.
 
 use crate::config::{ConfigError, ConfigScope, ConfigUpdate, ConfigUpdatePlan, Schema};
 use crate::persistence::{SaveError, SaveErrorKind, SaveOrigin, SavePlan, SaveReport};
@@ -225,7 +226,6 @@ type Isolate = Arc<dyn Fn(&Context) -> Context + Send + Sync>;
 #[derive(Clone)]
 struct RegisteredFactory {
     revision: u64,
-    schema: Schema,
     build: Factory,
 }
 #[derive(Clone)]
@@ -239,7 +239,9 @@ struct RegisteredService {
 /// so failed revisions can restore the last committed configuration.
 #[derive(Clone, Default)]
 pub struct FactoryRegistry {
-    factories: BTreeMap<String, Arc<RegisteredFactory>>,
+    factories: cordis_kernel::configuration_binding::Modules<
+        cordis_kernel::configuration_module::Definition<RegisteredFactory>,
+    >,
     services: BTreeMap<String, RegisteredService>,
     revision: u64,
 }
@@ -263,11 +265,13 @@ impl FactoryRegistry {
         let revision = self.next_revision();
         self.factories.insert(
             name.into(),
-            Arc::new(RegisteredFactory {
-                revision,
-                schema,
-                build: Arc::new(factory),
-            }),
+            Arc::new(cordis_kernel::configuration_module::Definition::new(
+                RegisteredFactory {
+                    revision,
+                    build: Arc::new(factory),
+                },
+                schema.compile().checked(),
+            )),
         );
         revision
     }
@@ -286,7 +290,14 @@ impl FactoryRegistry {
         self.factories.get(name).map(|factory| factory.revision)
     }
     pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.factories.keys().map(String::as_str)
+        let mut names = self
+            .factories
+            .names()
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        names.sort_unstable();
+        names.into_iter()
     }
 }
 #[derive(Debug)]
@@ -396,16 +407,22 @@ impl Signature {
 #[derive(Clone)]
 struct Node {
     path: String,
-    scope: ConfigScope,
+    recipe: cordis_kernel::configuration_module::Prepared<RegisteredFactory, ConfigScope>,
     signature: Signature,
-    factory: Option<Arc<RegisteredFactory>>,
     inject: Vec<(RegisteredService, Value)>,
 }
 impl Node {
+    fn scope(&self) -> &ConfigScope {
+        self.recipe.scope()
+    }
     fn build(&self) -> Result<Plugin, LoaderError> {
-        let result = catch_unwind(AssertUnwindSafe(|| match &self.factory {
-            Some(factory) => (factory.build)(&self.signature.entry.config, &self.scope),
-            None => Ok(Plugin::new(format!("group:{}", self.path), |_| Ok(()))),
+        let result = catch_unwind(AssertUnwindSafe(|| match self.recipe.selected() {
+            Some(factory) => (factory.build)(
+                &crate::config_data::decode(self.recipe.config().copy()),
+                self.recipe.scope(),
+            ),
+            None => Plugin::native_service_program(format!("group:{}", self.path), Vec::new())
+                .map_err(|error| error.to_string()),
         }));
         let mut plugin = result
             .map_err(|_| LoaderError::Factory {
@@ -485,7 +502,7 @@ impl ConfigNodes {
                     None => node.build()?,
                 };
                 let allocation =
-                    runtime.mount_configuration(node.scope.context(), parent, plugin)?;
+                    runtime.mount_configuration(node.scope().context(), parent, plugin)?;
                 if let Some(created) = created {
                     created.push(allocation.id());
                 }
@@ -634,7 +651,7 @@ impl Loader {
             .current()
             .nodes
             .get(path)
-            .map(|node| &node.scope)
+            .map(|node| node.scope())
     }
     pub fn revision(&self) -> u64 {
         self.configuration.revision()
@@ -657,7 +674,6 @@ impl Loader {
     ) -> Result<Snapshot, LoaderError> {
         struct Parent {
             scope: ConfigScope,
-            inject: BTreeMap<String, Value>,
             retained: bool,
         }
         let entries = tree
@@ -670,7 +686,6 @@ impl Loader {
             entries,
             Parent {
                 scope: self.root.clone(),
-                inject: BTreeMap::new(),
                 retained: true,
             },
             self.runtime.configuration_domain(),
@@ -690,14 +705,8 @@ impl Loader {
                 for (name, patch) in &entry.intercept {
                     scope = scope.intercept(name, patch.clone());
                 }
-                let mut inject = parent.inject.clone();
-                inject.extend(
-                    entry
-                        .inject
-                        .iter()
-                        .map(|(name, config)| (name.clone(), config.clone())),
-                );
-                scope = scope.with_injections(&inject);
+                scope = scope.with_injections(&entry.inject.0);
+                let inject = scope.injections();
                 let service =
                     |name: &str| {
                         loader.registry.services.get(name).cloned().ok_or_else(|| {
@@ -713,21 +722,36 @@ impl Loader {
                     .iter()
                     .map(|name| service(name))
                     .collect::<Result<Vec<_>, _>>()?;
-                let factory = match &entry.name {
-                    Some(name) => Some(loader.registry.factories.get(name).cloned().ok_or_else(
-                        || ConfigError::new(&path, format!("unknown plugin factory: {name}")),
-                    )?),
-                    None => None,
-                };
-                let mut normalized = entry.clone();
-                if let Some(factory) = &factory {
-                    normalized.config = factory
-                        .schema
-                        .validate(&scope.resolve(entry.name.as_deref().unwrap(), &entry.config))
-                        .map_err(|error| {
+                let patch = entry
+                    .name
+                    .as_deref()
+                    .and_then(|name| scope.interception(name))
+                    .map(crate::config_data::encode);
+                let recipe = loader
+                    .registry
+                    .factories
+                    .prepare(
+                        entry.name.as_deref(),
+                        crate::config_data::encode(&entry.config),
+                        patch.as_ref(),
+                        scope.clone(),
+                    )
+                    .map_err(|error| match error {
+                        cordis_kernel::configuration_module::Error::Unknown => ConfigError::new(
+                            &path,
+                            format!(
+                                "unknown plugin factory: {}",
+                                entry.name.as_deref().unwrap_or_default()
+                            ),
+                        ),
+                        cordis_kernel::configuration_module::Error::Schema(error) => {
+                            let error = ConfigError::schema(error, "$");
                             ConfigError::new(format!("{path}{}", error.path), error.message)
-                        })?;
-                }
+                        }
+                    })?;
+                let mut normalized = entry.clone();
+                normalized.config = crate::config_data::decode(recipe.config().copy());
+                let factory_revision = recipe.selected().map(|factory| factory.revision);
                 let signature = Signature {
                     entry: normalized,
                     inject: inject
@@ -741,7 +765,7 @@ impl Loader {
                         .zip(&isolates)
                         .map(|(name, service)| (name.clone(), service.revision))
                         .collect(),
-                    factory: factory.as_ref().map(|factory| factory.revision),
+                    factory: factory_revision,
                     enabled: declaration.enabled(),
                 };
                 let retained = parent.retained
@@ -766,7 +790,7 @@ impl Loader {
                         });
                 let allocation = if retained {
                     let old = &loader.configuration.current().nodes[&path];
-                    scope = old.scope.clone();
+                    scope = old.scope().clone();
                     old.allocation()
                 } else {
                     for service in isolates {
@@ -775,19 +799,15 @@ impl Loader {
                     None
                 };
 
+                let recipe = recipe.with_scope(scope.clone());
                 Ok::<_, LoaderError>(planning::Prepared {
                     data: Node {
                         path,
-                        scope: scope.clone(),
+                        recipe,
                         signature,
-                        factory,
                         inject: services,
                     },
-                    context: Parent {
-                        scope,
-                        inject,
-                        retained,
-                    },
+                    context: Parent { scope, retained },
                     allocation,
                 })
             },
@@ -1027,7 +1047,7 @@ impl Loader {
                 match self.runtime.prepare_config_update(
                     id,
                     previous,
-                    node.signature.entry.config.clone(),
+                    crate::config_data::decode(node.recipe.config().copy()),
                 )? {
                     ConfigUpdate::Restart => {
                         restart.insert(path);
@@ -1641,5 +1661,36 @@ fn project_sources(
         used_resolutions: BTreeMap::new(),
     };
     projector.file(root, &tree.entries)?;
-    Ok((projector.desired, projector.used_resolutions))
+    // Preserve the regular-file error contract before the virtual round trip
+    // resolves paths. Commit repeats these checks before replacing any file.
+    for path in projector.desired.keys() {
+        crate::persistence::check_regular(path)?;
+    }
+    let encoded = projector
+        .desired
+        .iter()
+        .map(|(path, document)| {
+            document
+                .to_json()
+                .map(|text| (path.clone(), text))
+                .map_err(|error| Projector::error(path, error.to_string()))
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let expanded = read_tree_cached(root, Some(encoded))
+        .map_err(|error| Projector::error(root, error.to_string()))?;
+    let expected = crate::config_data::encode(
+        &serde_json::to_value(tree).expect("configuration serialization"),
+    );
+    let actual = crate::config_data::encode(
+        &serde_json::to_value(expanded.tree).expect("configuration serialization"),
+    );
+    let projection =
+        cordis_kernel::configuration_data::RoundTrip::check(projector.desired, &expected, &actual)
+            .map_err(|_| {
+                Projector::error(
+                    root,
+                    "projected source files do not expand to the current configuration",
+                )
+            })?;
+    Ok((projection.into_inner(), projector.used_resolutions))
 }

@@ -9,7 +9,7 @@ impl<R,H,T:?Sized,M> NativeRuntime<R,H,ServiceSlot<SharedPayload<T>,M>> {
     /// Includes retained publications even when they are no longer visible.
     pub fn payload_service_snapshot(&self)->(out:history::Snapshot<ServiceSlot<SharedPayload<T>,M>>)
         requires self.wf(),
-        ensures out.certified(),out.history()==self.execution_history(),out.positions()==self.history_positions(),out.key()==self.joint_key(),
+        ensures out.certified(),super::production::interpreted(out.joint_spec().events(),out.key()),out.history()==self.execution_history(),out.positions()==self.history_positions(),out.key()==self.joint_key(),
             out.joint_spec().journal_spec()==self.journal_spec(),
             self.publications().slots_observed(self.journal_spec(),out.joint_spec().last()),
             self.publications().payloads_observed(self.journal_spec(),out.joint_spec().last()),

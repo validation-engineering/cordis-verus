@@ -199,6 +199,20 @@ impl<V> History<V> {
             assert(self.states[at+1].owners[id]==self.states[index].owners[id]);
         }
     }
+    /// Every current root or Child has an actual Insert with the same parent.
+    /// A later lifecycle rule cannot manufacture or reparent a registration.
+    pub proof fn insertion_origin(&self,end:int,id:usize)->(at:int)
+        requires self.valid(),0<=end<self.states.len(),r::registered(self.states[end].control,id),
+        ensures 0<=at<end,self.labels[at]==(id,r::Rule::Insert),
+            r::registered(self.states[at+1].control,id),
+            self.states[at+1].control.fibers[id].parent==self.states[end].control.fibers[id].parent,
+        decreases end,
+    {
+        assert(end>0);let i=end-1;
+        assert(0<=i<self.labels.len());assert(step(self.states[i],self.states[i+1],self.labels[i].0,self.labels[i].1));
+        if self.labels[i]==(id,r::Rule::Insert) {i}
+        else {self.insertion_origin(i,id)}
+    }
     pub open spec fn controls(&self)->Seq<r::State> {self.states.map(|_:int,s:Observation<V>|s.control)}
     pub open spec fn base_only(&self)->bool {forall|i:int| 0<=i<self.labels.len() ==> #[trigger] self.labels[i].1!=r::Rule::Restart}
     /// The structural/value history has one continuous control projection.
@@ -240,13 +254,18 @@ impl<V> Snapshot<V> {
         requires joint.certified(),history.valid(),history.indexed(positions,joint.events(),key),
             joint.last().contains_pair(key,joint::Record::Native {state:history.states.last().project(history.labels.len())}),
         ensures out.certified(),out.joint_spec()==joint,out.history()==history,out.positions()==positions,out.key()==key,
-    {Self {joint,history:Ghost(history),positions:Ghost(positions),key:Ghost(key)}}
+            super::production::interpreted(out.joint_spec().events(),out.key()),
+    {let out=Self {joint,history:Ghost(history),positions:Ghost(positions),key:Ghost(key)};proof {out.production_trace();}out}
     pub proof fn valid_history(&self)
         requires self.certified(),ensures self.joint_spec().certified(),self.history().valid(),
             self.positions().len()==self.history().states.len(),
+            self.history().indexed(self.positions(),self.joint_spec().events(),self.key()),
+            self.joint_spec().last().contains_pair(self.key(),joint::Record::Native {state:self.history().states.last().project(self.history().labels.len())}),
     {}
     pub fn joint(&self)->(out:&joint::Snapshot) ensures *out==self.joint_spec(), {&self.joint}
-    pub fn into_joint(self)->(out:joint::Snapshot) ensures out==self.joint_spec(), {self.joint}
+    pub fn into_joint(self)->(out:joint::Snapshot)
+        requires self.certified(),ensures out==self.joint_spec(),out.certified(),super::production::interpreted(out.events(),self.key()),
+    {proof {self.production_trace();}self.joint}
     proof fn complete_at(&self,n:nat)->(index:int)
         requires self.certified(),n<self.joint_spec().events().len(),
             self.joint_spec().events()[n as int].event.key==self.key(),

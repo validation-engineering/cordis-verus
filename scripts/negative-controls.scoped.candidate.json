@@ -7600,9 +7600,16 @@
           "file": "cleanup_completion.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "let _accepted=self.complete_following(ticket,RestoreOutcome::Succeeded,None,Tracked(cause));\n                assert(_accepted.is_ok());"
+        },
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::restore_value",
+          "module": "cleanup_queue::completion",
+          "file": "cleanup_completion.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let _accepted=self.complete_following(ticket,RestoreOutcome::Failed,\n                    Some(crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse)),Tracked(cause));\n                assert(_accepted.is_ok());"
         }
       ],
-      "selectionRationale": "Acknowledge the issued inverse as succeeded before actually running its guarded restore, then attempt the ordinary result acknowledgement. This changes runtime behavior and must be rejected at the real checked completion boundary. Require a fresh same-selector positive, whole-mutant compilation and the exact named proof failure. The earlier new candidate merely omitted an interval proof and hit a resource limit; that run is not accepted as contract evidence."
+      "selectionRationale": "Acknowledge the issued inverse as succeeded before actually running its guarded restore, then attempt the ordinary result acknowledgement. This changes runtime behavior and must be rejected at the real checked completion boundary. Require a fresh same-selector positive, whole-mutant compilation and the exact named proof failure. The earlier new candidate merely omitted an interval proof and hit a resource limit; that run is not accepted as contract evidence. The original successful-restore assertion and the failed-restore assertion must both reject premature acknowledgement. Requiring both avoids depending on which branch is reported first and preserves the original required diagnostic."
     },
     {
       "name": "r2-issued-reuses-real-attempt",
@@ -7709,6 +7716,131 @@
       "selectionRationale": "Keep the actual latest status receipt but substitute a nonexistent allocation index. The returned observation must authenticate its real constructor and cannot invent an initial state. Require a fresh exact matching positive, whole-mutant compilation and the named diagnostic rejection; no whole-negative or R2 acceptance claim."
     },
     {
+      "name": "r2-host-object-substitution",
+      "mutation": {
+        "file": "node_bridge.rs",
+        "old": "self.objects.get(&key.id())",
+        "new": "self.objects.get(&self.next)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::bridge",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::bridge::Bridge::get",
+          "module": "node_runtime::bridge",
+          "file": "node_bridge.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires self.wf(),ensures out.is_some()==(key.domain()==self.domain_id() && self.objects().contains_key(key.id())),"
+        }
+      ],
+      "selectionRationale": "The mutated executable producer is used by the production host. Require a fresh matching positive, whole-mutant compilation and rejection in the named contract. This is affected development evidence, not full negative-suite or paper-wide acceptance."
+    },
+    {
+      "name": "r2-host-dispatch-ignores-ticket",
+      "mutation": {
+        "file": "node_bridge.rs",
+        "old": "if !node.state().pending_matches(ticket) {return Err(BridgeError::Stale);}",
+        "new": "if false {return Err(BridgeError::Stale);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::bridge",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::bridge::Bridge::begin_call",
+          "module": "node_runtime::bridge",
+          "file": "node_bridge.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(trace::Event::Begin {claim:Claim {ticket,fiber:fiber.id(),recipe:recipe.id()},node:node.history()});"
+        }
+      ],
+      "selectionRationale": "The mutated executable producer is used by the production host. Require a fresh matching positive, whole-mutant compilation and rejection in the named contract. This is affected development evidence, not full negative-suite or paper-wide acceptance. The production reference history now checks the pending-ticket guard at its actual Begin commit before returning a Call; require that exact precondition rejection rather than the earlier return postcondition."
+    },
+    {
+      "name": "r2-host-drops-retained-object",
+      "mutation": {
+        "file": "node_bridge.rs",
+        "old": "if node.store().contains_handle(id) {return Err(BridgeError::Retained);}",
+        "new": "if false {return Err(BridgeError::Retained);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::bridge",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::bridge::Bridge::remove",
+          "module": "node_runtime::bridge",
+          "file": "node_bridge.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(trace::Event::Remove {id,node:node.history()});"
+        }
+      ],
+      "selectionRationale": "The mutated executable producer is used by the production host. Require a fresh matching positive, whole-mutant compilation and rejection in the named contract. This is affected development evidence, not full negative-suite or paper-wide acceptance. The actual reference-history Remove commit now rejects a still-retained handle before its return postcondition; require precisely that retention precondition at the real mutation boundary."
+    },
+    {
+      "name": "r2-static-writes-foreign-owner",
+      "mutation": {
+        "file": "static_values.rs",
+        "old": "if owner!=self.context.owner || !contains(&self.context.provisions,port)",
+        "new": "if false || !contains(&self.context.provisions,port)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "static_values",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::static_values::Values::provide",
+          "module": "static_values",
+          "file": "static_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> owner==old(self).context_spec().owner_id() && old(self).context_spec().provisions().contains(port)"
+        }
+      ],
+      "selectionRationale": "The mutated executable producer is used by the production host. Require a fresh matching positive, whole-mutant compilation and rejection in the named contract. This is affected development evidence, not full negative-suite or paper-wide acceptance."
+    },
+    {
+      "name": "r2-shared-episode-ignores-domain",
+      "mutation": {
+        "file": "host_context.rs",
+        "old": "{self.origin==execution.lifecycle_ticket() && self.domain==execution.work().domain()}",
+        "new": "{self.origin==execution.lifecycle_ticket()}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "host_context",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::host_context::Association::matches",
+          "module": "host_context",
+          "file": "host_context.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==self.owns(execution),"
+        }
+      ],
+      "selectionRationale": "The mutated executable producer is used by the production host. Require a fresh matching positive, whole-mutant compilation and rejection in the named contract. This is affected development evidence, not full negative-suite or paper-wide acceptance."
+    },
+    {
       "name": "r2-managed-return-omits-effects",
       "mutation": {
         "file": "managed_root.rs",
@@ -7807,6 +7939,206 @@
         }
       ],
       "selectionRationale": "Drop all prior function witnesses at the actual payload write; the A/B/A causal contract must not be inferred from report order. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection; timeouts, resource limits and compilation errors are not evidence."
+    },
+    {
+      "name": "r2-config-roundtrip-accepts-changed-tree",
+      "mutation": {
+        "file": "configuration_data.rs",
+        "old": "if !expected.equals(expanded) {return Err(payload);}",
+        "new": "if false && !expected.equals(expanded) {return Err(payload);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_data",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_data::RoundTrip::check",
+          "module": "configuration_data",
+          "file": "configuration_data.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok()==(expected.model()==expanded.model()),"
+        }
+      ],
+      "selectionRationale": "Change the executable configuration decision used by the actual Loader. Require a fresh matching positive, whole-mutant compilation and rejection at the named contract; resource limits, compilation errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-config-merge-drops-disk-edit",
+      "mutation": {
+        "file": "configuration_data.rs",
+        "old": "value:copy_optional(theirs),proof",
+        "new": "value:copy_optional(ours),proof"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_data",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_data::merge",
+          "module": "configuration_data",
+          "file": "configuration_data.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok() ==> out->Ok_0.evidence().valid() && out->Ok_0.evidence().base==optional(base)"
+        }
+      ],
+      "selectionRationale": "Change the executable configuration decision used by the actual Loader. Require a fresh matching positive, whole-mutant compilation and rejection at the named contract; resource limits, compilation errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-config-skips-default",
+      "mutation": {
+        "file": "configuration_schema.rs",
+        "old": "Some(v)=>Some(v),None=>field.default.as_ref()",
+        "new": "Some(v)=>Some(v),None=>None"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_schema",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_schema::Schema::validate",
+          "module": "configuration_schema",
+          "file": "configuration_schema.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(data::optional(chosen)==match data::lookup(input,field.name@) {Some(v)=>Some(v),None=>defaults(field.default)});"
+        }
+      ],
+      "selectionRationale": "Change the executable configuration decision used by the actual Loader. Require a fresh matching positive, whole-mutant compilation and rejection at the named contract; resource limits, compilation errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-config-module-ignores-intercept",
+      "mutation": {
+        "file": "configuration_module.rs",
+        "old": "Some(patch)=>data::apply(&raw,patch),None=>raw.copy()",
+        "new": "Some(_patch)=>raw.copy(),None=>raw.copy()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_module",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_binding::Modules::prepare",
+          "module": "configuration_module",
+          "file": "configuration_module.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.raw_value()==raw.model() && out->Ok_0.context()==scope"
+        }
+      ],
+      "selectionRationale": "Change the executable configuration decision used by the actual Loader. Require a fresh matching positive, whole-mutant compilation and rejection at the named contract; resource limits, compilation errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-native-confuses-control-stutter",
+      "mutation": {
+        "file": "native_production.rs",
+        "old": "if c::at(frames,index as nat)==c::at(frames,(index+1) as nat) {Kind::Internal}",
+        "new": "if control(frames,index as nat,key)==control(frames,(index+1) as nat,key) {Kind::Internal}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::production",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::Snapshot::production_step",
+          "module": "lifecycle_state::native::runtime::production",
+          "file": "native_production.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures classified(self.joint_spec().events(),index,self.key()),"
+        }
+      ],
+      "selectionRationale": "Reject the exact production classification or provenance fault. Require a fresh matching positive, full mutant compilation and the named contract diagnostic; solver limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-node-confuses-control-stutter",
+      "mutation": {
+        "file": "node_production.rs",
+        "old": "if b.same(a) {Kind::Internal}",
+        "new": "if a.control.control().paper()==b.control.control().paper() {Kind::Internal}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::production",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::history::History::production_step",
+          "module": "node_runtime::production",
+          "file": "node_production.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires self.valid(),0<=index<self.events.len(),ensures classified(*self,index),"
+        }
+      ],
+      "selectionRationale": "Reject the exact production classification or provenance fault. Require a fresh matching positive, full mutant compilation and the named contract diagnostic; solver limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-host-finishes-pending-claim",
+      "mutation": {
+        "file": "node_bridge.rs",
+        "old": "if node.state().pending_matches(call.ticket) {return Err(BridgeError::Busy);}",
+        "new": "if false {return Err(BridgeError::Busy);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::bridge",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::bridge::Bridge::finish_call",
+          "module": "node_runtime::bridge",
+          "file": "node_bridge.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(trace::Event::Finish {claim:Claim {ticket:call.ticket,fiber:call.fiber.id(),recipe:call.recipe.id()},node:node.history()});"
+        }
+      ],
+      "selectionRationale": "Reject the exact production classification or provenance fault. Require a fresh matching positive, full mutant compilation and the named contract diagnostic; solver limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r2-config-substitutes-insert-origin",
+      "mutation": {
+        "file": "configuration_runtime.rs",
+        "old": "insertion=self.history_positions()[at+1];",
+        "new": "insertion=self.history_positions()[at];"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::configuration_allocation",
+          "module": "configuration_runtime",
+          "file": "configuration_runtime.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().wf() && out.unwrap().owner()==id"
+        }
+      ],
+      "selectionRationale": "Reject the exact production classification or provenance fault. Require a fresh matching positive, full mutant compilation and the named contract diagnostic; solver limits, frontend errors and unrelated failures are not evidence."
     }
   ]
 }

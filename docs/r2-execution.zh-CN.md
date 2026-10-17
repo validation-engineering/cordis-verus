@@ -1,10 +1,23 @@
 # R2：生产执行路径的合同
 
+当前 R2 状态以[第 5 包统一验收](r2-acceptance.zh-CN.md)为准：managed-production/v1 范围已完成。下文保留各批次历史记录及其当时的验证范围。
+
+## 历史实施与验证记录
+
+[第 4 包生产组合](r2-production-composition.zh-CN.md)已接入真实原生／Node 轨迹、引用表修改历史及类型化配置／来源投影；第 5 包仍负责 R2 统一验收。
+
+[第 3 包配置语义](r2-configuration-semantics.zh-CN.md)已补齐原生配置数据／绑定与完整来源回读；R2 的受验证载体组合见第 4 包，仍需第 5 包总验收。
+
 [English](r2-execution.md) · [论文里程碑](paper-refinement-roadmap.zh-CN.md)
 
 R2 要把论文约束连接到实际的托管调用。**R2 仍在推进中。** 下列合同已经用于
 Rust 和 Node 宿主，补齐了载荷、登记和结果传递的缺口；它们尚不构成整个宿主的语义
 refinement，也没有证明任意插件回调满足 Component 合同。
+
+[第 2 包：宿主／Node 组合](r2-host-composition.zh-CN.md) 已将实际 Node-API 弱引用、
+Fiber 绑定与回调 claim 接入受验证所有者；静态强类型导入和共享 Episode 访问也检查
+真实归属。配置语义与受验证载体的生产步骤组合分别见第 3、4 包。当前证据以链接开发记录的源码
+指纹为准；下文历史检查点不自动覆盖改动后的源码。
 
 R2 第一函数包将完整存储的**标量／强类型混合 root 或 Child 程序体**连接到完整载体上的
 操作／continuation／inverse 定律、实际声明读写、失败来源、混合清理及真实调用返回。

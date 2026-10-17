@@ -277,68 +277,42 @@ impl StaticPlugin {
         }) {
             return Err("StaticInheritedContextChanged".into());
         }
-        let mut expected = self
-            .declarations
-            .dependencies
-            .iter()
-            .map(|key| port(*key))
-            .collect::<Vec<_>>();
-        for inherited in &self.inherited_dependencies {
-            if !expected.contains(inherited) {
-                expected.push(*inherited);
-            }
-        }
-        if imports.len() != expected.len() {
-            return Err("InvalidStaticBindings".into());
-        }
-        let mut seen = std::collections::BTreeSet::new();
-        for import in &imports {
-            if !expected.contains(&import.port)
-                || !seen.insert((import.port.key, import.port.realm))
-            {
-                return Err("InvalidStaticBindings".into());
-            }
-        }
-        let provisions = self
-            .declarations
-            .provisions
-            .iter()
-            .map(|key| port(*key))
-            .collect();
-        let bindings = imports
-            .iter()
-            .map(|import| Binding {
-                key: import.port.key,
-                realm: import.port.realm,
-                provider: import.provider,
-            })
-            .collect();
-        let values = imports
-            .into_iter()
-            .map(|import| {
-                (
-                    (import.provider, import.port.key, import.port.realm),
-                    import.slot.0,
-                )
-            })
-            .collect();
         let cleanups = Cleanups::new();
+        let values = cordis_kernel::static_values::Values::from_definition(
+            &cleanups.protocol,
+            cordis_kernel::static_values::Definition {
+                owner,
+                generation,
+                realms: context.realms.clone(),
+                dependencies: self.declarations.dependencies.clone(),
+                inherited: self.inherited_dependencies.clone(),
+                provisions: self.declarations.provisions.clone(),
+            },
+            imports
+                .into_iter()
+                .map(|import| cordis_kernel::static_values::Import {
+                    port: import.port,
+                    provider: import.provider,
+                    value: import.slot.0,
+                })
+                .collect(),
+        )
+        .map_err(|_| "InvalidStaticBindings".to_owned())?;
+        let external = values.context();
+        let association = external.association();
         let scope = cleanups
             .protocol
             .root_scope()
             .expect("static Begin has a root scope");
         let setup = AsyncSetup {
             state: Arc::new(SharedEpisode {
+                association,
                 generation,
                 context,
-                services: SetupServices::External {
-                    owner,
-                    bindings,
-                    provisions,
-                },
+                services: SetupServices::External(external),
                 anchor: anchor.unwrap_or(Port { key: 0, realm: 0 }),
                 episode: Mutex::new(Episode {
-                    values: EpisodeValues(values),
+                    values: EpisodeValues(Some(values)),
                     cleanups,
                     driver: None,
                     static_only: true,
@@ -1116,5 +1090,34 @@ impl StaticChildControl {
         };
         drop(previous);
         result
+    }
+}
+
+#[cfg(test)]
+mod association_tests {
+    use super::*;
+
+    #[test]
+    fn a_shared_episode_rejects_a_substituted_execution_before_access() {
+        let mut plugin = StaticPlugin::new(Plugin::new("association", |_| Ok(()))).unwrap();
+        let start = plugin.begin(7, 1, Context::new(), vec![]).unwrap();
+        let shared = start.episode.setup.state.clone();
+        let original = {
+            let mut state = shared.episode.lock().unwrap();
+            std::mem::replace(
+                &mut state.cleanups.protocol,
+                Execution::new(fresh(&NEXT_CLEANUP)),
+            )
+        };
+        let rejected =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(lock(&shared))));
+        assert!(rejected.is_err());
+        shared
+            .episode
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .cleanups
+            .protocol = original;
+        assert_eq!(lock(&shared).phase(), EpisodePhase::Loading);
     }
 }

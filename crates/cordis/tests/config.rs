@@ -105,3 +105,48 @@ fn text_config_rejects_typos_and_roundtrips() {
     assert!(ConfigTree::from_json(r#"[{"id":"workspace","enabeld":false}]"#).is_err());
     assert!(ConfigTree::from_json(r#"[{"id":"workspace","enabled":"false"}]"#).is_err());
 }
+
+#[test]
+fn compiled_schema_preserves_float_zero_and_integer_precision_boundaries() {
+    let bounded = Schema::Number {
+        min: Some(0.0),
+        max: Some(0.0),
+    };
+    for text in ["0.0", "-0.0"] {
+        let input: serde_json::Value = serde_json::from_str(text).unwrap();
+        let output = bounded.validate(&input).unwrap();
+        assert_eq!(
+            input.as_f64().unwrap().to_bits(),
+            output.as_f64().unwrap().to_bits()
+        );
+        assert!(Schema::Enum(vec![json!(0.0)]).validate(&input).is_ok());
+    }
+    let values = [
+        json!(i64::MIN),
+        json!(i64::MAX),
+        json!(u64::MAX),
+        json!(9007199254740993u64),
+    ];
+    for input in values {
+        assert_eq!(Schema::Any.validate(&input).unwrap(), input);
+        assert_eq!(
+            Schema::Enum(vec![input.clone()]).validate(&input).unwrap(),
+            input
+        );
+    }
+    assert!(Schema::Integer {
+        min: None,
+        max: None
+    }
+    .validate(&json!(u64::MAX))
+    .is_err());
+    assert!(Schema::Enum(vec![json!(9007199254740992u64)])
+        .validate(&json!(9007199254740993u64))
+        .is_err());
+    assert!(Schema::Number {
+        min: Some(f64::NAN),
+        max: Some(f64::INFINITY)
+    }
+    .validate(&json!(-2.5))
+    .is_ok());
+}

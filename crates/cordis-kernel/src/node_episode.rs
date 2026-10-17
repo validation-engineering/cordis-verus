@@ -1,7 +1,8 @@
 //! Actual Node episode ownership and host status, in the protocol owner's history.
 //! Error strings are retained values; callback truth remains a host input.
 #[cfg(verus_keep_ghost)]
-use super::history::{Event, Observation};
+use super::history::Event;
+use super::history::Observation;
 use super::*;
 verus! {
 pub struct Episode {
@@ -112,4 +113,41 @@ pub open spec fn step(a:Observation,b:Observation,event:Event)->bool {
         _=>b.admissions==a.admissions && b.episodes==a.episodes,
     }
 }
+/// Only the actual status map changes. Keeping its local transition separate
+/// from the full protocol history avoids unfolding every protocol in each branch.
+pub(super) fn apply(episodes:&mut BTreeMap<usize,Episode>,control:&LifecycleState,command:Command,Ghost(before):Ghost<Observation>)->(out:Result<(),EpisodeError>)
+    requires control.wf(),*control==before.control,old(episodes)@==before.episodes,
+    ensures out==command_result(before,command),
+        final(episodes)@==if out.is_ok() {before.episodes.insert(command.owner(),command_state(before,command))} else {before.episodes},
+    {
+        let id=command.id();
+        if !episodes.contains_key(&id) || !control.kernel().contains(id) {return Err(EpisodeError::Unknown);}
+        let phase=control.kernel().phase(id);let retired=control.kernel().retired(id);
+        let generation=control.kernel().episode_generation(id);
+        match command {
+            Command::Prepare {..}=>{
+                if retired || phase!=Some(Phase::Inactive) || generation!=Some(0) {return Err(EpisodeError::Closed);}
+                episodes.get_mut(&id).unwrap().prepared=true;
+            },
+            Command::Restart {..}=>{
+                if retired {return Err(EpisodeError::Retired);}
+                let e=episodes.get_mut(&id).unwrap();e.failed=None;e.restart=phase!=Some(Phase::Inactive);
+            },
+            Command::Fail {generation:expected,error,..}=>{
+                if generation!=Some(expected) {return Err(EpisodeError::Stale);}
+                if retired || (phase!=Some(Phase::Loading) && phase!=Some(Phase::Active)) {return Err(EpisodeError::Closed);}
+                let e=episodes.get_mut(&id).unwrap();if e.failed.is_none() {e.failed=Some(error);}
+            },
+            Command::Seal {sealed,..}=>{
+                if phase!=Some(Phase::Inactive) || generation!=Some(0) {return Err(EpisodeError::Closed);}
+                episodes.get_mut(&id).unwrap().sealed=sealed;
+            },
+            Command::NotifyRetry {..}=>{
+                if episodes.get(&id).unwrap().cleanup_failed {return Err(EpisodeError::Closed);}
+                episodes.get_mut(&id).unwrap().failed=None;
+            },
+        }
+        Ok(())
+    }
+
 }

@@ -113,11 +113,31 @@ class IsolatedRunnerTests(unittest.TestCase):
     def test_timeout_preserves_partial_output_without_accepting_evidence(self):
         prefix = self.reports / "interrupted"
         executable = self.root / "fake-verus"
-        executable.write_text(f"#!{sys.executable}\nimport time, sys\n"
+        ready = self.root / "ready"
+        executable.write_text(f"#!{sys.executable}\nimport time, sys\nfrom pathlib import Path\n"
                               "print('{\"unfinished\":', flush=True)\n"
                               "print('partial diagnostic', file=sys.stderr, flush=True)\n"
+                              f"Path({str(ready)!r}).write_text('ready')\n"
                               "time.sleep(30)\n")
         executable.chmod(0o755)
+
+        class ReadySupervisor(CHECKS.ProcessSupervisor):
+            def start(self, command, **kwargs):
+                process = super().start(command, **kwargs)
+                try:
+                    # This tests preservation of emitted output, not Python's
+                    # startup speed. The real one-second timeout still starts
+                    # before start(), and may already be expired on return.
+                    deadline = time.monotonic() + 5
+                    while not ready.exists() and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    if not ready.exists():
+                        raise AssertionError("fake verifier did not emit its partial output")
+                    return process
+                except BaseException:
+                    self.finish(process, terminate=True)
+                    raise
+
         killpg = os.killpg
         def signal_group(pid, number):
             # macOS can reject signal-0 probes during group teardown even when
@@ -126,7 +146,8 @@ class IsolatedRunnerTests(unittest.TestCase):
                 raise PermissionError("group disappeared during permission check")
             return killpg(pid, number)
         with patch.object(CHECKS.os, "killpg", side_effect=signal_group), self.assertRaises(subprocess.TimeoutExpired):
-            CHECKS.run_verus(executable, os.environ.copy(), self.baseline / "lib.rs", prefix, timeout=1)
+            CHECKS.run_verus(executable, os.environ.copy(), self.baseline / "lib.rs", prefix,
+                             timeout=1, supervisor=ReadySupervisor())
         self.assertEqual(prefix.with_suffix(".stdout.json").read_text(), '{"unfinished":\n')
         self.assertEqual(prefix.with_suffix(".stderr.txt").read_text(), 'partial diagnostic\n')
         meta = json.loads(prefix.with_suffix(".meta.json").read_text())

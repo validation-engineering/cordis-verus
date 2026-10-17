@@ -1,6 +1,14 @@
 # R2：Node 协议执行历史
 
+当前 R2 状态以[第 5 包统一验收](r2-acceptance.zh-CN.md)为准：managed-production/v1 范围已完成。下文保留各批次历史记录及其当时的验证范围。
+
+## 历史实施与验证记录
+
 [English](r2-node-execution.md) · [执行合同](r2-execution.zh-CN.md)
+
+[宿主组合包](r2-host-composition.zh-CN.md) 现由受验证 `Bridge` 拥有真实 Node-API
+弱引用、Fiber 绑定和保留回调配方；强类型导入携带真实查询签发的封闭结果。这补齐了
+先前检查点中的引用关联缺口；JS 对象内部状态与完整生产步骤 refinement 仍是明确边界。
 
 生产 Node Driver 现在使用一个受验证的 `NodeRuntime`，持有真实生命周期、publication
 句柄与版本、lease、availability 检查、需要检查的 publication 集合，以及保留的 admission 和
@@ -244,8 +252,8 @@ node --test --test-concurrency=4 --test-timeout=30000 tests/node-compat/*.test.m
 该历史从真实空状态开始，在**一个 Node 所有者内部**连续。它没有为独立 native Journal、
 Node 实例或进程虚构全序。JavaScript 对象内容、N-API／JSON 翻译、predicate 与 I/O 真实性、
 JS 调度、Fiber 效果／Child 函数和 HMR 模块行为仍需各自接入。profile 选择、mount／seal
-准入、通知重试选择、parent／接口状态和声明协调现已进入受验证所有者。返回的句柄批次现来自受验证所有者；JSON 编码、传给 JS map
-以及实际对象删除仍是普通适配层操作。实际 scope receipt 和 publication 选择
+准入、通知重试选择、parent／接口状态和声明协调现已进入受验证所有者。返回的句柄批次现来自受验证所有者；引用移除还会检查 `Bridge` 中真实的
+publication／Fiber／claim 表。JSON 交付、JS 保留根删除与垃圾回收仍属于适配层／运行时。实际 scope receipt 和 publication 选择
 已经由受验证所有者管理；JavaScript 仍负责派发回调及选择 ALS 父上下文；原生路径保证保留所选父路径，
 不等于证明完整 JS 因果祖先或回调结束。从 registry 构造完整清单，也不等于
 证明 JS 对象的销毁或其中任意效果的语义。Harness 通知后清除失败时，受影响 consumer 的完整选择

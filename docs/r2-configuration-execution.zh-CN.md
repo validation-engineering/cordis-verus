@@ -1,5 +1,11 @@
 # 配置更新：从实际计划到已接受版本
 
+当前 R2 状态以[第 5 包统一验收](r2-acceptance.zh-CN.md)为准：managed-production/v1 范围已完成。下文保留各批次历史记录及其当时的验证范围。
+
+## 历史实施与验证记录
+
+第 3 包现已补上配置数据与绑定解释，包括 schema 规范化和来源回读。下文较早检查点记录协议的逐步实现；其中的剩余边界应结合当前边界节与[第 3 包审查说明](r2-configuration-semantics.zh-CN.md)阅读。
+
 [English](r2-configuration-execution.md)
 
 生产 Loader 已用受验证的 owner 管理实际更新计划、正向／逆向 Future、已接受快照
@@ -442,16 +448,20 @@ native／Node 语义组合仍是独立义务。源／配置的共同 Journal 连
 
 ## 尚未完成的 R2 边界
 
-- `Target` 依赖 driver 分配唯一运行域；它不认证人为复用相同 domain 的独立运行时。
-  捕获／检查目标读取生命周期和登记状态；配方版本仍是显式的登记观察。
-- JSON／schema／模块处理、分组组件的效果函数和配置树到 Component 的语义，
-  仍需联合 refinement。实际 mount 的父身份和结构性协议已连接；六字段投影仍只覆盖解析后的命名叶子。
-- 快照和恢复配方仍含不透明泛型值。生产恢复已要求完整结构阶段、准确的保存配方遍历、
-  失败前缀和实际恢复载荷提取；这些工厂与目标 Component 含义的语义等价仍是适配层义务。
-- 轮询、panic 捕获与用户回调效果仍是宿主边界。协议证明真实返回结果允许怎样推进，
-  不证明 Future 最终返回、调度公平或外部 I/O 正确。
-- 配置协议与加载源／checkpoint 状态已进入原生 Journal，完整 native／Node 语义组合仍待完成。真实保存确认与 checkpoint 所有权已验证；源投影／合并含义、文件系统真实性与整树收敛仍未完成。
-  R2 保持 `in_progress`。
+[第 3 包](r2-configuration-semantics.zh-CN.md)现已验证实际模块／作用域绑定、递归 schema
+与默认值规范化、三方合并、完整子条目排序和来源回读。`Prepared::entry` 补充原有保守的
+叶条目投影；原生 group 使用受验证的空程序和结构化归属子条目。
+
+- 第 4 包仍需把这些精确的类型化观察接入完整 native／Node 生产步骤解释；第 5 包负责
+  R2 总验收。R2 继续保持 `in_progress`。
+- JSON／URL／IEEE 编解码、文件系统身份与 I/O、服务键翻译、任意工厂体和 JS schema
+  回调属于明确的适配或外部系统边界；原生 schema 与合并算法自身已是验证代码。
+- Target 认证驱动实际分配的唯一 domain，不认证故意复用 domain 的独立运行时。配方
+  revision 与实际 allocation／parent 检查保留现有合同。
+- 快照和恢复载荷保留真实不可变规范化配方，但配置校验不授予任意工厂效果或回调逆操作
+  Component 定律。轮询／panic 真实性与回调最终返回仍需独立合同。
+- 成功规划、来源回读或单文件保存确认，不等于完整生产步骤 refinement、一般恢复、
+  全局终止或合流。
 
 ## 验证
 

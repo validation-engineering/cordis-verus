@@ -9,6 +9,8 @@
 
 mod availability;
 mod node;
+mod objects;
+pub use objects::{HostBridge, HostCall, HostSelection, ObjectKey};
 mod protocol;
 use availability::{Availability, Candidate};
 pub use availability::{CheckAction, CheckTicket};
@@ -829,6 +831,7 @@ impl Driver {
     /// `snapshot`, this does not resolve targets, scan dependency histories, or
     /// construct diagnostics/storage. It carries no new admission authority.
     pub fn snapshot_state(&self) -> Value {
+        let _execution = self.execution_snapshot();
         let plugins: Vec<_> = self
             .kernel
             .core
@@ -839,10 +842,17 @@ impl Driver {
         json!({"abi": 1, "profile": self.profile(), "domain": self.domain.to_string(), "plugins": plugins})
     }
 
+    /// The checked protocol trajectory is erased from the executable. It is
+    /// captured from this actual owner, independently of JSON diagnostics.
+    pub fn execution_snapshot(&self) -> cordis_kernel::node_runtime::Snapshot {
+        self.kernel.core.snapshot()
+    }
+
     /// Diagnostic observations, not an independent lifecycle state machine.
     /// `leaseRecords` counts stored live leases; `leaseAllocations` is the
     /// monotonic allocation count, including leases already released.
     pub fn snapshot(&self) -> Value {
+        let _execution = self.execution_snapshot();
         let mut consumers: BTreeMap<usize, Vec<Value>> = BTreeMap::new();
         for &id in self.kernel.core.interfaces().keys() {
             let mut providers = std::collections::BTreeSet::new();

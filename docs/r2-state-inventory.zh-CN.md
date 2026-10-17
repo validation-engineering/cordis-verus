@@ -1,6 +1,18 @@
 # R2 生产状态清单
 
+当前 R2 状态以[第 5 包统一验收](r2-acceptance.zh-CN.md)为准：managed-production/v1 范围已完成。下文保留各批次历史记录及其当时的验证范围。
+
+## 历史实施与验证记录
+
+当前生产组合与准确解释边界见[第 4 包](r2-production-composition.zh-CN.md)。下文历史检查点保留原有范围。
+
+[配置解释](r2-configuration-semantics.zh-CN.md)现已将实际模块选择、作用域键归属、schema／默认值规范化、保存合并与回读判断接入验证代码；生产步骤组合见第 4 包，综合验收仍待完成。
+
 [English](r2-state-inventory.md) · [执行合同](r2-execution.zh-CN.md)
+
+[宿主组合包](r2-host-composition.zh-CN.md) 新增真实外部引用所有者、派发 claim、
+静态强类型槽组装与共享 Episode 归属检查。下表记录其当前范围；第 3 包已补齐配置值
+解释，受验证载体的轨迹组合见第 4 包；普通宿主边界与最终验收仍单独保留。
 
 这是 R2-C/E 的工作清单，沿实际原生 Runtime 盘点共享状态、逃逸的 setup 句柄和清理路径。
 **它还不是完整共享状态解释，也不是整个宿主联合生产轨迹的证明。** Node 与 loader 行标出后续
@@ -32,7 +44,7 @@
 | `NativeRuntime::{host, services, owners, history, positions, joint, recipes}`；`NativeHost::{lifecycle, entries}` | 注册／Child 注册、Begin、根准入／调用、Finish、撤销、重试、Unload、Remove、回调更新 | 已验证成员关系、分配的 episode 身份、publication 与连续控制／槽／owner 联合历史。回调体及不透明 `Mounted` 内部状态尚未进入该历史解释。 |
 | `NativeEpisode` 的共享不可变 `NativeContext`（origin／work 域／登记 realm／anchor／声明／绑定）、imports、自有值、关闭状态、擦除的 `Capture`；`NativePublication` 的 origin、槽和相同 capture | `begin_managed_execution`、`Execution::provide`、`finish_managed_execution`、`release_managed_execution` | imports 来自真实 Begin 绑定与已发布槽；Finish／Unload 保持来源。槽内部修改需要自己的语义。 |
 | `Execution::{work, groups, values, initialized, effects, checked_out, attempts}` | 根／请求准入与完成、组准入、runner 取出／归还／退休、取消、清理、重试、seal | 一个受验证 owner 绑定未完成工作、全部清理队列、原生值和阶段。不透明 iterator／Future 的函数含义仍待解释，包含被取出执行期间。 |
-| `AsyncSetup::{state, scope}`；`SharedEpisode::{generation, context, services, anchor, episode}`；`Episode::{cleanups, values}` | Setup 读取／提供值、克隆／逃逸、嵌套效果／Child、服务替换与轮询 | 同一分配共享不可变元数据和可变 Episode。原生 `services` 与真实 Begin 所有者共享受验证 `NativeContext`，原生效果由内核读取其绑定。realm／anchor 来自同一登记 Begin；受验证 scope 准入／调用与实际检查点连接存活队列。五个生产身份分配器已使用受验证 CAS 分配；普通 mutex／Arc／Weak 关联、其余命名空间及静态宿主元数据／槽表仍是边界。 |
+| `AsyncSetup::{state, scope}`；`SharedEpisode::{generation, context, services, anchor, episode}`；`Episode::{cleanups, values}` | Setup 读取／提供值、克隆／逃逸、嵌套效果／Child、服务替换与轮询 | 同一分配共享不可变元数据和可变 Episode。原生 `services` 与真实 Begin 所有者共享受验证 `NativeContext`，原生效果由内核读取其绑定。realm／anchor 来自同一登记 Begin；受验证 scope 准入／调用与实际检查点连接存活队列。五个生产身份分配器已使用受验证 CAS 分配；每次共享 Episode 锁访问现检查签发的 execution 关联；静态元数据与准确 Arc 槽由 `static_values::from_definition` 共同组装。标准 Arc／Mutex 语义、其余命名空间和外部静态租约真实性仍是边界。 |
 | `Episode::{driver, static_only, dynamic_host, external_children, service_updates, unsupported}` | Setup／效果注册、Child 提交、服务通知、静态宿主轮询 | 唤醒属于调度记账，外部 Child 结果与不支持操作标志则影响结果。控制投影中没有这些字段，不等于它们在完整观察中保持不变。 |
 | `ServiceSlot::{payload, metadata}`、标量槽位或 `SharedPayload<dyn Any + Send + Sync>`；保留槽的 `ServiceHandle` | `ServiceSlot::{get, accepts, replace}`、`AsyncSetup::{provide, publish, set, refresh}` 及句柄操作 | 受验证共享 owner 绑定真实载荷／版本历史、私有锁与 Journal。真实 Runtime 检查点收集完整已发布／自有／imported 载荷观察，替换保持无关标量／载荷别名。predicate、任意内部状态、一般 inverse 定律及外层 Episode mutex 关联仍待解释。 |
 | `ReversibleValue` 私有锁内的真实值／深度及擦除的连续历史；`Inverse` 的真实目标／前态／后态 | 既有 `apply`／`run_value_program`、新增 `prepare_effect`／受管提交、队列 inverse 派发 | 已验证标量写入与严格恢复定义域；后续不匹配状态阻止恢复并保留 inverse。该历史只解释这个值，不覆盖所有服务对象内部状态。 |
@@ -43,9 +55,9 @@
 | `Mounted::control` 中的 `poll_control::PollControl::{owner, episode, work_domain, failed, cleanup_failure, restart}` | 受守卫 Begin、restart、失败报告、真实 retry／Unload；`poll_flags` 与共同快照 | 保留真实错误载荷与轮询输入；成功 native 操作控制重置入口。同域／成员关联前提及 availability 真实性仍明确保留。 |
 | `Execution::statuses` 与受验证 `host_status::Cell`；`HostStatus` 以擦除的线性权限持有错误／终止／Child 载荷；适配层持有 waiter／driver／notify | 唯一状态工厂、所有者选择的初始化／退休、载荷报告及带凭据的观察 | 实际保存的 link 决定 Journal、Begin／work 和 group 归属；普通与观察退休共用先移除后完成协议，拒绝保留归属。这些入口不再需要条件式状态 Journal 前提；整个 Episode 的 Arc／Weak／mutex 关联、调度和回调真实性仍待完成。 |
 | 受验证 driver 旁的 `Runtime::{cleanup_errors, maintenance_changes, shutdown_failures}` | 维护、清理报告、shutdown 聚合 | 这些字段报告真实宿主决策。错误聚合可被用户观察，不能假定它与完整 refinement 无关。 |
-| Node `Domain`／Fiber、JavaScript 对象／publication 表、lease 与 invocation 句柄；原生 `Driver` 与 addon backend | 发布／替换／读取、异步回调、原生命令结果、清理／重试、动态接口、HMR | 受验证 Node 所有者现已将实际生命周期／publication／版本／lease／检查变化组合到同一历史；JS 对象／Fiber／函数／HMR 语义、回调派发／祖先列表和普通宿主字段仍需完整 native／Node 解释（R2-D）。 |
-| `Loader::{runtime, root, parent, registry, configuration}`；`Snapshot`、`Transaction`、`UpdateKey`、`SourceTracking` | Apply／recover、include／group、回调更新、文件加载／重载、prepare／commit save | 私有字段与 RuntimeAccess 操作视图保持实际宿主身份；受验证原生构造入口与单次读取快照关联真实原生 member、配置和源。Configuration 拥有实际 Batch 与计划，Reversible 拥有真实正向／逆向 Future。原生 Target 检查域／ID／代次／配方；提交要求更新全部完成，恢复要求 inverse 排空。原生 allocation 快照及结构性正向／恢复阶段已连接；配置树到组件语义、完整联合解释和源投影／合并含义仍开放（R2-I）。 |
-| `Recorded::{inner, ledger, sources, source_ledger}`；实际配置的候选／恢复载荷／Batch 及带类型历史位置 | begin、更新／逆向／结构轮询、commit、恢复、refresh | 与真实 Runtime 共用 Journal；完整投影、原始提交候选与接受来源有证明。回调在锁外执行；源加载／清空／保存历史已在同一 Journal 写入点核对归属配置，完整配置语义仍待完成。 |
+| Node `Domain`／Fiber、JavaScript 对象／publication 表、lease 与 invocation 句柄；原生 `Driver` 与 addon backend | 发布／替换／读取、异步回调、原生命令结果、清理／重试、动态接口、HMR | 受验证 Node 所有者现已将实际生命周期／publication／版本／lease／检查变化组合到同一历史；受验证 Bridge 现拥有真实 Node-API 弱引用、Fiber 绑定和待处理票据的配方 claim；封闭选择接入 typed 导入。任意 JS 对象／函数内部状态、HMR 模块效果、完整派发／诊断观察及整个步骤解释仍开放。 |
+| `Loader::{runtime, root, parent, registry, configuration}`；`Snapshot`、`Transaction`、`UpdateKey`、`SourceTracking` | Apply／recover、include／group、回调更新、文件加载／重载、prepare／commit save | 私有字段与 RuntimeAccess 操作视图保持实际宿主身份；受验证原生构造入口与单次读取快照关联真实原生 member、配置和源。Configuration 拥有实际 Batch 与计划，Reversible 拥有真实正向／逆向 Future。原生 Target 检查域／ID／代次／配方；提交要求更新全部完成，恢复要求 inverse 排空。原生 allocation 快照及结构性正向／恢复阶段已连接；第 3 包已补齐真实模块／作用域绑定、schema／默认值规范化、递归保存合并和完整源回读检查。整棵树到组件及联合生产步骤的组合仍开放（R2-I）。 |
+| `Recorded::{inner, ledger, sources, source_ledger}`；实际配置的候选／恢复载荷／Batch 及带类型历史位置 | begin、更新／逆向／结构轮询、commit、恢复、refresh | 与真实 Runtime 共用 Journal；完整投影、原始提交候选与接受来源有证明。回调在锁外执行；源加载／清空／保存历史已在同一 Journal 写入点核对归属配置。第 3 包补上配置值解释，完整生产序列的组合仍待完成。 |
 
 源码入口：[`runtime.rs`](../crates/cordis/src/runtime.rs)、
 [`static_host.rs`](../crates/cordis/src/runtime/static_host.rs)、
@@ -72,11 +84,14 @@ Begin／retry／Unload 入口重置并进入共同快照。原生句柄携带 Be
 | `NodeRuntime::checked` 与适配层 `availability.errors` | checked 登记／撤销、诊断回复 | 选择检查与报告错误；没有另一份版本计数，诊断不授权准入。 |
 | `NodeRuntime::{admissions, episodes}`；实际 `Admission`、`Episode` 标志与错误载荷 | Begin、prepare／seal／fail／restart、实际完成、清理／重试／释放／移除 | 同一连续协议历史证明真实 Begin 来源与成功释放前保留；旧回复保持状态及资源。待处理票据直接读取 action ledger。 |
 | `NodeRuntime::{scopes, restoring}` 及从 registry 构造的 publication 清单 | BeginScope／FinishScope／ScopesLive／CheckScopeWait、捕获／revoke／reclaim 与受管释放 | 同一历史约束真实回调 receipt、当前等待图和撤回回读选择；释放清单来自真实 registry，publication／scope 来源及 scope 身份不复用具有有限历史证明。 |
-| `NodeRuntime::released` | 成功替换／reclaim／释放，Drive 回复前的 `drain_released` | 真实载荷候选及有序筛选进入同一历史；检查写入／释放来源、完整入队与排除保留槽位。JSON 传递和 JS `Map.delete` 仍是外部操作。 |
+| `NodeRuntime::released` | 成功替换／reclaim／释放，Drive 回复前的 `drain_released` | 真实载荷候选及有序筛选进入同一历史；检查写入／释放来源、完整入队与排除保留槽位。Bridge 移除现先检查真实 publication／Fiber／claim 的保留条件；JSON 交付与垃圾回收仍是外部操作。 |
 | 实际 Node 读取参数、选定 publication／来源、句柄与版本 | `Driver::resolve`、typed import／调用授权 → `NodeRuntime::resolve` | 保持状态的历史事件；真实 Begin 租约／捕获／写入来源、精确选择和按调用方解释的只读 lift。对象方法及线协议翻译仍为外部边界。 |
 | `NodeRuntime::{interfaces, dynamic}`；真实 parent、初始 provisions、当前依赖与动态所有者 | insert／configure、declare／release／remove、`publish_service`、`reconcile_declarations` | 同一历史中的接口对应与 mount／声明来源；精确发布分支及包含失败前缀的完整协调。动态接口保留扩展分类，Driver 不再另存这些表。 |
 | `NodeRuntime::policy`：实际 `profile`／`configured` | configure、成功分配、mount／seal gate、通知重试选择 | 同一历史证明 profile 永久冻结、准确调用／失败前缀与完整受影响集合；保留清理失败和无关 episode。 |
 | `NativeInvocation` 持有私有 `paths::Path`；`NodeRuntime::scopes` 持有存活 receipt | `begin_invocation`、`finish_invocation`、`invocation_live`、`invocation_own_live`、`check_invocation_wait` | 准确所选父前缀、完整路径查询和真实签发来源；逃逸上下文持有非活动路径条目，账本只保留存活 receipt。ALS 父选择及任意 JS 行为仍为外部边界。 |
+| `Bridge<WeakReference<NativeObject>>::{objects, fibers, claims}`；私有 JS box／root map | 对象签发／读取／发布／替换／移除；Fiber 绑定／解绑；回调开始／完成；显式快照 | 准确原始引用与待处理票据关联；publication／Fiber／配方保留时禁止释放；检查完整快照覆盖。JS 解引用、box 适配层与载荷内部状态仍是审查边界。 |
+| `static_values::Values<ServiceSlot>` 及共享 `Context` | 静态定义组装、读取和提供值 | 组合真实 realm／声明／继承端口与准确 Arc 输入；拒绝重复／缺失／额外导入和其他 owner 写入。外部静态租约权限仍单独保留。 |
+| `SharedEpisode::association` 与实际 Episode mutex | native／static 创建及每次共享锁访问 | checked 关联与真实上下文共同签发；访问前和锁内 execution 比较。标准 Arc／Mutex 语义仍是信任边界。 |
 | JS 回调派发及剩余 Driver 派发／诊断 | 回调调度、ALS 父选择、回复编码 | 原生捕获路径保持所选父级；完整 JS 因果祖先、调度及对象／效果解释仍需组合。 |
 | `Configuration::{current, revision, pending, updates, structure}`；待办的 candidate／recovery | begin／work／commit／recover／refresh | 修改待办保持已接受快照／版本，不能修改批次；真实回调驱动顺序成功前缀与逆序重试栈。提交要求更新完成，恢复要求 inverse 义务为空。见[配置执行](r2-configuration-execution.zh-CN.md)。 |
 | `Transaction::{before, created}`；受验证的真实 Tree 节点及原生 Allocation 记录 | apply_prepared／recover、mount、update／rollback await | 父级局部身份准备、完整移除派发和保存配方重建已在受验证树中执行，保证 allocation 唯一和准确失败前缀；取消保留旧 factory 和 inverse。工厂的 Component 含义及共同 Journal 仍开放。 |
@@ -93,7 +108,7 @@ Begin／retry／Unload 入口重置并进入共同快照。原生句柄携带 Be
 | 实际步骤 | 受检查结果 | 分类范围 |
 | --- | --- | --- |
 | 取快照，再于值／episode 锁外调用 `ScalarEffect::compute` | 经过验证的实现，其实际输出等于模型结果 | 局部准备；回调的额外任意副作用没有在这里解释。 |
-| 获取 episode owner，重新检查票据／work／队列身份、阶段与组准入 | 已关闭／取消的准入不能进入受管写入 | 拒绝保持 execution owner；普通 mutex／宿主身份对应仍是边界。 |
+| 获取 episode owner，重新检查票据／work／队列身份、阶段与组准入 | 已关闭／取消的准入不能进入受管写入 | 拒绝保持 execution owner；共享锁访问现检查签发的归属。标准 mutex 语义仍是信任边界。 |
 | 比较当前值／深度与私有捕获状态 | 不匹配记录 `StaleComputation` 并拒绝；容量耗尽／计算拒绝也不改变标量状态 | 实际拒绝保持 Journal 记录状态与待登记义务。完整恢复到捕获状态允许提交。 |
 | 写入实际结果，将真实 inverse 追加到所属清理队列 | 真实目标／前后态／分支／inverse；保留原有队列前缀及无关组／runner | 对应 dependent grammar 标量操作和受管登记，尚不是完整 R1 context 步骤。 |
 | 派发该队列 inverse | 仅在捕获后态恢复成功；干扰时保留 inverse 供重试 | 既有标量历史和清理合同同样适用于新原语。 |

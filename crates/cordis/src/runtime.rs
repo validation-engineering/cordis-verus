@@ -132,13 +132,25 @@ struct SlotRejection {
     message: &'static str,
 }
 type SharedSlot = Arc<ServiceSlot>;
-type Values = BTreeMap<(PluginId, u64, u64), SharedSlot>;
-// Values supplied by static embeddings retain their explicit host contract.
+// Static values and their metadata are assembled by one checked owner.
 #[derive(Default)]
-struct EpisodeValues(Values);
+struct EpisodeValues(Option<cordis_kernel::static_values::Values<ServiceSlot>>);
 impl EpisodeValues {
     fn own(&self, owner: PluginId, port: Port) -> Option<&SharedSlot> {
-        self.0.get(&(owner, port.key, port.realm))
+        self.0.as_ref()?.own(owner, port)
+    }
+    fn read(
+        &self,
+        port: Port,
+    ) -> Result<(usize, &SharedSlot), cordis_kernel::lifecycle_state::services::NativeReadError>
+    {
+        self.0
+            .as_ref()
+            .ok_or(cordis_kernel::lifecycle_state::services::NativeReadError {
+                reason: NativeValueError::Closed,
+                provider: None,
+            })?
+            .read(port)
     }
     fn provide(
         &mut self,
@@ -147,15 +159,10 @@ impl EpisodeValues {
         port: Port,
         value: SharedSlot,
     ) -> Result<(), (NativeValueError, SharedSlot)> {
-        if !provisions.contains(&port) {
-            return Err((NativeValueError::Undeclared, value));
+        match self.0.as_mut() {
+            Some(values) => values.provide(owner, provisions, port, value),
+            None => Err((NativeValueError::Closed, value)),
         }
-        let key = (owner, port.key, port.realm);
-        if self.0.contains_key(&key) {
-            return Err((NativeValueError::Duplicate, value));
-        }
-        self.0.insert(key, value);
-        Ok(())
     }
 }
 type ConfigUpdateCallback = Box<
@@ -309,9 +316,24 @@ type SetupFuture = Pin<Box<dyn Future<Output = CallbackResult> + Send>>;
 type StageFuture = Pin<Box<dyn Future<Output = Result<Inverse, CallbackError>> + Send>>;
 type Stage = Box<dyn FnOnce(AsyncSetup) -> StageFuture + Send>;
 
-fn lock<T>(value: &Mutex<T>) -> MutexGuard<'_, T> {
-    // A user panic cannot permanently poison the host bookkeeping.
-    value.lock().unwrap_or_else(|error| error.into_inner())
+trait HostLock {
+    type State;
+    fn checked_lock(&self) -> MutexGuard<'_, Self::State>;
+}
+impl<T> HostLock for Mutex<T> {
+    type State = T;
+    fn checked_lock(&self) -> MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(|error| error.into_inner())
+    }
+}
+impl<T: HostLock> HostLock for Arc<T> {
+    type State = T::State;
+    fn checked_lock(&self) -> MutexGuard<'_, Self::State> {
+        (**self).checked_lock()
+    }
+}
+fn lock<T: HostLock>(value: &T) -> MutexGuard<'_, T::State> {
+    value.checked_lock()
 }
 fn value_error(error: ValueError) -> CallbackError {
     match error {
@@ -798,7 +820,7 @@ impl<T: 'static> ServiceKey<T> {
         Self::shared(Some(name), name)
     }
     fn shared(qualifier: Option<&'static str>, name: &'static str) -> Self {
-        let id = *lock(&SHARED_KEYS)
+        let id = *lock(&*SHARED_KEYS)
             .entry((TypeId::of::<T>(), qualifier))
             .or_insert_with(|| fresh(&NEXT_KEY));
         Self {
@@ -1112,6 +1134,7 @@ pub struct AsyncSetup {
 // Keep immutable context and mutable execution in one allocation. Cloning or
 // scoping an AsyncSetup cannot pair a copied context with another Episode.
 struct SharedEpisode {
+    association: cordis_kernel::host_context::Association,
     generation: u64,
     context: Context,
     services: SetupServices,
@@ -1120,38 +1143,34 @@ struct SharedEpisode {
 }
 enum SetupServices {
     Native(Arc<NativeContext>),
-    External {
-        owner: PluginId,
-        bindings: Vec<Binding>,
-        provisions: Vec<Port>,
-    },
+    External(Arc<cordis_kernel::static_values::Context>),
 }
 impl SetupServices {
     fn owner(&self) -> PluginId {
         match self {
             Self::Native(context) => context.owner(),
-            Self::External { owner, .. } => *owner,
-        }
-    }
-    fn bindings(&self) -> &[Binding] {
-        match self {
-            Self::Native(context) => context.committed(),
-            Self::External { bindings, .. } => bindings,
+            Self::External(context) => context.owner(),
         }
     }
     fn provisions(&self) -> &[Port] {
         match self {
             Self::Native(context) => context.provision_ports(),
-            Self::External { provisions, .. } => provisions,
+            Self::External(context) => context.provision_ports(),
         }
     }
 }
-impl std::ops::Deref for SharedEpisode {
-    type Target = Mutex<Episode>;
-    fn deref(&self) -> &Self::Target {
-        &self.episode
+impl HostLock for SharedEpisode {
+    type State = Episode;
+    fn checked_lock(&self) -> MutexGuard<'_, Episode> {
+        let state = self.episode.checked_lock();
+        assert!(
+            self.association.matches(&state.cleanups.protocol),
+            "shared Episode execution identity changed"
+        );
+        state
     }
 }
+
 impl AsyncSetup {
     fn require_dynamic(&self, feature: &str) -> CallbackResult {
         let mut state = lock(&self.state);
@@ -1257,22 +1276,17 @@ impl AsyncSetup {
                 (provider, Some(slot.clone()))
             }
             None => {
-                let values = &state.values.0;
-                let provider = if self.state.services.provisions().contains(&port) {
-                    self.state.services.owner()
-                } else {
-                    self.state
-                        .services
-                        .bindings()
-                        .iter()
-                        .find(|binding| binding.key == port.key && binding.realm == port.realm)
-                        .map(|binding| binding.provider)
-                        .ok_or_else(|| error(ServiceReadFailure::Undeclared, None))?
-                };
-                (
-                    provider,
-                    values.get(&(provider, port.key, port.realm)).cloned(),
-                )
+                let (provider, slot) = state.values.read(port).map_err(|failure| {
+                    error(
+                        match failure.reason {
+                            NativeValueError::Closed => ServiceReadFailure::ClosedEpisode,
+                            NativeValueError::Undeclared => ServiceReadFailure::Undeclared,
+                            _ => ServiceReadFailure::MissingValue,
+                        },
+                        failure.provider,
+                    )
+                })?;
+                (provider, Some(slot.clone()))
             }
         };
         drop(state);
@@ -1310,22 +1324,16 @@ impl AsyncSetup {
         }
         // Static embeddings supply their own authoritative provider/lease
         // contract. They still use the exact same checked slot and capture.
-        let provider = if self.state.services.provisions().contains(&port) {
-            self.state.services.owner()
-        } else {
-            self.state
-                .services
-                .bindings()
-                .iter()
-                .find(|binding| binding.key == port.key && binding.realm == port.realm)
-                .map(|binding| binding.provider)
-                .ok_or_else(|| error(ServiceReadFailure::Undeclared, None))?
-        };
-        let slot = state
-            .values
-            .0
-            .get(&(provider, port.key, port.realm))
-            .ok_or_else(|| error(ServiceReadFailure::MissingValue, Some(provider)))?;
+        let (provider, slot) = state.values.read(port).map_err(|failure| {
+            error(
+                match failure.reason {
+                    NativeValueError::Closed => ServiceReadFailure::ClosedEpisode,
+                    NativeValueError::Undeclared => ServiceReadFailure::Undeclared,
+                    _ => ServiceReadFailure::MissingValue,
+                },
+                failure.provider,
+            )
+        })?;
         slot.capture_binding(provider, port)
             .ok_or_else(|| error(ServiceReadFailure::TypeMismatch, Some(provider)))
     }
@@ -2152,10 +2160,15 @@ impl AsyncSetup {
                     .protocol
                     .enqueue_native_effect(self.scope.group(), domain, payload)
             }
-            SetupServices::External { bindings, .. } => state
+            SetupServices::External(context) => state
                 .cleanups
                 .protocol
-                .enqueue_effect(self.scope.group(), domain, bindings.clone(), payload)
+                .enqueue_effect(
+                    self.scope.group(),
+                    domain,
+                    context.committed().to_vec(),
+                    payload,
+                )
                 .map_err(|(_, payload)| payload),
         };
         let group = match admitted {
@@ -3732,9 +3745,9 @@ impl Runtime {
         drop(discarded);
     }
     fn start(&mut self, id: PluginId, cx: &mut TaskContext<'_>, protocol: EpisodeExecution) {
-        let native_context = protocol
-            .native_context()
-            .expect("native Begin carries its checked context");
+        let (association, native_context) =
+            cordis_kernel::host_context::Association::native(&protocol)
+                .expect("native Begin carries its checked context");
         let context = Context {
             realms: native_context.realm_context(),
         };
@@ -3768,6 +3781,7 @@ impl Runtime {
         }
         let episode = AsyncSetup {
             state: Arc::new(SharedEpisode {
+                association,
                 generation: fresh(&NEXT_EPISODE),
                 context,
                 services,

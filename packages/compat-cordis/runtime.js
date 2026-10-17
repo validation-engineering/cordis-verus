@@ -1,6 +1,7 @@
 // JS values and callbacks remain in this environment. All activation, invalidation,
 // provider selection and cleanup admission are selected by the native Driver.
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { HostBridge } from './host-bridge.js';
 import { createRequire } from 'node:module';
 import { selectNativeArtifact } from './native-artifacts.js';
 import { EventsService } from './events.js';
@@ -46,6 +47,7 @@ function nativeDriver(options) {
     throw new Error(`Incompatible Cordis addon at ${addon}: expected ABI 1 and profile cordis-4.0.0-rc.10-experimental with JavaScript object-table values`);
   }
   if (info.scopeProtocol !== 2) throw new Error('Incompatible Cordis addon: invocation scope protocol 2 is required');
+  if (info.hostProtocol !== 1) throw new Error('Incompatible Cordis addon: host identity protocol 1 is required');
   if (options.profile === 'harness' && !info.profiles?.includes('harness')) {
     throw new Error('Incompatible Cordis addon: Harness profile support is required');
   }
@@ -167,8 +169,18 @@ class Domain {
     this.driverDirty = true;
     this.pumping = false;
     this.driver.command(JSON.stringify({op:'configure',profile:this.profile}));
-    this.fibers = new Map();
-    this.values = new Map();
+    this.host = new HostBridge(this.driver);
+    for (const operation of ['publish','complete']) {
+      const execute = this.host[operation].bind(this.host);
+      this.host[operation] = (...args) => { this.driverDirty = true; try { return execute(...args); } finally { this.wake(); } };
+    }
+    for (const operation of ['resolve','get','fiber','hasFiber']) {
+      const execute = this.host[operation].bind(this.host);
+      this.host[operation] = (...args) => { try { return execute(...args); } catch(error) { this.driverDirty = true; throw error; } };
+    }
+    this.fibers = {get:id=>this.host.fiber(id),has:id=>this.host.hasFiber(id),set:(id,fiber)=>this.host.bind(id,fiber),
+      delete:id=>this.host.unbind(id),values:()=>this.host.fibers()};
+    this.values = {get:id=>this.host.get(id),delete:id=>this.host.delete(id)};
     this.services = new Map();
     this.realms = new Map();
     this.props = Object.create(null);
@@ -881,7 +893,7 @@ export class Fiber {
     this._generation = ticket.generation;
     this._error = undefined;
     const token = beginInvocation(this, {generation:ticket.generation,kind:'setup',ticket});
-    let success = true;
+    let success = true, dispatch;
     try {
       this._setState(FiberState.LOADING);
       await Promise.resolve();
@@ -891,7 +903,8 @@ export class Fiber {
         try { this._domain.command({op:'validate',id:this.id,generation:ticket.generation}); }
         catch (error) {
           if (/AdmissionClosed|StaleEpisode/.test(error.message)) {
-            this._domain.command({op:'complete',ticket,success:true});
+            dispatch = this._domain.host.begin(ticket,this,{kind:'cancelled-setup'});
+            this._domain.host.complete(dispatch,true);
             this._domain.schedule();
             return;
           }
@@ -900,24 +913,27 @@ export class Fiber {
       }
       await invocation.run(token, () => {
         if (this._domain.profile === 'harness') this.config = this._resolveConfig(this._config);
+        dispatch = this._domain.host.begin(ticket,this,{kind:'setup',callback:this.runtime?.callback,config:this.config});
+        const {callback,config} = this._domain.host.recipe(dispatch);
         if (!this.runtime) return;
-        const callback = this.runtime.callback;
         let result;
         if (isConstructor(callback)) {
-          const instance = new callback(this.ctx, this.config);
+          const instance = new callback(this.ctx, config);
           for (const hook of instance?.[symbols.initHooks] ?? []) hook();
           result = instance?.[symbols.init]?.();
-        } else result = callback(this.ctx, this.config);
+        } else result = callback(this.ctx, config);
         return collectEffect(result, inverse => this._disposables.push(inverse), () => this.uid !== null);
       });
     } catch (error) {
       success = false; this._error = error;
       try { this.ctx.logger.error(error); } catch (loggingError) { this._domain.errors.push(loggingError); }
     } finally { finishInvocation(token); }
-    this._domain.command({op:'complete', ticket, success, ...(success ? {} : {error:serializableError(this._error)})});
+    dispatch ??= this._domain.host.begin(ticket,this,{kind:'failed-setup'});
+    this._domain.host.complete(dispatch,success,success ? undefined : serializableError(this._error));
     this._domain.schedule();
   }
   async _cleanup(ticket) {
+    const dispatch = this._domain.host.begin(ticket,this,{kind:'cleanup'});
     const errors = [];
     const observation = hostDiagnostics(this);
     try { this._setState(FiberState.UNLOADING); } catch(error) { errors.push(error); }
@@ -966,7 +982,7 @@ export class Fiber {
         try { await this._domain.rust.closeSessions(this); } catch (error) { errors.push(error); }
       }
     }); } finally { finishInvocation(token); }
-    this._domain.command({op:'complete',ticket,success:errors.length === 0,...(errors.length ? {error:errors.map(serializableError).join('; ')} : {})});
+    this._domain.host.complete(dispatch,errors.length === 0,errors.length ? errors.map(serializableError).join('; ') : undefined);
     if (!errors.length) this._publications.clear();
     if (errors.length) { this._error = new AggregateError(errors, `Cleanup failed for ${this.name}`, this._error ? {cause:this._error} : undefined); this._domain.errors.push(this._error); }
     this._domain.schedule();
@@ -1386,8 +1402,8 @@ const contextHandler = {
           // A shadowed Service method keeps the definition fiber's committed
           // injection realm, even when its caller uses a different realm.
           const port=ctx[kDomain].port(prop in fiber.inject ? fiber.ctx : ctx,prop);
-          const result=ctx[kDomain].command({op:'resolve',...port,consumer:fiber.id,generation:fiber._generation});
-          if (result) return getTraceable(ctx,ctx[kDomain].values.get(result.value));
+          const result=ctx[kDomain].host.resolve({op:'resolve',...port,consumer:fiber.id,generation:fiber._generation});
+          if (result) return getTraceable(ctx,result.value);
           if (prop in fiber.inject) throw new Error(`cannot get required service "${prop}" in inactive context`);
         }
         if (!fiber.runtime || fiber.parent[symbols.isolate][prop]!==realm) throw error;
@@ -1424,11 +1440,11 @@ export class ReflectService {
   _getImpl(name,strict=true) {
     const domain=this.ctx[kDomain];
     assertCurrentInvocation(domain);
-    const reply=domain.command({op:'resolve',...domain.port(this.ctx,name)});
+    const reply=domain.host.resolve({op:'resolve',...domain.port(this.ctx,name)});
     if (!reply) return;
     const fiber=domain.fibers.get(reply.owner);
     if (strict && fiber?.state!==FiberState.ACTIVE) return;
-    return {name,fiber,value:domain.values.get(reply.value),publication:reply.publication};
+    return {name,fiber,value:reply.value,publication:reply.publication};
   }
   provide(name,value,check) {
     if (check != null && typeof check !== 'function') throw new TypeError('Service.check must be a function');
@@ -1448,11 +1464,8 @@ export class ReflectService {
       if (binding?.publication === publication) throw new CordisError('REENTRANT_MUTATION','Cannot dispose a publication from its committed consumer action');
     };
     const dispose = fiber.effect(()=>{
-      const handle=String(++domain.counter);
-      domain.values.set(handle,value);
-      try { ({publication}=domain.command({op:'publish',id:fiber.id,generation,...domain.port(ctx,name),value:handle,check:!!check})); }
+      try { ({publication}=domain.host.publish({op:'publish',id:fiber.id,generation,...domain.port(ctx,name),check:!!check},value)); }
       catch (error) {
-        domain.values.delete(handle);
         if (error.message==='Publication: Conflict' || (error.code==='Publication' && error.message==='Conflict')) {
           const port=JSON.stringify(domain.port(ctx,name));
           const owner=this._getImpl(name,false)?.fiber ?? [...domain.fibers.values()].find(candidate=>candidate._publications.has(port));
@@ -1500,9 +1513,7 @@ export class ReflectService {
       if (this._getImpl(name,false)) throw new Error(`cannot set property "${name}" in multiple fibers`);
       throw new Error(`cannot set property "${name}" without provide`);
     }
-    const handle=String(++domain.counter);
-    domain.command({op:'set',id:fiber.id,generation:fiber._generation,publication:entry.publication,value:handle});
-    domain.values.set(handle,value);
+    domain.host.publish({op:'set',id:fiber.id,generation:fiber._generation,publication:entry.publication},value);
     domain.schedule();
     return true;
   }
@@ -1565,7 +1576,8 @@ export class Context {
     const action=actions.find(action=>action.id===id && action.kind==='setup');
     if (!action) throw new Error('Native root setup was not admitted');
     this.fiber._generation=action.ticket.generation;
-    domain.command({op:'complete',ticket:action.ticket,success:true});
+    const rootCall=domain.host.begin(action.ticket,this.fiber,{kind:'root-setup'});
+    domain.host.complete(rootCall,true);
     this.fiber.state=FiberState.ACTIVE;
     this.reflect=new ReflectService(self);
     this.registry=new RegistryService(self);

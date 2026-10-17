@@ -347,7 +347,7 @@ impl SavePlan {
     }
 }
 
-fn read_regular(path: &Path) -> Result<(String, Permissions), SaveError> {
+pub(crate) fn check_regular(path: &Path) -> Result<(), SaveError> {
     let metadata = fs::symlink_metadata(path).map_err(|error| SaveError::io(path, error))?;
     if !metadata.file_type().is_file() {
         return Err(SaveError::io(
@@ -358,6 +358,11 @@ fn read_regular(path: &Path) -> Result<(String, Permissions), SaveError> {
     if fs::canonicalize(path).map_err(|error| SaveError::io(path, error))? != path {
         return Err(SaveError::new(Some(path), SaveErrorKind::SourceChanged));
     }
+    Ok(())
+}
+
+fn read_regular(path: &Path) -> Result<(String, Permissions), SaveError> {
+    check_regular(path)?;
     let mut file = File::open(path).map_err(|error| SaveError::io(path, error))?;
     let mut text = String::new();
     file.read_to_string(&mut text)
@@ -458,44 +463,98 @@ pub(crate) fn include_signature(entries: &[Entry]) -> BTreeMap<String, PathBuf> 
     walk(entries, "", &mut result);
     result
 }
-fn merge_json(
-    base: Option<&Value>,
-    ours: Option<&Value>,
-    theirs: Option<&Value>,
-    path: &str,
-    conflicts: &mut Vec<String>,
-) -> Option<Value> {
-    if ours == base {
-        return theirs.cloned();
+// Keyed children are encoded separately from their order. JSON arrays in user
+// configuration remain atomic values; only entry lists receive keyed merging.
+fn encoded_entries(entries: &[Entry], path: &str) -> Result<Value, String> {
+    let mut members = Map::new();
+    let mut order = Vec::new();
+    for entry in entries {
+        let child_path = format!("{path}/{}", entry.id);
+        let mut fields = serde_json::to_value(entry).expect("Entry serialization");
+        fields.as_object_mut().unwrap().insert(
+            "children".into(),
+            encoded_entries(&entry.children, &child_path)?,
+        );
+        if members.insert(entry.id.clone(), fields).is_some() {
+            return Err(format!("{child_path} (duplicate id)"));
+        }
+        order.push(Value::String(entry.id.clone()));
     }
-    if theirs == base || ours == theirs {
-        return ours.cloned();
+    Ok(serde_json::json!({"<order>": order, "<entries>": members}))
+}
+
+fn decoded_entries(value: Value, path: &str) -> Result<Vec<Entry>, String> {
+    let invalid = || format!("{path}/<order>");
+    let order = value
+        .get("<order>")
+        .and_then(Value::as_array)
+        .ok_or_else(invalid)?
+        .iter()
+        .map(|id| id.as_str().map(str::to_owned).ok_or_else(invalid))
+        .collect::<Result<Vec<_>, _>>()?;
+    let members = value
+        .get("<entries>")
+        .and_then(Value::as_object)
+        .ok_or_else(invalid)?;
+    let members = members
+        .iter()
+        .map(|(key, value)| (key.clone(), crate::config_data::encode(value)))
+        .collect::<Vec<_>>();
+    let ordered =
+        cordis_kernel::configuration_data::ordered(&members, &order).map_err(|_| invalid())?;
+    ordered
+        .into_iter()
+        .zip(order)
+        .map(|(entry, id)| {
+            let mut value = crate::config_data::decode(entry);
+            let child_path = format!("{path}/{id}");
+            let children = value
+                .as_object_mut()
+                .and_then(|entry| entry.remove("children"))
+                .ok_or_else(|| child_path.clone())?;
+            let children = decoded_entries(children, &child_path)?;
+            value
+                .as_object_mut()
+                .ok_or_else(|| child_path.clone())?
+                .insert("children".into(), Value::Array(Vec::new()));
+            let mut entry: Entry = serde_json::from_value(value).map_err(|_| child_path.clone())?;
+            if entry.id != id {
+                return Err(child_path);
+            }
+            entry.children = children;
+            Ok(entry)
+        })
+        .collect()
+}
+
+fn conflict_path(root: &str, parts: Vec<String>) -> String {
+    // Strip only the keyed encoding's structural markers. User entry IDs and
+    // configuration keys may themselves be named <entries> or children.
+    enum Position {
+        List,
+        Id,
+        Field,
+        Data,
     }
-    if let (Some(Value::Object(base)), Some(Value::Object(ours)), Some(Value::Object(theirs))) =
-        (base, ours, theirs)
-    {
-        let mut result = Map::new();
-        let keys: BTreeSet<_> = base
-            .keys()
-            .chain(ours.keys())
-            .chain(theirs.keys())
-            .collect();
-        for key in keys {
-            if let Some(value) = merge_json(
-                base.get(key),
-                ours.get(key),
-                theirs.get(key),
-                &format!("{path}/{key}"),
-                conflicts,
-            ) {
-                result.insert(key.clone(), value);
+    let mut position = Position::List;
+    let mut visible = Vec::new();
+    for part in parts {
+        match position {
+            Position::List if part == "<entries>" => position = Position::Id,
+            Position::Id => {
+                visible.push(part);
+                position = Position::Field;
+            }
+            Position::Field if part == "children" => position = Position::List,
+            _ => {
+                visible.push(part);
+                position = Position::Data;
             }
         }
-        return Some(Value::Object(result));
     }
-    conflicts.push(path.to_owned());
-    ours.cloned()
+    format!("{root}/{}", visible.join("/"))
 }
+
 fn merge_entries(
     base: &[Entry],
     ours: &[Entry],
@@ -503,79 +562,21 @@ fn merge_entries(
     path: &str,
     conflicts: &mut Vec<String>,
 ) -> Vec<Entry> {
-    fn index<'a>(
-        entries: &'a [Entry],
-        path: &str,
-        conflicts: &mut Vec<String>,
-    ) -> BTreeMap<&'a str, &'a Entry> {
-        let mut result = BTreeMap::new();
-        for entry in entries {
-            if result.insert(entry.id.as_str(), entry).is_some() {
-                conflicts.push(format!("{path}/{} (duplicate id)", entry.id));
-            }
-        }
-        result
-    }
-    let (b, o, t) = (
-        index(base, path, conflicts),
-        index(ours, path, conflicts),
-        index(theirs, path, conflicts),
-    );
-    let ids: BTreeSet<_> = b.keys().chain(o.keys()).chain(t.keys()).copied().collect();
-    let mut merged = BTreeMap::new();
-    for id in ids {
-        let (base, ours, theirs) = (b.get(id).copied(), o.get(id).copied(), t.get(id).copied());
-        let child_path = format!("{path}/{id}");
-        let value = if ours == base {
-            theirs.cloned()
-        } else if theirs == base || ours == theirs {
-            ours.cloned()
-        } else if let (Some(base), Some(ours), Some(theirs)) = (base, ours, theirs) {
-            let mut bv = serde_json::to_value(base).expect("Entry serialization is infallible");
-            let mut ov = serde_json::to_value(ours).expect("Entry serialization is infallible");
-            let mut tv = serde_json::to_value(theirs).expect("Entry serialization is infallible");
-            for value in [&mut bv, &mut ov, &mut tv] {
-                value.as_object_mut().unwrap().remove("children");
-            }
-            let fields =
-                merge_json(Some(&bv), Some(&ov), Some(&tv), &child_path, conflicts).unwrap();
-            let mut entry: Entry =
-                serde_json::from_value(fields).expect("merged entry fields retain their type");
-            entry.children = merge_entries(
-                &base.children,
-                &ours.children,
-                &theirs.children,
-                &child_path,
-                conflicts,
-            );
-            Some(entry)
-        } else {
-            conflicts.push(child_path);
-            ours.cloned()
-        };
-        if let Some(value) = value {
-            merged.insert(id, value);
+    let result = (|| {
+        let base = encoded_entries(base, path)?;
+        let ours = encoded_entries(ours, path)?;
+        let theirs = encoded_entries(theirs, path)?;
+        let merged = crate::config_data::merge(&base, &ours, &theirs)
+            .map_err(|parts| conflict_path(path, parts))?;
+        decoded_entries(merged, path)
+    })();
+    match result {
+        Ok(entries) => entries,
+        Err(error) => {
+            conflicts.push(error);
+            Vec::new()
         }
     }
-    let ids = |entries: &[Entry]| {
-        entries
-            .iter()
-            .map(|entry| entry.id.clone())
-            .collect::<Vec<_>>()
-    };
-    let (bi, oi, ti) = (ids(base), ids(ours), ids(theirs));
-    let order = if oi == bi {
-        ti
-    } else if ti == bi || oi == ti {
-        oi
-    } else {
-        conflicts.push(format!("{path}/<order>"));
-        oi
-    };
-    order
-        .iter()
-        .filter_map(|id| merged.remove(id.as_str()))
-        .collect()
 }
 
 #[cfg(test)]

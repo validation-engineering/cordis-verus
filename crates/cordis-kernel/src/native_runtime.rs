@@ -9,6 +9,8 @@ pub mod configuration;
 pub mod history;
 #[path = "native_owner.rs"]
 pub mod owner;
+#[path = "native_production.rs"]
+pub mod production;
 #[path = "recipe_history.rs"]
 pub mod recipes;
 #[path = "native_slot_runtime.rs"]
@@ -327,7 +329,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     /// into the shared value/work/cleanup trajectory. Evidence is erased.
     pub fn publication_snapshot(&self)->(out:history::Snapshot<V>)
         requires self.wf(),
-        ensures out.certified(),out.history()==self.execution_history(),out.positions()==self.history_positions(),out.key()==self.joint_key(),
+        ensures out.certified(),production::interpreted(out.joint_spec().events(),out.key()),out.history()==self.execution_history(),out.positions()==self.history_positions(),out.key()==self.joint_key(),
             out.joint_spec().certified(),out.joint_spec().domain()==self.journal_spec().source(),
             self.execution_history().indexed(self.history_positions(),out.joint_spec().events(),self.joint_key()),
             out.joint_spec().last().contains_pair(self.joint_key(),joint::Record::Native {state:self.observation().project(self.execution_history().labels.len())}),

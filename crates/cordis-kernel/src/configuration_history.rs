@@ -170,6 +170,7 @@ impl<S,R,K,U> Snapshot<S,R,K,U> {
     pub proof fn valid_history(&self)
         requires self.certified(),ensures self.joint_spec().certified(),self.history().valid(),
             self.positions().len()==self.history().states.len(),
+            self.joint_spec().last().contains_pair(self.key(),joint::Record::Configuration {state:shape(self.history().states.last(),self.history().events.len())}),
     {}
     pub(crate) proof fn position(&self,i:int)
         requires self.certified(),0<=i<self.history().states.len(),

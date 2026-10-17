@@ -1,5 +1,7 @@
 # 存储函数与动态服务解析
 
+当前 R2 状态以[第 5 包统一验收](r2-acceptance.zh-CN.md)为准：managed-production/v1 范围已完成。下文保留各批次历史记录及其当时的验证范围。
+
 [English](r2-function-semantics.md) · [R2 进度](r2-execution.zh-CN.md) · [Rust API](rust-api.zh-CN.md)
 
 R2 第一函数包现在还支持通过 `Plugin::native_function` 组合**标量和强类型替换效果**。

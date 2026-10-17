@@ -165,6 +165,7 @@ impl<S,R,K,U,P,V> Snapshot<S,R,K,U,P,V> {
         requires self.certified(),
         ensures self.configuration().certified(),self.joint_spec().certified(),self.history().valid(),
             self.positions().len()==self.history().states.len(),self.reviews().len()==self.history().events.len(),
+            self.joint_spec().last().contains_pair(self.key(),joint::Record::Sources {state:shape(self.history().states.last(),self.configuration().key(),self.history().events.len())}),
     {reveal(Snapshot::certified);self.configuration.valid_history();}
     proof fn facts(&self)
         requires self.certified(),

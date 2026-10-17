@@ -1,5 +1,11 @@
 # Configuration updates: from owned plans to accepted revisions
 
+Current R2 status is defined by [package 5 acceptance](r2-acceptance.md): managed-production/v1 is complete. Earlier checkpoints below retain their original evidence and scope.
+
+## Historical implementation and verification checkpoints
+
+Package 3 now supplies the configuration-data and binding interpretation, including schema normalization and source round trips. The earlier checkpoints below document protocol increments; their open-boundary statements should be read with the current remaining-boundaries section and the [package 3 review](r2-configuration-semantics.md).
+
 [中文](r2-configuration-execution.zh-CN.md)
 
 The production Loader now uses checked owners for its actual update plans,
@@ -615,25 +621,29 @@ and sequencing protocol.
 
 ## Remaining R2 boundaries
 
-- `Target` uses the driver's unique domain allocation; it does not authenticate
-  independently constructed runtimes that deliberately reuse the same domain.
-  Capturing/checking a target reads lifecycle and registration state. Recipe
-  revision remains an explicit registration observation.
-- JSON/schema/module handling, grouped-component effect functions and the
-  configuration-to-Component meaning still require a joint refinement. Actual
-  mount/parent provenance and structural phase execution are now connected.
-  The existing six-field projection covers resolved named leaves only.
-- Snapshot/recovery fields remain opaque generic values to the checked owner.
-  Production recovery proves complete phase execution, exact saved-recipe traversal,
-  failure prefixes and actual payload extraction. Equivalence of those factories
-  to the intended Component meaning remains an adapter obligation.
-- Polling, panic capture and user callback effects remain host boundaries. The
-  protocol establishes what follows from actual returned outcomes, not eventual
-  Future completion, scheduler fairness or correctness of external I/O.
-- Configuration protocol and loaded-source/checkpoint states now join the native
-  Journal; the complete native/Node semantic interpretation still requires composition. Actual save acknowledgements and checkpoint ownership are
-  checked above; source projection/merge semantics, filesystem truth and whole-tree
-  convergence remain open. R2 remains `in_progress`.
+The [package 3 interpretation](r2-configuration-semantics.md) now checks module/scope
+binding, recursive schema/default normalization, three-way merge, complete keyed
+ordering and full source round trips. `Prepared::entry` complements the older
+resolved-leaf projection; native groups execute a verified empty program with
+structurally managed children.
+
+- Package 4 still has to compose these exact typed observations with the complete
+  native/Node production-step interpretation; package 5 provides combined R2
+  acceptance. R2 remains `in_progress`.
+- JSON/URL/IEEE codecs, external filesystem identity and I/O, service-key
+  translation, arbitrary factory bodies and JavaScript schema callbacks remain
+  explicit audited or foreign-system boundaries. The native schema and merge
+  algorithms themselves are checked executable code.
+- Captured targets authenticate the driver's unique domains, not independently
+  constructed runtimes that deliberately reuse a domain. Actual recipe revisions
+  and allocation/parent checks retain their existing contracts.
+- Snapshot/recovery payloads contain the real immutable normalized recipes, but
+  arbitrary factory effects and callback inverses do not acquire Component laws
+  through configuration validation. Polling/panic truth and eventual callback
+  return remain separate.
+- Complete production-step refinement, general recovery, global termination and
+  confluence are not established by a successful plan, source round trip or
+  per-file save acknowledgement.
 
 ## Validation
 

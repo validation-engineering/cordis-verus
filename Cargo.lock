@@ -70,6 +70,7 @@ name = "cordis-node"
 version = "0.2.0"
 dependencies = [
  "cordis-driver",
+ "cordis-kernel",
  "cordis-plugin-api",
  "cordis-verus",
  "libloading",

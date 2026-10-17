@@ -1,5 +1,7 @@
 # Whole-paper refinement milestones
 
+R2 is complete for the explicit [managed-production/v1 profile](r2-acceptance.md). R3/R4 remain in progress and R5 remains planned; original paper audit outcomes are unchanged.
+
 [简体中文](paper-refinement-roadmap.zh-CN.md)
 
 The goal is to connect the constraints in the Cordis paper to the code that
@@ -11,7 +13,7 @@ records review entry points, unresolved premises and acceptance criteria.
 
 R0 is complete as a planning baseline. R1 is complete for the explicit
 [finite strict interpretation](r1-semantics.md), with required revisions recorded
-separately from the original paper. R2–R4 have partial results; R5 remains planned. These are work milestones, not percentages of correctness.
+separately from the original paper. R3–R4 have partial results; R5 remains planned. These are work milestones, not percentages of correctness.
 Encoding a definition does not establish that a production component satisfies it.
 
 | Milestone | Deliverable | Exit condition |
@@ -28,7 +30,7 @@ alongside one another; R4 combines their results, and R5 audits the full chain.
 Implementation and proof work can span milestones before the runtime cases and
 full acceptance checks are completed for the integrated batch.
 
-## Current work and next steps
+## Historical implementation checkpoints and next steps
 
 R1 now supplies a semantic contract for the spawning parent, every continuation
 and dynamic child on the full stated carrier. The reified context identifies

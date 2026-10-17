@@ -1,5 +1,6 @@
-// Compile the value-independent SDK itself, with no Node environment or second
-// graph. NAPI integration and ticket admission are exercised by the JS suite.
+// Compile the value-independent SDK with no Node environment. Import fixtures
+// obtain sealed selections from actual checked graph execution; NAPI integration
+// is exercised separately by the JS suite.
 #[path = "../src/plugin.rs"]
 mod plugin;
 use plugin::*;
@@ -12,6 +13,67 @@ use std::{
     },
     task::{Context, Poll, Waker},
 };
+
+fn selected_import(
+    port: cordis_driver::ServicePort,
+    owner: usize,
+    publication: usize,
+    consumer: usize,
+) -> cordis_driver::HostSelection {
+    selected_import_in(0, port, owner, publication, consumer)
+}
+
+fn selected_import_in(
+    domain: u64,
+    port: cordis_driver::ServicePort,
+    owner: usize,
+    publication: usize,
+    consumer: usize,
+) -> cordis_driver::HostSelection {
+    use cordis_kernel::{node_runtime::NodeRuntime, Port};
+    let port = Port {
+        key: port.key,
+        realm: port.realm,
+    };
+    let mut graph = NodeRuntime::new(domain);
+    for id in 0..=owner.max(consumer) {
+        assert_eq!(
+            graph
+                .insert(
+                    None,
+                    if id == consumer { vec![port] } else { vec![] },
+                    if id == owner { vec![port] } else { vec![] }
+                )
+                .unwrap(),
+            id
+        );
+    }
+    let ticket = graph.begin(owner).unwrap();
+    for index in 0..=publication {
+        let selected = if index == publication {
+            port
+        } else {
+            Port {
+                key: u64::MAX - index as u64,
+                realm: u64::MAX,
+            }
+        };
+        assert_eq!(
+            graph
+                .publish_service(owner, 1, selected, index as u64 + 1)
+                .unwrap()
+                .0,
+            index
+        );
+    }
+    graph.complete(ticket, None).unwrap();
+    graph.finish(owner).unwrap();
+    graph.begin(consumer).unwrap();
+    graph
+        .select(port, Some(consumer), Some(1))
+        .unwrap()
+        .unwrap()
+}
 
 #[derive(Default)]
 struct Data {
@@ -1405,8 +1467,7 @@ fn typed_import_and_json_view_share_the_providers_original_arc() {
             vec![ResolvedImport {
                 name: "counter".into(),
                 port,
-                owner: 11,
-                publication: 40,
+                selection: selected_import(port, 11, 40, 12),
             }],
         )
         .unwrap();
@@ -1497,11 +1558,34 @@ fn typed_imports_match_exact_publication_owner_port_and_real_key_identity() {
                 vec![ResolvedImport {
                     name: "counter".into(),
                     port: candidate_port,
-                    owner,
-                    publication,
+                    selection: selected_import(candidate_port, owner, publication, 10),
                 }]
             )
             .is_err());
+    }
+    // The backend must consume the actual lookup credential for this exact
+    // runtime, consumer, generation and port, not just its provider numbers.
+    for (domain, consumer, generation, selected_port) in [
+        (1, 10, 1, port),
+        (0, 11, 1, port),
+        (0, 10, 2, port),
+        (0, 10, 1, typed_port(50, 61)),
+    ] {
+        assert_eq!(
+            backend.start_resolved(
+                10,
+                generation,
+                "consumer",
+                Value::Null,
+                ports.clone(),
+                vec![ResolvedImport {
+                    name: "counter".into(),
+                    port,
+                    selection: selected_import_in(domain, selected_port, 1, 70, consumer),
+                }],
+            ),
+            Err("TypedImportSelectionMismatch".into()),
+        );
     }
     for factory in ["other-key", "wrong-type"] {
         assert_eq!(
@@ -1514,8 +1598,7 @@ fn typed_imports_match_exact_publication_owner_port_and_real_key_identity() {
                 vec![ResolvedImport {
                     name: "counter".into(),
                     port,
-                    owner: 1,
-                    publication: 70,
+                    selection: selected_import(port, 1, 70, 10),
                 }]
             ),
             Err("TypedServiceMismatch".into())
@@ -1533,8 +1616,7 @@ fn typed_imports_match_exact_publication_owner_port_and_real_key_identity() {
             vec![ResolvedImport {
                 name: "counter".into(),
                 port,
-                owner: 1,
-                publication: 70,
+                selection: selected_import(port, 1, 70, 10),
             }]
         )
         .is_err());
@@ -2087,23 +2169,22 @@ fn typed_dependency_configuration_is_advertised_and_matches_the_original_plugin(
         .start_resolved(1, 1, "provider", Value::Null, ports.clone(), vec![])
         .unwrap();
     let session = typed_publish(&mut backend, &provider, 17, port);
-    let import = || {
+    let import = |id| {
         vec![ResolvedImport {
             name: "counter".into(),
             port,
-            owner: 1,
-            publication: 17,
+            selection: selected_import(port, 1, 17, id),
         }]
     };
     for (id, name) in [(2, "configured"), (3, "null")] {
         let started = backend
-            .start_resolved(id, 1, name, Value::Null, ports.clone(), import())
+            .start_resolved(id, 1, name, Value::Null, ports.clone(), import(id))
             .unwrap();
         assert_eq!(backend.poll()["jobs"][0]["success"], true);
         typed_release(&mut backend, number(&started, "session"));
     }
     assert!(
-        matches!(backend.start_resolved(4,1,"mismatch",Value::Null,ports,import()),Err(error) if error == "StaticInjectionConfigurationMismatch")
+        matches!(backend.start_resolved(4,1,"mismatch",Value::Null,ports,import(4)),Err(error) if error == "StaticInjectionConfigurationMismatch")
     );
     typed_release(&mut backend, session);
 }
@@ -2185,8 +2266,7 @@ fn typed_child_protocol_preserves_definition_slots_allocation_and_removal() {
             vec![ResolvedImport {
                 name: anchor.into(),
                 port: ports[anchor],
-                owner: 1,
-                publication: 20,
+                selection: selected_import(ports[anchor], 1, 20, 2),
             }],
         )
         .unwrap();

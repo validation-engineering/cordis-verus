@@ -3,7 +3,7 @@
 English · [简体中文](full-negative-validation.zh-CN.md)
 
 This independent specification regression deliberately changes kernel operations, guards or specifications
-and requires the proofs to reject each change. Every one of the 132 canonical mutations must first
+and requires the proofs to reject each change. Every canonical mutation in the current manifest must first
 compile and then produce a concrete contract failure while verifying the entire
 crate. The unchanged kernel must also pass. A timeout, resource limit, frontend
 error or partial result does not satisfy this requirement.
@@ -290,3 +290,21 @@ Child-inverse transport checks its concrete retirement-state equation in
 `child_inverse_state` before composing the existing contracts. The active-child
 example uses `restore_retires` directly; the underlying child inverse remains
 responsible for the retirement bit in the same whole-crate verification.
+
+## Configuration interpretation controls
+
+The package 3 batch adds four canonical controls for accepting a changed source
+round trip, losing an external save edit, skipping a schema default and ignoring
+interception in the actual module binding. The canonical inventory contains 314
+controls. Selected checks retain the same fresh-positive, whole-mutant compile
+and exact-contract rejection requirements. The current development record does
+not claim the complete negative regression has run. See the
+[configuration review](r2-configuration-semantics.md).
+
+## Production composition controls
+
+Package 4 adds four controls for native and Node control/full-state stutter
+confusion, premature callback-claim completion and substituted Insert provenance.
+The canonical inventory is now 318 controls. Selected checks retain exact
+positive, compilation and named-failure requirements; this addition does not
+claim a fresh run of the full negative regression.

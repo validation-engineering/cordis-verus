@@ -23,19 +23,26 @@ impl Target {
 /// certified execution snapshot. The record is evidence of that observation;
 /// it does not claim that the registration remains live forever.
 #[allow(dead_code)]
-pub struct Allocation {domain:u64,id:usize,parent:Option<usize>,evidence:Ghost<joint::Snapshot>,key:Ghost<nat>}
+pub struct Allocation {domain:u64,id:usize,parent:Option<usize>,evidence:Ghost<joint::Snapshot>,key:Ghost<nat>,insert:Ghost<nat>}
 impl Allocation {
     pub closed spec fn domain_id(&self)->u64 {self.domain}
     pub closed spec fn owner(&self)->usize {self.id}
     pub closed spec fn parent_id(&self)->Option<usize> {self.parent}
     pub closed spec fn snapshot(&self)->joint::Snapshot {self.evidence@}
     pub closed spec fn native_key(&self)->nat {self.key@}
+    pub closed spec fn insertion(&self)->nat {self.insert@}
     pub open spec fn wf(&self)->bool {
         self.snapshot().certified() && self.snapshot().last().contains_key(self.native_key())
             && self.snapshot().last()[self.native_key()] is Native
             && self.snapshot().last()[self.native_key()]->Native_state.control.fibers.dom().contains(self.owner())
             && self.snapshot().last()[self.native_key()]->Native_state.control.fibers[self.owner()].parent==self.parent_id()
             && !self.snapshot().last()[self.native_key()]->Native_state.control.fibers[self.owner()].retired
+            && self.insertion()<self.snapshot().events().len()
+            && self.snapshot().events()[self.insertion() as int].event.key==self.native_key()
+            && self.snapshot().events()[self.insertion() as int].event.change==(joint::Change::Native {actor:self.owner(),rule:crate::refinement::Rule::Insert})
+            && self.snapshot().events()[self.insertion() as int].event.after is Native
+            && self.snapshot().events()[self.insertion() as int].event.after->Native_state.control.fibers.dom().contains(self.owner())
+            && self.snapshot().events()[self.insertion() as int].event.after->Native_state.control.fibers[self.owner()].parent==self.parent_id()
     }
     pub fn id(&self)->(out:usize) ensures out==self.owner(), {self.id}
     pub fn domain(&self)->(out:u64) ensures out==self.domain_id(), {self.domain}
@@ -43,7 +50,7 @@ impl Allocation {
 }
 impl Clone for Allocation {
     fn clone(&self)->(out:Self) ensures out==*self,
-    {Self {domain:self.domain,id:self.id,parent:self.parent,evidence:Ghost(self.evidence@),key:Ghost(self.key@)}}
+    {Self {domain:self.domain,id:self.id,parent:self.parent,evidence:Ghost(self.evidence@),key:Ghost(self.key@),insert:Ghost(self.insert@)}}
 }
 impl<R,H,V> NativeRuntime<R,H,V> {
     pub fn configuration_allocation(&self,id:usize)->(out:Option<Allocation>)
@@ -59,8 +66,13 @@ impl<R,H,V> NativeRuntime<R,H,V> {
         if self.kernel().retired(id) {return None;}
         let parent=recipe.parent();let domain=self.lifecycle().domain();
         let _evidence=self.execution_snapshot();
-        proof {assert(self.registry().recipe_matches(id));reveal(crate::Kernel::paper);reveal(crate::Kernel::is_retired);}
-        Some(Allocation {domain,id,parent,evidence:Ghost(_evidence),key:Ghost(self.joint_key())})
+        let ghost insertion;
+        proof {
+            assert(self.registry().recipe_matches(id));reveal(crate::Kernel::paper);reveal(crate::Kernel::is_retired);
+            let at=self.execution_history().insertion_origin(self.execution_history().states.len() as int-1,id);
+            insertion=self.history_positions()[at+1];
+        }
+        Some(Allocation {domain,id,parent,evidence:Ghost(_evidence),key:Ghost(self.joint_key()),insert:Ghost(insertion)})
     }
     pub open spec fn configuration_enabled(&self,id:usize)->bool {
         self.registry().entries().contains_key(id) && self.state().control().phase_of(id)==Some(Phase::Active)

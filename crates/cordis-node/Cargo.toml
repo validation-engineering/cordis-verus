@@ -37,3 +37,6 @@ unsafe_code = "deny"
 [[example]]
 name = "interop_fixture"
 crate-type = ["cdylib"]
+
+[dev-dependencies]
+cordis-kernel = { path = "../cordis-kernel", version = "=0.2.0" }
