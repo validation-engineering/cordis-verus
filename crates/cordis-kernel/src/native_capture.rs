@@ -18,6 +18,8 @@ pub open spec fn sources<T>(entries:Map<usize,NativePublication<T>>)->Map<usize,
 pub struct Capture<T> {
     pub origin:ActionTicket,
     pub work_domain:u64,
+    pub realms:Map<u64,u64>,
+    pub anchor:Port,
     pub control:Kernel,
     pub provisions:Seq<Port>,
     pub bindings:Seq<Binding>,

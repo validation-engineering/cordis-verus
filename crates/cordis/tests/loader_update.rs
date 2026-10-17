@@ -295,6 +295,7 @@ fn cancelled_apply_lands_before_inverse_and_failed_inverse_is_retryable() {
     assert!(poll(change.as_mut()).is_pending());
     drop(change);
     assert!(loader.recovery_pending());
+    drop(loader.execution_snapshot());
     assert_eq!(applied.load(Ordering::SeqCst), 1);
     let mut recovery = Box::pin(loader.recover());
     assert!(poll(recovery.as_mut()).is_pending());
@@ -304,11 +305,20 @@ fn cancelled_apply_lands_before_inverse_and_failed_inverse_is_retryable() {
     assert!(run(loader.recover()).is_err());
     assert_eq!(value.load(Ordering::SeqCst), 2);
     assert!(loader.recovery_pending());
+    drop(loader.execution_snapshot());
     run(loader.recover()).unwrap();
     assert_eq!(value.load(Ordering::SeqCst), 1);
     assert_eq!(applied.load(Ordering::SeqCst), 1);
     assert_eq!(rollbacks.load(Ordering::SeqCst), 2);
     assert_eq!(loader.tree(), &tree(1));
+    drop(loader.execution_snapshot());
+    // The operation view lends the original runtime to a saved future.
+    let id = loader.id("worker").unwrap();
+    loader.runtime_mut().restart(id).unwrap();
+    let settle = loader.runtime_mut().settle();
+    run(settle).unwrap();
+    assert_eq!(loader.id("worker"), Some(id));
+    drop(loader.execution_snapshot());
 }
 
 #[test]
@@ -581,4 +591,118 @@ fn replaced_dynamic_service_owner_forces_dependent_update_to_restart() {
     assert_eq!(plans.load(Ordering::SeqCst), 0);
     assert_eq!(applies.load(Ordering::SeqCst), 0);
     assert_eq!(loader.runtime().ids().len(), 3);
+}
+
+#[test]
+fn cancelled_inverse_keeps_its_future_and_retry_keeps_the_accepted_revision() {
+    let gate = Arc::new(AtomicBool::new(false));
+    let state = Arc::new(AtomicUsize::new(1));
+    let applies = Arc::new(AtomicUsize::new(0));
+    let inverses = Arc::new(AtomicUsize::new(0));
+    let mut registry = FactoryRegistry::new();
+    let (g, s, a, r) = (
+        gate.clone(),
+        state.clone(),
+        applies.clone(),
+        inverses.clone(),
+    );
+    registry.register("worker", schema(), move |_, _| {
+        let (g, s, a, r) = (g.clone(), s.clone(), a.clone(), r.clone());
+        Ok(
+            Plugin::new("worker", |_| Ok(())).on_config_update(move |_, before, after| {
+                let old = before["value"].as_u64().unwrap() as usize;
+                let next = after["value"].as_u64().unwrap() as usize;
+                let (write, count) = (s.clone(), a.clone());
+                let (restore, gate, attempts) = (s.clone(), g.clone(), r.clone());
+                Ok(ConfigUpdate::Apply(ConfigUpdatePlan::new_async(
+                    move || async move {
+                        count.fetch_add(1, Ordering::SeqCst);
+                        write.store(next, Ordering::SeqCst);
+                        Err("partial application".into())
+                    },
+                    move || {
+                        let attempt = attempts.fetch_add(1, Ordering::SeqCst);
+                        let (restore, gate) = (restore.clone(), gate.clone());
+                        async move {
+                            poll_fn(|_| {
+                                if gate.load(Ordering::SeqCst) {
+                                    Poll::Ready(())
+                                } else {
+                                    Poll::Pending
+                                }
+                            })
+                            .await;
+                            if attempt == 0 {
+                                return Err("inverse temporarily failed".into());
+                            }
+                            restore.store(old, Ordering::SeqCst);
+                            Ok(())
+                        }
+                    },
+                )))
+            }),
+        )
+    });
+    let mut loader = Loader::new(Context::new(), registry);
+    let revision = run(loader.apply(tree(1))).unwrap().revision;
+    let ids = loader.runtime().ids();
+    let mut update = Box::pin(loader.apply(tree(2)));
+    assert!(poll(update.as_mut()).is_pending());
+    drop(update);
+    assert_eq!(state.load(Ordering::SeqCst), 2);
+    assert_eq!(inverses.load(Ordering::SeqCst), 1);
+    let mut recovery = Box::pin(loader.recover());
+    assert!(poll(recovery.as_mut()).is_pending());
+    drop(recovery);
+    assert_eq!(inverses.load(Ordering::SeqCst), 1);
+    gate.store(true, Ordering::SeqCst);
+    assert!(run(loader.recover()).is_err());
+    assert!(loader.recovery_pending());
+    assert_eq!(loader.revision(), revision);
+    assert_eq!(loader.tree(), &tree(1));
+    run(loader.recover()).unwrap();
+    assert_eq!(state.load(Ordering::SeqCst), 1);
+    assert_eq!(applies.load(Ordering::SeqCst), 1);
+    assert_eq!(inverses.load(Ordering::SeqCst), 2);
+    assert_eq!(loader.runtime().ids(), ids);
+    assert_eq!(loader.revision(), revision);
+}
+
+#[test]
+fn rollback_factory_panic_retains_the_plan_for_retry() {
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let restores = Arc::new(AtomicUsize::new(0));
+    let mut registry = FactoryRegistry::new();
+    let (a, r) = (attempts.clone(), restores.clone());
+    registry.register("worker", schema(), move |_, _| {
+        let (a, r) = (a.clone(), r.clone());
+        Ok(
+            Plugin::new("worker", |_| Ok(())).on_config_update(move |_, _, _| {
+                let (attempts, restores) = (a.clone(), r.clone());
+                Ok(ConfigUpdate::Apply(ConfigUpdatePlan::new_async(
+                    || std::future::ready(Err("update failed".into())),
+                    move || {
+                        assert_ne!(attempts.fetch_add(1, Ordering::SeqCst), 0, "factory panic");
+                        restores.fetch_add(1, Ordering::SeqCst);
+                        std::future::ready(Ok(()))
+                    },
+                )))
+            }),
+        )
+    });
+    let mut loader = Loader::new(Context::new(), registry);
+    let revision = run(loader.apply(tree(1))).unwrap().revision;
+    assert!(matches!(
+        run(loader.apply(tree(2))),
+        Err(LoaderError::Apply {
+            rollback: Some(_),
+            ..
+        })
+    ));
+    assert!(loader.recovery_pending());
+    assert_eq!(restores.load(Ordering::SeqCst), 0);
+    run(loader.recover()).unwrap();
+    assert_eq!(restores.load(Ordering::SeqCst), 1);
+    assert_eq!(loader.tree(), &tree(1));
+    assert_eq!(loader.revision(), revision);
 }

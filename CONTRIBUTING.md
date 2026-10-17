@@ -49,6 +49,15 @@ futures whenever possible. Do not silence a failing proof by changing the
 implementation into an unchecked duplicate or adding `assume`, `admit`, or
 `external_body`. Consult `AGENTS.md` and `docs/semantics.md`.
 
+R2–R4 refinement work uses implementation batches: develop the connected runtime
+code and proofs first, using compilation and targeted Verus checks as needed.
+Record deferred regression and negative-control scenarios while interfaces are
+changing, then implement the necessary cases and run the complete development
+workflow at integration acceptance. A regression remains required before accepting
+a behavioral fix, but need not interrupt every intermediate implementation step.
+Existing tests and CI gates remain in place. See the
+[batch workflow](docs/paper-refinement-roadmap.md#implementation-batches-and-acceptance).
+
 Kernel code is both executable Rust and Verus input. Changes must preserve the
 published contracts and be verified with the exact pinned toolchain. Host tests
 are not a formal refinement proof. Report new assumptions and limits explicitly.

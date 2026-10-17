@@ -72,20 +72,22 @@ impl TypedSlot {
         Self::from_erased(value)
     }
     pub fn from_erased(value: Arc<dyn Any + Send + Sync>) -> Self {
-        Self(ServiceSlot::new(value, None))
+        Self(ServiceSlot::from_value(value, None))
     }
     pub fn get<T: Any + Send + Sync>(&self) -> Option<Arc<T>> {
         self.0.get()
     }
     pub fn has_check(&self) -> bool {
-        self.0.check.is_some()
+        self.0.metadata().check.is_some()
     }
     /// Evaluates a pure predicate without retaining a bookkeeping lock. Panics reject.
     pub fn accepts(&self, context: &Context, config: &serde_json::Value) -> bool {
         self.0.accepts(context, config)
     }
     pub fn value(&self) -> Arc<dyn Any + Send + Sync> {
-        lock(&self.0.value).get().clone()
+        self.0
+            .read_value()
+            .expect("a live typed slot retains its payload until final release")
     }
 }
 #[derive(Clone)]
@@ -170,10 +172,7 @@ impl StaticPlugin {
         if self.inherited_context.is_some() {
             return Err("StaticDependenciesAlreadyInherited".into());
         }
-        let port = |key| Port {
-            key,
-            realm: context.realms.get(&key).copied().unwrap_or(0),
-        };
+        let port = |key| context.resolve(key);
         let provisions = self
             .declarations
             .provisions
@@ -239,8 +238,7 @@ impl StaticPlugin {
         anchor: Port,
         notify: Arc<dyn Fn() + Send + Sync>,
     ) -> Result<StaticStart, String> {
-        if anchor.key == 0 || context.realms.get(&anchor.key).copied().unwrap_or(0) != anchor.realm
-        {
+        if anchor.key == 0 || context.resolve(anchor.key) != anchor {
             return Err("InvalidStaticOwnerAnchor".into());
         }
         self.begin_inner(
@@ -271,10 +269,7 @@ impl StaticPlugin {
         {
             return Err("PreviousStaticEpisodeNotRestored".into());
         }
-        let port = |key| Port {
-            key,
-            realm: context.realms.get(&key).copied().unwrap_or(0),
-        };
+        let port = |key| context.resolve(key);
         if self.inherited_context.as_ref().is_some_and(|expected| {
             expected
                 .iter()
@@ -328,24 +323,32 @@ impl StaticPlugin {
             })
             .collect();
         let cleanups = Cleanups::new();
+        let scope = cleanups
+            .protocol
+            .root_scope()
+            .expect("static Begin has a root scope");
         let setup = AsyncSetup {
-            generation,
-            owner,
-            context,
-            bindings,
-            provisions,
-            anchor: anchor.unwrap_or(Port { key: 0, realm: 0 }),
-            state: Arc::new(Mutex::new(Episode {
-                values: EpisodeValues(values),
-                cleanups,
-                driver: None,
-                static_only: true,
-                dynamic_host: anchor.and(service_updates.clone()),
-                external_children: Vec::new(),
-                service_updates,
-                unsupported: None,
-            })),
-            group: 0,
+            state: Arc::new(SharedEpisode {
+                generation,
+                context,
+                services: SetupServices::External {
+                    owner,
+                    bindings,
+                    provisions,
+                },
+                anchor: anchor.unwrap_or(Port { key: 0, realm: 0 }),
+                episode: Mutex::new(Episode {
+                    values: EpisodeValues(values),
+                    cleanups,
+                    driver: None,
+                    static_only: true,
+                    dynamic_host: anchor.and(service_updates.clone()),
+                    external_children: Vec::new(),
+                    service_updates,
+                    unsupported: None,
+                }),
+            }),
+            scope,
         };
         let episode = StaticEpisode {
             setup,
@@ -388,10 +391,10 @@ pub struct StaticEpisode {
 }
 impl StaticEpisode {
     pub fn owner(&self) -> PluginId {
-        self.setup.owner
+        self.setup.owner()
     }
     pub fn generation(&self) -> u64 {
-        self.setup.generation
+        self.setup.state.generation
     }
     pub fn is_closed(&self) -> bool {
         lock(&self.setup.state).phase() == EpisodePhase::Closed
@@ -480,15 +483,19 @@ impl StaticEpisode {
     }
     pub fn provided(&self) -> Result<Vec<(Port, TypedSlot)>, String> {
         let state = lock(&self.setup.state);
-        AsyncSetup::check_live(&state).map_err(|error| error.to_string())?;
+        self.setup
+            .check_live(&state)
+            .map_err(|error| error.to_string())?;
         Ok(self
             .setup
-            .provisions
+            .state
+            .services
+            .provisions()
             .iter()
             .filter_map(|port| {
                 state
                     .values
-                    .own(self.setup.owner, *port)
+                    .own(self.setup.owner(), *port)
                     .map(|slot| (*port, TypedSlot(slot.clone())))
             })
             .collect())
@@ -604,9 +611,11 @@ impl Future for StaticSetupFuture {
                 if let Some(port) = self
                     .episode
                     .setup
-                    .provisions
+                    .state
+                    .services
+                    .provisions()
                     .iter()
-                    .find(|port| state.own(self.episode.setup.owner, **port).is_none())
+                    .find(|port| state.own(self.episode.setup.owner(), **port).is_none())
                 {
                     result = Err(format!("declared service {} has no value", port.key).into());
                 } else {
@@ -754,6 +763,18 @@ impl Future for StaticCleanupFuture {
                 let Some(dispatch) = action else {
                     return self.fail("StaticCleanupUnsettled".into());
                 };
+                let dispatch = match dispatch {
+                    PayloadDispatch::Payload(completion) => {
+                        let result = completion.report.result;
+                        drop(completion.restored);
+                        drop(completion.report.discarded);
+                        if let Err(error) = result {
+                            return self.fail(payload_restore_error(error));
+                        }
+                        continue;
+                    }
+                    PayloadDispatch::Other(dispatch) => dispatch,
+                };
                 let (ticket, action) = match dispatch {
                     CleanupDispatch::Value { completion, .. } => {
                         if let Err(error) = completion.report.result {
@@ -839,10 +860,7 @@ pub struct StaticChildRequest {
 impl StaticChildRequest {
     /// Resolve an original ServiceKey identity in this child's exact context.
     pub fn port(&self, key: u64) -> Port {
-        Port {
-            key,
-            realm: self.context.realms.get(&key).copied().unwrap_or(0),
-        }
+        self.context.resolve(key)
     }
 }
 struct StaticChildProgress {
@@ -899,7 +917,7 @@ impl StaticChildControl {
             || state
                 .service
                 .as_ref()
-                .is_some_and(|service| lock(&service.status).cancelled)
+                .is_some_and(|service| lock(&service.status).checked().observe().cancelled())
     }
     pub fn is_removed(&self) -> bool {
         lock(&self.0).removed
@@ -949,7 +967,10 @@ impl StaticChildControl {
             if let Some(id) = assigned_id {
                 let waiters = {
                     let mut status = lock(&service.status);
-                    status.external_child_id = Some(id);
+                    assert!(
+                        status.checked_mut().assign_child(id),
+                        "one service child assignment"
+                    );
                     std::mem::take(&mut status.wakers)
                 };
                 // A join may already be pending inside the owner's setup. Wake
@@ -958,7 +979,7 @@ impl StaticChildControl {
             }
             if let Some(error) = error {
                 if error != CANCELLED {
-                    lock(&service.status).errors.push(error.into());
+                    lock(&service.status).checked_mut().push_error(error.into());
                 }
                 finish_service(&service);
             }
@@ -980,7 +1001,7 @@ impl StaticChildControl {
         if let Some(service) = service {
             let waiters = {
                 let mut status = lock(&service.status);
-                status.initialized = true;
+                assert!(status.checked_mut().report_service_initialized());
                 std::mem::take(&mut status.wakers)
             };
             wake_waiters(waiters);
@@ -1016,11 +1037,12 @@ impl StaticChildControl {
         if let Some(service) = service {
             let mut state = lock(&service.status);
             if !state
-                .errors
+                .checked()
+                .errors()
                 .iter()
                 .any(|existing| existing.message() == error)
             {
-                state.errors.push(error.into());
+                state.checked_mut().push_error(error.into());
             }
         }
     }
@@ -1041,12 +1063,12 @@ impl StaticChildControl {
         self.record_error(error.clone());
         let service = lock(&self.0).service.clone();
         if let Some(service) = service {
-            let waiters = {
+            let (waiters, unused) = {
                 let mut status = lock(&service.status);
-                status.cancelled = true;
-                status.terminal_error.get_or_insert(error.into());
-                std::mem::take(&mut status.wakers)
+                let unused = status.checked_mut().report_terminal(error.into());
+                (std::mem::take(&mut status.wakers), unused)
             };
+            drop(unused);
             wake_waiters(waiters);
         }
         if let Some(wake) = wake {

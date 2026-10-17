@@ -33,6 +33,7 @@ pub struct EffectRequest<P> {identity:EffectIdentity,payload:P}
 impl<P> EffectRequest<P> {
     pub fn id(&self)->(out:usize) ensures out==self.identity().group_id(), {self.identity.id()}
 
+    pub fn domain(&self)->(out:u64) ensures out==self.identity().domain_id(), {self.identity.domain}
     pub closed spec fn identity(&self)->EffectIdentity {self.identity}
     pub closed spec fn payload(&self)->P {self.payload}
     pub fn activate<T>(self,groups:&CleanupGroups<T>)->(out:Result<EffectRun<P>,Self>)
@@ -53,7 +54,7 @@ impl<C,P> SetupWork<C,EffectRequest<P>> {
     pub fn enqueue_effect<T>(&mut self,groups:&mut CleanupGroups<T>,source:usize,domain:u64,committed:Vec<Binding>,payload:P)
         ->(out:Result<usize,(Vec<Binding>,P)>)
         requires old(self).wf(),old(groups).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(groups).wf(),final(self).origin()==old(self).origin(),
+        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(groups).wf(),final(self).origin()==old(self).origin(),
             final(groups).origin()==old(groups).origin(),
             out.is_ok()==(old(self).owns(old(groups)) && old(self).origin()==old(groups).origin()
                 && old(self).accepts() && old(self).next_id()<u64::MAX && old(groups).acquisition_open(source)
@@ -92,6 +93,7 @@ impl<T,E> EffectReply<T,E> {
 /// Cancellation never discards a pending attempt or its eventual inverse.
 pub struct EffectRun<P> {identity:EffectIdentity,payload:P,next:u64,current:Option<u64>,called:bool}
 impl<P> EffectRun<P> {
+    pub fn domain(&self)->(out:u64) ensures out==self.identity().domain_id(), {self.identity.domain}
     pub closed spec fn identity(&self)->EffectIdentity {self.identity}
     pub closed spec fn payload(&self)->P {self.payload}
     pub closed spec fn next(&self)->u64 {self.next}
@@ -114,7 +116,7 @@ impl<P> EffectRun<P> {
     {&mut self.payload}
     pub fn admit<T>(&mut self,groups:&mut CleanupGroups<T>,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),old(groups).wf(),
-        ensures final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
+        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
             final(self).payload()==old(self).payload(),final(groups).origin()==old(groups).origin(),
             final(groups).frame(old(groups),old(self).identity().group_id()),
             out ==> old(self).identity().matches(old(groups)) && old(self).current().is_none()
@@ -149,10 +151,32 @@ impl<P> EffectRun<P> {
         let reply=EffectReply {identity:self.identity,serial:self.current.unwrap(),result};
         Ok((Self {identity:self.identity,payload,next:self.next,current:self.current,called:true},reply))
     }
+    /// Deliver the kernel-issued scope and stored iterator together. The
+    /// adapter cannot call an admitted iterator with another group's scope.
+    // Rejection returns the actual runner, argument and closure without an
+    // allocation or dropping any owned callback resource.
+    #[allow(clippy::type_complexity,clippy::result_large_err)]
+    pub fn call_scoped<A,T,E,F:FnOnce(P,(crate::setup_context::SetupScope,A))->(P,EffectOutput<T,E>)>(
+        self,argument:(crate::setup_context::SetupScope,A),callback:F)
+        ->(out:Result<(Self,EffectReply<T,E>),(Self,(crate::setup_context::SetupScope,A),F)>)
+        requires self.wf(),callback.requires((self.payload(),argument)),
+        ensures out.is_ok()==(self.current().is_some() && !self.called() && argument.0.matches_effect(self.identity())),
+            out.is_err() ==> out->Err_0==(self,argument,callback),
+            out.is_ok() ==> {
+                let run=out->Ok_0.0;let reply=out->Ok_0.1;
+                &&& run.wf() && run.identity()==self.identity() && run.next()==self.next()
+                &&& run.current()==self.current() && run.called()
+                &&& reply.identity()==self.identity() && reply.serial()==self.current().unwrap()
+                &&& callback.ensures((self.payload(),argument),(run.payload(),reply.result()))
+            },
+    {
+        if !argument.0.accepts_effect(self.identity.origin,self.identity.group,self.identity.domain) {return Err((self,argument,callback));}
+        self.call(argument,callback)
+    }
     pub fn land<T,E>(&mut self,groups:&mut CleanupGroups<T>,reply:EffectReply<T,E>)
         ->(out:Result<Option<StageReport<E>>,EffectReply<T,E>>)
         requires old(self).wf(),old(groups).wf(),
-        ensures final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
+        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
             final(self).payload()==old(self).payload(),final(self).next()==old(self).next(),
             final(groups).origin()==old(groups).origin(),final(groups).frame(old(groups),old(self).identity().group_id()),
             out.is_err() ==> *final(self)==*old(self) && *final(groups)==*old(groups) && out->Err_0==reply,

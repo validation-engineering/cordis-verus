@@ -2,7 +2,8 @@
 //!
 //! Only live records occupy storage. Completed handles remain valid inactive
 //! origins, while their never-reused identities cannot finish a newer callback.
-//! The host supplies the ALS ancestry; this module checks every supplied scope.
+//! This ledger checks supplied scopes; the production Node path owner captures
+//! them once, preserving its selected parent. ALS selection remains in the host.
 use crate::{
     request_ledger::{RequestLedger, RequestTicket},
     wait_guard::WaitDecision,
@@ -34,6 +35,14 @@ impl InvocationLedger {
     pub closed spec fn next_id(&self) -> u64 { self.requests.next_id() }
     pub closed spec fn records(&self) -> Seq<RequestTicket> { self.requests.records() }
     pub closed spec fn unchanged(&self, prior: &Self) -> bool { self.requests.unchanged(&prior.requests) }
+    pub proof fn allocation_facts(&self)
+        requires self.wf(),ensures self.next_id()>0,
+    {self.requests.record_facts();}
+    pub proof fn unchanged_reflexive(&self) ensures self.unchanged(self), {reveal(RequestLedger::unchanged);}
+    pub proof fn unchanged_observations(&self,prior:&Self)
+        requires self.unchanged(prior),
+        ensures self.domain_id()==prior.domain_id(),self.next_id()==prior.next_id(),self.records()==prior.records(),
+    {reveal(RequestLedger::unchanged);}
     pub open spec fn known(&self, handle: ScopeHandle) -> bool {
         handle.domain == self.domain_id() && 0 < handle.scope < self.next_id()
     }

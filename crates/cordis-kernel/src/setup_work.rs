@@ -5,6 +5,10 @@
 use crate::action_ledger::ActionKind;
 use crate::action_ledger::ActionTicket;
 use crate::cleanup_groups::CleanupGroups;
+#[cfg(verus_keep_ghost)]
+use crate::reversible_value::joint::episode::work_step;
+use crate::reversible_value::joint::episode::{WorkChange, WorkState};
+use crate::reversible_value::joint::{self, Journal, Member};
 use crate::Binding;
 use core::future::Future;
 use std::collections::{BTreeMap, VecDeque};
@@ -102,6 +106,7 @@ pub struct SetupWork<C,G> {
     issued:BTreeMap<u64,WorkKind>,
     accepting:bool,
     closed:bool,
+    joint:Option<Member>,
 }
 
 impl<C,G> SetupWork<C,G> {
@@ -121,7 +126,7 @@ impl<C,G> SetupWork<C,G> {
         self.root_status()==RootStatus::Settled && self.child_requests().len()==0
             && self.group_requests().len()==0 && self.outstanding().len()==0
     }
-    pub open spec fn wf(&self)->bool {
+    pub open spec fn local_wf(&self)->bool {
         &&& self.next_id()>0
         &&& self.origin().is_some() ==> self.origin().unwrap().kind==ActionKind::Setup
         &&& self.is_closed() ==> self.idle() && !self.accepts()
@@ -136,22 +141,71 @@ impl<C,G> SetupWork<C,G> {
             ticket.domain()==self.domain_id() && 0<ticket.id()<self.next_id() && ticket.kind()==WorkKind::Group
         }
     }
+    pub closed spec fn link(&self)->Option<(Journal,nat)> {
+        match self.joint {Some(member)=>Some((member.journal(),member.key())),None=>None}
+    }
+    pub open spec fn observation(&self)->WorkState {
+        WorkState {domain:self.domain_id(),origin:self.origin(),next:self.next_id(),root:self.root_status(),
+            failed:self.failed(),accepting:self.accepts(),closed:self.is_closed(),
+            children:self.child_requests().map(|i:int,item:WorkItem<C>|item.origin()),
+            groups:self.group_requests().map(|i:int,item:WorkItem<G>|item.origin()),issued:self.outstanding()}
+    }
+    pub closed spec fn traces(&self,state:WorkState)->bool {
+        match self.joint {None=>true,Some(member)=>member.wf() && member.record()==(joint::Record::Work {state})}
+    }
+    pub open spec fn wf(&self)->bool {self.local_wf() && self.traces(self.observation())}
+    pub open spec fn same_local(&self,prior:&Self)->bool {
+        self.observation()==prior.observation() && self.child_requests()==prior.child_requests()
+            && self.group_requests()==prior.group_requests()
+    }
+    fn commit(&mut self,Ghost(before):Ghost<WorkState>,Ghost(event):Ghost<WorkChange>)
+        requires old(self).local_wf(),old(self).traces(before),work_step(before,old(self).observation(),event),
+        ensures final(self).wf(),final(self).same_local(old(self)),final(self).link()==old(self).link(),
+    {
+        let ghost after=self.observation();
+        if let Some(member)=&mut self.joint {
+            proof {reveal(joint::changes);}
+            member.update(Ghost(joint::Record::Work {state:after}),Ghost(joint::Change::Work {event}));
+        }
+    }
+    pub(crate) fn attach_execution(&mut self,journal:&Journal)
+        requires old(self).wf(),old(self).link().is_none(),
+        ensures final(self).wf(),final(self).same_local(old(self)),final(self).link().is_some(),final(self).link().unwrap().0==*journal,
+    {
+        self.joint=Some(journal.allocate(Ghost(joint::Record::Work {state:self.observation()})));
+    }
+    pub(crate) fn certify(&self,view:&joint::ReadView)
+        requires self.wf(),view.wf(),self.link().is_some(),view.journal_spec()==self.link().unwrap().0,
+        ensures view.state().contains_key(self.link().unwrap().1),
+            view.state()[self.link().unwrap().1]==(joint::Record::Work {state:self.observation()}),
+    {self.joint.as_ref().unwrap().certify(view);}
+    // The explicit Some branch supplies this actual member's invariant.
+    #[allow(clippy::manual_map)]
+    pub fn observe_execution(&self)->(out:Option<joint::Snapshot>)
+        requires self.wf(),
+        ensures out.is_some()==self.link().is_some(),out.is_some() ==> out.unwrap().certified()
+            && out.unwrap().journal_spec()==self.link().unwrap().0
+            && out.unwrap().last().contains_key(self.link().unwrap().1)
+            && out.unwrap().last()[self.link().unwrap().1]==(joint::Record::Work {state:self.observation()}),
+    {
+        match &self.joint {Some(member)=>Some(member.observe()),None=>None}
+    }
     pub open spec fn queued_unchanged(&self,prior:&Self)->bool {
         self.child_requests()==prior.child_requests() && self.group_requests()==prior.group_requests()
             && self.next_id()==prior.next_id() && self.outstanding()==prior.outstanding()
             && self.domain_id()==prior.domain_id() && self.origin()==prior.origin()
     }
     pub fn new(domain:u64)->(out:Self)
-        ensures out.wf(),out.origin().is_none(),out.domain_id()==domain,out.root_status()==RootStatus::Unissued,
+        ensures out.link().is_none(),out.wf(),out.origin().is_none(),out.domain_id()==domain,out.root_status()==RootStatus::Unissued,
             !out.failed(),out.child_requests().len()==0,out.group_requests().len()==0,
             out.outstanding().len()==0,out.next_id()==1,out.accepts(),!out.is_closed(),
     {Self {domain,lifecycle:None,next:1,root:RootStatus::Unissued,root_failed:false,children:VecDeque::new(),
-        groups:VecDeque::new(),issued:BTreeMap::new(),accepting:true,closed:false}}
+        groups:VecDeque::new(),issued:BTreeMap::new(),accepting:true,closed:false,joint:None}}
 
     /// Only verified kernel admission constructs a lifecycle-bound work owner.
     pub(crate) fn for_lifecycle(ticket:ActionTicket,domain:u64)->(out:Self)
         requires ticket.kind==ActionKind::Setup,
-        ensures out.wf(),out.origin()==Some(ticket),out.domain_id()==domain,
+        ensures out.link().is_none(),out.wf(),out.origin()==Some(ticket),out.domain_id()==domain,
             out.root_status()==RootStatus::Unissued,!out.failed(),out.child_requests().len()==0,out.group_requests().len()==0,
             out.outstanding().len()==0,out.next_id()==1,out.accepts(),!out.is_closed(),
     {
@@ -168,23 +222,25 @@ impl<C,G> SetupWork<C,G> {
     /// Close acquisition, retaining every already admitted request and inverse.
     pub fn withdraw(&mut self)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).wf(),final(self).origin()==old(self).origin(),!final(self).accepts(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).wf(),final(self).origin()==old(self).origin(),!final(self).accepts(),final(self).queued_unchanged(old(self)),
             final(self).root_status()==old(self).root_status(),final(self).failed()==old(self).failed(),
             final(self).is_closed()==old(self).is_closed(),
-    {self.accepting=false;}
+    {let ghost before=self.observation();self.accepting=false;self.commit(Ghost(before),Ghost(WorkChange::Withdraw));}
 
     /// Issue exactly one root invocation, with its actual argument owned by the
     /// item. A callback failure still has to land; it never resets the admission.
     pub fn issue_root<A>(&mut self,argument:A)->(out:Result<WorkItem<A>,A>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
             out.is_ok()==(old(self).root_status()==RootStatus::Unissued && !old(self).is_closed()),
             out.is_ok() ==> out->Ok_0.value()==argument && out->Ok_0.origin().domain()==old(self).domain_id() && out->Ok_0.origin().id()==0 && out->Ok_0.origin().kind()==WorkKind::Root
                 && final(self).root_status()==RootStatus::Queued,
             out.is_err() ==> out->Err_0==argument && *final(self)==*old(self),
     {
         if self.root!=RootStatus::Unissued || self.closed {return Err(argument);}
+        let ghost before=self.observation();
         self.root=RootStatus::Queued;
+        self.commit(Ghost(before),Ghost(WorkChange::IssueRoot));
         Ok(WorkItem {ticket:WorkTicket {domain:self.domain,id:0,kind:WorkKind::Root},payload:argument})
     }
     fn root_ticket(&self,ticket:WorkTicket)->(out:bool)
@@ -192,31 +248,33 @@ impl<C,G> SetupWork<C,G> {
     {ticket.domain()==self.domain && ticket.id()==0 && ticket.kind()==WorkKind::Root}
     pub fn start_root(&mut self,ticket:WorkTicket)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
             out==(ticket.domain()==old(self).domain_id() && ticket.id()==0 && ticket.kind()==WorkKind::Root
                 && (old(self).root_status()==RootStatus::Queued || old(self).root_status()==RootStatus::Running)),
             out ==> final(self).root_status()==RootStatus::Running,
             !out ==> *final(self)==*old(self),
     {
         if !self.root_ticket(ticket) || (self.root!=RootStatus::Queued && self.root!=RootStatus::Running) {return false;}
-        self.root=RootStatus::Running;true
+        let ghost before=self.observation();
+        self.root=RootStatus::Running;self.commit(Ghost(before),Ghost(WorkChange::StartRoot {ticket}));true
     }
     /// Only work whose first poll has not begun may be discarded on withdrawal.
     /// This is cancellation, never successful initialization.
     pub fn cancel_queued_root(&mut self,ticket:WorkTicket)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
             out==(ticket.domain()==old(self).domain_id() && ticket.id()==0 && ticket.kind()==WorkKind::Root
                 && old(self).root_status()==RootStatus::Queued && !old(self).accepts()),
             out ==> final(self).root_status()==RootStatus::Settled && final(self).failed(),
             !out ==> *final(self)==*old(self),
     {
         if !self.root_ticket(ticket) || self.root!=RootStatus::Queued || self.accepting {return false;}
-        self.root=RootStatus::Settled;self.root_failed=true;true
+        let ghost before=self.observation();
+        self.root=RootStatus::Settled;self.root_failed=true;self.commit(Ghost(before),Ghost(WorkChange::CancelRoot {ticket}));true
     }
     pub fn complete_root<E>(&mut self,receipt:WorkReceipt<Result<(),E>>)->(out:Result<Result<(),E>,WorkReceipt<Result<(),E>>>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
             out.is_ok()==(receipt.origin().domain()==old(self).domain_id() && receipt.origin().id()==0 && receipt.origin().kind()==WorkKind::Root
                 && (old(self).root_status()==RootStatus::Queued || old(self).root_status()==RootStatus::Running)),
             out.is_ok() ==> out->Ok_0==receipt.value() && final(self).root_status()==RootStatus::Settled
@@ -224,27 +282,32 @@ impl<C,G> SetupWork<C,G> {
             out.is_err() ==> out->Err_0==receipt && *final(self)==*old(self),
     {
         if !self.root_ticket(receipt.ticket) || (self.root!=RootStatus::Queued && self.root!=RootStatus::Running) {return Err(receipt);}
-        self.root=RootStatus::Settled;self.root_failed=receipt.result.is_err();Ok(receipt.result)
+        let ghost before=self.observation();
+        self.root=RootStatus::Settled;self.root_failed=receipt.result.is_err();
+        self.commit(Ghost(before),Ghost(WorkChange::CompleteRoot {ticket:receipt.origin(),failed:receipt.value().is_err()}));Ok(receipt.result)
     }
     /// A caught panic records failure only. No success receipt can be fabricated
     /// through this path. The ticket still has to match the issued root.
     pub fn fail_root<E>(&mut self,ticket:WorkTicket,error:E)->(out:Result<E,E>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
             out.is_ok() ==> final(self).root_status()==RootStatus::Settled && final(self).failed() && out->Ok_0==error,
             out.is_err() ==> out->Err_0==error && *final(self)==*old(self),
     {
         if !self.root_ticket(ticket) || (self.root!=RootStatus::Queued && self.root!=RootStatus::Running) {return Err(error);}
-        self.root=RootStatus::Settled;self.root_failed=true;Ok(error)
+        let ghost before=self.observation();
+        self.root=RootStatus::Settled;self.root_failed=true;self.commit(Ghost(before),Ghost(WorkChange::FailRoot {ticket}));Ok(error)
     }
     /// Dropping a running root is not completion. It permanently blocks drain.
     pub fn abandon_root(&mut self)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), !final(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), !final(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).queued_unchanged(old(self)),
             old(self).root_status()!=RootStatus::Settled ==> final(self).root_status()==RootStatus::Abandoned && !final(self).idle(),
     {
+        let ghost before=self.observation();
         self.accepting=false;
         if self.root!=RootStatus::Settled {self.root=RootStatus::Abandoned;self.root_failed=true;}
+        self.commit(Ghost(before),Ghost(WorkChange::Abandon));
     }
     pub fn can_enqueue(&self)->(out:bool)
         ensures out==(self.accepts() && self.next_id()<u64::MAX),
@@ -262,7 +325,7 @@ impl<C,G> SetupWork<C,G> {
     pub fn enqueue_owned_child<T>(&mut self,cleanups:&mut CleanupGroups<T>,group:usize,payload:C,inverse:T)
         ->(out:Result<usize,(C,T)>)
         requires old(self).wf(),old(cleanups).wf(),
-        ensures final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
+        ensures final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
             out.is_ok()==(old(self).owns(old(cleanups)) && old(self).accepts() && old(self).next_id()<u64::MAX && old(cleanups).acquisition_open(group)),
             out.is_err() ==> out->Err_0==(payload,inverse) && *final(self)==*old(self) && *final(cleanups)==*old(cleanups),
             out.is_ok() ==> old(self).owns(old(cleanups)) && old(self).accepts()
@@ -277,7 +340,7 @@ impl<C,G> SetupWork<C,G> {
     }
     pub fn enqueue_child(&mut self,payload:C)->(out:Result<(),C>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_ok()==(old(self).accepts() && old(self).next_id()<u64::MAX),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_ok()==(old(self).accepts() && old(self).next_id()<u64::MAX),
             out.is_ok() ==> final(self).next_id()==old(self).next_id()+1
                 && final(self).child_requests().len()==old(self).child_requests().len()+1
                 && final(self).child_requests().take(old(self).child_requests().len() as int)==old(self).child_requests()
@@ -288,12 +351,15 @@ impl<C,G> SetupWork<C,G> {
             final(self).root_status()==old(self).root_status(),final(self).domain_id()==old(self).domain_id(),
     {
         if !self.accepting || self.next==u64::MAX {return Err(payload);}
+        let ghost before=self.observation();
         let ticket=WorkTicket {domain:self.domain,id:self.next,kind:WorkKind::Child};self.next+=1;
-        self.children.push_back(WorkItem {ticket,payload});Ok(())
+        self.children.push_back(WorkItem {ticket,payload});
+        proof {assert(self.observation().children.drop_last() =~= before.children);}
+        self.commit(Ghost(before),Ghost(WorkChange::Enqueue {kind:WorkKind::Child}));Ok(())
     }
     pub fn enqueue_group(&mut self,payload:G)->(out:Result<(),G>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_ok()==(old(self).accepts() && old(self).next_id()<u64::MAX),
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_ok()==(old(self).accepts() && old(self).next_id()<u64::MAX),
             out.is_ok() ==> final(self).next_id()==old(self).next_id()+1
                 && final(self).group_requests().len()==old(self).group_requests().len()+1
                 && final(self).group_requests().take(old(self).group_requests().len() as int)==old(self).group_requests()
@@ -304,14 +370,17 @@ impl<C,G> SetupWork<C,G> {
             final(self).root_status()==old(self).root_status(),final(self).domain_id()==old(self).domain_id(),
     {
         if !self.accepting || self.next==u64::MAX {return Err(payload);}
+        let ghost before=self.observation();
         let ticket=WorkTicket {domain:self.domain,id:self.next,kind:WorkKind::Group};self.next+=1;
-        self.groups.push_back(WorkItem {ticket,payload});Ok(())
+        self.groups.push_back(WorkItem {ticket,payload});
+        proof {assert(self.observation().groups.drop_last() =~= before.groups);}
+        self.commit(Ghost(before),Ghost(WorkChange::Enqueue {kind:WorkKind::Group}));Ok(())
     }
     // The pinned Verus VecDeque specification covers len, not is_empty.
     #[allow(clippy::len_zero)]
     pub fn take_child(&mut self)->(out:Option<WorkItem<C>>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_some() ==> out.unwrap()==old(self).child_requests().first()
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_some() ==> out.unwrap()==old(self).child_requests().first()
             && !old(self).outstanding().contains_key(out.unwrap().origin().id())
             && final(self).outstanding()==old(self).outstanding().insert(out.unwrap().origin().id(),WorkKind::Child)
             && final(self).child_requests()==old(self).child_requests().skip(1),
@@ -322,13 +391,33 @@ impl<C,G> SetupWork<C,G> {
         if self.children.len()==0 {return None;}
         let ticket=self.children[0].ticket;
         if self.issued.contains_key(&ticket.id()) {return None;}
-        let item=self.children.pop_front().unwrap();self.issued.insert(ticket.id(),WorkKind::Child);Some(item)
+        let ghost before=self.observation();
+        let ghost prior=*self;
+        let item=self.children.pop_front().unwrap();self.issued.insert(ticket.id(),WorkKind::Child);
+        proof {
+            assert(self.observation().children =~= before.children.skip(1));
+            assert forall|i:int| 0<=i<self.child_requests().len() implies {
+                let selected=#[trigger] self.child_requests()[i].origin();
+                selected.domain()==self.domain_id() && 0<selected.id()<self.next_id() && selected.kind()==WorkKind::Child
+            } by {assert(self.child_requests()[i]==prior.child_requests()[i+1]);}
+        }
+        proof {
+            assert(!prior.is_closed());
+            assert(ticket==prior.child_requests()[0].origin());
+            assert(0<ticket.id()<self.next_id());
+            assert forall|id:u64| #[trigger] self.outstanding().contains_key(id) implies
+                0<id<self.next_id() && self.outstanding()[id]!=WorkKind::Root by {
+                if id!=ticket.id() {assert(prior.outstanding().contains_key(id));}
+            }
+            assert(self.local_wf());
+        }
+        self.commit(Ghost(before),Ghost(WorkChange::Take {kind:WorkKind::Child}));Some(item)
     }
     // The pinned Verus VecDeque specification covers len, not is_empty.
     #[allow(clippy::len_zero)]
     pub fn take_group(&mut self)->(out:Option<WorkItem<G>>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_some() ==> out.unwrap()==old(self).group_requests().first()
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_some() ==> out.unwrap()==old(self).group_requests().first()
             && !old(self).outstanding().contains_key(out.unwrap().origin().id())
             && final(self).outstanding()==old(self).outstanding().insert(out.unwrap().origin().id(),WorkKind::Group)
             && final(self).group_requests()==old(self).group_requests().skip(1),
@@ -339,11 +428,31 @@ impl<C,G> SetupWork<C,G> {
         if self.groups.len()==0 {return None;}
         let ticket=self.groups[0].ticket;
         if self.issued.contains_key(&ticket.id()) {return None;}
-        let item=self.groups.pop_front().unwrap();self.issued.insert(ticket.id(),WorkKind::Group);Some(item)
+        let ghost before=self.observation();
+        let ghost prior=*self;
+        let item=self.groups.pop_front().unwrap();self.issued.insert(ticket.id(),WorkKind::Group);
+        proof {
+            assert(self.observation().groups =~= before.groups.skip(1));
+            assert forall|i:int| 0<=i<self.group_requests().len() implies {
+                let selected=#[trigger] self.group_requests()[i].origin();
+                selected.domain()==self.domain_id() && 0<selected.id()<self.next_id() && selected.kind()==WorkKind::Group
+            } by {assert(self.group_requests()[i]==prior.group_requests()[i+1]);}
+        }
+        proof {
+            assert(!prior.is_closed());
+            assert(ticket==prior.group_requests()[0].origin());
+            assert(0<ticket.id()<self.next_id());
+            assert forall|id:u64| #[trigger] self.outstanding().contains_key(id) implies
+                0<id<self.next_id() && self.outstanding()[id]!=WorkKind::Root by {
+                if id!=ticket.id() {assert(prior.outstanding().contains_key(id));}
+            }
+            assert(self.local_wf());
+        }
+        self.commit(Ghost(before),Ghost(WorkChange::Take {kind:WorkKind::Group}));Some(item)
     }
     pub fn complete_request<R>(&mut self,receipt:WorkReceipt<R>)->(out:Result<R,WorkReceipt<R>>)
         requires old(self).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_ok()==(receipt.origin().domain()==old(self).domain_id()
+        ensures final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(self).wf(),final(self).origin()==old(self).origin(),out.is_ok()==(receipt.origin().domain()==old(self).domain_id()
             && old(self).outstanding().contains_key(receipt.origin().id())
             && old(self).outstanding()[receipt.origin().id()]==receipt.origin().kind()),
             out.is_ok() ==> out->Ok_0==receipt.value()
@@ -354,7 +463,8 @@ impl<C,G> SetupWork<C,G> {
     {
         let ticket=receipt.ticket;
         if ticket.domain()!=self.domain || self.issued.get(&ticket.id())!=Some(&ticket.kind()) {return Err(receipt);}
-        self.issued.remove(&ticket.id());Ok(receipt.result)
+        let ghost before=self.observation();
+        self.issued.remove(&ticket.id());self.commit(Ghost(before),Ghost(WorkChange::Complete {ticket}));Ok(receipt.result)
     }
     // The pinned Verus VecDeque specification covers len, not is_empty.
     #[allow(clippy::len_zero)]
@@ -371,7 +481,7 @@ impl<C,G> SetupWork<C,G> {
     /// dispatch queue cannot hide work already handed to a host or a Future.
     pub fn seal<T>(&mut self,cleanups:&mut CleanupGroups<T>)->(out:bool)
         requires old(self).wf(),old(cleanups).wf(),
-        ensures final(self).domain_id()==old(self).domain_id(), final(cleanups).origin()==old(cleanups).origin(), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
+        ensures final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(cleanups).origin()==old(cleanups).origin(), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
             out==(old(self).owns(old(cleanups)) && old(self).idle() && old(cleanups).all_drained()),
             final(cleanups).drained_failure()==old(cleanups).drained_failure(),
             out ==> final(self).is_closed() && final(cleanups).closed() && old(self).outstanding().len()==0,
@@ -379,7 +489,8 @@ impl<C,G> SetupWork<C,G> {
     {
         if !self.matches(cleanups) || !self.is_idle() {return false;}
         if !cleanups.seal() {return false;}
-        self.accepting=false;self.closed=true;true
+        let ghost before=self.observation();
+        self.accepting=false;self.closed=true;self.commit(Ghost(before),Ghost(WorkChange::Seal));true
     }
 }
 }

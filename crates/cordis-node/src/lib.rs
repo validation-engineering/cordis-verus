@@ -5,6 +5,7 @@
 //! path invokes JavaScript while holding a Driver or executor borrow.
 
 mod interop;
+mod invocation;
 pub mod plugin;
 use cordis_driver::Driver;
 use napi::{bindgen_prelude::Function, Env, Error, Result, Status};
@@ -113,7 +114,7 @@ impl Drop for NativeDriver {
 #[napi]
 pub fn binding_info() -> String {
     concat!(
-        "{\"abi\":1,\"scopeProtocol\":1,\"package\":\"cordis-node\",",
+        "{\"abi\":1,\"scopeProtocol\":2,\"package\":\"cordis-node\",",
         "\"version\":\"",
         env!("CARGO_PKG_VERSION"),
         "\",",

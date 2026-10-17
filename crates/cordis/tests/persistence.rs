@@ -486,3 +486,41 @@ fn merged_configuration_is_validated_before_any_file_is_written() {
     assert_eq!(files.read("root.json")[0]["config"]["n"], 1);
     assert_eq!(files.read("root.json")[0]["name"], "unregistered");
 }
+
+#[test]
+fn save_plan_cannot_be_reused_after_revision_aba_or_on_another_runtime() {
+    let files = Files::new();
+    files.write("root.json", json!([{"id":"a","config":{"n":1}}]));
+    let mut loader = files.loader("root.json");
+    edit(&mut loader, "a", "n", json!(2));
+    let before = loader.tree().clone();
+    let plan = loader.prepare_save().unwrap();
+    edit(&mut loader, "a", "n", json!(3));
+    edit(&mut loader, "a", "n", json!(2));
+    assert_eq!(loader.tree(), &before);
+    assert_eq!(
+        loader.commit_save(plan).unwrap_err().kind,
+        SaveErrorKind::StalePlan
+    );
+    assert_eq!(files.read("root.json")[0]["config"]["n"], 1);
+
+    let plan = loader.prepare_save().unwrap();
+    let mut other = files.loader("root.json");
+    edit(&mut other, "a", "n", json!(2));
+    edit(&mut other, "a", "n", json!(3));
+    edit(&mut other, "a", "n", json!(2));
+    // Equalize revisions as well: domain identity must still distinguish them.
+    assert_eq!(other.revision(), loader.revision());
+    assert_eq!(other.tree(), loader.tree());
+    assert_eq!(
+        other.commit_save(plan).unwrap_err().kind,
+        SaveErrorKind::StalePlan
+    );
+    assert_eq!(files.read("root.json")[0]["config"]["n"], 1);
+    assert_eq!(
+        loader.save().unwrap().written,
+        vec![files.path("root.json")]
+    );
+    assert_eq!(files.read("root.json")[0]["config"]["n"], 2);
+    files.no_temporary_files();
+}

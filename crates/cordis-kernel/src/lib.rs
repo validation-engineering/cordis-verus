@@ -4,6 +4,7 @@ use vstd::prelude::*;
 pub mod action_ledger;
 pub mod administrative_orchestration;
 pub mod alpha;
+pub mod availability;
 pub mod calculus;
 pub mod canonical;
 pub mod causal_normalization;
@@ -13,6 +14,14 @@ pub mod cleanup_groups;
 pub mod cleanup_journal;
 pub mod cleanup_queue;
 pub mod coeffects;
+pub mod configuration_batch;
+pub mod configuration_future;
+pub mod configuration_history;
+pub mod configuration_recorded;
+pub mod configuration_runtime;
+pub mod configuration_save;
+pub mod configuration_source_history;
+pub mod configuration_transaction;
 pub mod contexts;
 pub mod deletion;
 pub mod dependent_grammar;
@@ -30,6 +39,8 @@ pub mod grammar_lift;
 pub mod grammar_ordering;
 pub mod grammar_recovery;
 pub mod history;
+pub mod host_status;
+pub mod identity_issuer;
 pub mod indexed_ordering;
 pub mod invocation_ledger;
 pub mod iterator_bridge;
@@ -49,6 +60,7 @@ pub mod mixed_syntax;
 pub mod mixed_transport;
 pub mod mixed_transposition;
 pub mod monoid;
+pub mod node_runtime;
 pub mod observation;
 pub mod observational_algebra;
 pub mod observational_examples;
@@ -62,6 +74,7 @@ pub mod paper_counterexamples;
 pub mod partial_domains;
 pub mod partial_independence;
 pub mod permutation;
+pub mod poll_control;
 pub mod poll_result;
 pub mod preservation;
 pub mod program;
@@ -74,6 +87,7 @@ pub mod provision_coverage;
 pub mod provision_history;
 pub mod publication;
 pub mod quotient;
+pub mod realm_context;
 pub mod recovery_examples;
 pub mod recursive_context;
 pub mod refinement;
@@ -82,9 +96,11 @@ pub mod resources;
 pub mod reversible_value;
 pub mod rule_frames;
 pub mod semantics;
+pub mod setup_context;
 pub mod setup_work;
 pub mod terminal_episode;
 pub mod termination;
+pub mod versioned_value;
 pub mod wait_guard;
 pub mod witnessed;
 pub mod xor_recovery_algebra;
@@ -371,6 +387,34 @@ impl Kernel {
         &&& forall|i: int| 0 <= i < bindings.len() ==> self.binding_is_target(id, bindings[i])
         &&& forall|i: int| 0 <= i < self.declarations.len() && !self.declarations[i].provides && self.declarations[i].owner == id
             ==> Self::view_has_port(bindings, self.declarations[i].port)
+    }
+    /// A concrete target vector covers every possible binding, independently
+    /// of its private ordering or repeated declarations.
+    pub proof fn complete_target_facts(&self,id:usize,bindings:Seq<Binding>)
+        requires self.wf(),self.complete_target(id,bindings),
+        ensures !self.unavailable(id),
+            forall|b:Binding|self.binding_is_target(id,b) == bindings.contains(b),
+    {
+        assert forall|i:int|0<=i<self.declarations.len() && !self.declarations[i].provides
+            && self.declarations[i].owner==id implies self.has_provider(self.declarations[i].port) by {
+            let p=self.declarations[i].port;
+            let j=choose|j:int|0<=j<bindings.len() && bindings[j].key==p.key && bindings[j].realm==p.realm;
+            assert(self.binding_is_target(id,bindings[j]));
+        }
+        assert forall|b:Binding|self.binding_is_target(id,b) == bindings.contains(b) by {
+            if self.binding_is_target(id,b) {
+                let p=Port {key:b.key,realm:b.realm};
+                let i=choose|i:int|0<=i<self.declarations.len() && !self.declarations[i].provides
+                    && self.declarations[i].owner==id && self.declarations[i].port==p;
+                let j=choose|j:int|0<=j<bindings.len() && bindings[j].key==p.key && bindings[j].realm==p.realm;
+                assert(self.binding_is_target(id,bindings[j]));
+                self.resolution_unique(p,b.provider,bindings[j].provider);
+                assert(bindings[j]==b);
+            } else if bindings.contains(b) {
+                let j=choose|j:int|0<=j<bindings.len() && bindings[j]==b;
+                assert(self.binding_is_target(id,bindings[j]));
+            }
+        }
     }
     /// Executable L-Begin admission includes the bounded episode-generation
     /// counter, which is erased by the paper control projection.
@@ -1138,6 +1182,24 @@ impl Kernel {
     pub closed spec fn declares_provision(&self, owner: usize, port: Port) -> bool {
         Self::declares(self.declarations@, owner, port, true)
     }
+    pub closed spec fn declares_dependency(&self, owner: usize, port: Port) -> bool {
+        Self::declares(self.declarations@, owner, port, false)
+    }
+    pub fn dependency_declared(&self,owner:usize,port:Port)->(out:bool)
+        ensures out==self.declares_dependency(owner,port),
+    {
+        let mut i=0;
+        while i<self.declarations.len()
+            invariant i<=self.declarations.len(),
+                forall|j:int|0<=j<i ==> !(self.declarations[j].owner==owner && self.declarations[j].port==port && !self.declarations[j].provides),
+            decreases self.declarations.len()-i,
+        {
+            let entry=self.declarations[i];
+            if entry.owner==owner && entry.port==port && !entry.provides {return true;}
+            i+=1;
+        }
+        false
+    }
 
     /// Extend a live logical fiber's service interface, including its initial
     /// inactive reservation before the first Begin. Admission of host effects
@@ -1769,21 +1831,39 @@ impl Kernel {
         None
     }
 
+    spec fn dependency_count(declarations:Seq<Declaration>,id:usize)->nat
+        decreases declarations.len(),
+    {
+        if declarations.len()==0 {0} else {
+            Self::dependency_count(declarations.drop_last(),id)
+                + if !declarations.last().provides && declarations.last().owner==id {1nat} else {0nat}
+        }
+    }
+    pub closed spec fn target_count(&self,id:usize)->nat {Self::dependency_count(self.declarations@,id)}
+    proof fn dependency_count_next(declarations:Seq<Declaration>,id:usize,i:int)
+        requires 0<=i<declarations.len(),
+        ensures Self::dependency_count(declarations.take(i+1),id)==Self::dependency_count(declarations.take(i),id)
+            + if !declarations[i].provides && declarations[i].owner==id {1nat} else {0nat},
+    {
+        assert(declarations.take(i+1).drop_last() =~= declarations.take(i));
+        assert(declarations.take(i+1).last()==declarations[i]);
+    }
     pub fn target(&self, id: usize) -> (r: Option<Vec<Binding>>)
         requires self.wf(),
-        ensures r.is_some() ==> self.complete_target(id, r.unwrap()@),
+        ensures r.is_some() ==> self.complete_target(id, r.unwrap()@) && r.unwrap().len()==self.target_count(id),
             r.is_none() ==> self.unavailable(id),
     {
         if !self.contains(id) || self.nodes[id].retired { return None; }
         let mut out: Vec<Binding> = Vec::new();
         let mut i = 0;
         while i < self.declarations.len()
-            invariant i <= self.declarations.len(), self.wf(), self.registered(id), !self.nodes[id as int].retired,
+            invariant i <= self.declarations.len(), out.len()==Self::dependency_count(self.declarations@.take(i as int),id), self.wf(), self.registered(id), !self.nodes[id as int].retired,
                 forall|j: int| 0 <= j < out.len() ==> self.binding_is_target(id, #[trigger] out[j]),
                 forall|j: int| 0 <= j < i && !self.declarations[j].provides && self.declarations[j].owner == id
                     ==> Self::view_has_port(out@, self.declarations[j].port),
             decreases self.declarations.len() - i,
         {
+            proof {Self::dependency_count_next(self.declarations@,id,i as int);}
             let ghost prev = out@;
             let d = self.declarations[i];
             if !d.provides && d.owner == id {
@@ -1809,6 +1889,8 @@ impl Kernel {
             }
             i += 1;
         }
+        assert(self.declarations@.take(i as int) =~= self.declarations@);
+        assert(out.len()==self.target_count(id));
         Some(out)
     }
 
@@ -2462,3 +2544,9 @@ mod iteration_tests;
 pub mod guarded_components;
 
 pub mod async_completion;
+
+pub mod configuration_tree;
+
+pub mod configuration_expansion;
+
+pub mod configuration_planning;

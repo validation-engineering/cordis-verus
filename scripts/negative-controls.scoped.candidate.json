@@ -3,6 +3,1103 @@
   "negativeMode": "scoped-negative",
   "cases": [
     {
+      "name": "r2-node-profile-reopens",
+      "mutation": {
+        "file": "node_policy.rs",
+        "old": "if self.policy.configured {Err(PolicyError::ProfileFrozen)}",
+        "new": "if false {Err(PolicyError::ProfileFrozen)}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::policy",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::configure_profile",
+          "module": "node_runtime::policy",
+          "file": "node_policy.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),out==if old(self).observation().policy.configured {Err(PolicyError::ProfileFrozen)} else {Ok(())},"
+        }
+      ],
+      "selectionRationale": "Mutate the real profile gate, parent admission or notification failure selection used by the production Node driver. Require a fresh matching positive, whole-mutant compilation and rejection in the named executable contract. This is selected development evidence, not full R2 or JavaScript callback acceptance."
+    },
+    {
+      "name": "r2-node-mount-ignores-parent",
+      "mutation": {
+        "file": "node_policy.rs",
+        "old": "Some(id) if !self.control.kernel().contains(id) || self.control.kernel().retired(id) || self.control.kernel().phase(id)==Some(Phase::Unloading)=>Err(PolicyError::ParentClosed),",
+        "new": "Some(_id) if false=>Err(PolicyError::ParentClosed),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::policy",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::gate",
+          "module": "node_runtime::policy",
+          "file": "node_policy.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::Gate {gate,out});"
+        }
+      ],
+      "selectionRationale": "Mutate the real profile gate, parent admission or notification failure selection used by the production Node driver. Require a fresh matching positive, whole-mutant compilation and rejection in the named executable contract. This is selected development evidence, not full R2 or JavaScript callback acceptance."
+    },
+    {
+      "name": "r2-node-notify-clears-cleanup-failure",
+      "mutation": {
+        "file": "node_policy.rs",
+        "old": "!e.cleanup_failed && intersects(interface.dependencies.as_slice(),ports)",
+        "new": "intersects(interface.dependencies.as_slice(),ports)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::policy",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::retry_notified",
+          "module": "node_runtime::policy",
+          "file": "node_policy.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(should_retry==selected(before,*id,ports@));"
+        }
+      ],
+      "selectionRationale": "Mutate the real profile gate, parent admission or notification failure selection used by the production Node driver. Require a fresh matching positive, whole-mutant compilation and rejection in the named executable contract. This is selected development evidence, not full R2 or JavaScript callback acceptance."
+    },
+    {
+      "name": "r2-node-read-wrong-payload",
+      "mutation": {
+        "file": "node_reads.rs",
+        "old": "Read {publication:id,owner:entry.owner,value:*value,revision,source}",
+        "new": "Read {publication:id,owner:entry.owner,value:*value ^ 1,revision,source}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::reads",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::read_value",
+          "module": "node_runtime::reads",
+          "file": "node_reads.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures valid_read(self.observation(),out),out==materialized(self.observation(),id,source),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual payload read, current-generation rejection or precedence of the retained Begin binding. Require a fresh matching positive, complete mutant compilation and rejection in the named executable function and source contract. This is a selected development control, not proof of JavaScript object methods or full R2 acceptance."
+    },
+    {
+      "name": "r2-node-read-ignores-generation",
+      "mutation": {
+        "file": "node_reads.rs",
+        "old": "if self.control.kernel().episode_generation(id)!=Some(generation) {return Err(ReadError::Stale);}",
+        "new": "if false {return Err(ReadError::Stale);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::reads",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::lookup",
+          "module": "node_runtime::reads",
+          "file": "node_reads.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.control.control().generation_of(id)==Some(generation));"
+        }
+      ],
+      "selectionRationale": "Mutate the actual payload read, current-generation rejection or precedence of the retained Begin binding. Require a fresh matching positive, complete mutant compilation and rejection in the named executable function and source contract. This is a selected development control, not proof of JavaScript object methods or full R2 acceptance."
+    },
+    {
+      "name": "r2-node-read-bypasses-commit",
+      "mutation": {
+        "file": "node_reads.rs",
+        "old": "if let Some(index)=self.bound_index(id,port) {",
+        "new": "if let Some(index)=None::<usize> {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::reads",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::lookup",
+          "module": "node_runtime::reads",
+          "file": "node_reads.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(first_binding(bindings(self.observation(),id),port).is_none());"
+        }
+      ],
+      "selectionRationale": "Mutate the actual payload read, current-generation rejection or precedence of the retained Begin binding. Require a fresh matching positive, complete mutant compilation and rejection in the named executable function and source contract. This is a selected development control, not proof of JavaScript object methods or full R2 acceptance."
+    },
+    {
+      "name": "r2-node-drain-retained-handle",
+      "mutation": {
+        "file": "node_handles.rs",
+        "old": "if !self.store.contains_handle(value) {out.push(value);}",
+        "new": "if true {out.push(value);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::handles",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::drain_released",
+          "module": "node_runtime::handles",
+          "file": "node_handles.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "out@==pending@.take(i as int).filter(unheld(before.store))"
+        }
+      ],
+      "selectionRationale": "Mutate the actual delivery filter, batch payload enqueue or replacement retirement. Require a fresh matching positive, complete mutant compilation and rejection in the named execution function and source contract. Handles are opaque values; this does not prove JavaScript deletion or whole-paper refinement."
+    },
+    {
+      "name": "r2-node-release-wrong-candidate",
+      "mutation": {
+        "file": "node_handles.rs",
+        "old": "self.released.push(items[i].value);",
+        "new": "self.released.push(items[i].value ^ 1);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::handles",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::queue_released",
+          "module": "node_runtime::handles",
+          "file": "node_handles.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "self.observation()==(Observation {released:before.released+values(items@.take(i as int)),..before})"
+        }
+      ],
+      "selectionRationale": "Mutate the actual delivery filter, batch payload enqueue or replacement retirement. Require a fresh matching positive, complete mutant compilation and rejection in the named execution function and source contract. Handles are opaque values; this does not prove JavaScript deletion or whole-paper refinement."
+    },
+    {
+      "name": "r2-node-replace-omits-retirement",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "if previous!=value {self.released.push(previous);}",
+        "new": "if previous==value {self.released.push(previous);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::replace"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::replace",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.released@ =~= before.released+handles::added(Event::Replace {id,owner,generation,value,out}));"
+        }
+      ],
+      "selectionRationale": "Mutate the actual delivery filter, batch payload enqueue or replacement retirement. Require a fresh matching positive, complete mutant compilation and rejection in the named execution function and source contract. Handles are opaque values; this does not prove JavaScript deletion or whole-paper refinement."
+    },
+    {
+      "name": "r2-identity-reuses-one",
+      "mutation": {
+        "file": "identity_issuer.rs",
+        "old": "Identity {value:next,point:Tracked(issued.tracked_unwrap())}",
+        "new": "Identity {value:1,point:Tracked(issued.tracked_unwrap())}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "identity_issuer",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::identity_issuer::IdentityIssuer::issue",
+          "module": "identity_issuer",
+          "file": "identity_issuer.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.source()==self.source(),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual CAS allocator used for native keys, realms, Episodes and cleanup domains. Require a matching selected positive, whole-mutant compilation and the exact issuance/exhaustion postcondition rejection. This does not prove Arc/Weak ownership or cross-issuer numeric identity."
+    },
+    {
+      "name": "r2-identity-exhausts-early",
+      "mutation": {
+        "file": "identity_issuer.rs",
+        "old": "if next==u64::MAX {return Err(Exhausted",
+        "new": "if next>=u64::MAX-1 {return Err(Exhausted"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "identity_issuer",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::identity_issuer::IdentityIssuer::issue",
+          "module": "identity_issuer",
+          "file": "identity_issuer.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> out->Err_0.wf() && out->Err_0.source()==self.progress_source(),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual CAS allocator used for native keys, realms, Episodes and cleanup domains. Require a matching selected positive, whole-mutant compilation and the exact issuance/exhaustion postcondition rejection. This does not prove Arc/Weak ownership or cross-issuer numeric identity."
+    },
+    {
+      "name": "r2-node-path-truncates-ancestors",
+      "mutation": {
+        "file": "node_scope_path.rs",
+        "old": "while i<parent.handles.len()",
+        "new": "while i<parent.handles.len() && i==0"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::paths",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::begin_invocation",
+          "module": "node_runtime::paths",
+          "file": "node_scope_path.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "proof {assert(handles@==ancestors(parent));}"
+        }
+      ],
+      "selectionRationale": "Mutate the actual captured parent path or wait input used by the production Node binding. Require a fresh matching positive, whole-mutant compilation and the exact named contract failure. This checks preservation of selected ancestry, not ALS parent selection or arbitrary JavaScript semantics."
+    },
+    {
+      "name": "r2-node-path-waits-only-own",
+      "mutation": {
+        "file": "node_scope_path.rs",
+        "old": "let ghost prior=*self;let out=self.check_scope_wait(path.handles.as_slice(),target);",
+        "new": "let ghost prior=*self;let own=vec![path.own()];let out=self.check_scope_wait(own.as_slice(),target);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::paths",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::check_invocation_wait",
+          "module": "node_runtime::paths",
+          "file": "node_scope_path.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "proof {recorded_scope(prior,*self,Event::ScopeWait {handles:path.chain(),target,out});reveal(scopes::wait_result);}"
+        }
+      ],
+      "selectionRationale": "Mutate the actual captured parent path or wait input used by the production Node binding. Require a fresh matching positive, whole-mutant compilation and the exact named contract failure. This checks preservation of selected ancestry, not ALS parent selection or arbitrary JavaScript semantics."
+    },
+    {
+      "name": "r2-node-scope-wrong-owner",
+      "mutation": {
+        "file": "node_scopes.rs",
+        "old": "self.scopes.begin(self.control.kernel(),id,generation)",
+        "new": "self.scopes.begin(self.control.kernel(),id ^ 1,generation)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::scopes",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::begin_scope",
+          "module": "node_runtime::scopes",
+          "file": "node_scopes.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::BeginScope {id,generation,out});"
+        }
+      ],
+      "selectionRationale": "Select the exact implementation module, which has no child modules. Use --verify-module because pinned Verus omits --verify-only-module from its partial-verification marker; do not relax evidence validation. Inherent methods retain their nominal type path. Require a fresh matching positive, complete mutant compilation and rejection at the exact named function and source contract. This is scoped development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-node-scope-skips-completion",
+      "mutation": {
+        "file": "node_scopes.rs",
+        "old": "let out=self.scopes.finish(handle);",
+        "new": "let out=Ok(());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::scopes",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::finish_scope",
+          "module": "node_runtime::scopes",
+          "file": "node_scopes.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::FinishScope {handle,out});"
+        }
+      ],
+      "selectionRationale": "Select the exact implementation module, which has no child modules. Use --verify-module because pinned Verus omits --verify-only-module from its partial-verification marker; do not relax evidence validation. Inherent methods retain their nominal type path. Require a fresh matching positive, complete mutant compilation and rejection at the exact named function and source contract. This is scoped development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-node-manifest-omits-withdrawn",
+      "mutation": {
+        "file": "node_resources.rs",
+        "old": "if p.owner==owner && p.retained && (!visible || p.visible) {out.push(id);}",
+        "new": "if p.owner==owner && p.retained && p.visible && (!visible || p.visible) {out.push(id);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::resources",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::publication_manifest",
+          "module": "node_runtime::resources",
+          "file": "node_resources.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(out[out.len()-1]==id);"
+        }
+      ],
+      "selectionRationale": "Select the exact implementation module, which has no child modules. Use --verify-module because pinned Verus omits --verify-only-module from its partial-verification marker; do not relax evidence validation. Inherent methods retain their nominal type path. Require a fresh matching positive, complete mutant compilation and rejection at the exact named function and source contract. This is scoped development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-node-withdraw-stops-early",
+      "mutation": {
+        "file": "node_resources.rs",
+        "old": "while i<ids.len()\n            invariant self.wf(),i<=ids.len(),manifest",
+        "new": "while i<ids.len() && i==0\n            invariant self.wf(),i<=ids.len(),manifest"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::resources",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::withdraw_publications",
+          "module": "node_runtime::resources",
+          "file": "node_resources.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(ids@.take(i as int)==ids@);"
+        }
+      ],
+      "selectionRationale": "Select the exact implementation module, which has no child modules. Use --verify-module because pinned Verus omits --verify-only-module from its partial-verification marker; do not relax evidence validation. Inherent methods retain their nominal type path. Require a fresh matching positive, complete mutant compilation and rejection at the exact named function and source contract. This is scoped development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-node-admission-wrong-owner",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "self.admissions.insert(consumer,admission);",
+        "new": "self.admissions.insert(consumer ^ 1,admission);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::begin"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::begin",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::Begin {consumer,out});"
+        }
+      ],
+      "selectionRationale": "Mutate the real retained admission owner or accepted cleanup-failure update. Require a fresh matching positive, entire-mutant compilation and rejection at the exact history commit. This is scoped development evidence, not complete negative regression."
+    },
+    {
+      "name": "r2-node-failure-discards-admission",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "state.cleanup_failed=true;",
+        "new": "state.cleanup_failed=true;self.admissions.remove(&ticket.id);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::cleanup_with_error"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::cleanup_with_error",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::Cleanup {command,error:saved_error,out});"
+        }
+      ],
+      "selectionRationale": "Mutate the real retained admission owner or accepted cleanup-failure update. Require a fresh matching positive, entire-mutant compilation and rejection at the exact history commit. This is scoped development evidence, not complete negative regression."
+    },
+    {
+      "name": "r2-node-hides-cleanup-failure",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "state.cleanup_failed=true;",
+        "new": "state.cleanup_failed=false;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::cleanup_with_error"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::cleanup_with_error",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::Cleanup {command,error:saved_error,out});"
+        }
+      ],
+      "selectionRationale": "Mutate the real retained admission owner or accepted cleanup-failure update. Require a fresh matching positive, entire-mutant compilation and rejection at the exact history commit. This is scoped development evidence, not complete negative regression."
+    },
+    {
+      "name": "r2-node-replaces-wrong-handle",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "self.store.replace_checked(&self.control,id,owner,generation,value)",
+        "new": "self.store.replace_checked(&self.control,id,owner,generation,value ^ 1)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::replace"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::replace",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::Replace {id,owner,generation,value,out});"
+        }
+      ],
+      "selectionRationale": "Mutate a real Node owner call while retaining its actual input/result history contract. Require a fresh matching positive, whole-mutant compilation and exact rejection at the history commit; this is selected development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-node-inverts-check-result",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "self.checks.complete(ticket,&self.control,&self.store,available)",
+        "new": "self.checks.complete(ticket,&self.control,&self.store,!available)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::complete_check"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::complete_check",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.record(before,Event::CompleteCheck {ticket,available,out});"
+        }
+      ],
+      "selectionRationale": "Mutate a real Node owner call while retaining its actual input/result history contract. Require a fresh matching positive, whole-mutant compilation and exact rejection at the history commit; this is selected development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-node-bypasses-resource-release",
+      "mutation": {
+        "file": "node_runtime.rs",
+        "old": "CleanupCommand::Release {..}=>false,",
+        "new": "CleanupCommand::Release {..}=>true,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::cleanup_allowed"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::cleanup_allowed",
+          "module": "node_runtime",
+          "file": "node_runtime.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out==episode::cleanup_allowed(self.observation(),command)"
+        }
+      ],
+      "selectionRationale": "Permit raw Release in the actual admission/cleanup guard. Require a fresh selected positive, whole-mutant compilation and the exact guard-contract rejection; no full negative-suite claim."
+    },
+    {
+      "name": "r2-native-config-unrelated-domain",
+      "mutation": {
+        "file": "native_configuration.rs",
+        "old": "{Recorded::new_in(&self.execution_journal(),current)}",
+        "new": "{Recorded::new_in(&joint::Journal::new(),current)}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::configuration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::configuration",
+          "module": "lifecycle_state::native::runtime::configuration",
+          "file": "native_configuration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.wf(),out.journal()==self.journal_spec(),out.core().accepted()==current,out.core().version()==0,out.core().staged().is_none(),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual native configuration producer or omit authentication of the actual native member in the common read epoch. Require a fresh matching module positive, whole-mutant compilation and precise contract rejection. This is scoped composition evidence, not whole-host semantic refinement."
+    },
+    {
+      "name": "r2-source-snapshot-omits-native",
+      "mutation": {
+        "file": "configuration_source_history.rs",
+        "old": "configuration.certify(&view);native.certify(&view);",
+        "new": "configuration.certify(&view);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_source_history",
+          "descendants": false,
+          "function": "cordis_negative::configuration_source_history::Ledger::snapshot_with"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_source_history::Ledger::snapshot_with",
+          "module": "configuration_source_history",
+          "file": "configuration_source_history.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.joint_spec().certified(),out.joint_spec().last().contains_pair(native.key(),native.record()),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual native configuration producer or omit authentication of the actual native member in the common read epoch. Require a fresh exact-function positive, whole-mutant compilation and precise contract rejection. This is scoped composition evidence, not whole-host semantic refinement."
+    },
+    {
+      "name": "r2-source-load-during-recovery",
+      "mutation": {
+        "file": "configuration_recorded.rs",
+        "old": "if self.inner.pending().is_some() {return Err(input);}",
+        "new": "if false {return Err(input);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_recorded",
+          "descendants": false,
+          "function": "cordis_negative::configuration_recorded::Recorded::load_sources"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_recorded::Recorded::load_sources",
+          "module": "configuration_recorded",
+          "file": "configuration_recorded.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "self.sources.load(input.root,input.contents,input.checkpoints,input.resolutions);self.record_sources(Ghost(event));Ok(())"
+        }
+      ],
+      "selectionRationale": "Mutate the actual composite source load admission or allocate its recorder in an unrelated Journal. Require a fresh exact-function positive, successful whole-mutant compilation and the named contract/source-anchor rejection. This verifies source/configuration ownership wiring; arbitrary source parsing and merge meaning remain separate."
+    },
+    {
+      "name": "r2-source-journal-unrelated-domain",
+      "mutation": {
+        "file": "configuration_source_history.rs",
+        "old": "let journal=configuration.domain();",
+        "new": "let journal=joint::Journal::new();"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_source_history",
+          "descendants": false,
+          "function": "cordis_negative::configuration_source_history::Ledger::new"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_source_history::Ledger::new",
+          "module": "configuration_source_history",
+          "file": "configuration_source_history.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.wf(),out.journal()==configuration.journal(),out.configuration()==configuration.key(),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual composite source load admission or allocate its recorder in an unrelated Journal. Require a fresh exact-function positive, successful whole-mutant compilation and the named contract/source-anchor rejection. This verifies source/configuration ownership wiring; arbitrary source parsing and merge meaning remain separate."
+    },
+    {
+      "name": "r2-source-saves-unprocessed",
+      "mutation": {
+        "file": "configuration_source.rs",
+        "old": "if phase==Stage::Sync || phase==Stage::Done {",
+        "new": "if true {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_save",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_save::Save::apply_sources",
+          "module": "configuration_save::sources",
+          "file": "configuration_source.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "source.observation()==(Observation {checkpoints:advanced(before.checkpoints,records.take(i as int)),..before}),"
+        }
+      ],
+      "selectionRationale": "Mutate actual checked source checkpoint/durability ownership or the immutable review bound to the real save cursor. Select the complete save module and its source-owner child; require a fresh matching selected positive, whole-mutant compilation and the exact named function/diagnostic/source-anchor rejection. Filesystem truth and JSON/Component interpretation remain separate."
+    },
+    {
+      "name": "r2-source-discards-sync-retry",
+      "mutation": {
+        "file": "configuration_source.rs",
+        "old": "source.checkpoints.insert(target.key,Checkpoint {value:target.value,pending_sync:phase==Stage::Sync});",
+        "new": "source.checkpoints.insert(target.key,Checkpoint {value:target.value,pending_sync:false});"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_save",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_save::Save::apply_sources",
+          "module": "configuration_save::sources",
+          "file": "configuration_source.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "source.observation()==(Observation {checkpoints:advanced(before.checkpoints,records.take(i as int)),..before}),"
+        }
+      ],
+      "selectionRationale": "Mutate actual checked source checkpoint/durability ownership or the immutable review bound to the real save cursor. Select the complete save module and its source-owner child; require a fresh matching selected positive, whole-mutant compilation and the exact named function/diagnostic/source-anchor rejection. Filesystem truth and JSON/Component interpretation remain separate."
+    },
+    {
+      "name": "r2-source-accepts-stale-review",
+      "mutation": {
+        "file": "configuration_source.rs",
+        "old": "Some(stamp)=>if !self.accepts_save(domain,stamp) {return Err(save);},",
+        "new": "Some(_stamp)=>{},"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_save",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_transaction::Configuration::accept_saved_sources",
+          "module": "configuration_save::sources",
+          "file": "configuration_source.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(self.staged().is_none() && save.review().is_some() && domain==save.review().unwrap().domain() && self.version()==save.review().unwrap().revision()),"
+        }
+      ],
+      "selectionRationale": "Mutate actual checked source checkpoint/durability ownership or the immutable review bound to the real save cursor. Select the complete save module and its source-owner child; require a fresh matching selected positive, whole-mutant compilation and the exact named function/diagnostic/source-anchor rejection. Filesystem truth and JSON/Component interpretation remain separate."
+    },
+    {
+      "name": "r2-save-discards-review-on-progress",
+      "mutation": {
+        "file": "configuration_save.rs",
+        "old": "let ghost before=*self;\n        let i=self.cursor;",
+        "new": "let ghost before=*self;\n        self.origin=None;\n        let i=self.cursor;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_save",
+          "descendants": false,
+          "function": "cordis_negative::configuration_save::Save::step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_save::Save::step",
+          "module": "configuration_save",
+          "file": "configuration_save.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "final(self).review()==old(self).review(),"
+        }
+      ],
+      "selectionRationale": "Mutate actual checked source checkpoint/durability ownership or the immutable review bound to the real save cursor. Require a fresh matching selected positive, whole-mutant compilation and the exact named contract rejection; filesystem truth and JSON/Component interpretation remain separate."
+    },
+    {
+      "name": "r2-save-skips-durability",
+      "mutation": {
+        "file": "configuration_save.rs",
+        "old": "Stage::Replace=>Stage::Sync,Stage::Sync=>Stage::Done,",
+        "new": "Stage::Replace=>Stage::Done,Stage::Sync=>Stage::Done,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_save",
+          "descendants": false,
+          "function": "cordis_negative::configuration_save::Save::step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_save::Save::step",
+          "module": "configuration_save",
+          "file": "configuration_save.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(stages(*doc,next)==self.history@[i as int].push(phase));"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration-save owner or accepted-revision gate used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection. Callback I/O truth and filesystem crash semantics remain explicit boundaries."
+    },
+    {
+      "name": "r2-save-hides-durability-failure",
+      "mutation": {
+        "file": "configuration_save.rs",
+        "old": "merged_external:d.merged_external() && phase!=Stage::Check,durability_uncertain:phase==Stage::Sync",
+        "new": "merged_external:d.merged_external() && phase!=Stage::Check,durability_uncertain:false"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_save",
+          "descendants": false,
+          "function": "cordis_negative::configuration_save::Save::progress"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_save::Save::progress",
+          "module": "configuration_save",
+          "file": "configuration_save.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap()==progress(self.documents()[index as int],self.phases()[index as int])"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration-save owner or accepted-revision gate used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection. Callback I/O truth and filesystem crash semantics remain explicit boundaries."
+    },
+    {
+      "name": "r2-save-accepts-old-revision",
+      "mutation": {
+        "file": "configuration_transaction.rs",
+        "old": "self.pending.is_none() && domain==stamp.domain && self.revision==stamp.revision",
+        "new": "self.pending.is_none() && domain==stamp.domain"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_transaction",
+          "descendants": false,
+          "function": "cordis_negative::configuration_transaction::Configuration::accepts_save"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_transaction::Configuration::accepts_save",
+          "module": "configuration_transaction",
+          "file": "configuration_transaction.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out==(self.staged().is_none() && domain==stamp.domain() && self.version()==stamp.revision())"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration-save owner or accepted-revision gate used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection. Callback I/O truth and filesystem crash semantics remain explicit boundaries."
+    },
+    {
+      "name": "r2-save-accepts-foreign-domain",
+      "mutation": {
+        "file": "configuration_transaction.rs",
+        "old": "self.pending.is_none() && domain==stamp.domain && self.revision==stamp.revision",
+        "new": "{let _unused=domain; self.pending.is_none() && self.revision==stamp.revision}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_transaction",
+          "descendants": false,
+          "function": "cordis_negative::configuration_transaction::Configuration::accepts_save"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_transaction::Configuration::accepts_save",
+          "module": "configuration_transaction",
+          "file": "configuration_transaction.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out==(self.staged().is_none() && domain==stamp.domain() && self.version()==stamp.revision())"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration-save owner or accepted-revision gate used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection. Callback I/O truth and filesystem crash semantics remain explicit boundaries."
+    },
+    {
+      "name": "r2-config-commit-skips-structure",
+      "mutation": {
+        "file": "configuration_transaction.rs",
+        "old": " || (self.structure.is_some() && self.structure!=Some(Structure::Ready))",
+        "new": ""
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_transaction",
+          "descendants": false,
+          "function": "cordis_negative::configuration_transaction::Configuration::commit"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_transaction::Configuration::commit",
+          "module": "configuration_transaction",
+          "file": "configuration_transaction.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).staged().is_some() && old(self).batch().complete() && (old(self).structural_phase().is_none() || old(self).structural_phase()==Some(Structure::Ready)))"
+        }
+      ],
+      "selectionRationale": "Exercise the actual production structural commit/reconstruction gate and validated configuration index. A fresh matching positive, whole-mutant compilation and exact contract rejection are required. No claim about parser correctness, external callback semantics or convergence."
+    },
+    {
+      "name": "r2-config-recovery-skips-rebuild",
+      "mutation": {
+        "file": "configuration_transaction.rs",
+        "old": "if !self.updates.restored() || (self.structure.is_some() && self.structure!=Some(Structure::Recovered)) {return Err(TransactionError::NotReady);}",
+        "new": "if !self.updates.restored() {return Err(TransactionError::NotReady);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_transaction",
+          "descendants": false,
+          "function": "cordis_negative::configuration_transaction::Configuration::recover_with"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_transaction::Configuration::recover_with",
+          "module": "configuration_transaction",
+          "file": "configuration_transaction.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).staged().is_some() && old(self).batch().entries().len()==0\n                && (old(self).structural_phase().is_none() || old(self).structural_phase()==Some(Structure::Recovered)))"
+        }
+      ],
+      "selectionRationale": "Exercise the actual production structural commit/reconstruction gate and validated configuration index. A fresh matching positive, whole-mutant compilation and exact contract rejection are required. No claim about parser correctness, external callback semantics or convergence."
+    },
+    {
+      "name": "r2-config-cache-selects-wrong-entry",
+      "mutation": {
+        "file": "configuration_tree.rs",
+        "old": "if node.key.as_str()==key {Some(node)} else {None}",
+        "new": "{let _unused=key;Some(node)}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_tree",
+          "descendants": false,
+          "function": "cordis_negative::configuration_tree::Tree::get"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_tree::Tree::get",
+          "module": "configuration_tree",
+          "file": "configuration_tree.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some()==(index<self@.len() && self@[index as int].name()==key@)"
+        }
+      ],
+      "selectionRationale": "Exercise the actual production structural commit/reconstruction gate and validated configuration index. A fresh matching positive, whole-mutant compilation and exact contract rejection are required. No claim about parser correctness, external callback semantics or convergence."
+    },
+    {
+      "name": "r2-config-commit-before-success",
+      "mutation": {
+        "file": "configuration_batch.rs",
+        "old": "{!self.recovering && self.completed==self.actions.len()}",
+        "new": "{!self.recovering}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_batch",
+          "descendants": false,
+          "function": "cordis_negative::configuration_batch::Batch::ready"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_batch::Batch::ready",
+          "module": "configuration_batch",
+          "file": "configuration_batch.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn ready(&self)->(out:bool) ensures out==self.complete(),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration update gate, retained Future sequencing, inverse result or native target check used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact named contract rejection. This verifies scoped safety/provenance contracts, not arbitrary callback inverses, liveness or whole-tree reconciliation."
+    },
+    {
+      "name": "r2-config-recovery-with-pending-inverse",
+      "mutation": {
+        "file": "configuration_batch.rs",
+        "old": "{self.actions.is_empty()}",
+        "new": "{self.completed==0}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_batch",
+          "descendants": false,
+          "function": "cordis_negative::configuration_batch::Batch::restored"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_batch::Batch::restored",
+          "module": "configuration_batch",
+          "file": "configuration_batch.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn restored(&self)->(out:bool) ensures out==(self.entries().len()==0),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration update gate, retained Future sequencing, inverse result or native target check used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact named contract rejection. This verifies scoped safety/provenance contracts, not arbitrary callback inverses, liveness or whole-tree reconciliation."
+    },
+    {
+      "name": "r2-config-inverse-before-forward",
+      "mutation": {
+        "file": "configuration_future.rs",
+        "old": "if matches!(self.poll_apply(forward),Poll::Pending) {return Poll::Pending;}",
+        "new": "let _unused_forward=forward;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_future",
+          "descendants": false,
+          "function": "cordis_negative::configuration_future::Reversible::poll_rollback"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_future::Reversible::poll_rollback",
+          "module": "configuration_future",
+          "file": "configuration_future.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "if let Err(error)=self.prepare_inverse()"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration update gate, retained Future sequencing, inverse result or native target check used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact named contract rejection. This verifies scoped safety/provenance contracts, not arbitrary callback inverses, liveness or whole-tree reconciliation."
+    },
+    {
+      "name": "r2-config-failed-inverse-reports-drained",
+      "mutation": {
+        "file": "configuration_batch.rs",
+        "old": "Poll::Ready(Err(error))=>Poll::Ready(Err(error)),",
+        "new": "Poll::Ready(Err(_error))=>Poll::Ready(Ok(true)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_batch",
+          "descendants": false,
+          "function": "cordis_negative::configuration_batch::Batch::poll_rollback"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::configuration_batch::Batch::poll_rollback",
+          "module": "configuration_batch",
+          "file": "configuration_batch.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "old(self).attempted()>0 ==> {"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration update gate, retained Future sequencing, inverse result or native target check used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact named contract rejection. This verifies scoped safety/provenance contracts, not arbitrary callback inverses, liveness or whole-tree reconciliation."
+    },
+    {
+      "name": "r2-config-update-discards-identity",
+      "mutation": {
+        "file": "configuration_runtime.rs",
+        "old": "self.configuration_target(target.id)==Some(target)",
+        "new": "self.configuration_target(target.id).is_some()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_runtime",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::configuration_target_is_current",
+          "module": "configuration_runtime",
+          "file": "configuration_runtime.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires self.wf(),ensures out==self.configuration_matches(target),"
+        }
+      ],
+      "selectionRationale": "Mutate the actual configuration update gate, retained Future sequencing, inverse result or native target check used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact named contract rejection. This verifies scoped safety/provenance contracts, not arbitrary callback inverses, liveness or whole-tree reconciliation."
+    },
+    {
       "name": "provider-lifetime-guard",
       "mutation": {
         "file": "lib.rs",
@@ -3049,19 +4146,19 @@
           "kind": "module",
           "path": "cleanup_queue",
           "descendants": false,
-          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete"
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete_following"
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete",
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete_following",
           "module": "cleanup_queue",
           "file": "cleanup_queue.rs",
-          "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "&& final(self).slots()==old(self).slots().update(ticket.token as int,retained)"
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "proof {assert(self.observation().occupied =~= before.occupied.update(ticket.token as int,keep));}"
         }
       ],
-      "selectionRationale": "The real payload container used by Rust Runtime and typed hosts must store the exact retained payload in its selected slot. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+      "selectionRationale": "The real payload container used by Rust Runtime and typed hosts must store the exact retained payload in its selected slot. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract. The moved implementation rejects this fault at its exact occupancy assertion before the causal commit. Match that specific assertion, function and diagnostic; arbitrary verifier failure is not accepted."
     },
     {
       "name": "cleanup-dispatch-promotes-failure",
@@ -3438,7 +4535,7 @@
           "module": "publication::values",
           "file": "publication_values.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "ensures out.is_some()==(id.0<self.values().len() && self.values()[id.0 as int].is_some()),"
+          "uniqueSourceAnchor": "ensures out.is_some()==(id.0<self.values().len() && self.values()[id.0 as int].is_some()),\n            out.is_some() ==> *out.unwrap()==self.values()[id.0 as int].unwrap(),"
         }
       ],
       "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
@@ -3514,7 +4611,7 @@
           "module": "publication::values",
           "file": "publication_values.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.0==self.registry_view().active_lease(token).unwrap().publication"
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.0==self.registry_view().active_lease(token).unwrap().publication\n                && self.values()[out->Ok_0.0.0 as int]==Some(*out->Ok_0.1),"
         }
       ],
       "selectionRationale": "The production payload or completion path must preserve its actual value, identity, result and continuation. Require a fresh selected positive, complete mutant compilation and exact contract rejection. This is scoped development evidence, not full negative or R2 acceptance."
@@ -3702,8 +4799,8 @@
       "name": "r2-registration-forgets-actual-dependencies",
       "mutation": {
         "file": "plugin_registration.rs",
-        "old": "Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies,provisions,revision:0,payload:definition.payload})",
-        "new": "Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies:Vec::new(),provisions,revision:0,payload:definition.payload})"
+        "old": "Ok(RegisteredPlugin {domain,id,parent,anchor,realms:RealmContext::from_map(realms.clone()),dependencies,provisions,revision:0,payload:definition.payload})",
+        "new": "Ok(RegisteredPlugin {domain,id,parent,anchor,realms:RealmContext::from_map(realms.clone()),dependencies:Vec::new(),provisions,revision:0,payload:definition.payload})"
       },
       "targets": [
         {
@@ -3727,8 +4824,8 @@
       "name": "r2-registered-call-ignores-recipe-revision",
       "mutation": {
         "file": "plugin_registration.rs",
-        "old": "if invocation.domain!=self.domain || invocation.id!=self.id || invocation.revision!=self.revision {return Err(invocation);}",
-        "new": "if invocation.domain!=self.domain || invocation.id!=self.id {return Err(invocation);}"
+        "old": "if invocation.domain!=self.domain || invocation.id!=self.id || invocation.revision!=self.revision {return Err(invocation);}\n        Ok(invocation.item.run(&mut self.payload))",
+        "new": "if invocation.domain!=self.domain || invocation.id!=self.id {return Err(invocation);}\n        Ok(invocation.item.run(&mut self.payload))"
       },
       "targets": [
         {
@@ -3743,7 +4840,7 @@
           "module": "lifecycle_state::registration",
           "file": "plugin_registration.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_ok()==(invocation.domain_id()==old(self).domain_id() && invocation.owner()==old(self).owner()"
+          "uniqueSourceAnchor": "out.is_ok()==(invocation.domain_id()==old(self).domain_id() && invocation.owner()==old(self).owner()\n                && invocation.version()==old(self).version()),"
         }
       ],
       "selectionRationale": "The actual runtime registration path must preserve resolved dependencies, invoke only its admitted recipe revision and retire a Child only in its owning runtime. Require a fresh selected positive, complete mutant compilation and rejection of the named contract; this is not whole-host semantic refinement."
@@ -3902,8 +4999,8 @@
       "name": "r2-native-values-omit-imports",
       "mutation": {
         "file": "native_values.rs",
-        "old": "NativeEpisode {origin:ticket,work_domain:work.domain(),provisions,bindings,owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}",
-        "new": "NativeEpisode {origin:ticket,work_domain:work.domain(),provisions,bindings,owned:BTreeMap::new(),imports:BTreeMap::new(),closed:false,capture:Ghost(capture)}"
+        "old": "NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings}),owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}",
+        "new": "NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings}),owned:BTreeMap::new(),imports:BTreeMap::new(),closed:false,capture:Ghost(capture)}"
       },
       "targets": [
         {
@@ -3952,8 +5049,8 @@
       "name": "r2-native-values-substitute-publication",
       "mutation": {
         "file": "native_values.rs",
-        "old": "store.entries.insert(id,NativePublication {origin:values.origin,values:values.owned.clone(),capture:Ghost(values.capture())});Ok(())",
-        "new": "store.entries.insert(id,NativePublication {origin:values.origin,values:BTreeMap::new(),capture:Ghost(values.capture())});Ok(())"
+        "old": "store.entries.insert(id,NativePublication {origin:values.context.origin,values:values.owned.clone(),capture:Ghost(values.capture())});Ok(())",
+        "new": "store.entries.insert(id,NativePublication {origin:values.context.origin,values:BTreeMap::new(),capture:Ghost(values.capture())});Ok(())"
       },
       "targets": [
         {
@@ -3977,7 +5074,7 @@
       "name": "r2-native-values-release-other-episode",
       "mutation": {
         "file": "native_values.rs",
-        "old": "if let Some(entry)=store.entries.get(&id) {if entry.origin!=values.origin {return Err(Error::InvalidState);}}",
+        "old": "if let Some(entry)=store.entries.get(&id) {if entry.origin!=values.context.origin {return Err(Error::InvalidState);}}",
         "new": "if let Some(_entry)=store.entries.get(&id) {if false {return Err(Error::InvalidState);}}"
       },
       "targets": [
@@ -4293,7 +5390,7 @@
           "module": "execution",
           "file": "execution.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "pub fn put_effect(&mut self,run:EffectRun<G>)->(out:Result<(),EffectRun<G>>)\n        requires old(self).wf(),run.wf(),ensures final(self).wf(),"
+          "uniqueSourceAnchor": "pub fn put_effect(&mut self,run:EffectRun<G>)->(out:Result<(),EffectRun<G>>)\n        requires old(self).wf(),run.wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),"
         }
       ],
       "selectionRationale": "Removing the origin/domain check permits a foreign runner into the actual map and violates Execution::wf. Require fresh selected positive verification, whole mutant compilation, and this exact invariant postcondition rejection."
@@ -4327,8 +5424,8 @@
       "name": "r2-owner-retires-live-queue",
       "mutation": {
         "file": "execution.rs",
-        "old": "if !self.groups.remove(id) {return Err(run);}",
-        "new": "// Negative: return the runner while its queue remains live."
+        "old": "let (payload,_observation)=self.retire_with_status(run)?;Ok(payload)",
+        "new": "Ok(run.into_payload())"
       },
       "targets": [
         {
@@ -4439,46 +5536,47 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::reversible_value::Inverse::restore",
+          "function": "cordis_negative::reversible_value::Inverse::restore_following",
           "module": "reversible_value",
           "file": "reversible_value.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "proof {cell.record(before,Event::Restore {inverse:self.state,before,after:cell.state});}"
+          "uniqueSourceAnchor": "cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state}),Ghost(false),Tracked(cause))"
         }
       ],
-      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract."
     },
     {
       "name": "r2-value-forgets-actual-inverse",
       "mutation": {
         "file": "execution.rs",
-        "old": "        let registered=self.register(id,ChildCleanup::Value(applied.inverse));\n        let token=match registered {Ok(token)=>token,Err(_)=>{assert(false);return Err(crate::reversible_value::ValueError::Closed);}};\n        Ok(ValueAdmission {outcome:applied.outcome,next:applied.next,token})",
-        "new": "        Ok(ValueAdmission {outcome:applied.outcome,next:applied.next,token:0})"
+        "old": "        let registered=self.register_inverse(id,applied);\n        Ok(ValueAdmission {outcome,next,token:registered.token,evidence:registered.evidence})",
+        "new": "        let registered=self.register_inverse(id,applied);\n        let _dropped=self.pop(id);\n        Ok(ValueAdmission {outcome,next,token:registered.token,evidence:registered.evidence})"
       },
       "targets": [
         {
           "kind": "module",
           "path": "execution",
-          "descendants": true
+          "descendants": false,
+          "function": "cordis_negative::execution::Execution::apply_value_following"
         }
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::execution::Execution::apply_value",
+          "function": "cordis_negative::execution::Execution::apply_value_following",
           "module": "execution",
           "file": "execution.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_ok() ==> old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)"
+          "uniqueSourceAnchor": "out.is_ok() ==> final(self).cleanup_state().live(id) && old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)"
         }
       ],
-      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+      "selectionRationale": "The public API delegates to this actual causal implementation. Retain the original mutation and named failure contract at its implementation; require a fresh selected positive, complete mutant compilation and exact diagnostic rejection."
     },
     {
       "name": "r2-value-confirms-failed-restore",
       "mutation": {
         "file": "cleanup_completion.rs",
-        "old": "let report=self.accept_result(ticket,Err(crate::reversible_value::ValueError::Interference),",
-        "new": "let report=self.accept_result(ticket,Ok(()),"
+        "old": "let _accepted=self.complete_following(ticket,RestoreOutcome::Failed,\n                    Some(crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse)),Tracked(cause));\n                assert(_accepted.is_ok());\n                (CleanupReport {result:Err(crate::reversible_value::ValueError::Interference),outcome:RestoreOutcome::Failed,discarded:None},None)",
+        "new": "let _discarded=inverse;\n                let _accepted=self.complete_following(ticket,RestoreOutcome::Succeeded,None,Tracked(cause));\n                assert(_accepted.is_ok());\n                (CleanupReport {result:Ok(()),outcome:RestoreOutcome::Succeeded,discarded:None},None)"
       },
       "targets": [
         {
@@ -4496,7 +5594,7 @@
           "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.corresponds(inverse) && !final(self).issued()"
         }
       ],
-      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence."
+      "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence. Preserve the false-success fault after typed completion replaced accept_result: acknowledge a blocked restore as succeeded and discard its real inverse."
     },
     {
       "name": "r2-value-program-skips-continuation",
@@ -4514,7 +5612,7 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::reversible_value::ReversibleValue::run",
+          "function": "cordis_negative::reversible_value::ReversibleValue::run_following",
           "module": "reversible_value::program",
           "file": "value_program.rs",
           "diagnosticKind": "invariant not satisfied",
@@ -4593,7 +5691,7 @@
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "assertion failed",
-          "uniqueSourceAnchor": "assert(self.linked(id));assert(prior.linked(id));self.generation_step(&prior,id,Rule::Finish);self.transition(&prior,id,Rule::Finish);"
+          "uniqueSourceAnchor": "assert(self.linked(id));assert(prior.linked(id));self.generation_step(&prior,id,Rule::Finish);"
         }
       ],
       "selectionRationale": "Require the actual native aggregate to preserve its joint registry/publication invariant and continuous history. A fresh selected positive proof, whole-mutant compilation and exact named contract rejection are required."
@@ -4618,7 +5716,7 @@
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));self.generation_step(&prior,id,Rule::Unload);self.transition(&prior,id,Rule::Unload);}"
+          "uniqueSourceAnchor": "if out.is_ok() {self.transition(Ghost(prior),Ghost(id),Ghost(Rule::Unload));}"
         }
       ],
       "selectionRationale": "Require the actual native aggregate to preserve its joint registry/publication invariant and continuous history. A fresh selected positive proof, whole-mutant compilation and exact named contract rejection are required."
@@ -4652,7 +5750,7 @@
       "name": "r2-capture-accepts-foreign-work",
       "mutation": {
         "file": "native_values.rs",
-        "old": "&& values.work_domain==work.domain() && !values.closed}",
+        "old": "&& values.context.work_domain==work.domain() && !values.closed}",
         "new": "&& !values.closed}"
       },
       "targets": [
@@ -4672,6 +5770,156 @@
         }
       ],
       "selectionRationale": "Tie actual native values to their Begin capture and work domain through publication and release. Require a fresh scoped positive proof, whole-mutant compilation and rejection by the named contract."
+    },
+    {
+      "name": "r2-registration-discards-realms",
+      "mutation": {
+        "file": "plugin_registration.rs",
+        "old": "realms:RealmContext::from_map(realms.clone()),dependencies,provisions,revision:0",
+        "new": "realms:RealmContext::default(),dependencies,provisions,revision:0"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::register_plugin",
+          "module": "lifecycle_state::registration",
+          "file": "plugin_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let plugin=out->Ok_0;"
+        }
+      ],
+      "selectionRationale": "Registration and Begin must retain the actual realm/anchor; admitted callbacks must use their own live queue scope. Fresh positive verification, complete mutant compilation and exact contract rejection are required; numeric scopes do not prove arbitrary host pointer identity."
+    },
+    {
+      "name": "r2-capture-substitutes-anchor",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "let anchor=registration.anchor();",
+        "new": "let anchor=Port {key:registration.anchor().key ^ 1,realm:registration.anchor().realm};"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::capture_native_values",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.wf() && !out.closed() && out.owned()==Map::empty()"
+        }
+      ],
+      "selectionRationale": "Registration and Begin must retain the actual realm/anchor; admitted callbacks must use their own live queue scope. Fresh positive verification, complete mutant compilation and exact contract rejection are required; numeric scopes do not prove arbitrary host pointer identity."
+    },
+    {
+      "name": "r2-effect-scope-selects-root",
+      "mutation": {
+        "file": "setup_context.rs",
+        "old": "self.scope_for_group(run.id())",
+        "new": "self.scope_for_group(0)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "setup_context",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::admit_scoped_effect",
+          "module": "setup_context",
+          "file": "setup_context.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().matches(final(self))"
+        }
+      ],
+      "selectionRationale": "Registration and Begin must retain the actual realm/anchor; admitted callbacks must use their own live queue scope. Fresh positive verification, complete mutant compilation and exact contract rejection are required; numeric scopes do not prove arbitrary host pointer identity."
+    },
+    {
+      "name": "r2-effect-call-accepts-foreign-scope",
+      "mutation": {
+        "file": "effect_work.rs",
+        "old": "if !argument.0.accepts_effect(self.identity.origin,self.identity.group,self.identity.domain) {return Err((self,argument,callback));}",
+        "new": "if false && !argument.0.accepts_effect(self.identity.origin,self.identity.group,self.identity.domain) {return Err((self,argument,callback));}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "effect_work",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::effect_work::EffectRun::call_scoped",
+          "module": "effect_work",
+          "file": "effect_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok()==(self.current().is_some() && !self.called() && argument.0.matches_effect(self.identity())),"
+        }
+      ],
+      "selectionRationale": "Registration and Begin must retain the actual realm/anchor; admitted callbacks must use their own live queue scope. Fresh positive verification, complete mutant compilation and exact contract rejection are required; numeric scopes do not prove arbitrary host pointer identity."
+    },
+    {
+      "name": "r2-native-context-substitutes-owner",
+      "mutation": {
+        "file": "native_values.rs",
+        "old": "pub fn owner(&self)->(out:usize) ensures out==self.origin().id, {self.origin.id}",
+        "new": "pub fn owner(&self)->(out:usize) ensures out==self.origin().id, {self.origin.id ^ 1}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::NativeContext::owner",
+          "module": "lifecycle_state::services",
+          "file": "native_values.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "pub fn owner(&self)->(out:usize) ensures out==self.origin().id,"
+        }
+      ],
+      "selectionRationale": "The actual native context must report Begin ownership and feed the admitted effect queue with Begin bindings. Require a fresh positive, complete mutant compilation and exact contract rejection; no host pointer-identity proof is inferred."
+    },
+    {
+      "name": "r2-native-effect-substitutes-bindings",
+      "mutation": {
+        "file": "setup_context.rs",
+        "old": "let committed=context.committed_vec();",
+        "new": "let _context=context;let committed=Vec::new();"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "setup_context",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::enqueue_native_effect",
+          "module": "setup_context",
+          "file": "setup_context.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> old(self).capture().is_some()\n                && out->Ok_0==old(self).cleanup_state().next_id()\n                && final(self).cleanup_state().queues().contains_key(out->Ok_0)\n                && final(self).cleanup_state().queues().remove(out->Ok_0)==old(self).cleanup_state().queues()\n                && final(self).cleanup_state().queues()[out->Ok_0].protocol().stage().committed_view()==old(self).capture().unwrap().bindings\n                && final(self).work_state().group_requests().last().value().payload()==payload\n                && final(self).work_state().group_requests().last().value().identity().matches(&final(self).cleanup_state()),"
+        }
+      ],
+      "selectionRationale": "The actual native context must report Begin ownership and feed the admitted effect queue with Begin bindings. Require a fresh positive, complete mutant compilation and exact contract rejection; no host pointer-identity proof is inferred."
     },
     {
       "name": "r2-capture-forgets-begin-sources",
@@ -4703,7 +5951,7 @@
       "mutation": {
         "file": "native_values.rs",
         "old": "values:values.owned.clone(),capture:Ghost(values.capture())",
-        "new": "values:values.owned.clone(),capture:Ghost(Capture {origin:values.capture().origin,work_domain:values.capture().work_domain,control:self.control(),provisions:values.capture().provisions,bindings:values.capture().bindings,imports:values.capture().imports,sources:values.capture().sources})"
+        "new": "values:values.owned.clone(),capture:Ghost(Capture {origin:values.capture().origin,work_domain:values.capture().work_domain,realms:values.capture().realms,anchor:values.capture().anchor,control:self.control(),provisions:values.capture().provisions,bindings:values.capture().bindings,imports:values.capture().imports,sources:values.capture().sources})"
       },
       "targets": [
         {
@@ -4727,8 +5975,8 @@
       "name": "r2-root-call-skips-live-episode",
       "mutation": {
         "file": "native_host.rs",
-        "old": "if invocation.lifecycle_ticket().id!=id || !self.lifecycle.accepts_root_invocation(invocation.lifecycle_ticket()) {return Err(invocation);}",
-        "new": "// Negative: execute without revalidating the admitted lifecycle."
+        "old": "if invocation.lifecycle_ticket().id!=id || !self.lifecycle.accepts_root_invocation(invocation.lifecycle_ticket()) {return Err(invocation);}\n        match self.entries.get_mut(&id) {Some(entry)=>entry.registration.call(invocation),None=>Err(invocation)}",
+        "new": "// Negative: execute without revalidating the admitted lifecycle.\n        match self.entries.get_mut(&id) {Some(entry)=>entry.registration.call(invocation),None=>Err(invocation)}"
       },
       "targets": [
         {
@@ -4743,7 +5991,7 @@
           "module": "lifecycle_state::native",
           "file": "native_host.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_ok()==(old(self).entries().contains_key(id) && invocation.owner()==id"
+          "uniqueSourceAnchor": "out.is_ok()==(old(self).entries().contains_key(id) && invocation.owner()==id\n                && invocation.domain_id()==old(self).state().protocol().domain_id()"
         }
       ],
       "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
@@ -4818,7 +6066,7 @@
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "assertion failed",
-          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));assert(!prior.publications().entries().contains_key(id));self.transition(&prior,id,Rule::Begin);}"
+          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));assert(!prior.publications().entries().contains_key(id));}"
         }
       ],
       "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
@@ -4843,7 +6091,7 @@
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "assertion failed",
-          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));self.generation_step(&prior,id,Rule::Unload);self.transition(&prior,id,Rule::Unload);} else {self.state().control().unchanged_observations(&prior.state().control());self.unchanged(&prior);}"
+          "uniqueSourceAnchor": "if out.is_ok() {assert(prior.linked(id));assert(self.linked(id));self.generation_step(&prior,id,Rule::Unload);}"
         }
       ],
       "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
@@ -4868,10 +6116,1697 @@
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "assertion failed",
-          "uniqueSourceAnchor": "assert(self.linked(id));assert(prior.linked(id));self.generation_step(&prior,id,Rule::Finish);self.transition(&prior,id,Rule::Finish);"
+          "uniqueSourceAnchor": "assert(self.linked(id));assert(prior.linked(id));self.generation_step(&prior,id,Rule::Finish);"
         }
       ],
       "selectionRationale": "Revalidate actual root invocation and preserve the native Begin owner through successful Unload. Require a fresh same-selector positive proof, whole-mutant compilation and the named semantic contract rejection; numeric domain allocation and opaque callback effects remain separate boundaries."
+    },
+    {
+      "name": "r2-cursor-skips-owner",
+      "mutation": {
+        "file": "value_cursor.rs",
+        "old": "if !self.accepts_acquisition(id) || !cursor.owner.check(self,id) {return Err(ValueError::Closed);}",
+        "new": "if !self.accepts_acquisition(id) {return Err(ValueError::Closed);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::cursor",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::advance_value_program",
+          "module": "reversible_value::cursor",
+          "file": "value_cursor.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "(out==Err(ValueError::Closed))==!(old(cursor).owner().matches(old(self),id)"
+        }
+      ],
+      "selectionRationale": "Exercise the real interleaved program owner: the actual stored continuation, authenticated episode/group, and actual cleanup inverse must stay connected. Require fresh selected positive proofs, a compiling whole-crate mutant, and rejection at the named contract. This is scoped evidence only."
+    },
+    {
+      "name": "r2-cursor-skips-stored-continuation",
+      "mutation": {
+        "file": "value_cursor.rs",
+        "old": "self.checkpoint=snapshot;self.next=next;",
+        "new": "self.checkpoint=snapshot;self.next=None;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::cursor",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::cursor::Cursor::advance",
+          "module": "reversible_value::cursor",
+          "file": "value_cursor.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),final(self).same_program(old(self)),final(self).checkpoint().extends(&old(self).checkpoint()),"
+        }
+      ],
+      "selectionRationale": "Exercise the real interleaved program owner: the actual stored continuation, authenticated episode/group, and actual cleanup inverse must stay connected. Require fresh selected positive proofs, a compiling whole-crate mutant, and rejection at the named contract. This is scoped evidence only."
+    },
+    {
+      "name": "r2-cursor-drops-registered-inverse",
+      "mutation": {
+        "file": "value_cursor.rs",
+        "old": "let _registered=self.register_inverse(id,applied);\n        proof {cursor.last_registration=Ghost(Some(_registered.evidence@));}",
+        "new": "let _inverse=applied.inverse;\n        proof {cursor.last_registration=Ghost(None);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::cursor",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::advance_value_program",
+          "module": "reversible_value::cursor",
+          "file": "value_cursor.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() && out->Ok_0.is_some() ==> {\n                let slots=final(self).cleanup_state().queues()[id].slots();let prior=old(self).cleanup_state().queues()[id].slots();"
+        }
+      ],
+      "selectionRationale": "Exercise the real interleaved program owner: the actual stored continuation, authenticated episode/group, and actual cleanup inverse must stay connected. Require fresh selected positive proofs, a compiling whole-crate mutant, and rejection at the named contract. This is scoped evidence only."
+    },
+    {
+      "name": "r2-host-cancel-finishes-effect",
+      "mutation": {
+        "file": "host_status.rs",
+        "old": "let ghost before=cell.state();cell.cancelled=true;\n            proof {reveal(joint::host::step);}cell.commit(Ghost(before),Ghost(Event::Cancel));",
+        "new": "let ghost before=cell.state();cell.cancelled=true;cell.finished=true;\n            proof {reveal(joint::host::step);}cell.commit(Ghost(before),Ghost(Event::Cancel));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "host_status",
+          "descendants": false,
+          "function": "cordis_negative::host_status::HostStatus::cancel"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::host_status::HostStatus::cancel",
+          "module": "host_status",
+          "file": "host_status.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "proof {reveal(joint::host::step);}cell.commit(Ghost(before),Ghost(Event::Cancel));"
+        }
+      ],
+      "selectionRationale": "Set the actual completion field while requesting cancellation. A pending stage or inverse must remain incomplete. Require a fresh matching positive, complete mutant compilation and the named transition-contract rejection; no whole-negative or milestone claim."
+    },
+    {
+      "name": "r2-host-finish-skips-retirement",
+      "mutation": {
+        "file": "host_status.rs",
+        "old": "if !self.groups.remove(id) {return Err(run);}",
+        "new": "// Negative: publish completion without removing the actual cleanup group."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "host_status",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::retire_with_status",
+          "module": "host_status",
+          "file": "host_status.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.0==run.payload() && !final(self).cleanup_state().live(run.identity().group_id())\n                && run.identity().group_id()<final(self).cleanup_state().next_id()"
+        }
+      ],
+      "selectionRationale": "Skip removal of the actual cleanup group inside the shared retirement implementation. The successful-return contract must reject a live group before completion can be accepted. Require a fresh matching positive, complete mutant compilation and the exact named postcondition rejection; the original guard and diagnostic criteria remain unchanged."
+    },
+    {
+      "name": "r2-poll-restart-clears-cleanup",
+      "mutation": {
+        "file": "poll_control.rs",
+        "old": "let running=phase!=Phase::Inactive;let ghost before=control.state();let discarded=control.failed.take();control.restart=running;",
+        "new": "let running=phase!=Phase::Inactive;let ghost before=control.state();let discarded=control.failed.take();control.restart=running;control.cleanup_failure=None;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "poll_control",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::request_restart",
+          "module": "poll_control",
+          "file": "poll_control.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "control.commit(view,Ghost(before),Ghost(Event::Restart {running}));Ok(discarded)"
+        }
+      ],
+      "selectionRationale": "Exercise the real shared-episode/polling path: retained failures, actual Begin membership, rejected retry or foreign-handle rejection. Require fresh selected positives, complete mutant compilation and the exact named contract failure; ordinary Arc/Mutex identity is still an explicit host boundary."
+    },
+    {
+      "name": "r2-poll-begin-binds-other-group",
+      "mutation": {
+        "file": "poll_control.rs",
+        "old": "control.groups=Ghost(Some(execution.cleanup_state().link().unwrap().1));",
+        "new": "control.groups=Ghost(Some(execution.cleanup_state().link().unwrap().1+1));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "poll_control",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::begin_controlled_execution",
+          "module": "poll_control",
+          "file": "poll_control.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "control.commit(view,Ghost(before),Ghost(Event::Begin {episode:execution.origin().unwrap(),work_domain:domain,groups:execution.cleanup_state().link().unwrap().1}));Ok((execution,discarded))"
+        }
+      ],
+      "selectionRationale": "Exercise the real shared-episode/polling path: retained failures, actual Begin membership, rejected retry or foreign-handle rejection. Require fresh selected positives, complete mutant compilation and the exact named contract failure; ordinary Arc/Mutex identity is still an explicit host boundary."
+    },
+    {
+      "name": "r2-poll-retry-clears-on-rejection",
+      "mutation": {
+        "file": "poll_control.rs",
+        "old": "let ticket=self.retry_managed_execution(id,execution)?;",
+        "new": "let ticket=match self.retry_managed_execution(id,execution) {Ok(ticket)=>ticket,Err(error)=>{control.cleanup_failure=None;return Err(error);}};"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "poll_control",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::retry_controlled_execution",
+          "module": "poll_control",
+          "file": "poll_control.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),final(execution).wf(),final(control).wf(),final(control).bound(final(self)),final(control).key()==old(control).key(),\n            final(control).setup_error()==old(control).setup_error(),\n            out.is_err() ==> *final(control)==*old(control),"
+        }
+      ],
+      "selectionRationale": "Exercise the real shared-episode/polling path: retained failures, actual Begin membership, rejected retry or foreign-handle rejection. Require fresh selected positives, complete mutant compilation and the exact named contract failure; ordinary Arc/Mutex identity is still an explicit host boundary."
+    },
+    {
+      "name": "r2-host-accepts-foreign-origin",
+      "mutation": {
+        "file": "host_status.rs",
+        "old": "let status=HostStatus::new(journal,Kind::Effect {group:id,domain:queue.domain()},Some(EpisodeIdentity {origin:self.lifecycle_ticket(),work_domain:self.work().domain()}),Ghost(Some(self.cleanup_state().link().unwrap().1)));",
+        "new": "let status=HostStatus::new(journal,Kind::Effect {group:id,domain:queue.domain()},None,Ghost(Some(self.cleanup_state().link().unwrap().1)));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "host_status",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::effect_status",
+          "module": "host_status",
+          "file": "host_status.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),final(self).work_state()==old(self).work_state(),final(self).cleanup_state()==old(self).cleanup_state(),"
+        }
+      ],
+      "selectionRationale": "The owner-selected API has no foreign status parameter. Mutate its real factory to install an unbound status; the Execution invariant must reject it. Require fresh matching positives, whole-mutant compilation and the exact named ownership-contract failure."
+    },
+    {
+      "name": "r2-service-function-substitutes-operation",
+      "mutation": {
+        "file": "service_function.rs",
+        "old": "code.push(Call {port,instruction:call.instruction});i+=1;",
+        "new": "code.push(Call {port,instruction:Instruction {operation:super::Operation::Replace(0),branch:call.instruction.branch}});i+=1;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::service_function",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::service_function::Function::bind",
+          "module": "reversible_value::service_function",
+          "file": "service_function.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "forall|j:int| 0<=j<i ==> (#[trigger] code@[j]).instruction==self.code()[j].instruction"
+        }
+      ],
+      "selectionRationale": "Stored registered function binding, qualified dynamic allocation semantics and exact accumulated inverse order. The binding mutation changes runtime code; the other two alter the semantic interpretation used by actual producer contracts. Require same-source positive proof, whole-mutant compilation, and only the named verification rejection. Scoped evidence, not whole-R2 acceptance."
+    },
+    {
+      "name": "r2-service-resolution-discards-domain",
+      "mutation": {
+        "file": "service_composition.rs",
+        "old": "Address {journal:receipt.journal(),key:receipt.event().key}",
+        "new": "Address {journal:arbitrary(),key:receipt.event().key}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::service_composition",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::service_composition::address_origin"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::service_composition::address_origin",
+          "module": "reversible_value::service_composition",
+          "file": "service_composition.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "address(write).journal==write.admission.registration().write().journal(),"
+        }
+      ],
+      "selectionRationale": "Stored registered function binding, qualified dynamic allocation semantics and exact accumulated inverse order. The binding mutation changes runtime code; the other two alter the semantic interpretation used by actual producer contracts. Require same-source positive proof, whole-mutant compilation, and only the named verification rejection. Scoped evidence, not whole-R2 acceptance."
+    },
+    {
+      "name": "r2-service-stack-restores-oldest-first",
+      "mutation": {
+        "file": "service_stack.rs",
+        "old": "match inverse_step(inverses.last(),heap) {Some(previous)=>queued_undo(inverses.drop_last(),previous),None=>None}",
+        "new": "match inverse_step(inverses.first(),heap) {Some(previous)=>queued_undo(inverses.drop_last(),previous),None=>None}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::service_stack",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::service_stack::same_stack",
+          "module": "reversible_value::service_stack",
+          "file": "service_stack.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures queued_undo(inverses,heap)==undo(steps,heap),"
+        }
+      ],
+      "selectionRationale": "Stored registered function binding, qualified dynamic allocation semantics and exact accumulated inverse order. The binding mutation changes runtime code; the other two alter the semantic interpretation used by actual producer contracts. Require same-source positive proof, whole-mutant compilation, and only the named verification rejection. Scoped evidence, not whole-R2 acceptance."
+    },
+    {
+      "name": "r2-multiservice-accepts-undeclared-body",
+      "mutation": {
+        "file": "service_program.rs",
+        "old": "if !episode.declares_service(self.code[i].port) {return Some(i);}",
+        "new": "if false {return Some(i);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::services",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::services::Program::missing"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::services::Program::missing",
+          "module": "reversible_value::services",
+          "file": "service_program.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "forall|j:int| 0<=j<i ==> access::declared(*episode,#[trigger] self.code()[j].port)"
+        }
+      ],
+      "selectionRationale": "Multi-service native body declarations, retained failed prefixes, authentic inter-call ordering and complete dynamic alias frames. The cause and frame mutations alter proof instrumentation; none of these controls claims whole-kernel or R2 acceptance."
+    },
+    {
+      "name": "r2-multiservice-discards-failed-prefix",
+      "mutation": {
+        "file": "service_program.rs",
+        "old": "Self {steps,failure:Some(failure),receipts}",
+        "new": "Self {steps,failure:None,receipts}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::services",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::services::Report::failed"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::services::Report::failed",
+          "module": "reversible_value::services",
+          "file": "service_program.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.failure==Some(failure),"
+        }
+      ],
+      "selectionRationale": "The actual run_service_program failure return calls Report::failed. Mutating that result-transfer boundary preserves the successful steps but discards the real final rejection; the exact failure/prefix postcondition must reject it. Require a fresh same-selector positive and whole-mutant compilation. This replaces the former in-loop mutation after extracting the actual constructor to avoid unrelated trace-expansion limits."
+    },
+    {
+      "name": "r2-multiservice-loses-prior-cause",
+      "mutation": {
+        "file": "joint_execution.rs",
+        "old": "if let Some(ref receipt)=second {if receipt.journal()==*self {_cell.history.borrow().extends(&receipt.witness);}}",
+        "new": "// Negative: omit the actual prior completion witness."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::joint",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::joint::Journal::join_causes"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::joint::Journal::join_causes",
+          "module": "reversible_value::joint",
+          "file": "joint_execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "second.is_some() && second.unwrap().journal()==*self ==> out@.is_some() && out@.unwrap().covers(&second.unwrap())"
+        }
+      ],
+      "selectionRationale": "Multi-service native body declarations, retained failed prefixes, authentic inter-call ordering and complete dynamic alias frames. The cause and frame mutations alter proof instrumentation; none of these controls claims whole-kernel or R2 acceptance."
+    },
+    {
+      "name": "r2-multiservice-frames-only-first-write",
+      "mutation": {
+        "file": "service_program.rs",
+        "old": "values.dom().filter(|key:K|exists|i:int|0<=i<self.steps.len() && {",
+        "new": "values.dom().filter(|key:K|exists|i:int|i==0 && 0<=i<self.steps.len() && {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::services",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::services::Report::includes_affected"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::services::Report::includes_affected",
+          "module": "reversible_value::services",
+          "file": "service_program.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures self.affected(values,journal).contains(key),"
+        }
+      ],
+      "selectionRationale": "Multi-service native body declarations, retained failed prefixes, authentic inter-call ordering and complete dynamic alias frames. The cause and frame mutations alter proof instrumentation; none of these controls claims whole-kernel or R2 acceptance."
+    },
+    {
+      "name": "r2-native-call-substitutes-declared-port",
+      "mutation": {
+        "file": "value_access.rs",
+        "old": "let binding=match values.read_reversible(port) {Ok(binding)=>binding,Err(error)=>return Err(Error::Read(error))};",
+        "new": "let binding=match values.read_reversible(Port {key:0,realm:port.realm}) {Ok(binding)=>binding,Err(error)=>return Err(Error::Read(error))};"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::access",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::apply_native_value",
+          "module": "reversible_value::access",
+          "file": "value_access.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;"
+        }
+      ],
+      "selectionRationale": "Actual native access uses the requested declared port, retains the capture-to-write causal prefix, and frames current services by allocation aliases. Fresh selected positive, whole-mutant compilation and exact rejection are required; this is not a whole-kernel or R2 acceptance claim."
+    },
+    {
+      "name": "r2-native-write-loses-selection-cause",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "let result=cell.forward_following(op,branch,Ghost(managed),Tracked(cause));",
+        "new": "let result=cell.forward(op,branch,Ghost(managed));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::ReversibleValue::apply_pending_following"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::ReversibleValue::apply_pending_following",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "cause.is_some() && cause.unwrap().journal()==self.journal_spec() ==> final(attempts).events().last().follows(&cause.unwrap())"
+        }
+      ],
+      "selectionRationale": "Actual native access uses the requested declared port, retains the capture-to-write causal prefix, and frames current services by allocation aliases. Fresh selected positive, whole-mutant compilation and exact rejection are required; this is not a whole-kernel or R2 acceptance claim."
+    },
+    {
+      "name": "r2-service-frame-ignores-aliases",
+      "mutation": {
+        "file": "native_slot_observation.rs",
+        "old": "=>selection.object.key==object,",
+        "new": "=>false,"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services::slots",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::services::slots::project_value_step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::slots::project_value_step",
+          "module": "lifecycle_state::services::slots",
+          "file": "native_slot_observation.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert forall|key:K| values.contains_key(key) && !affected(values,journal,before,event.key).contains(key) implies\n        #[trigger] projection(values,journal,after)[key]==projection(values,journal,before)[key] by {"
+        }
+      ],
+      "selectionRationale": "Actual native access uses the requested declared port, retains the capture-to-write causal prefix, and frames current services by allocation aliases. Fresh selected positive, whole-mutant compilation and exact rejection are required; this is not a whole-kernel or R2 acceptance claim."
+    },
+    {
+      "name": "r2-slot-allocates-without-object-receipt",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "journal.allocate_referencing(Ghost(joint::Record::Slot {source,revision:0,object:value.object()}),Tracked(Some(target)))",
+        "new": "journal.allocate_referencing(Ghost(joint::Record::Slot {source,revision:0,object:value.object()}),Tracked(None))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::slot::Slot::new"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::slot::Slot::new",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "journal.allocate_referencing(Ghost(joint::Record::Slot {source,revision:0,object:value.object()}),Tracked(None))"
+        }
+      ],
+      "selectionRationale": "Actual slot commits require the target allocation receipt; current observations resolve the object selected by the slot and preserve aliases. Require a fresh selected positive, complete mutant compilation and exact named-contract rejection. Other modules and full-suite acceptance are outside this selected control."
+    },
+    {
+      "name": "r2-slot-replacement-borrows-old-object-receipt",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "let (_domain,Tracked(target))=value.reference();",
+        "new": "let (_domain,Tracked(target))=self.capture().value().reference();"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::slot::Slot::replace"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::slot::Slot::replace",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "cell.joint.update_following(Ghost(joint::Record::Slot {source:self.source(),revision:cell.value.revision_spec(),object:value.object()}),\n                    Ghost(joint::Change::Replace),Tracked(Some(target)),Ghost(false),Tracked(None))"
+        }
+      ],
+      "selectionRationale": "Actual slot commits require the target allocation receipt; current observations resolve the object selected by the slot and preserve aliases. Require a fresh selected positive, complete mutant compilation and exact named-contract rejection. Other modules and full-suite acceptance are outside this selected control."
+    },
+    {
+      "name": "r2-slot-projection-reads-slot-as-object",
+      "mutation": {
+        "file": "value_references.rs",
+        "old": "source:state[object.key]->Object_source,state:state[object.key]->Object_state",
+        "new": "source:state[object.key]->Object_source,state:state[key]->Object_state"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::joint::references",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::joint::references::aliases"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::joint::references::aliases",
+          "module": "reversible_value::joint::references",
+          "file": "value_references.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "resolve(state,domain,a).unwrap()->Local_state==resolve(state,domain,b).unwrap()->Local_state"
+        }
+      ],
+      "selectionRationale": "Actual slot commits require the target allocation receipt; current observations resolve the object selected by the slot and preserve aliases. Require a fresh selected positive, complete mutant compilation and exact named-contract rejection. Other modules and full-suite acceptance are outside this selected control."
+    },
+    {
+      "name": "r2-slot-capture-borrows-other-commit",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "let tracked commit=self.joint.receipt();",
+        "new": "let other=Slot::new(value.clone());let Tracked(commit)=other.receipt();"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::slot::Cell::capture"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::slot::Cell::capture",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.wf(),out.slot()==*slot,out.revision_spec()==self.value.revision_spec()"
+        }
+      ],
+      "selectionRationale": "Require a fresh same-selector positive, whole-mutant compilation, and rejection of the exact actual-slot provenance or complete-service-map contract. Foreign objects and opaque payloads remain explicit boundaries; resource failures never count as rejection."
+    },
+    {
+      "name": "r2-publication-omits-slot-evidence",
+      "mutation": {
+        "file": "native_slot_observation.rs",
+        "old": "if let Some(slot)=value.reversible() {evidence.add(slot);}",
+        "new": "if let Some(_slot)=value.reversible() {}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services::slots",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::services::slots::collect"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::slots::collect",
+          "module": "lifecycle_state::services::slots",
+          "file": "native_slot_observation.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "forall|j:int| 0<=j<iter.index() && #[trigger] sequence[j].managed().is_some() ==> evidence.contains(sequence[j].managed().unwrap())"
+        }
+      ],
+      "selectionRationale": "Require a fresh same-selector positive, whole-mutant compilation, and rejection of the exact actual-slot provenance or complete-service-map contract. Foreign objects and opaque payloads remain explicit boundaries; resource failures never count as rejection."
+    },
+    {
+      "name": "r2-episode-omits-import-slot-evidence",
+      "mutation": {
+        "file": "native_slot_observation.rs",
+        "old": "collect(&self.imports,evidence);",
+        "new": "// Negative: omit the actual Begin imports."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::services::slots",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::NativeEpisode::collect_slots",
+          "module": "lifecycle_state::services::slots",
+          "file": "native_slot_observation.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "covered(self.owned(),*final(evidence)) && covered(self.imports(),*final(evidence))"
+        }
+      ],
+      "selectionRationale": "Require a fresh same-selector positive, whole-mutant compilation, and rejection of the exact actual-slot provenance or complete-service-map contract. Foreign objects and opaque payloads remain explicit boundaries; resource failures never count as rejection."
+    },
+    {
+      "name": "r2-slot-accepts-stale-capture",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "let accepted=result && current.revision==self.revision;",
+        "new": "let accepted=result;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::slot::Capture::check_result",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.accepted_spec()==(result && out.current().revision_spec()==self.revision_spec())"
+        }
+      ],
+      "selectionRationale": "Check the actual typed slot boundary. The same-selector positive must pass, the complete mutant must compile, and the named contract must reject this canonical executable mutation. This development candidate is not full negative-regression acceptance."
+    },
+    {
+      "name": "r2-slot-substitutes-replacement",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "let previous=cell.capture(self);",
+        "new": "let previous=cell.capture(self);let value=cell.value.get().clone();let (_domain,Tracked(target))=value.reference();"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::slot::Slot::replace",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.previous().slot()==*self\n            && out->Ok_0.current().value_spec()==value"
+        },
+        {
+          "function": "cordis_negative::reversible_value::slot::Slot::replace",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> out->Err_0.value==value && out->Err_0.error==crate::versioned_value::ReplaceError::Capacity"
+        }
+      ],
+      "selectionRationale": "Check the actual typed slot boundary. The same-selector positive must pass, the complete mutant must compile, and the named contract must reject this canonical executable mutation. This development candidate is not full negative-regression acceptance. Substituting the supplied object violates both the successful replacement and capacity-rejection payload contracts; require both exact diagnostics from the same function."
+    },
+    {
+      "name": "r2-slot-reads-wrong-realm",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "match self.read(port) {Ok(value)=>value,Err(error)=>return Err(ReadError::Native(error))}",
+        "new": "match self.read(Port {key:port.key,realm:0}) {Ok(value)=>value,Err(error)=>return Err(ReadError::Native(error))}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::NativeEpisode::read_reversible",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> !self.closed() && out->Ok_0.wf() && out->Ok_0.port_spec()==port\n            && self.selects_slot(out->Ok_0.provider_spec(),port,out->Ok_0.capture_spec().slot())"
+        }
+      ],
+      "selectionRationale": "Check the actual typed slot boundary. The same-selector positive must pass, the complete mutant must compile, and the named contract must reject this canonical executable mutation. This development candidate is not full negative-regression acceptance."
+    },
+    {
+      "name": "r2-joint-value-omits-commit",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "let pending=self.joint.update_following(Ghost(joint::Record::Object {source:self.authority@.source(),state:self.state}),Ghost(joint::Change::Value {event}),Tracked(cause),Ghost(managed),Tracked(None));\n        proof {\n            joint::append_indexed(events,self.positions@,frames,self.joint.events(),self.joint.key(),event);\n            let prior=self.positions@;\n            self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));\n            assert(self.positions@.take(prior.len() as int) =~= prior);\n        }",
+        "new": "// Negative: publish the real object change without its joint commit.\n        let pending=Tracked(None);\n        proof {self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Cell::record_following",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>\n                cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),\n            joint::pending_matches(out@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),\n            final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),"
+        }
+      ],
+      "selectionRationale": "Check the real unified execution and stored finite body. Require a fresh same-selector positive, whole-mutant compilation, and rejection by this named contract; not full negative-regression acceptance. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract."
+    },
+    {
+      "name": "r2-native-misattributes-joint-position",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "self.positions=Ghost(prior.history_positions().push((self.joint.events().len()-1) as nat));",
+        "new": "self.positions=Ghost(prior.history_positions().push(0nat));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::transition"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::transition",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.structural());assert(self.joint_valid());"
+        }
+      ],
+      "selectionRationale": "Reject a wrong native history position or a checkpoint missing the actual work/cleanup owners. Require same-selector positive, whole-mutant compilation and a named contract diagnostic; resource limits and unrelated failures are not accepted."
+    },
+    {
+      "name": "r2-native-episode-omits-cleanup-observation",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "        self.joint.certify(&view);execution.certify(&view);",
+        "new": "        self.joint.certify(&view);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::episode_snapshot"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::episode_snapshot",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(execution.observed_state(view.state()));"
+        }
+      ],
+      "selectionRationale": "Reject a wrong native history position or a checkpoint missing the actual work/cleanup owners. Require same-selector positive, whole-mutant compilation and a named contract diagnostic; resource limits and unrelated failures are not accepted."
+    },
+    {
+      "name": "r2-joint-control-omits-commit",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "self.joint.update(Ghost(joint::Record::Native {state:self.observation().project(self.execution_history().labels.len())}),Ghost(joint::Change::Native {actor:id,rule}));",
+        "new": "// Negative: publish the real lifecycle change without its joint commit."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::transition"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::transition",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "prior.execution_history().append_indexed(prior.history_positions(),prior.joint.events(),self.joint.events(),self.joint.key(),self.observation(),id,rule);"
+        }
+      ],
+      "selectionRationale": "The exact typed-history indexing now rejects an omitted native commit at append_indexed before joint_valid. Verify the actual transition function, require a fresh positive and full mutant compilation, and match this specific precondition diagnostic. Full impacted-module proofs are separate."
+    },
+    {
+      "name": "r2-function-skips-root-status",
+      "mutation": {
+        "file": "value_function.rs",
+        "old": "fn root_running(status:RootStatus)->(out:bool)\n    ensures out==(status==RootStatus::Queued || status==RootStatus::Running),\n{status==RootStatus::Queued || status==RootStatus::Running}",
+        "new": "fn root_running(status:RootStatus)->(out:bool)\n    ensures out==(status==RootStatus::Queued || status==RootStatus::Running),\n{true}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::function",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::function::root_running",
+          "module": "reversible_value::function",
+          "file": "value_function.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==(status==RootStatus::Queued || status==RootStatus::Running),"
+        }
+      ],
+      "selectionRationale": "Check the real unified execution and stored finite body. Require a fresh same-selector positive, whole-mutant compilation, and rejection by this named contract; not full negative-regression acceptance."
+    },
+    {
+      "name": "r2-value-return-omits-effect-witnesses",
+      "mutation": {
+        "file": "value_function.rs",
+        "old": "Ok(report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),report.program.receipt_witnesses()),",
+        "new": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::function",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_value_root",
+          "module": "reversible_value::function",
+          "file": "value_function.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
+        }
+      ],
+      "selectionRationale": "Discard actual write/inverse/rejection witnesses at the real function return. Require a fresh selected positive, complete mutant compilation and the exact return-contract failure; no proof or resource failure is accepted as rejection."
+    },
+    {
+      "name": "r2-service-return-omits-effect-witnesses",
+      "mutation": {
+        "file": "service_function.rs",
+        "old": "Ok(report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),report.receipt_witnesses()),",
+        "new": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::service_function",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_service_root",
+          "module": "reversible_value::service_function",
+          "file": "service_function.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
+        }
+      ],
+      "selectionRationale": "Discard actual write/inverse/rejection witnesses at the real function return. Require a fresh selected positive, complete mutant compilation and the exact return-contract failure; no proof or resource failure is accepted as rejection."
+    },
+    {
+      "name": "r2-registered-function-substitutes-body",
+      "mutation": {
+        "file": "value_function.rs",
+        "old": "let result=function.run(execution,port);",
+        "new": "let substitute=Function::new(function.key(),Program::new(Vec::new()).unwrap());\n        let function=&substitute;\n        let result=function.run(execution,port);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::function",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_value_root",
+          "module": "reversible_value::function",
+          "file": "value_function.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
+        }
+      ],
+      "selectionRationale": "Bind real registered code and computed completion to actual object history positions. Require a fresh same-selector positive, whole-mutant compilation and the named contract failure; selected development evidence only."
+    },
+    {
+      "name": "r2-registered-function-confirms-failure",
+      "mutation": {
+        "file": "value_function.rs",
+        "old": "let outcome:Result<(),()>=if successful {Ok(())} else {Err(())};",
+        "new": "let outcome:Result<(),()>=Ok(());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::function",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_value_root",
+          "module": "reversible_value::function",
+          "file": "value_function.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
+        }
+      ],
+      "selectionRationale": "Bind real registered code and computed completion to actual object history positions. Require a fresh same-selector positive, whole-mutant compilation and the named contract failure; selected development evidence only."
+    },
+    {
+      "name": "r2-joint-value-misattributes-position",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));",
+        "new": "self.positions=Ghost(self.positions@.push(0nat));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Cell::record_following",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>\n                cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),\n            joint::pending_matches(out@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),\n            final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),"
+        }
+      ],
+      "selectionRationale": "Bind real registered code and computed completion to actual object history positions. Require a fresh same-selector positive, whole-mutant compilation and the named contract failure; selected development evidence only. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract."
+    },
+    {
+      "name": "r2-joint-work-omits-commit",
+      "mutation": {
+        "file": "setup_work.rs",
+        "old": "member.update(Ghost(joint::Record::Work {state:after}),Ghost(joint::Change::Work {event}));",
+        "new": "// Negative: keep the real work mutation but omit its shared history commit."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "setup_work",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::setup_work::SetupWork::commit",
+          "module": "setup_work",
+          "file": "setup_work.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(self).wf(),final(self).same_local(old(self)),final(self).link()==old(self).link(),"
+        }
+      ],
+      "selectionRationale": "Require a fresh positive on the same selector, whole-mutant compilation, and exact joint-observation contract rejection. Development evidence only."
+    },
+    {
+      "name": "r2-joint-cleanup-omits-commit",
+      "mutation": {
+        "file": "cleanup_queue.rs",
+        "old": "member.update(Ghost(joint::Record::Cleanup {state:after}),Ghost(joint::Change::Cleanup {event}));",
+        "new": "// Negative: keep the real cleanup mutation but omit its shared history commit."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::commit",
+          "module": "cleanup_queue",
+          "file": "cleanup_queue.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires old(self).local_wf(),old(self).traces(before),cleanup_step(before,old(self).observation(),event),\n        ensures final(self).wf(),final(self).protocol()==old(self).protocol(),final(self).slots()==old(self).slots(),\n            final(self).issued()==old(self).issued(),final(self).link()==old(self).link(),"
+        }
+      ],
+      "selectionRationale": "Require a fresh positive on the same selector, whole-mutant compilation, and exact joint-observation contract rejection. Development evidence only."
+    },
+    {
+      "name": "r2-register-inverse-omits-edge",
+      "mutation": {
+        "file": "cleanup_queue.rs",
+        "old": "let ghost change=if cause.is_some() && cause.unwrap().journal()==member.journal() && cause.unwrap().forward()\n                    {joint::Change::RegisterInverse {write:cause.unwrap().at()}} else {joint::Change::Cleanup {event:CleanupChange::Register}};",
+        "new": "let ghost change=joint::Change::Cleanup {event:CleanupChange::Register};"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::register_following",
+          "module": "cleanup_queue",
+          "file": "cleanup_queue.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.recorded(final(self).link(),final(self).observation(),cause,joint::pending_index(pending)),"
+        },
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::register_following",
+          "module": "cleanup_queue",
+          "file": "cleanup_queue.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "member.update_following(Ghost(joint::Record::Cleanup {state:after}),Ghost(change),Tracked(cause),Ghost(false),Tracked(pending))"
+        }
+      ],
+      "selectionRationale": "Reject loss of the authenticated write-to-registration edge in the actual queue instrumentation. Require a fresh same-selector positive and whole-mutant compilation; an erased-proof instrumentation mutation, not a runtime fault or full negative-regression result."
+    },
+    {
+      "name": "r2-managed-write-omits-pending",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "let pending=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(managed),Tracked(cause));",
+        "new": "let pending=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(false),Tracked(cause));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::Cell::forward_following"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Cell::forward_following",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> joint::pending_matches(out->Ok_0.pending@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),"
+        }
+      ],
+      "selectionRationale": "The public API delegates to this actual causal implementation. Retain the original mutation and named failure contract at its implementation; require a fresh selected positive, complete mutant compilation and exact diagnostic rejection."
+    },
+    {
+      "name": "r2-registration-drops-pending-capability",
+      "mutation": {
+        "file": "value_registration.rs",
+        "old": "self.groups.register_following(id,ChildCleanup::Value(applied.inverse),Tracked(cause),applied.pending)",
+        "new": "self.groups.register_following(id,ChildCleanup::Value(applied.inverse),Tracked(cause),Tracked(None))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::registration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::register_inverse",
+          "module": "reversible_value::registration",
+          "file": "value_registration.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.evidence@.records(applied.inverse,final(self).cleanup_state().queues()[id].link(),final(self).cleanup_state().queues()[id].protocol().domain_id(),out.token),"
+        }
+      ],
+      "selectionRationale": "Check erased pending-inverse instrumentation in the actual managed executor. Require a fresh same-selector positive, whole-mutant compilation and rejection at this named contract. This is proof instrumentation, not a runtime fault or whole-R2 acceptance."
+    },
+    {
+      "name": "r2-value-discards-write-as-error",
+      "mutation": {
+        "file": "execution.rs",
+        "old": "let outcome=applied.outcome;let next=applied.next;\n        let registered=self.register_inverse(id,applied);\n        Ok(ValueAdmission {outcome,next,token:registered.token,evidence:registered.evidence})",
+        "new": "let _discarded=applied;\n        Err(crate::reversible_value::ValueError::Overflow)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "execution",
+          "descendants": false,
+          "function": "cordis_negative::execution::Execution::apply_value_following"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::apply_value_following",
+          "module": "execution",
+          "file": "execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() && out!=Err(crate::reversible_value::ValueError::Closed) ==>\n                crate::reversible_value::attempt::value_rejection(final(self).value_attempts().event(),operation,out->Err_0),"
+        }
+      ],
+      "selectionRationale": "The public API delegates to this actual causal implementation. Retain the original mutation and named failure contract at its implementation; require a fresh selected positive, complete mutant compilation and exact diagnostic rejection."
+    },
+    {
+      "name": "r2-prepared-discards-write-as-error",
+      "mutation": {
+        "file": "scalar_effect.rs",
+        "old": "let outcome=applied.outcome;let next=applied.next;\n        let registered=self.register_inverse(id,applied);\n        Ok(ValueAdmission {outcome,next,token:registered.token,evidence:registered.evidence})",
+        "new": "let _discarded=applied;\n        Err(EffectError::Rejected)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::effect",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::apply_prepared_effect",
+          "module": "reversible_value::effect",
+          "file": "scalar_effect.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() && out!=Err(EffectError::Closed) ==>\n                super::attempt::effect_rejection(final(self).value_attempts().event(),prepared.code(),prepared.expected(),out->Err_0),"
+        }
+      ],
+      "selectionRationale": "Discard a real committed extensible effect and return Rejected without queuing its inverse. Require the producer-authenticated attempted outcome to reject this loss. Require a fresh matching selected positive proof, whole-mutant compilation and strict rejection at the named contract. This is scoped development evidence, not full regression acceptance."
+    },
+    {
+      "name": "r2-cursor-discards-write-as-error",
+      "mutation": {
+        "file": "value_cursor.rs",
+        "old": "        let outcome=applied.outcome;\n        let _registered=self.register_inverse(id,applied);\n        proof {cursor.last_registration=Ghost(Some(_registered.evidence@));}\n        proof {\n            let prior=old(self).cleanup_state().queues()[id].slots();\n            assert(prior.push(Some(ChildCleanup::<Cb,X>::Value(applied.inverse))).take(prior.len() as int) =~= prior);\n        }\n        Ok(Some(outcome))",
+        "new": "        let _discarded=applied;\n        Err(ValueError::Overflow)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::cursor",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::advance_value_program",
+          "module": "reversible_value::cursor",
+          "file": "value_cursor.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() && out!=Err(ValueError::Closed) ==> old(cursor).next().is_some()\n                && super::attempt::value_rejection(final(cursor).checkpoint().history().last(),"
+        }
+      ],
+      "selectionRationale": "Drop a successful cursor step and report Overflow. The real retained checkpoint must prove rejection, not merely allow the execution owner fields to be unchanged. Require a fresh matching selected positive proof, whole-mutant compilation and strict rejection at the named contract. This is scoped development evidence, not full regression acceptance."
+    },
+    {
+      "name": "r2-program-discards-failed-prefix",
+      "mutation": {
+        "file": "value_program.rs",
+        "old": "let batch=value.run_following(program,Ghost(managed),Tracked(cause));let ghost all=batch.items@;",
+        "new": "let batch=value.run_following(program,Ghost(managed),Tracked(cause));\n        if batch.report.error.is_some() {return Err(ValueError::Overflow);}\n        let ghost all=batch.items@;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::program",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::run_value_program_following",
+          "module": "reversible_value::program",
+          "file": "value_program.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> *final(self)==*old(self) && out==Err(ValueError::Closed),"
+        }
+      ],
+      "selectionRationale": "The public API delegates to this actual causal implementation. Retain the original mutation and named failure contract at its implementation; require a fresh selected positive, complete mutant compilation and exact diagnostic rejection."
+    },
+    {
+      "name": "r2-value-forges-rejection-code",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "return Err(ValueError::Capacity);",
+        "new": "return Err(ValueError::Overflow);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::Cell::forward_following"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Cell::forward_following",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> attempt::value_rejection(final(self).history@.last(),op,out->Err_0),"
+        }
+      ],
+      "selectionRationale": "The public API delegates to this actual causal implementation. Retain the original mutation and named failure contract at its implementation; require a fresh selected positive, complete mutant compilation and exact diagnostic rejection."
+    },
+    {
+      "name": "r2-value-omits-attempt-receipt",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "proof {attempts.record(&origin);}",
+        "new": "// Negative: omit the real producer receipt while keeping the shared write."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::ReversibleValue::apply_pending",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures final(attempts).appended(old(attempts),self),"
+        }
+      ],
+      "selectionRationale": "Remove the producer-side append of the authenticated receipt. The actual call must extend its owner observation on success and rejection. Require a fresh matching selected positive proof, whole-mutant compilation and strict rejection at the named contract. This is scoped development evidence, not full regression acceptance."
+    },
+    {
+      "name": "r2-effect-forges-stale-rejection",
+      "mutation": {
+        "file": "scalar_effect.rs",
+        "old": "return Err(EffectError::Interference);",
+        "new": "return Err(EffectError::Rejected);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::effect",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::effect::commit_calculated",
+          "module": "reversible_value::effect",
+          "file": "scalar_effect.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),code,expected,out->Err_0)"
+        }
+      ],
+      "selectionRationale": "Misclassify an intervening shared write as rejection by the prepared scalar function. The real stale-computation event must determine the returned error. Require a fresh matching selected positive proof, whole-mutant compilation and strict rejection at the named contract. This is scoped development evidence, not full regression acceptance."
+    },
+    {
+      "name": "r2-alias-forgets-other-bindings",
+      "mutation": {
+        "file": "value_alias.rs",
+        "old": "targets.contains_key(key) && targets[key]==object && aliases(targets,object)==set![key]",
+        "new": "targets.contains_key(key) && targets[key]==object"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::alias",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::alias::single_key_write",
+          "module": "reversible_value::alias",
+          "file": "value_alias.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "view(targets,heap.insert(object,value)) =~= view(targets,heap).insert(key,value)"
+        }
+      ],
+      "selectionRationale": "Check the actual native effect owner, authentic read-to-write cause, and the alias condition needed by the single-key paper lift. One mutation changes runtime admission; the alias/cause mutations weaken semantic or proof evidence. Require a fresh positive proof, whole-mutant compilation and exactly the named rejection, never a timeout or compilation failure. Scoped development evidence, not whole-R2 acceptance."
+    },
+    {
+      "name": "r2-native-effect-skips-owner-check",
+      "mutation": {
+        "file": "native_effect.rs",
+        "old": "if !self.accepts_acquisition(id) {return false;}\n        owner.check(self,id)",
+        "new": "if !self.accepts_acquisition(id) {return false;}\n        true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::native_effect",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::admits_native_effect",
+          "module": "reversible_value::native_effect",
+          "file": "native_effect.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out==(self.work_state().accepts() && self.cleanup_state().acquisition_open(id) && owner.matches(self,id))"
+        }
+      ],
+      "selectionRationale": "Check the actual native effect owner, authentic read-to-write cause, and the alias condition needed by the single-key paper lift. One mutation changes runtime admission; the alias/cause mutations weaken semantic or proof evidence. Require a fresh positive proof, whole-mutant compilation and exactly the named rejection, never a timeout or compilation failure. Scoped development evidence, not whole-R2 acceptance."
+    },
+    {
+      "name": "r2-effect-omits-read-cause",
+      "mutation": {
+        "file": "scalar_effect.rs",
+        "old": "let pending=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(Some(cause.duplicate())));",
+        "new": "let pending=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(None));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::effect",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::effect::commit_calculated",
+          "module": "reversible_value::effect",
+          "file": "scalar_effect.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "final(attempts).events().last().follows(&cause)"
+        }
+      ],
+      "selectionRationale": "Check the actual native effect owner, authentic read-to-write cause, and the alias condition needed by the single-key paper lift. One mutation changes runtime admission; the alias/cause mutations weaken semantic or proof evidence. Require a fresh positive proof, whole-mutant compilation and exactly the named rejection, never a timeout or compilation failure. Scoped development evidence, not whole-R2 acceptance."
+    },
+    {
+      "name": "r2-restore-omits-actual-write",
+      "mutation": {
+        "file": "reversible_value.rs",
+        "old": "cell.state=self.state.before;",
+        "new": "// Negative: report restoration without restoring the real cell."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::Inverse::restore_following",
+          "module": "reversible_value",
+          "file": "reversible_value.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state}),Ghost(false),Tracked(cause))"
+        }
+      ],
+      "selectionRationale": "Keep the restore event and snapshot while removing the actual inverse write. Its real post-state must satisfy the strict inverse. Require a fresh matching selected positive, whole-mutant compilation and strict rejection at the named contract; no full-regression or whole-R2 claim."
+    },
+    {
+      "name": "r2-restore-omits-issue-cause",
+      "mutation": {
+        "file": "cleanup_completion.rs",
+        "old": "inverse.restore_following(Tracked(cause));",
+        "new": "inverse.restore_following(Tracked(None));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue::completion",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::restore_value",
+          "module": "cleanup_queue::completion",
+          "file": "cleanup_completion.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "trace.establish_interval();"
+        }
+      ],
+      "selectionRationale": "Remove the actual issue receipt from restoration while preserving the runtime write. This checks erased causal provenance, not a claimed runtime behavioral fault. Require a fresh matching selected positive, whole-mutant compilation and strict rejection at the named contract; no full-regression or whole-R2 claim. The interval producer now checks this causal relation before constructing its stronger result; require its exact protocol precondition in restore_value, not an arbitrary verification failure."
+    },
+    {
+      "name": "r2-completion-omits-restore-cause",
+      "mutation": {
+        "file": "cleanup_queue.rs",
+        "old": "self.commit_following(Ghost(before),Ghost(CleanupChange::Complete {ticket,outcome,retained:keep}),Tracked(cause));",
+        "new": "self.commit_following(Ghost(before),Ghost(CleanupChange::Complete {ticket,outcome,retained:keep}),Tracked(None));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::complete_following",
+          "module": "cleanup_queue",
+          "file": "cleanup_queue.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() && cause.is_some() && final(self).link().is_some() && cause.unwrap().journal()==final(self).link().unwrap().0 ==>\n                cause.unwrap().events().len()<final(self).trace().len() && final(self).trace().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),"
+        }
+      ],
+      "selectionRationale": "Omit the real restoration receipt from acknowledgement. This erased-instrumentation fault must lose the claimed restore-before-completion relation. Require a fresh matching selected positive, whole-mutant compilation and strict rejection at the named contract; no full-regression or whole-R2 claim."
+    },
+    {
+      "name": "r2-cleanup-hides-completed-action",
+      "mutation": {
+        "file": "cleanup_completion.rs",
+        "old": "Ok(Some(CleanupDispatch::Value {ticket,completion}))",
+        "new": "{let _discarded=completion;Ok(None)}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue::completion",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::dispatch",
+          "module": "cleanup_queue::completion",
+          "file": "cleanup_completion.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_err() || out==Ok(None) ==> final(self).same(old(self)) && final(self).trace()==old(self).trace(),"
+        }
+      ],
+      "selectionRationale": "Execute and acknowledge the actual inverse but return no action. The no-action return must preserve queue state and its authentic trace. Require a fresh matching selected positive, whole-mutant compilation and strict rejection at the named contract; no full-regression or whole-R2 claim."
+    },
+    {
+      "name": "r2-issued-confirms-before-restore",
+      "mutation": {
+        "file": "cleanup_completion.rs",
+        "old": "let (result,Tracked(attempt))=inverse.restore_following(Tracked(cause));",
+        "new": "let _premature=self.complete_following(ticket,RestoreOutcome::Succeeded,None,Tracked(None));\n        let (result,Tracked(attempt))=inverse.restore_following(Tracked(cause));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_queue::completion",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::restore_value",
+          "module": "cleanup_queue::completion",
+          "file": "cleanup_completion.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "let _accepted=self.complete_following(ticket,RestoreOutcome::Succeeded,None,Tracked(cause));\n                assert(_accepted.is_ok());"
+        }
+      ],
+      "selectionRationale": "Acknowledge the issued inverse as succeeded before actually running its guarded restore, then attempt the ordinary result acknowledgement. This changes runtime behavior and must be rejected at the real checked completion boundary. Require a fresh same-selector positive, whole-mutant compilation and the exact named proof failure. The earlier new candidate merely omitted an interval proof and hit a resource limit; that run is not accepted as contract evidence."
+    },
+    {
+      "name": "r2-issued-reuses-real-attempt",
+      "mutation": {
+        "file": "cleanup_journal.rs",
+        "old": "let ticket=RestoreTicket {domain:self.domain,attempt:self.next,token:self.current.unwrap().token};",
+        "new": "let ticket=RestoreTicket {domain:self.domain,attempt:self.current.unwrap().attempt,token:self.current.unwrap().token};"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "cleanup_journal",
+          "descendants": false,
+          "function": "cordis_negative::cleanup_journal::CleanupJournal::retry"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::cleanup_journal::CleanupJournal::retry",
+          "module": "cleanup_journal",
+          "file": "cleanup_journal.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> final(self).selected()==Some(out.unwrap()) && !final(self).failed_spec()\n                && out.unwrap().domain==old(self).domain_id()\n                && out.unwrap().token==old(self).selected().unwrap().token\n                && out.unwrap().attempt==old(self).next_attempt()\n                && out.unwrap().attempt>old(self).selected().unwrap().attempt\n                && final(self).next_attempt()==old(self).next_attempt()+1,"
+        }
+      ],
+      "selectionRationale": "Reuse the old attempt in the actual executable retry. Freshness of the real returned ticket is required for the interval and permanent stale-reply guarantee. Require a fresh same-selector positive, whole-mutant compilation and exactly the named proof failure. This is selected development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-issued-protocol-allows-ticket-revival",
+      "mutation": {
+        "file": "episode_execution.rs",
+        "old": "&& ticket==(RestoreTicket {domain:a.domain,attempt:a.next,token:a.selected.unwrap().token})\n            && ticket.attempt>a.selected.unwrap().attempt",
+        "new": "&& ((ticket==(RestoreTicket {domain:a.domain,attempt:a.next,token:a.selected.unwrap().token})\n            && ticket.attempt>a.selected.unwrap().attempt) || ticket==a.selected.unwrap())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::joint::episode::interval",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::joint::episode::interval::one_step"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::joint::episode::interval::one_step",
+          "module": "reversible_value::joint::episode::interval",
+          "file": "cleanup_interval.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ticket.attempt<a.next && active(b,ticket) ==> active(a,ticket),"
+        }
+      ],
+      "selectionRationale": "Broaden the shared transition relation to allow retry with an already failed ticket. The no-revival lemma must reject that semantic change; this checks a protocol specification, not an existing runtime bug. Require a fresh same-selector positive, whole-mutant compilation and exactly the named proof failure. This is selected development evidence, not full negative regression."
+    },
+    {
+      "name": "r2-checkout-loses-status-link",
+      "mutation": {
+        "file": "execution.rs",
+        "old": "let out=self.effects.remove(&id);if out.is_some() {self.checked_out.insert(id,());}out",
+        "new": "let out=self.effects.remove(&id);self.statuses=BTreeMap::new();if out.is_some() {self.checked_out.insert(id,());}out"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "execution",
+          "descendants": false,
+          "function": "cordis_negative::execution::Execution::take_effect"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::execution::Execution::take_effect",
+          "module": "execution",
+          "file": "execution.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap()==old(self).effect_state()[id] && out.unwrap().wf(),\n            final(self).status_links()==old(self).status_links(),"
+        }
+      ],
+      "selectionRationale": "Discard the actual status map when checking out the runner. General well-formedness alone permits an empty map; exact frame preservation must reject losing the escaped handle association. Require a fresh exact matching positive, whole-mutant compilation and the named diagnostic rejection; no whole-negative or R2 acceptance claim."
+    },
+    {
+      "name": "r2-status-observation-invents-allocation",
+      "mutation": {
+        "file": "host_status.rs",
+        "old": "birth:Ghost(self.birth@)",
+        "new": "birth:Ghost(self.member.events().len())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "host_status",
+          "descendants": false,
+          "function": "cordis_negative::host_status::Cell::observe"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::host_status::Cell::observe",
+          "module": "host_status",
+          "file": "host_status.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "requires self.wf(),ensures out.wf(),out.allocation()==self.birth@,"
+        }
+      ],
+      "selectionRationale": "Keep the actual latest status receipt but substitute a nonexistent allocation index. The returned observation must authenticate its real constructor and cannot invent an initial state. Require a fresh exact matching positive, whole-mutant compilation and the named diagnostic rejection; no whole-negative or R2 acceptance claim."
+    },
+    {
+      "name": "r2-managed-return-omits-effects",
+      "mutation": {
+        "file": "managed_root.rs",
+        "old": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(_report.receipt_witnesses())),",
+        "new": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::root",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_managed_root",
+          "module": "reversible_value::managed::root",
+          "file": "managed_root.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "report.execution_interval();"
+        }
+      ],
+      "selectionRationale": "Omit both scalar and typed effect/inverse witnesses at the real registered function return. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection; timeouts, resource limits and compilation errors are not evidence."
+    },
+    {
+      "name": "r2-managed-drops-continuation",
+      "mutation": {
+        "file": "managed_function.rs",
+        "old": "pc=step.next;append_step::<E,T,M>",
+        "new": "pc=None;append_step::<E,T,M>"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::Owner::run_function",
+          "module": "reversible_value::managed",
+          "file": "managed_function.rs",
+          "diagnosticKind": "invariant not satisfied",
+          "uniqueSourceAnchor": "prefix(function.code(),ports@,steps@,values),pc==next(function.code().len(),steps@),pc.is_some() ==> pc.unwrap()<function.code().len(),"
+        }
+      ],
+      "selectionRationale": "Stop after a successful instruction instead of following the actual selected continuation, while retaining its real inverse. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection; timeouts, resource limits and compilation errors are not evidence."
+    },
+    {
+      "name": "r2-managed-forges-read-rejection",
+      "mutation": {
+        "file": "value_slot.rs",
+        "old": "let error=ReadError::NotReversible {provider};",
+        "new": "let error=ReadError::Native(NativeReadError {reason:crate::lifecycle_state::services::NativeValueError::Closed,provider:None});"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::slot",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::services::NativeEpisode::read_reversible",
+          "module": "reversible_value::slot",
+          "file": "value_slot.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.reversible_read_failed(port,error));"
+        }
+      ],
+      "selectionRationale": "Replace an actual service-kind mismatch with a false closed-episode rejection. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection; timeouts, resource limits and compilation errors are not evidence."
+    },
+    {
+      "name": "r2-managed-payload-forgets-earlier-causes",
+      "mutation": {
+        "file": "payload_inverse.rs",
+        "old": "journal.join_receipts::<(int,bool)>(Tracked(causes),Tracked(None))",
+        "new": "journal.join_receipts::<(int,bool)>(Tracked(&Map::tracked_empty()),Tracked(None))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::payload::restoration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_managed_following",
+          "module": "reversible_value::payload::restoration",
+          "file": "payload_inverse.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "after@.commit.after_cover(&cause.unwrap(),&causes[k]);"
+        }
+      ],
+      "selectionRationale": "Drop all prior function witnesses at the actual payload write; the A/B/A causal contract must not be inferred from report order. Require a fresh matching positive, whole-mutant compilation and the exact contract rejection; timeouts, resource limits and compilation errors are not evidence."
     }
   ]
 }

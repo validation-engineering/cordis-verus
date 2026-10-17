@@ -3,10 +3,23 @@
 - `crates/cordis-kernel/src/` is executable Verus Rust, also compiled by Cargo.
   Do not introduce `assume`, `admit`, `external_body`, or unchecked replacement
   implementations to make verification pass. Use the pinned toolchain.
-- Run `./scripts/check-development.sh --offline` for a development change with cached
-  dependencies. It checks formatting/lints/docs, whole-kernel proofs, tests,
-  examples and extracted crate builds. Use `scripts/record-development.py` to
-  record this evidence; it does not claim release readiness. The release recorder
+- During R2–R4 implementation batches, prioritize executable code and proof
+  composition. Use compilation and targeted Verus checks to resolve integration
+  or proof blockers; writing a proof body alone is not verification. Defer new
+  runtime tests, fault demonstrations and negative controls until the related
+  interfaces and contracts are integrated. Record the needed scenarios as a
+  concise checklist; do not run the full development workflow after each small
+  increment. Preserve existing tests and strict proof/negative-control criteria.
+- Continue dependent R3/R4 implementation once its required contracts have been
+  established, even if the batch's runtime acceptance is still pending. Keep
+  implementation progress, verified scope and pending acceptance distinct; do
+  not mark a milestone complete or carry an old pass to changed sources.
+- At integration acceptance, run `python3 scripts/record-development.py --offline`
+  once on the final source, rather than running both it and its underlying
+  `./scripts/check-development.sh --offline`. This checks formatting/lints/docs,
+  whole-kernel proofs, tests, examples and extracted crate builds. Repair failures
+  and repeat the affected checks; refresh the full record after the final fixes.
+  Development evidence does not claim release readiness. The release recorder
   also runs these shared checks and can record a release-quality change.
 - A release requires `./scripts/quality.sh --offline`, with complete positive
   proof, runtime tests and packaging checks, followed by actual asset installation

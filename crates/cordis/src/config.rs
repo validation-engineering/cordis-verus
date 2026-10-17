@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::future::{poll_fn, Future};
+use std::future::Future;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -293,7 +293,7 @@ pub enum ConfigUpdate {
 }
 
 type UpdateFuture = Pin<Box<dyn Future<Output = crate::CallbackResult> + Send>>;
-type UndoFactory = Box<dyn FnMut() -> UpdateFuture + Send>;
+type UndoFactory = Box<dyn FnMut() -> Result<UpdateFuture, crate::CallbackError> + Send>;
 
 /// A reversible configuration update whose inverse is registered before apply.
 ///
@@ -303,11 +303,11 @@ type UndoFactory = Box<dyn FnMut() -> UpdateFuture + Send>;
 /// after a rollback error. These are plugin contracts, not Verus-proved effects.
 /// Neither callback runs while constructing this value.
 pub struct ConfigUpdatePlan {
-    apply: Option<UpdateFuture>,
-    applied: Option<crate::CallbackResult>,
-    started: bool,
-    rollback: UndoFactory,
-    restoring: Option<UpdateFuture>,
+    execution: cordis_kernel::configuration_future::Reversible<
+        UpdateFuture,
+        UndoFactory,
+        crate::CallbackError,
+    >,
 }
 impl ConfigUpdatePlan {
     pub fn new(
@@ -326,59 +326,53 @@ impl ConfigUpdatePlan {
         R: FnMut() -> RF + Send + 'static,
         RF: Future<Output = crate::CallbackResult> + Send + 'static,
     {
+        let forward: UpdateFuture = Box::pin(async move { apply().await });
+        let inverse: UndoFactory = Box::new(move || {
+            catch_unwind(AssertUnwindSafe(|| Box::pin(rollback()) as UpdateFuture)).map_err(|_| {
+                crate::CallbackError::panic("configuration rollback construction panicked".into())
+            })
+        });
         Self {
-            // Constructing the user's future is inside the guarded poll boundary.
-            apply: Some(Box::pin(async move { apply().await })),
-            applied: None,
-            started: false,
-            rollback: Box::new(move || Box::pin(rollback())),
-            restoring: None,
+            execution: cordis_kernel::configuration_future::Reversible::new(forward, inverse),
         }
     }
-    fn poll_apply(&mut self, cx: &mut TaskContext<'_>) -> Poll<crate::CallbackResult> {
-        if let Some(result) = &self.applied {
-            return Poll::Ready(result.clone());
-        }
-        self.started = true;
-        let result = match poll_catching_unwind(self.apply.as_mut().unwrap().as_mut(), cx) {
-            Ok(Poll::Pending) => return Poll::Pending,
-            Ok(Poll::Ready(result)) => result,
-            Err(_) => Err(crate::CallbackError::panic(
-                "configuration update panicked".into(),
-            )),
-        };
-        self.apply = None;
-        self.applied = Some(result.clone());
-        Poll::Ready(result)
+    pub(crate) fn poll_apply(&mut self, cx: &mut TaskContext<'_>) -> Poll<crate::CallbackResult> {
+        self.execution
+            .poll_apply(|future| poll_update_future(future, cx, "configuration update panicked"))
+            .map(Clone::clone)
     }
-    pub(crate) async fn apply(&mut self) -> crate::CallbackResult {
-        poll_fn(|cx| self.poll_apply(cx)).await
+    pub(crate) fn poll_rollback(
+        &mut self,
+        cx: &mut TaskContext<'_>,
+    ) -> Poll<crate::CallbackResult> {
+        // Both closures need the caller's task context, and the checked owner
+        // invokes them sequentially. RefCell supplies a short, exclusive borrow.
+        let context = std::cell::RefCell::new(cx);
+        self.execution.poll_rollback(
+            |future| {
+                poll_update_future(
+                    future,
+                    &mut context.borrow_mut(),
+                    "configuration update panicked",
+                )
+            },
+            |future| {
+                poll_update_future(
+                    future,
+                    &mut context.borrow_mut(),
+                    "configuration rollback panicked",
+                )
+            },
+        )
     }
-    pub(crate) async fn rollback(&mut self) -> crate::CallbackResult {
-        if !self.started {
-            return Ok(());
-        }
-        // A started forward operation must land before its registered inverse.
-        let _ = poll_fn(|cx| self.poll_apply(cx)).await;
-        if self.restoring.is_none() {
-            self.restoring = Some(
-                catch_unwind(AssertUnwindSafe(|| (self.rollback)())).map_err(|_| {
-                    crate::CallbackError::panic(
-                        "configuration rollback construction panicked".into(),
-                    )
-                })?,
-            );
-        }
-        let result = poll_fn(|cx| {
-            match poll_catching_unwind(self.restoring.as_mut().unwrap().as_mut(), cx) {
-                Ok(result) => result,
-                Err(_) => Poll::Ready(Err(crate::CallbackError::panic(
-                    "configuration rollback panicked".into(),
-                ))),
-            }
-        })
-        .await;
-        self.restoring = None;
-        result
+}
+fn poll_update_future(
+    future: &mut UpdateFuture,
+    cx: &mut TaskContext<'_>,
+    panic_message: &str,
+) -> Poll<crate::CallbackResult> {
+    match poll_catching_unwind(future.as_mut(), cx) {
+        Ok(result) => result,
+        Err(_) => Poll::Ready(Err(crate::CallbackError::panic(panic_message.into()))),
     }
 }

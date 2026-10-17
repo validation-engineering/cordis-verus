@@ -2,16 +2,30 @@
 //! These host operations are behavior-tested, not Verus-proved callbacks.
 
 use crate::config::{ConfigError, ConfigScope, ConfigUpdate, ConfigUpdatePlan, Schema};
-use crate::persistence::{SaveError, SaveErrorKind, SavePlan, SaveReport};
+use crate::persistence::{SaveError, SaveErrorKind, SaveOrigin, SavePlan, SaveReport};
 use crate::{Context, Phase, Plugin, PluginId, Runtime, RuntimeError, ServiceKey};
+use cordis_kernel::configuration_planning as planning;
+use cordis_kernel::configuration_transaction::{Structure, StructureError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
+use std::future::{poll_fn, Future};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Poll;
+
+fn structure_error(error: StructureError<LoaderError>) -> LoaderError {
+    match error {
+        StructureError::Callback(error) => error,
+        StructureError::NotReady => LoaderError::Transaction(
+            cordis_kernel::configuration_transaction::TransactionError::NotReady,
+        ),
+    }
+}
 
 fn enabled() -> bool {
     true
@@ -93,7 +107,36 @@ pub type PaperEntry<'a, Url> = cordis_kernel::configuration_entry::Entry<
     &'a BTreeMap<String, Value>,
     &'a Value,
 >;
+type ExpansionEntry = cordis_kernel::configuration_expansion::Entry<Entry, PathBuf>;
+type ExpansionDocument = cordis_kernel::configuration_expansion::Document<Entry, PathBuf, PathBuf>;
 impl Entry {
+    // JSON decoding is the input boundary. Move structural fields into the
+    // checked expander; the remaining entry payload is preserved without cloning.
+    fn into_expansion(mut self) -> ExpansionEntry {
+        let children = std::mem::take(&mut self.children)
+            .into_iter()
+            .map(Self::into_expansion)
+            .collect();
+        let include = self.include.take();
+        ExpansionEntry::new(self, children, include)
+    }
+    fn from_expansion(expanded: ExpansionEntry) -> Self {
+        let mut entry = expanded.payload;
+        entry.children = expanded
+            .children
+            .into_iter()
+            .map(Self::from_expansion)
+            .collect();
+        entry.include = expanded.include;
+        entry
+    }
+    fn into_planning(mut self) -> planning::Entry<Self> {
+        let children = std::mem::take(&mut self.children)
+            .into_iter()
+            .map(Self::into_planning)
+            .collect();
+        planning::Entry::new(self.id.clone(), self.enabled, self, children)
+    }
     /// Project a named plugin leaf after explicitly resolving its module URL.
     ///
     /// Groups, includes, unresolved names and entries with children return None:
@@ -248,6 +291,7 @@ impl FactoryRegistry {
 }
 #[derive(Debug)]
 pub enum LoaderError {
+    Transaction(cordis_kernel::configuration_transaction::TransactionError),
     Config(ConfigError),
     Source {
         path: PathBuf,
@@ -287,6 +331,7 @@ impl From<RuntimeError> for LoaderError {
 impl fmt::Display for LoaderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Transaction(error) => write!(f, "configuration transaction: {error:?}"),
             Self::Config(error) => write!(f, "{error}"),
             Self::Source { path, message } => write!(f, "{}: {message}", path.display()),
             Self::IncludeCycle(paths) => write!(
@@ -351,12 +396,10 @@ impl Signature {
 #[derive(Clone)]
 struct Node {
     path: String,
-    parent: Option<String>,
     scope: ConfigScope,
     signature: Signature,
     factory: Option<Arc<RegisteredFactory>>,
     inject: Vec<(RegisteredService, Value)>,
-    id: Option<PluginId>,
 }
 impl Node {
     fn build(&self) -> Result<Plugin, LoaderError> {
@@ -379,43 +422,141 @@ impl Node {
         Ok(plugin)
     }
 }
+type CheckedNode = cordis_kernel::configuration_tree::Node<Node>;
+
+/// The index is only a lookup cache. The checked owner stores the authoritative
+/// name, recipe, enabled flag, parent index and actual mounted identity.
+#[derive(Clone, Default)]
+struct ConfigNodes {
+    by_path: BTreeMap<String, usize>,
+    checked: cordis_kernel::configuration_tree::Tree<Node>,
+}
+impl ConfigNodes {
+    fn get(&self, path: &str) -> Option<&CheckedNode> {
+        self.checked.get(*self.by_path.get(path)?, path)
+    }
+    fn contains_key(&self, path: &str) -> bool {
+        self.get(path).is_some()
+    }
+    fn len(&self) -> usize {
+        self.checked.nodes().len()
+    }
+    fn values(&self) -> impl Iterator<Item = &CheckedNode> {
+        self.checked.nodes().iter()
+    }
+    fn iter(&self) -> impl Iterator<Item = (&String, &CheckedNode)> {
+        self.values().map(|node| (node.key(), node))
+    }
+    fn order(&self) -> Vec<String> {
+        self.checked.keys()
+    }
+    fn from_checked(checked: cordis_kernel::configuration_tree::Tree<Node>) -> Self {
+        let by_path = checked
+            .keys()
+            .into_iter()
+            .enumerate()
+            .map(|(index, path)| (path, index))
+            .collect();
+        Self { by_path, checked }
+    }
+    fn reconstruct(
+        &mut self,
+        runtime: &mut Runtime,
+        plugins: &mut BTreeMap<String, Plugin>,
+        created: Option<&mut Vec<PluginId>>,
+    ) -> Result<(), LoaderError> {
+        let mut host = (runtime, plugins, created);
+        let result = self
+            .checked
+            .reconstruct(&mut host, |host, node, parent| {
+                let (runtime, plugins, created) = host;
+                // Re-read the actual owner: a saved allocation is historical evidence,
+                // not a promise that it remains live or still has the required parent.
+                if let Some(allocation) = node
+                    .id()
+                    .and_then(|id| runtime.configuration_allocation(id))
+                {
+                    if allocation.parent() == parent {
+                        return Ok(allocation);
+                    }
+                }
+                let plugin = match plugins.remove(node.key()) {
+                    Some(plugin) => plugin,
+                    None => node.build()?,
+                };
+                let allocation =
+                    runtime.mount_configuration(node.scope.context(), parent, plugin)?;
+                if let Some(created) = created {
+                    created.push(allocation.id());
+                }
+                Ok::<_, LoaderError>(allocation)
+            })
+            .result;
+        result.map_err(|error| {
+            let path = self.checked.nodes()[error.index].key();
+            match error.error {
+                cordis_kernel::configuration_tree::MountError::Callback(error) => error,
+                cordis_kernel::configuration_tree::MountError::Mismatch(_) => ConfigError::new(
+                    path,
+                    "mount returned an invalid domain, parent, or duplicate identity",
+                )
+                .into(),
+                cordis_kernel::configuration_tree::MountError::Tree(error) => {
+                    ConfigError::new(path, format!("configuration tree: {error:?}")).into()
+                }
+            }
+        })
+    }
+}
+impl std::ops::Index<&String> for ConfigNodes {
+    type Output = CheckedNode;
+    fn index(&self, path: &String) -> &Self::Output {
+        self.get(path).expect("planned configuration entry")
+    }
+}
 #[derive(Clone, Default)]
 struct Snapshot {
     tree: ConfigTree,
-    nodes: BTreeMap<String, Node>,
-    order: Vec<String>,
-}
-impl Snapshot {
-    fn parent_for(&self, node: &Node, root_parent: Option<PluginId>) -> Option<PluginId> {
-        node.parent
-            .as_ref()
-            .and_then(|parent| self.nodes[parent].id)
-            .or(root_parent)
-    }
+    nodes: ConfigNodes,
 }
 
-/// File provenance and save progress belong to the last successful file load.
-/// Clear them together only after switching to a non-file source succeeds.
-#[derive(Default)]
-struct SourceTracking {
-    root: Option<PathBuf>,
-    contents: BTreeMap<PathBuf, String>,
-    checkpoints: BTreeMap<PathBuf, ConfigTree>,
-    pending_sync: BTreeSet<PathBuf>,
-    resolutions: BTreeMap<PathBuf, PathBuf>,
+/// Loaded text and logical merge checkpoints share one checked owner. Save
+/// reports remain diagnostics; only the actual save cursor can advance a base.
+pub(crate) type SourceTracking =
+    cordis_kernel::configuration_save::sources::Source<PathBuf, ConfigTree>;
+
+fn source_checkpoints(source: &SourceTracking) -> BTreeMap<PathBuf, ConfigTree> {
+    source
+        .checkpoints()
+        .iter()
+        .map(|(path, checkpoint)| (path.clone(), checkpoint.value.clone()))
+        .collect()
+}
+fn source_pending_sync(source: &SourceTracking) -> BTreeSet<PathBuf> {
+    source
+        .checkpoints()
+        .iter()
+        .filter(|(_, checkpoint)| checkpoint.pending_sync)
+        .map(|(path, _)| path.clone())
+        .collect()
 }
 
-struct PlannedUpdate {
+struct UpdateKey {
     path: String,
-    id: PluginId,
-    generation: u64,
-    plan: ConfigUpdatePlan,
-    started: bool,
+    target: cordis_kernel::configuration_runtime::Target,
 }
+type ConfigurationState = cordis_kernel::configuration_recorded::Recorded<
+    Snapshot,
+    Transaction,
+    UpdateKey,
+    ConfigUpdatePlan,
+    PathBuf,
+    ConfigTree,
+>;
+
 struct Transaction {
     before: Snapshot,
     created: Vec<PluginId>,
-    updates: Vec<PlannedUpdate>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ApplyReport {
@@ -439,10 +580,7 @@ pub struct Loader {
     root: ConfigScope,
     parent: Option<PluginId>,
     registry: FactoryRegistry,
-    current: Snapshot,
-    pending: Option<Transaction>,
-    revision: u64,
-    source: SourceTracking,
+    configuration: ConfigurationState,
 }
 impl Loader {
     pub fn new(context: Context, registry: FactoryRegistry) -> Self {
@@ -454,22 +592,28 @@ impl Loader {
         registry: FactoryRegistry,
         parent: Option<PluginId>,
     ) -> Self {
+        let configuration = runtime.configuration(Snapshot::default());
         Self {
             runtime,
             root,
             parent,
             registry,
-            current: Snapshot::default(),
-            pending: None,
-            revision: 0,
-            source: SourceTracking::default(),
+            configuration,
         }
     }
     pub fn runtime(&self) -> &Runtime {
         &self.runtime
     }
-    pub fn runtime_mut(&mut self) -> &mut Runtime {
-        &mut self.runtime
+    /// Mutate the retained runtime through its operations. The view cannot
+    /// replace the runtime that owns this Loader's configuration Journal.
+    pub fn runtime_mut(&mut self) -> crate::RuntimeAccess<'_> {
+        crate::RuntimeAccess::new(&mut self.runtime)
+    }
+    /// Capture native lifecycle, accepted/pending configuration and source
+    /// checkpoints in one Journal read. Typed proof history is erased; this is
+    /// not a serialized audit log or a proof of arbitrary plugin callbacks.
+    pub fn execution_snapshot(&self) -> cordis_kernel::reversible_value::joint::Snapshot {
+        self.runtime.configuration_snapshot(&self.configuration)
     }
     pub fn registry(&self) -> &FactoryRegistry {
         &self.registry
@@ -479,23 +623,31 @@ impl Loader {
     }
     /// Last successfully committed configuration, including expanded includes.
     pub fn tree(&self) -> &ConfigTree {
-        &self.current.tree
+        &self.configuration.current().tree
     }
     pub fn id(&self, path: &str) -> Option<PluginId> {
-        let id = self.current.nodes.get(path)?.id?;
+        let id = self.configuration.current().nodes.get(path)?.id()?;
         self.runtime.contains(id).then_some(id)
     }
     pub fn scope(&self, path: &str) -> Option<&ConfigScope> {
-        self.current.nodes.get(path).map(|node| &node.scope)
+        self.configuration
+            .current()
+            .nodes
+            .get(path)
+            .map(|node| &node.scope)
     }
     pub fn revision(&self) -> u64 {
-        self.revision
+        self.configuration.revision()
     }
     pub fn recovery_pending(&self) -> bool {
-        self.pending.is_some()
+        self.configuration.pending().is_some()
     }
     pub fn watched_files(&self) -> impl Iterator<Item = &Path> {
-        self.source.contents.keys().map(PathBuf::as_path)
+        self.configuration
+            .sources()
+            .contents()
+            .keys()
+            .map(PathBuf::as_path)
     }
 
     fn prepare(
@@ -503,205 +655,176 @@ impl Loader {
         tree: ConfigTree,
         restart: &BTreeSet<String>,
     ) -> Result<Snapshot, LoaderError> {
-        struct Planner<'a> {
-            loader: &'a Loader,
-            restart: &'a BTreeSet<String>,
-            plan: Snapshot,
+        struct Parent {
+            scope: ConfigScope,
+            inject: BTreeMap<String, Value>,
+            retained: bool,
         }
-        impl Planner<'_> {
-            #[allow(clippy::too_many_arguments)]
-            fn visit(
-                &mut self,
-                entries: &[Entry],
-                parent: Option<&str>,
-                scope: &ConfigScope,
-                inherited: &BTreeMap<String, Value>,
-                parent_enabled: bool,
-                parent_retained: bool,
-                depth: usize,
-            ) -> Result<(), LoaderError> {
-                if depth > 128 {
+        let entries = tree
+            .entries
+            .clone()
+            .into_iter()
+            .map(Entry::into_planning)
+            .collect();
+        let planned = planning::plan(
+            entries,
+            Parent {
+                scope: self.root.clone(),
+                inject: BTreeMap::new(),
+                retained: true,
+            },
+            self.runtime.configuration_domain(),
+            self.parent,
+            (self, restart),
+            |host, entry, declaration, parent| {
+                let (loader, restart) = host;
+                let path = declaration.key().clone();
+                if entry.include.is_some() {
                     return Err(ConfigError::new(
-                        parent.unwrap_or("$"),
-                        "configuration nesting exceeds 128",
+                        &path,
+                        "includes require load_file(), not apply() or load_json()",
                     )
                     .into());
                 }
-                let mut siblings = BTreeSet::new();
-                for entry in entries {
-                    if entry.id.is_empty()
-                        || entry.id.contains('/')
-                        || entry.id.contains(':')
-                        || !siblings.insert(entry.id.clone())
-                    {
-                        return Err(ConfigError::new(
-                            parent.unwrap_or("$"),
-                            "entry IDs must be unique, nonempty, and contain neither / nor :",
-                        )
-                        .into());
-                    }
-                    let path = parent.map_or_else(
-                        || entry.id.clone(),
-                        |parent| format!("{parent}/{}", entry.id),
-                    );
-                    if entry.include.is_some() {
-                        return Err(ConfigError::new(
-                            &path,
-                            "includes require load_file(), not apply() or load_json()",
-                        )
-                        .into());
-                    }
-                    let mut scope = scope.extend_json(&entry.metadata);
-                    for (name, patch) in &entry.intercept {
-                        scope = scope.intercept(name, patch.clone());
-                    }
-                    let mut inject = inherited.clone();
-                    inject.extend(
-                        entry
-                            .inject
-                            .iter()
-                            .map(|(name, config)| (name.clone(), config.clone())),
-                    );
-                    scope = scope.with_injections(&inject);
-                    let service = |name: &str| {
-                        self.loader
-                            .registry
-                            .services
-                            .get(name)
-                            .cloned()
-                            .ok_or_else(|| {
-                                ConfigError::new(&path, format!("unknown service: {name}"))
-                            })
-                    };
-                    let services = inject
+                let mut scope = parent.scope.extend_json(&entry.metadata);
+                for (name, patch) in &entry.intercept {
+                    scope = scope.intercept(name, patch.clone());
+                }
+                let mut inject = parent.inject.clone();
+                inject.extend(
+                    entry
+                        .inject
                         .iter()
-                        .map(|(name, config)| {
-                            service(name).map(|service| (service, config.clone()))
+                        .map(|(name, config)| (name.clone(), config.clone())),
+                );
+                scope = scope.with_injections(&inject);
+                let service =
+                    |name: &str| {
+                        loader.registry.services.get(name).cloned().ok_or_else(|| {
+                            ConfigError::new(&path, format!("unknown service: {name}"))
                         })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let isolates = entry
+                    };
+                let services = inject
+                    .iter()
+                    .map(|(name, config)| service(name).map(|service| (service, config.clone())))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let isolates = entry
+                    .isolate
+                    .iter()
+                    .map(|name| service(name))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let factory = match &entry.name {
+                    Some(name) => Some(loader.registry.factories.get(name).cloned().ok_or_else(
+                        || ConfigError::new(&path, format!("unknown plugin factory: {name}")),
+                    )?),
+                    None => None,
+                };
+                let mut normalized = entry.clone();
+                if let Some(factory) = &factory {
+                    normalized.config = factory
+                        .schema
+                        .validate(&scope.resolve(entry.name.as_deref().unwrap(), &entry.config))
+                        .map_err(|error| {
+                            ConfigError::new(format!("{path}{}", error.path), error.message)
+                        })?;
+                }
+                let signature = Signature {
+                    entry: normalized,
+                    inject: inject
+                        .iter()
+                        .zip(&services)
+                        .map(|((name, _), (service, _))| (name.clone(), service.revision))
+                        .collect(),
+                    isolate: entry
                         .isolate
                         .iter()
-                        .map(|name| service(name))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let factory = match &entry.name {
-                        Some(name) => Some(
-                            self.loader
-                                .registry
-                                .factories
-                                .get(name)
-                                .cloned()
-                                .ok_or_else(|| {
-                                    ConfigError::new(
-                                        &path,
-                                        format!("unknown plugin factory: {name}"),
-                                    )
-                                })?,
-                        ),
-                        None => None,
-                    };
-                    let mut normalized = entry.clone();
-                    normalized.children.clear();
-                    if let Some(factory) = &factory {
-                        normalized.config = factory
-                            .schema
-                            .validate(&scope.resolve(entry.name.as_deref().unwrap(), &entry.config))
-                            .map_err(|error| {
-                                ConfigError::new(format!("{path}{}", error.path), error.message)
-                            })?;
-                    }
-                    let signature = Signature {
-                        entry: normalized,
-                        inject: inject
-                            .iter()
-                            .zip(&services)
-                            .map(|((name, _), (service, _))| (name.clone(), service.revision))
-                            .collect(),
-                        isolate: entry
-                            .isolate
-                            .iter()
-                            .zip(&isolates)
-                            .map(|(name, service)| (name.clone(), service.revision))
-                            .collect(),
-                        factory: factory.as_ref().map(|factory| factory.revision),
-                        enabled: parent_enabled && entry.enabled,
-                    };
-                    let retained = parent_retained
-                        && self.loader.current.nodes.get(&path).is_some_and(|old| {
+                        .zip(&isolates)
+                        .map(|(name, service)| (name.clone(), service.revision))
+                        .collect(),
+                    factory: factory.as_ref().map(|factory| factory.revision),
+                    enabled: declaration.enabled(),
+                };
+                let retained = parent.retained
+                    && loader
+                        .configuration
+                        .current()
+                        .nodes
+                        .get(&path)
+                        .is_some_and(|old| {
                             (old.signature == signature
-                                || (!self.restart.contains(&path)
+                                || (!restart.contains(&path)
                                     && signature.only_config_changed(&old.signature)
-                                    && old.id.is_some_and(|id| {
-                                        self.loader.runtime.phase(id) == Some(Phase::Active)
+                                    && old.id().is_some_and(|id| {
+                                        loader.runtime.phase(id) == Some(Phase::Active)
                                     })))
-                                && match old.id {
+                                && match old.id() {
                                     Some(id) => {
-                                        self.loader.runtime.contains(id)
-                                            && !self.loader.runtime.retired(id)
+                                        loader.runtime.contains(id) && !loader.runtime.retired(id)
                                     }
                                     None => !signature.enabled,
                                 }
                         });
-                    let id = if retained {
-                        let old = &self.loader.current.nodes[&path];
-                        scope = old.scope.clone();
-                        old.id
-                    } else {
-                        for service in isolates {
-                            scope = scope.with_context((service.isolate)(scope.context()));
-                        }
-                        None
-                    };
-                    self.plan.order.push(path.clone());
-                    self.plan.nodes.insert(
-                        path.clone(),
-                        Node {
-                            path: path.clone(),
-                            parent: parent.map(str::to_owned),
-                            scope: scope.clone(),
-                            signature: signature.clone(),
-                            factory,
-                            inject: services,
-                            id,
-                        },
-                    );
-                    self.visit(
-                        &entry.children,
-                        Some(&path),
-                        &scope,
-                        &inject,
-                        signature.enabled,
+                let allocation = if retained {
+                    let old = &loader.configuration.current().nodes[&path];
+                    scope = old.scope.clone();
+                    old.allocation()
+                } else {
+                    for service in isolates {
+                        scope = scope.with_context((service.isolate)(scope.context()));
+                    }
+                    None
+                };
+
+                Ok::<_, LoaderError>(planning::Prepared {
+                    data: Node {
+                        path,
+                        scope: scope.clone(),
+                        signature,
+                        factory,
+                        inject: services,
+                    },
+                    context: Parent {
+                        scope,
+                        inject,
                         retained,
-                        depth + 1,
-                    )?;
-                }
-                Ok(())
-            }
-        }
-        let mut planner = Planner {
-            loader: self,
-            restart,
-            plan: Snapshot {
-                tree: tree.clone(),
-                ..Snapshot::default()
+                    },
+                    allocation,
+                })
             },
-        };
-        planner.visit(
-            &tree.entries,
-            None,
-            &self.root,
-            &BTreeMap::new(),
-            true,
-            true,
-            0,
-        )?;
-        Ok(planner.plan)
+        );
+        let checked = planned.result.map_err(|error| match error {
+            planning::PlanError::Callback { error, .. } => error,
+            planning::PlanError::Input(error) => ConfigError::new(
+                "$",
+                match error {
+                    planning::InputError::Depth => "configuration nesting exceeds 128",
+                    planning::InputError::Capacity => "configuration contains too many entries",
+                },
+            )
+            .into(),
+            planning::PlanError::Tree { index, cause } => {
+                let message = match cause {
+                    cordis_kernel::configuration_tree::TreeError::InvalidId
+                    | cordis_kernel::configuration_tree::TreeError::Duplicate => {
+                        "entry IDs must be unique, nonempty, and contain neither / nor :".to_owned()
+                    }
+                    error => format!("configuration tree: {error:?}"),
+                };
+                ConfigError::new(format!("$[entry {index}]"), message).into()
+            }
+        })?;
+        Ok(Snapshot {
+            tree,
+            nodes: ConfigNodes::from_checked(checked),
+        })
     }
 
     pub async fn load_json(&mut self, json: &str) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
         let report = self.apply_transaction(ConfigTree::from_json(json)?).await?;
-        self.source = SourceTracking::default();
+        self.configuration
+            .clear_sources()
+            .map_err(LoaderError::Transaction)?;
         self.settle_committed(report).await
     }
     pub async fn apply(&mut self, tree: ConfigTree) -> Result<ApplyReport, LoaderError> {
@@ -716,22 +839,22 @@ impl Loader {
             .settle()
             .await
             .map_err(|error| LoaderError::PostCommit {
-                revision: self.revision,
+                revision: self.configuration.revision(),
                 cause: Box::new(error.into()),
             })?;
         // New service availability can restart consumers and retire their owned
         // config children. Reinstall missing entries from the accepted tree.
-        if self.current.nodes.values().any(|node| {
+        if self.configuration.current().nodes.values().any(|node| {
             node.signature.enabled
                 && node
-                    .id
+                    .id()
                     .is_none_or(|id| !self.runtime.contains(id) || self.runtime.retired(id))
         }) {
             let repaired = self
-                .apply_transaction(self.current.tree.clone())
+                .apply_transaction(self.configuration.current().tree.clone())
                 .await
                 .map_err(|cause| LoaderError::PostCommit {
-                    revision: self.revision,
+                    revision: self.configuration.revision(),
                     cause: Box::new(cause),
                 })?;
             report.revision = repaired.revision;
@@ -740,7 +863,7 @@ impl Loader {
                     report.changed.push(path);
                 }
             }
-            report.retained = self.current.nodes.len() - report.changed.len();
+            report.retained = self.configuration.current().nodes.len() - report.changed.len();
         }
         Ok(report)
     }
@@ -751,16 +874,21 @@ impl Loader {
         let (mut plan, mut report) = loop {
             let plan = self.prepare(tree.clone(), &restart)?;
             let mut report = ApplyReport {
-                revision: self.revision,
+                revision: self.configuration.revision(),
                 ..ApplyReport::default()
             };
-            for path in &plan.order {
+            for path in &plan.nodes.order() {
                 let node = &plan.nodes[path];
-                let unchanged = self.current.nodes.get(path).is_some_and(|old| {
-                    node.signature == old.signature
-                        && node.id == old.id
-                        && (!node.signature.enabled || node.id.is_some())
-                });
+                let unchanged = self
+                    .configuration
+                    .current()
+                    .nodes
+                    .get(path)
+                    .is_some_and(|old| {
+                        node.signature == old.signature
+                            && node.id() == old.id()
+                            && (!node.signature.enabled || node.id().is_some())
+                    });
                 if unchanged {
                     report.retained += 1;
                 } else {
@@ -768,17 +896,25 @@ impl Loader {
                 }
             }
             report.removed = self
-                .current
-                .order
+                .configuration
+                .current()
+                .nodes
+                .order()
                 .iter()
-                .filter(|path| !plan.nodes.contains_key(*path))
+                .filter(|path| !plan.nodes.contains_key(path))
                 .cloned()
                 .collect();
             if !report.is_unchanged() {
                 break (plan, report);
             }
             if settled {
-                self.current.tree = plan.tree;
+                let mut refreshed = self.configuration.current().clone();
+                refreshed.tree = plan.tree;
+                let _previous = self
+                    .configuration
+                    .refresh(refreshed)
+                    .ok()
+                    .expect("recovery completed before planning");
                 return Ok(report);
             }
             // An explicit runtime.restart() can retire owned config children even
@@ -786,17 +922,23 @@ impl Loader {
             self.runtime.settle().await?;
             settled = true;
         };
+        self.configuration
+            .check_begin()
+            .map_err(LoaderError::Transaction)?;
         // A config update retains its episode only when structural changes cannot
         // restart it through ownership or the transitive committed dependency graph.
         let (plugins, updates) = loop {
             let mut affected = self
-                .current
+                .configuration
+                .current()
                 .nodes
+                .checked
+                .retirements(&plan.nodes.checked)
+                .map_err(|error| {
+                    ConfigError::new("$", format!("configuration selection: {error:?}"))
+                })?
                 .iter()
-                .filter_map(|(path, old)| {
-                    old.id
-                        .filter(|id| plan.nodes.get(path).and_then(|node| node.id) != Some(*id))
-                })
+                .map(|entry| entry.allocation().id())
                 .collect::<BTreeSet<_>>();
             let runtime_snapshot = self.runtime.snapshot();
             loop {
@@ -817,25 +959,35 @@ impl Loader {
                     break;
                 }
             }
-            let candidates =
-                plan.order
-                    .iter()
-                    .filter(|path| {
-                        let node = &plan.nodes[*path];
-                        node.id.is_some()
-                            && self.current.nodes.get(*path).is_some_and(|old| {
-                                node.signature.only_config_changed(&old.signature)
-                            })
-                    })
-                    .cloned()
-                    .collect::<Vec<_>>();
+            let candidates = plan
+                .nodes
+                .order()
+                .iter()
+                .filter(|path| {
+                    let node = &plan.nodes[*path];
+                    node.id().is_some()
+                        && self
+                            .configuration
+                            .current()
+                            .nodes
+                            .get(path)
+                            .is_some_and(|old| node.signature.only_config_changed(&old.signature))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
             let mut replan = false;
             for path in &candidates {
-                let id = plan.nodes[path].id.unwrap();
+                let id = plan.nodes[path].id().unwrap();
                 let prefix = format!("{path}/");
-                let child_affected = self.current.nodes.iter().any(|(child, node)| {
-                    child.starts_with(&prefix) && node.id.is_some_and(|id| affected.contains(&id))
-                });
+                let child_affected =
+                    self.configuration
+                        .current()
+                        .nodes
+                        .iter()
+                        .any(|(child, node)| {
+                            child.starts_with(&prefix)
+                                && node.id().is_some_and(|id| affected.contains(&id))
+                        });
                 if affected.contains(&id) || child_affected {
                     restart.insert(path.clone());
                     replan = true;
@@ -848,7 +1000,7 @@ impl Loader {
             // All candidate and standby factories are checked before user update
             // planning or resource retirement. Planning itself must be side-effect free.
             let mut plugins = BTreeMap::new();
-            for path in &plan.order {
+            for path in &plan.nodes.order() {
                 let node = &plan.nodes[path];
                 if node.signature.enabled {
                     plugins.insert(path.clone(), node.build()?);
@@ -857,17 +1009,21 @@ impl Loader {
             let mut updates = Vec::new();
             for path in candidates {
                 let node = &plan.nodes[&path];
-                let id = node.id.unwrap();
+                let id = node.id().unwrap();
                 if !self.runtime.config_recipe_compatible(id, &plugins[&path]) {
                     restart.insert(path);
                     replan = true;
                     break;
                 }
-                let generation = self
+                let target = self
                     .runtime
-                    .episode_generation(id)
+                    .configuration_target(id)
                     .ok_or(RuntimeError::InactiveOwner(id))?;
-                let previous = self.current.nodes[&path].signature.entry.config.clone();
+                let previous = self.configuration.current().nodes[&path]
+                    .signature
+                    .entry
+                    .config
+                    .clone();
                 match self.runtime.prepare_config_update(
                     id,
                     previous,
@@ -878,13 +1034,12 @@ impl Loader {
                         replan = true;
                         break;
                     }
-                    ConfigUpdate::Apply(update) => updates.push(PlannedUpdate {
-                        path,
-                        id,
-                        generation,
-                        plan: update,
-                        started: false,
-                    }),
+                    ConfigUpdate::Apply(update) => {
+                        updates.push(cordis_kernel::configuration_batch::Action::new(
+                            UpdateKey { path, target },
+                            update,
+                        ))
+                    }
                 }
             }
             if replan {
@@ -893,41 +1048,52 @@ impl Loader {
             }
             break (plugins, updates);
         };
-        self.pending = Some(Transaction {
-            before: self.current.clone(),
+        let recovery = Transaction {
+            before: self.configuration.current().clone(),
             created: Vec::new(),
-            updates,
-        });
-        let result = self.apply_prepared(&mut plan, plugins).await;
+        };
+        self.configuration
+            .begin_structural(plan, recovery, updates)
+            .map_err(|rejected| LoaderError::Transaction(rejected.error))?;
+        let result =
+            Self::apply_prepared(&mut self.runtime, &mut self.configuration, plugins).await;
         match result {
             Ok(()) => {
-                report.changed =
-                    plan.order
-                        .iter()
-                        .filter(|path| {
-                            let next = &plan.nodes[*path];
-                            self.current.nodes.get(*path).is_none_or(|old| {
-                                old.signature != next.signature || old.id != next.id
+                let plan = &self.configuration.pending().unwrap().candidate;
+                report.changed = plan
+                    .nodes
+                    .order()
+                    .iter()
+                    .filter(|path| {
+                        let next = &plan.nodes[*path];
+                        self.configuration
+                            .current()
+                            .nodes
+                            .get(path)
+                            .is_none_or(|old| {
+                                old.signature != next.signature || old.id() != next.id()
                             })
-                        })
-                        .cloned()
-                        .collect();
+                    })
+                    .cloned()
+                    .collect();
                 report.retained = plan.nodes.len() - report.changed.len();
                 report.updated = self
-                    .pending
-                    .as_ref()
-                    .unwrap()
-                    .updates
+                    .configuration
+                    .updates()
+                    .actions()
                     .iter()
-                    .map(|update| update.path.clone())
+                    .map(|update| update.key().path.clone())
                     .collect();
-                self.current = plan;
-                self.pending = None;
-                self.revision = self
-                    .revision
-                    .checked_add(1)
-                    .expect("loader revision space exhausted");
-                report.revision = self.revision;
+                if !plan.nodes.checked.ready() {
+                    return Err(LoaderError::Transaction(
+                        cordis_kernel::configuration_transaction::TransactionError::NotReady,
+                    ));
+                }
+                let _retired = self
+                    .configuration
+                    .commit()
+                    .map_err(LoaderError::Transaction)?;
+                report.revision = self.configuration.revision();
                 Ok(report)
             }
             Err(cause) => {
@@ -941,159 +1107,178 @@ impl Loader {
     }
 
     async fn apply_prepared(
-        &mut self,
-        plan: &mut Snapshot,
+        runtime: &mut Runtime,
+        configuration: &mut ConfigurationState,
         mut plugins: BTreeMap<String, Plugin>,
     ) -> Result<(), LoaderError> {
-        for (path, old) in &self.current.nodes {
-            if let Some(id) = old.id {
-                if plan.nodes.get(path).and_then(|node| node.id) != Some(id) {
-                    self.runtime.dispose(id)?;
+        loop {
+            let done = poll_fn(|cx| configuration.poll_structure(|phase, current, pending| {
+                let plan = &mut pending.candidate;
+                let transaction = &mut pending.recovery;
+                match phase {
+                    Structure::Remove => {
+                        current.nodes.checked.retire_into(&plan.nodes.checked, runtime,
+                            |runtime, allocation| runtime.dispose(allocation.id()))
+                            .result.map_err(|error| match error {
+                                cordis_kernel::configuration_tree::selection::RetireError::Tree(error) =>
+                                    LoaderError::from(ConfigError::new("$", format!("configuration selection: {error:?}"))),
+                                cordis_kernel::configuration_tree::selection::RetireError::Callback {error, ..} => error.into(),
+                            })?;
+                        Poll::Ready(Ok(()))
+                    }
+                    Structure::SettleRemoved => Pin::new(&mut runtime.settle()).poll(cx).map_err(LoaderError::from),
+                    Structure::Mount => {
+                        plan.nodes.reconstruct(runtime, &mut plugins, Some(&mut transaction.created))?;
+                        Poll::Ready(Ok(()))
+                    }
+                    Structure::SettleMounted => match Pin::new(&mut runtime.settle()).poll(cx) {
+                        Poll::Ready(Ok(())) if !plan.nodes.checked.ready() => Poll::Ready(Err(LoaderError::Transaction(
+                            cordis_kernel::configuration_transaction::TransactionError::NotReady))),
+                        result => result.map_err(LoaderError::from),
+                    },
+                    _ => Poll::Ready(Err(LoaderError::Transaction(
+                        cordis_kernel::configuration_transaction::TransactionError::NotReady))),
                 }
+            })).await.map_err(structure_error)?;
+            if done {
+                break;
             }
         }
-        self.runtime.settle().await?;
-        // Dependency changes can also retire a retained node's owned children.
-        for path in &plan.order {
-            let node = &plan.nodes[path];
-            if !node.signature.enabled {
-                continue;
-            }
-            if node
-                .id
-                .is_some_and(|id| self.runtime.contains(id) && !self.runtime.retired(id))
-            {
-                continue;
-            }
-            let plugin = match plugins.remove(path) {
-                Some(plugin) => plugin,
-                None => node.build()?,
-            };
-            let parent = plan.parent_for(node, self.parent);
-            let id = self.runtime.mount(node.scope.context(), parent, plugin)?;
-            self.pending.as_mut().unwrap().created.push(id);
-            plan.nodes.get_mut(path).unwrap().id = Some(id);
-        }
-        self.runtime.settle().await?;
-        for update in &mut self.pending.as_mut().unwrap().updates {
-            if self.runtime.episode_generation(update.id) != Some(update.generation)
-                || self.runtime.phase(update.id) != Some(Phase::Active)
-            {
-                return Err(LoaderError::Factory {
-                    entry: update.path.clone(),
-                    message: "configuration update owner changed activation".into(),
-                });
-            }
-            update.started = true;
-            update
-                .plan
-                .apply()
-                .await
-                .map_err(|error| LoaderError::Update {
-                    entry: update.path.clone(),
-                    error,
-                })?;
-        }
-        // Adoption only changes future setup recipes, after all reversible work
-        // and all newly mounted nodes have succeeded.
-        for update in &self.pending.as_ref().unwrap().updates {
-            if self.runtime.episode_generation(update.id) != Some(update.generation)
-                || self.runtime.phase(update.id) != Some(Phase::Active)
-            {
-                return Err(LoaderError::Factory {
-                    entry: update.path.clone(),
-                    message: "configuration update owner changed activation".into(),
-                });
+        loop {
+            let done = poll_fn(|cx| {
+                configuration.poll_update(|key, plan| {
+                    if !runtime.configuration_target_is_current(key.target) {
+                        return Poll::Ready(Err(LoaderError::Factory {
+                            entry: key.path.clone(),
+                            message: "configuration update owner changed activation or recipe"
+                                .into(),
+                        }));
+                    }
+                    plan.poll_apply(cx).map(|result| {
+                        result.map_err(|error| LoaderError::Update {
+                            entry: key.path.clone(),
+                            error,
+                        })
+                    })
+                })
+            })
+            .await
+            .map_err(|error| match error {
+                cordis_kernel::configuration_batch::StepError::Callback(error) => error,
+                cordis_kernel::configuration_batch::StepError::Recovering => {
+                    LoaderError::Transaction(
+                        cordis_kernel::configuration_transaction::TransactionError::NotReady,
+                    )
+                }
+            })?;
+            if done {
+                break;
             }
         }
-        let recipes = self
-            .pending
-            .as_ref()
-            .unwrap()
-            .updates
+        let adoption: Vec<_> = configuration
+            .updates()
+            .actions()
             .iter()
-            .map(|update| {
-                (
-                    update.id,
-                    plugins
-                        .remove(&update.path)
-                        .expect("preconstructed retained configuration update recipe"),
-                )
+            .map(|action| {
+                let key = action.key();
+                (key.path.clone(), key.target)
             })
             .collect();
-        self.runtime.adopt_config_recipes(recipes)?;
+        // Adoption is an owned phase after all actual updates. A failed
+        // preflight cannot authorize the checked transaction's commit gate.
+        poll_fn(|_cx| {
+            configuration.poll_structure(|phase, _current, _pending| {
+                if phase != Structure::Adopt {
+                    return Poll::Ready(Err(LoaderError::Transaction(
+                        cordis_kernel::configuration_transaction::TransactionError::NotReady,
+                    )));
+                }
+                let recipes = adoption
+                    .iter()
+                    .map(|(path, target)| {
+                        (
+                            *target,
+                            plugins
+                                .remove(path)
+                                .expect("preconstructed retained configuration update recipe"),
+                        )
+                    })
+                    .collect();
+                Poll::Ready(
+                    runtime
+                        .adopt_config_recipes(recipes)
+                        .map_err(LoaderError::from),
+                )
+            })
+        })
+        .await
+        .map_err(structure_error)?;
         Ok(())
     }
 
     /// Restore interrupted/failed revisions using captured old factories. Newly
     /// restored IDs are recorded before awaiting, so recovery can also be dropped.
     pub async fn recover(&mut self) -> Result<(), LoaderError> {
-        if self.pending.is_none() {
+        if self.configuration.pending().is_none() {
             return Ok(());
         }
-        // Undo in-place mutations while the old owner and its services still live.
-        // Keep the current inverse/future in the transaction when recovery is dropped.
-        while let Some(update) = self.pending.as_mut().unwrap().updates.last_mut() {
-            if update.started {
-                update
-                    .plan
-                    .rollback()
-                    .await
-                    .map_err(|error| LoaderError::Update {
-                        entry: update.path.clone(),
-                        error,
-                    })?;
+        loop {
+            let done = poll_fn(|cx| {
+                self.configuration.poll_rollback(|key, plan| {
+                    plan.poll_rollback(cx).map(|result| {
+                        result.map_err(|error| LoaderError::Update {
+                            entry: key.path.clone(),
+                            error,
+                        })
+                    })
+                })
+            })
+            .await?;
+            if done {
+                break;
             }
-            self.pending.as_mut().unwrap().updates.pop();
         }
-        let transaction = self.pending.as_ref().unwrap();
-        for id in &transaction.created {
-            self.runtime.dispose(*id)?;
-        }
-        for node in transaction.before.nodes.values() {
-            if let Some(id) = node.id {
-                if self.runtime.failure(id).is_some() {
-                    self.runtime.dispose(id)?;
+        let runtime = &mut self.runtime;
+        loop {
+            let done = poll_fn(|cx| self.configuration.poll_structure(|phase, _current, pending| {
+                let transaction = &mut pending.recovery;
+                match phase {
+                    Structure::RecoverRemove => {
+                        for id in &transaction.created { runtime.dispose(*id)?; }
+                        for node in transaction.before.nodes.values() {
+                            if let Some(id) = node.id() {
+                                if runtime.failure(id).is_some() { runtime.dispose(id)?; }
+                            }
+                        }
+                        Poll::Ready(Ok(()))
+                    }
+                    Structure::RecoverSettleRemoved => Pin::new(&mut runtime.settle()).poll(cx).map_err(LoaderError::from),
+                    Structure::RecoverMount => {
+                        transaction.before.nodes.reconstruct(runtime, &mut BTreeMap::new(), None)?;
+                        Poll::Ready(Ok(()))
+                    }
+                    Structure::RecoverSettleMounted => match Pin::new(&mut runtime.settle()).poll(cx) {
+                        Poll::Ready(Ok(())) if !transaction.before.nodes.checked.ready() => Poll::Ready(Err(LoaderError::Transaction(
+                            cordis_kernel::configuration_transaction::TransactionError::NotReady))),
+                        result => result.map_err(LoaderError::from),
+                    },
+                    _ => Poll::Ready(Err(LoaderError::Transaction(
+                        cordis_kernel::configuration_transaction::TransactionError::NotReady))),
                 }
+            })).await.map_err(structure_error)?;
+            if done {
+                break;
             }
         }
-        self.runtime.settle().await?;
-        let order = self.pending.as_ref().unwrap().before.order.clone();
-        for path in order {
-            let node = self.pending.as_ref().unwrap().before.nodes[&path].clone();
-            if !node.signature.enabled {
-                continue;
-            }
-            if node
-                .id
-                .is_some_and(|id| self.runtime.contains(id) && !self.runtime.retired(id))
-            {
-                continue;
-            }
-            let plugin = node.build()?;
-            let parent = self
-                .pending
-                .as_ref()
-                .unwrap()
-                .before
-                .parent_for(&node, self.parent);
-            let id = self.runtime.mount(node.scope.context(), parent, plugin)?;
-            self.pending
-                .as_mut()
-                .unwrap()
-                .before
-                .nodes
-                .get_mut(&path)
-                .unwrap()
-                .id = Some(id);
-        }
-        self.runtime.settle().await?;
-        self.current = self.pending.take().unwrap().before;
+        let _retired = self
+            .configuration
+            .recover_with(|transaction| std::mem::take(&mut transaction.before))
+            .map_err(LoaderError::Transaction)?;
         Ok(())
     }
     pub async fn reload(&mut self) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
-        self.apply(self.current.tree.clone()).await
+        self.apply(self.configuration.current().tree.clone()).await
     }
     pub async fn set_enabled(
         &mut self,
@@ -1101,7 +1286,7 @@ impl Loader {
         enabled: bool,
     ) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
-        let mut tree = self.current.tree.clone();
+        let mut tree = self.configuration.current().tree.clone();
         tree.entry_mut(path)
             .ok_or_else(|| ConfigError::new(path, "unknown entry"))?
             .enabled = enabled;
@@ -1109,30 +1294,27 @@ impl Loader {
     }
     pub async fn dispose(&mut self) -> Result<ApplyReport, LoaderError> {
         let report = self.apply_transaction(ConfigTree::default()).await?;
-        self.source = SourceTracking::default();
+        self.configuration
+            .clear_sources()
+            .map_err(LoaderError::Transaction)?;
         self.settle_committed(report).await
     }
     pub async fn load_file(&mut self, path: impl AsRef<Path>) -> Result<ApplyReport, LoaderError> {
         self.recover().await?;
         let loaded = read_tree(path.as_ref())?;
         let report = self.apply_transaction(loaded.tree).await?;
-        self.source.root = Some(loaded.root);
-        self.source.resolutions = loaded.resolutions;
-        self.source.checkpoints = loaded
-            .sources
-            .iter()
-            .map(|(path, text)| {
-                // read_tree already parsed every source before committing the runtime.
-                (
-                    path.clone(),
-                    ConfigTree::from_json(text).expect("successfully parsed source"),
-                )
+        self.configuration
+            .load_sources(cordis_kernel::configuration_recorded::Load {
+                root: loaded.root,
+                contents: loaded.sources,
+                checkpoints: loaded.checkpoints.into_iter().collect(),
+                resolutions: loaded.resolutions,
             })
-            .collect();
-        self.source.contents = loaded.sources;
-        self.source
-            .pending_sync
-            .retain(|path| self.source.contents.contains_key(path));
+            .map_err(|_| {
+                LoaderError::Transaction(
+                    cordis_kernel::configuration_transaction::TransactionError::Pending,
+                )
+            })?;
         self.settle_committed(report).await
     }
     /// Prepare an explicit, inspectable three-way save without writing files.
@@ -1141,27 +1323,32 @@ impl Loader {
     /// Saving never changes the running configuration; poll_reload applies any
     /// external edits retained by the merge.
     pub fn prepare_save(&self) -> Result<SavePlan, SaveError> {
-        if self.pending.is_some() {
-            return Err(SaveError::new(None, SaveErrorKind::RecoveryPending));
-        }
+        let configuration = self
+            .configuration
+            .save_stamp(self.runtime.configuration_domain())
+            .ok_or_else(|| SaveError::new(None, SaveErrorKind::RecoveryPending))?;
         let root = self
-            .source
-            .root
+            .configuration
+            .sources()
+            .root()
             .as_ref()
             .ok_or_else(|| SaveError::new(None, SaveErrorKind::NoFileSource))?;
         let (desired, include_targets) = project_sources(
             root,
-            &self.source.contents,
-            &self.source.resolutions,
-            &self.current.tree,
+            self.configuration.sources().contents(),
+            self.configuration.sources().resolutions(),
+            &self.configuration.current().tree,
         )?;
         let plan = SavePlan::prepare(
-            self.current.tree.clone(),
-            self.source.contents.clone(),
-            self.source.checkpoints.clone(),
+            self.configuration.current().tree.clone(),
+            self.configuration.sources().contents().clone(),
+            source_checkpoints(self.configuration.sources()),
             desired,
-            self.registry.revision,
-            self.source.pending_sync.clone(),
+            SaveOrigin {
+                registry_revision: self.registry.revision,
+                configuration,
+            },
+            source_pending_sync(self.configuration.sources()),
             include_targets,
         )?;
         let merged = read_tree_cached(root, Some(plan.merged_sources())).map_err(|error| {
@@ -1182,34 +1369,21 @@ impl Loader {
     /// Commit a reviewed plan. Errors contain exact per-file progress; completed
     /// files remain saved, and another save can retry the remaining local edits.
     pub fn commit_save(&mut self, plan: SavePlan) -> Result<SaveReport, SaveError> {
-        if self.pending.is_some() {
+        if self.configuration.pending().is_some() {
             return Err(SaveError::new(None, SaveErrorKind::RecoveryPending));
         }
-        if plan.tree != self.current.tree
-            || plan.sources != self.source.contents
-            || plan.checkpoints != self.source.checkpoints
-            || plan.registry_revision != self.registry.revision
-            || plan.pending_sync != self.source.pending_sync
+        if !self.configuration.accepts_save(
+            self.runtime.configuration_domain(),
+            &plan.origin.configuration,
+        ) || plan.tree != self.configuration.current().tree
+            || &plan.sources != self.configuration.sources().contents()
+            || plan.checkpoints != source_checkpoints(self.configuration.sources())
+            || plan.origin.registry_revision != self.registry.revision
+            || plan.pending_sync != source_pending_sync(self.configuration.sources())
         {
             return Err(SaveError::new(None, SaveErrorKind::StalePlan));
         }
-        let desired = plan.desired();
-        let result = plan.commit();
-        let report = match &result {
-            Ok(report) => report,
-            Err(error) => &error.report,
-        };
-        for path in report.written.iter().chain(&report.unchanged) {
-            self.source
-                .checkpoints
-                .insert(path.clone(), desired[path].clone());
-            if report.durability_uncertain.contains(path) {
-                self.source.pending_sync.insert(path.clone());
-            } else {
-                self.source.pending_sync.remove(path);
-            }
-        }
-        result
+        plan.commit(&mut self.configuration, self.runtime.configuration_domain())
     }
     /// Explicit convenience operation; apply and set_enabled never write files.
     pub fn save(&mut self) -> Result<SaveReport, SaveError> {
@@ -1219,7 +1393,7 @@ impl Loader {
     /// Poll contents and factory revisions once from an application's timer/event
     /// loop. Invalid files leave the previous successful source snapshot intact.
     pub async fn poll_reload(&mut self) -> Result<ApplyReport, LoaderError> {
-        let Some(path) = self.source.root.clone() else {
+        let Some(path) = self.configuration.sources().root().clone() else {
             return self.reload().await;
         };
         self.load_file(path).await
@@ -1230,6 +1404,7 @@ struct LoadedTree {
     tree: ConfigTree,
     root: PathBuf,
     sources: BTreeMap<PathBuf, String>,
+    checkpoints: BTreeMap<PathBuf, ConfigTree>,
     resolutions: BTreeMap<PathBuf, PathBuf>,
 }
 fn read_tree(path: &Path) -> Result<LoadedTree, LoaderError> {
@@ -1245,105 +1420,98 @@ fn read_tree_cached(
             message: error.to_string(),
         }
     }
-    fn read(
-        path: &Path,
-        stack: &mut Vec<PathBuf>,
-        sources: &mut BTreeMap<PathBuf, String>,
+    struct Reader {
+        sources: BTreeMap<PathBuf, String>,
+        checkpoints: BTreeMap<PathBuf, ConfigTree>,
         cached_only: bool,
-        resolutions: &mut BTreeMap<PathBuf, PathBuf>,
-    ) -> Result<ConfigTree, LoaderError> {
-        let lexical = path.to_owned();
-        let path = fs::canonicalize(path).map_err(|error| source_error(path, error))?;
-        if resolutions
-            .insert(lexical, path.clone())
-            .is_some_and(|previous| previous != path)
-        {
-            return Err(source_error(&path, "include target changed while reading"));
-        }
-        if stack.contains(&path) {
-            let mut cycle = stack.clone();
-            cycle.push(path);
-            return Err(LoaderError::IncludeCycle(cycle));
-        }
-        if stack.len() >= 128 {
-            return Err(source_error(&path, "include nesting exceeds 128"));
-        }
-        let text = match sources.get(&path) {
-            Some(text) => text.clone(),
-            None if cached_only => {
-                return Err(source_error(
-                    &path,
-                    "include source was not part of the save plan",
-                ))
+        resolutions: BTreeMap<PathBuf, PathBuf>,
+        locations: BTreeMap<Vec<u8>, PathBuf>,
+    }
+    impl Reader {
+        fn read(&mut self, path: &Path) -> Result<ExpansionDocument, LoaderError> {
+            let lexical = path.to_owned();
+            let path = fs::canonicalize(path).map_err(|error| source_error(path, error))?;
+            if self
+                .resolutions
+                .insert(lexical, path.clone())
+                .is_some_and(|previous| previous != path)
+            {
+                return Err(source_error(&path, "include target changed while reading"));
             }
-            None => fs::read_to_string(&path).map_err(|error| source_error(&path, error))?,
-        };
-        let mut tree = ConfigTree::from_json(&text).map_err(|error| source_error(&path, error))?;
-        sources.insert(path.clone(), text);
-        stack.push(path.clone());
-        fn expand(
-            entries: &mut [Entry],
-            base: &Path,
-            stack: &mut Vec<PathBuf>,
-            sources: &mut BTreeMap<PathBuf, String>,
-            depth: usize,
-            cached_only: bool,
-            resolutions: &mut BTreeMap<PathBuf, PathBuf>,
-        ) -> Result<(), LoaderError> {
-            if depth > 128 {
-                return Err(source_error(base, "configuration nesting exceeds 128"));
-            }
-            for entry in entries {
-                expand(
-                    &mut entry.children,
-                    base,
-                    stack,
-                    sources,
-                    depth + 1,
-                    cached_only,
-                    resolutions,
-                )?;
-                if let Some(include) = entry.include.take() {
-                    let included = read(
-                        &base.join(include),
-                        stack,
-                        sources,
-                        cached_only,
-                        resolutions,
-                    )?;
-                    entry.children.extend(included.entries);
+            // Preserve native path bytes: lossy Unicode conversion must not
+            // merge two file identities during cycle detection.
+            let identity = path.as_os_str().as_encoded_bytes().to_vec();
+            self.locations.insert(identity.clone(), path.clone());
+            let text = match self.sources.get(&path) {
+                Some(text) => text.clone(),
+                None if self.cached_only => {
+                    return Err(source_error(
+                        &path,
+                        "include source was not part of the save plan",
+                    ))
                 }
-            }
-            Ok(())
+                None => fs::read_to_string(&path).map_err(|error| source_error(&path, error))?,
+            };
+            let tree = ConfigTree::from_json(&text).map_err(|error| source_error(&path, error))?;
+            self.checkpoints.insert(path.clone(), tree.clone());
+            self.sources.insert(path.clone(), text);
+            Ok(ExpansionDocument {
+                identity,
+                base: path.parent().unwrap_or(Path::new(".")).to_owned(),
+                entries: tree
+                    .entries
+                    .into_iter()
+                    .map(Entry::into_expansion)
+                    .collect(),
+            })
         }
-        expand(
-            &mut tree.entries,
-            path.parent().unwrap_or(Path::new(".")),
-            stack,
-            sources,
-            0,
-            cached_only,
-            resolutions,
-        )?;
-        stack.pop();
-        Ok(tree)
+        fn location(&self, identity: &[u8]) -> &Path {
+            self.locations
+                .get(identity)
+                .expect("expansion identities originate from actual document reads")
+        }
     }
     let root = fs::canonicalize(path).map_err(|error| source_error(path, error))?;
-    let cached_only = cached.is_some();
-    let mut sources = cached.unwrap_or_default();
-    let mut resolutions = BTreeMap::new();
-    let tree = read(
-        &root,
-        &mut Vec::new(),
-        &mut sources,
-        cached_only,
-        &mut resolutions,
-    )?;
+    let mut reader = Reader {
+        cached_only: cached.is_some(),
+        sources: cached.unwrap_or_default(),
+        checkpoints: BTreeMap::new(),
+        resolutions: BTreeMap::new(),
+        locations: BTreeMap::new(),
+    };
+    let document = reader.read(&root)?;
+    let mut expander = cordis_kernel::configuration_expansion::Expander::new(
+        reader,
+        |reader: &mut Reader, base: &PathBuf, include: &PathBuf| reader.read(&base.join(include)),
+    );
+    let result = expander.expand(document).result;
+    let reader = expander.into_host();
+    let entries = result.map_err(|error| {
+        use cordis_kernel::configuration_expansion::ExpandError;
+        match error {
+            ExpandError::Read(error) => error,
+            ExpandError::Cycle(cycle) => LoaderError::IncludeCycle(
+                cycle
+                    .iter()
+                    .map(|key| reader.location(key).to_owned())
+                    .collect(),
+            ),
+            ExpandError::IncludeDepth(key) => {
+                source_error(reader.location(&key), "include nesting exceeds 128")
+            }
+            ExpandError::TreeDepth(key) => {
+                source_error(reader.location(&key), "configuration nesting exceeds 128")
+            }
+        }
+    })?;
     Ok(LoadedTree {
-        tree,
+        tree: ConfigTree {
+            entries: entries.into_iter().map(Entry::from_expansion).collect(),
+        },
         root,
-        sources,
-        resolutions,
+        sources: reader.sources,
+        checkpoints: reader.checkpoints,
+        resolutions: reader.resolutions,
     })
 }
 

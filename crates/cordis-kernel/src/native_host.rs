@@ -18,6 +18,7 @@ use crate::cleanup_groups::CleanupGroups;
 use crate::lifecycle_actions::CleanupOutcome;
 #[cfg(verus_keep_ghost)]
 use crate::refinement::{self, Rule};
+use crate::reversible_value::function::Body;
 use crate::setup_work::{SetupWork, WorkReceipt};
 use crate::{Error, Kernel, Port};
 use std::collections::BTreeMap;
@@ -33,6 +34,9 @@ impl<R,H> NativeEntry<R,H> {
     pub closed spec fn recipe(&self)->RegisteredPlugin<R> {self.registration}
     pub closed spec fn bookkeeping(&self)->H {self.host}
     pub closed spec fn with_host(&self,host:H)->Self {Self {registration:self.registration,host}}
+    pub proof fn with_host_properties(&self,host:H)
+        ensures self.with_host(host).recipe()==self.recipe(),self.with_host(host).bookkeeping()==host,
+    {}
     pub fn into_parts(self)->(out:(RegisteredPlugin<R>,H))
         ensures out.0==self.recipe(),out.1==self.bookkeeping(),
     {(self.registration,self.host)}
@@ -115,7 +119,8 @@ impl<R,H> NativeHost<R,H> {
     /// remain fixed even if a caller replaces all of its own bookkeeping.
     pub fn host_mut(&mut self,id:usize)->(out:Option<&mut H>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).state()==old(self).state(),
+        ensures final(self).wf(),final(self).state()==old(self).state(),final(self).entries().dom()==old(self).entries().dom(),
+            forall|n:usize| #[trigger] old(self).entries().contains_key(n) ==> final(self).entries()[n].recipe()==old(self).entries()[n].recipe(),
             match out {
                 Some(host)=>old(self).entries().contains_key(id) && *host==old(self).entries()[id].bookkeeping()
                     && final(self).entries()==old(self).entries().insert(id,old(self).entries()[id].with_host(*final(host))),
@@ -164,7 +169,10 @@ impl<R,H> NativeHost<R,H> {
                 && out->Err_0.1==definition && out->Err_0.2==host,
             out.is_ok() ==> final(self).entries().dom()==old(self).entries().dom().insert(out->Ok_0)
                 && !old(self).entries().contains_key(out->Ok_0)
+                && final(self).entries()[out->Ok_0].recipe().version()==0
                 && final(self).entries()[out->Ok_0].recipe().payload()==definition.payload()
+                && final(self).entries()[out->Ok_0].recipe().realms()==realms@
+                && final(self).entries()[out->Ok_0].recipe().anchor_port()==anchor
                 && final(self).entries()[out->Ok_0].bookkeeping()==host
                 && (forall|n:usize| #[trigger] old(self).entries().contains_key(n) ==> final(self).entries()[n]==old(self).entries()[n])
                 && refinement::step(old(self).state().control().paper(),final(self).state().control().paper(),out->Ok_0,Rule::Insert),
@@ -197,7 +205,10 @@ impl<R,H> NativeHost<R,H> {
                 && *final(slot)==*old(slot) && out->Err_0.1==definition && out->Err_0.2==host,
             out.is_ok() ==> final(self).entries().dom()==old(self).entries().dom().insert(out->Ok_0)
                 && !old(self).entries().contains_key(out->Ok_0)
+                && final(self).entries()[out->Ok_0].recipe().version()==0
                 && final(self).entries()[out->Ok_0].recipe().payload()==definition.payload()
+                && final(self).entries()[out->Ok_0].recipe().realms()==realms@
+                && final(self).entries()[out->Ok_0].recipe().anchor_port()==anchor
                 && final(self).entries()[out->Ok_0].bookkeeping()==host
                 && final(slot).state() is Assigned && final(slot).state()->Assigned_0.child()==out->Ok_0
                 && final(self).entries()[out->Ok_0].recipe().parent_id()==Some(old(slot).owner())
@@ -285,13 +296,16 @@ impl<R,H> NativeHost<R,H> {
     }
     pub fn admit_root<C,G,A>(&self,id:usize,work:&mut SetupWork<C,G>,argument:A)->(out:Result<RegisteredInvocation<A>,A>)
         requires self.wf(),old(work).wf(),
-        ensures final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> out->Err_0==argument && *final(work)==*old(work),
+        ensures final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> out->Err_0==argument && *final(work)==*old(work),
             out.is_ok() ==> self.entries().contains_key(id) && out->Ok_0.owner()==id
                 && out->Ok_0.domain_id()==self.state().protocol().domain_id()
                 && out->Ok_0.version()==self.entries()[id].recipe().version() && out->Ok_0.work().value()==argument
                 && out->Ok_0.lifecycle()==old(work).origin().unwrap()
                 && out->Ok_0.work().origin().domain_id()==old(work).domain_id()
-                && self.state().root_invocation_enabled(out->Ok_0.lifecycle()),
+                && self.state().root_invocation_enabled(out->Ok_0.lifecycle())
+                && out->Ok_0.version()==self.entries()[id].recipe().version()
+                && final(work).root_status()==crate::setup_work::RootStatus::Queued
+                && out->Ok_0.work().origin().request_id()==0 && out->Ok_0.work().origin().request_kind()==crate::setup_work::WorkKind::Root,
     {
         match self.entries.get(&id) {
             Some(entry)=>self.lifecycle.admit_registered_root(&entry.registration,work,argument),None=>Err(argument),
@@ -323,12 +337,42 @@ impl<R,H> NativeHost<R,H> {
     }
 }
 
+impl<R,H,F> NativeHost<Body<R,F>,H> {
+    pub fn call_opaque<A,O>(&mut self,id:usize,invocation:RegisteredInvocation<A>)->(out:Result<WorkReceipt<O>,RegisteredInvocation<A>>)
+        where R:FnMut(A)->O,
+        requires old(self).wf(),old(self).entries().contains_key(id) ==> old(self).entries()[id].recipe().payload().callback_requires::<A,O>(invocation.work().value()),
+        ensures final(self).wf(),final(self).state()==old(self).state(),final(self).entries().dom()==old(self).entries().dom(),
+            out.is_ok()==(old(self).entries().contains_key(id) && invocation.owner()==id
+                && old(self).entries()[id].recipe().payload() is Callback
+                && invocation.domain_id()==old(self).state().protocol().domain_id()
+                && invocation.version()==old(self).entries()[id].recipe().version()
+                && invocation.lifecycle().id==id && old(self).state().root_invocation_enabled(invocation.lifecycle())),
+            out.is_err() ==> final(self).entries()==old(self).entries() && out->Err_0==invocation,
+            out.is_ok() ==> old(self).entries().contains_key(id) && invocation.owner()==id
+                && old(self).entries()[id].recipe().payload() is Callback
+                && invocation.domain_id()==old(self).state().protocol().domain_id()
+                && invocation.version()==old(self).entries()[id].recipe().version()
+                && invocation.lifecycle().id==id && old(self).state().root_invocation_enabled(invocation.lifecycle())
+                && out->Ok_0.origin()==invocation.work().origin()
+                && old(self).entries()[id].recipe().payload().callback_ensures::<A,O>(invocation.work().value(),out->Ok_0.value()),
+            forall|n:usize| #[trigger] old(self).entries().contains_key(n) ==>
+                final(self).entries()[n].bookkeeping()==old(self).entries()[n].bookkeeping()
+                && final(self).entries()[n].recipe().same_identity(&old(self).entries()[n].recipe())
+                && final(self).entries()[n].recipe().version()==old(self).entries()[n].recipe().version()
+                && (n!=id ==> final(self).entries()[n]==old(self).entries()[n]),
+    {
+        if invocation.lifecycle_ticket().id!=id || !self.lifecycle.accepts_root_invocation(invocation.lifecycle_ticket()) {return Err(invocation);}
+        match self.entries.get_mut(&id) {Some(entry)=>entry.registration.call_opaque(invocation),None=>Err(invocation)}
+    }
+}
+
+
 impl<R,H> NativeHost<R,H> {
     #[allow(clippy::type_complexity)]
     pub fn begin_native_execution<V,C,G,I>(&mut self,id:usize,store:&NativeServices<V>,cleanup_domain:u64)
         ->(out:Result<(SetupWork<C,G>,CleanupGroups<I>,NativeEpisode<V>),Error>)
         requires old(self).wf(),store.wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), (forall|n:usize| n!=id ==> final(self).state().control().generation_of(n)==old(self).state().control().generation_of(n)), out.is_ok() ==> out->Ok_0.0.accepts(), out.is_ok() ==> !out->Ok_0.0.is_closed() && !out->Ok_0.1.closed(), final(self).wf(),final(self).entries()==old(self).entries(),
+        ensures out.is_ok() ==> out->Ok_0.0.link().is_none() && out->Ok_0.1.execution_journal().is_none() && out->Ok_0.1.queues().dom()==set![0usize],final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), (forall|n:usize| n!=id ==> final(self).state().control().generation_of(n)==old(self).state().control().generation_of(n)), out.is_ok() ==> out->Ok_0.0.accepts(), out.is_ok() ==> !out->Ok_0.0.is_closed() && !out->Ok_0.1.closed(), final(self).wf(),final(self).entries()==old(self).entries(),
             out.is_ok()==(old(self).entries().contains_key(id) && store.domain_id()==old(self).state().protocol().domain_id()
                 && !store.entries().contains_key(id) && old(self).state().protocol().admission_enabled(id) && old(self).state().control().begin_enabled(id)),
             out.is_err() ==> final(self).state().same(&old(self).state()),
@@ -341,6 +385,8 @@ impl<R,H> NativeHost<R,H> {
                 && out->Ok_0.2.capture().sources==crate::lifecycle_state::services::capture::sources(store.entries())
                 && out->Ok_0.2.capture().work_domain==cleanup_domain
                 && out->Ok_0.2.provisions()==old(self).entries()[id].recipe().provisions_spec()
+                && out->Ok_0.2.capture().realms==old(self).entries()[id].recipe().realms()
+                && out->Ok_0.2.capture().anchor==old(self).entries()[id].recipe().anchor_port()
                 && (forall|b:crate::Binding| out->Ok_0.2.bindings().contains(b)==final(self).state().control().binding_recorded(id,b))
                 && (forall|key:(usize,u64,u64)| #[trigger] out->Ok_0.2.imports().contains_key(key)==(out->Ok_0.2.bindings().contains(crate::Binding {provider:key.0,key:key.1,realm:key.2})
                     && store.available(&final(self).state(),key.0,Port {key:key.1,realm:key.2})))
@@ -395,7 +441,7 @@ impl<R,H> NativeHost<R,H> {
     pub fn release_native_execution<V,C,G,I>(&mut self,id:usize,store:&mut NativeServices<V>,values:&mut NativeEpisode<V>,work:&mut SetupWork<C,G>,groups:&mut CleanupGroups<I>)
         ->(out:Result<(CleanupOutcome,ReleasedNativeValues<V>),Error>)
         requires old(self).wf(),old(store).wf(),old(values).wf(),old(work).wf(),old(groups).wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), out.is_ok() ==> old(work).idle() && old(groups).all_drained(), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(values).wf(),final(work).wf(),final(groups).wf(),
+        ensures final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), out.is_ok() ==> old(work).idle() && old(groups).all_drained(), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(values).wf(),final(work).wf(),final(groups).wf(),
             final(store).domain_id()==old(store).domain_id(),final(values).same_identity(old(values)),
             out.is_err() ==> final(self).state().same(&old(self).state()) && *final(store)==*old(store) && *final(values)==*old(values)
                 && *final(work)==*old(work) && *final(groups)==*old(groups),
@@ -515,7 +561,7 @@ impl<R,H> NativeHost<R,H> {
 
     pub fn retry_execution<C,G,I>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&mut CleanupGroups<I>)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),work.wf(),old(groups).wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).entries()==old(self).entries(),final(self).state().control().unchanged(&old(self).state().control()),
+        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).entries()==old(self).entries(),final(self).state().control().unchanged(&old(self).state().control()),
             out.is_err() ==> final(self).state().same(&old(self).state()) && *final(groups)==*old(groups),
             final(groups).wf(),final(groups).drained_failure()==old(groups).drained_failure(),
             out.is_ok() ==> old(self).state().execution_matches(id,work,old(groups)) && old(groups).retries_ready()

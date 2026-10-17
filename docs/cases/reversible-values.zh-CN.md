@@ -47,7 +47,7 @@ cargo run -p cordis-verus --example reversible_values
 | 约束 | 实际代码与证明 |
 | --- | --- |
 | 操作返回值、结果以及真正的部分逆操作 | [`Cell::forward`、`operation`、`primitive_theory`](../../crates/cordis-kernel/src/reversible_value.rs) 实现并证明 Definition 30 和 Lemma 39 的 dependent grammar 所需的标量原语前提 |
-| 结果选择实际 continuation | `Branch::select` 和 [`ReversibleValue::run`](../../crates/cordis-kernel/src/value_program.rs)，宿主不提供预期结果 |
+| 结果选择实际 continuation | `Branch::select` 和 [`ReversibleValue::run_following`](../../crates/cordis-kernel/src/value_program.rs)，宿主不提供预期结果 |
 | 每个程序根和 continuation 都属于 Component | `Program::member`、`Program::component` 实例化 [R1](../r1-semantics.zh-CN.md) 的完整有限严格载体，不把载体缩成成功输入集合 |
 | 观察来自真实执行状态 | 真正的 `vstd::RwLock` 持有 `ValueState { value, depth }` 和 ghost 执行历史；`snapshot` 在锁内读取实际字段 |
 | 保存的 inverse 就是本次实际操作产生的那个 | [`Execution::apply_value`、`run_value_program`](../../crates/cordis-kernel/src/execution.rs) 保存真实 inverse 对象；程序部分实现在 `value_program.rs` |

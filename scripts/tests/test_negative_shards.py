@@ -673,12 +673,11 @@ class PlatformPlanTests(unittest.TestCase):
                  patch.object(CHECKS, 'toolchain', side_effect=AssertionError('plan must not install tools')), \
                  patch.object(CHECKS, 'run_verus', side_effect=AssertionError('plan must not run proofs')):
                 plan = SHARDS.regression_plan(include_macos=True, include_macos_intel=include_intel)
-                self.assertEqual(plan['mutationCount'], 190)
-                self.assertEqual(len(plan['negative']['include']), 130 if include_intel else 66)
-                expected = [('ubuntu-24.04', 2400, 28, 55), ('macos-15', 3600, 38, 75)]
+                self.assertEqual(plan['mutationCount'], len(CHECKS.mutation_manifest()))
+                expected = [('ubuntu-24.04', 2400, 55), ('macos-15', 3600, 75)]
                 if include_intel:
-                    expected.append(('macos-15-intel', 5400, 64, 105))
-                self.assertEqual([(row['os'], row['timeout'], row['shardCount'], row['preflightMinutes'])
+                    expected.append(('macos-15-intel', 5400, 105))
+                self.assertEqual([(row['os'], row['timeout'], row['preflightMinutes'])
                                   for row in plan['preflight']['include']], expected)
                 manifest = CHECKS.mutation_manifest()
                 for platform in plan['preflight']['include']:
@@ -689,14 +688,31 @@ class PlatformPlanTests(unittest.TestCase):
                     self.assertEqual(len(covered), len(manifest))
                     self.assertEqual(set(covered), set(manifest))
 
+    def test_manifest_growth_preserves_complete_control_and_cleanup_budgets(self):
+        for size in (1, 3, 5, 7, 8, 190, 200, 262, 400):
+            manifest = [(f'control-{i}', 'file.rs', 'before', 'after') for i in range(size)]
+            plan = SHARDS.regression_plan(manifest, include_macos=True, include_macos_intel=True)
+            for platform in plan['preflight']['include']:
+                with self.subTest(size=size, platform=platform['os']):
+                    pieces = [SHARDS.assigned(manifest, i, platform['shardCount']) for i in range(platform['shardCount'])]
+                    self.assertTrue(all(pieces))
+                    self.assertEqual(sorted(item[0] for piece in pieces for item in piece), sorted(item[0] for item in manifest))
+                    self.assertEqual(platform['compileTimeout'], 300)
+                    self.assertEqual(platform['shardMinutes'], 360)
+                    self.assertLessEqual(max(map(len, pieces)) * (platform['timeout'] + 300), 330 * 60)
+                    # One fewer shard would exceed the fixed per-control budget.
+                    if platform['shardCount'] > 1:
+                        previous = [SHARDS.assigned(manifest, i, platform['shardCount']-1) for i in range(platform['shardCount']-1)]
+                        self.assertGreater(max(map(len, previous)) * (platform['timeout'] + 300), 330 * 60)
+
     def test_default_is_linux_only_and_platforms_are_independent_options(self):
         for mac, intel, expected in [(False, False, ['ubuntu-24.04']), (True, False, ['ubuntu-24.04', 'macos-15']),
                                       (False, True, ['ubuntu-24.04', 'macos-15-intel'])]:
             self.assertEqual([row['os'] for row in SHARDS.regression_plan(include_macos=mac, include_macos_intel=intel)['preflight']['include']], expected)
 
-    def test_growth_cannot_silently_exceed_job_budget(self):
+    def test_empty_or_duplicate_manifest_is_rejected(self):
         for include_intel in (False, True):
-            for manifest in [[], [('same',)] * 121, [(f'control-{index}',) for index in range(200)]]:
+            for manifest in [[], [('same',)] * 121]:
                 with self.subTest(count=len(manifest), intel=include_intel), self.assertRaises(RuntimeError):
                     SHARDS.regression_plan(manifest, include_macos_intel=include_intel)
 
@@ -827,12 +843,13 @@ class SelectionTests(unittest.TestCase):
 
     def test_all_canonical_controls_are_partitioned_once_without_changing_each_control(self):
         manifest = CHECKS.mutation_manifest()
-        self.assertEqual(len(manifest), 190)
-        for count, maximum in [(28, 7), (38, 5), (64, 3)]:
+        self.assertGreater(len(manifest), 0)
+        for count in (1, 28, 38, 64):
+            maximum = (len(manifest) + count - 1) // count
             with self.subTest(count=count):
                 pieces = [SHARDS.assigned(manifest, index, count) for index in range(count)]
                 flattened = [item for group in pieces for item in group]
-                self.assertEqual(len(flattened), 190)
+                self.assertEqual(len(flattened), len(manifest))
                 self.assertEqual(set(flattened), set(manifest))
                 self.assertEqual(max(map(len, pieces)), maximum)
 

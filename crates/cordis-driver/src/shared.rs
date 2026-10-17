@@ -9,15 +9,15 @@ use crate::{ActionKind, ActionTicket, DriverError};
 use cordis_kernel::action_ledger::{
     ActionError, ActionKind as KernelActionKind, ActionTicket as KernelActionTicket,
 };
+use cordis_kernel::identity_issuer::IdentityIssuer;
 pub use cordis_kernel::lifecycle_actions::CleanupOutcome;
 use cordis_kernel::lifecycle_state::cleanup::{CleanupCommand, CleanupError};
 use cordis_kernel::lifecycle_state::LifecycleState;
 use cordis_kernel::{Error, Kernel, Phase, Port};
 use std::collections::BTreeMap;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
 
-static NEXT_DOMAIN: AtomicU64 = AtomicU64::new(1);
+static NEXT_DOMAIN: IdentityIssuer = IdentityIssuer::new();
 
 /// Observations that require access to executor-owned values or failure state.
 #[derive(Clone, Copy, Debug)]
@@ -153,6 +153,28 @@ impl LifecycleDriver {
         let ticket = self.state.begin(id)?;
         self.pending_views.insert(id, host_ticket(ticket));
         Ok(())
+    }
+    /// Admit Node setup and its actual publication leases in one checked call.
+    pub fn begin_checked(
+        &mut self,
+        id: usize,
+        store: &mut cordis_kernel::publication::values::PublicationStore<u64>,
+        availability: &cordis_kernel::availability::Availability,
+        checked: &std::collections::BTreeSet<usize>,
+    ) -> Result<cordis_kernel::availability::admission::Admission, DriverError> {
+        use cordis_kernel::availability::admission::AdmissionError;
+        let admission = availability
+            .begin_setup(&mut self.state, store, checked, id)
+            .map_err(|error| match error {
+                AdmissionError::Unavailable => {
+                    DriverError::new("Unavailable", "setup dependencies are unavailable")
+                }
+                AdmissionError::Lifecycle(error) => error.into(),
+                AdmissionError::Publication(error) => error.into(),
+            })?;
+        self.pending_views
+            .insert(id, host_ticket(admission.ticket()));
+        Ok(admission)
     }
     /// Admit a native episode together with its bound work and cleanup owners.
     #[allow(clippy::type_complexity)]
@@ -455,6 +477,21 @@ impl LifecycleDriver {
                 CleanupReleaseError::Publication(error) => error.into(),
             })
     }
+    /// A normal Node cleanup uses the exact admission returned by Begin.
+    pub fn finish_admission_values(
+        &mut self,
+        store: &mut cordis_kernel::publication::values::PublicationStore<u64>,
+        admission: &cordis_kernel::availability::admission::Admission,
+        publications: &[cordis_kernel::publication::PublicationId],
+    ) -> Result<Vec<cordis_kernel::publication::values::ReleasedValue<u64>>, DriverError> {
+        use cordis_kernel::lifecycle_actions::resources::CleanupReleaseError;
+        admission
+            .finish(&mut self.state, store, publications)
+            .map_err(|error| match error {
+                CleanupReleaseError::Lifecycle(error) => error.into(),
+                CleanupReleaseError::Publication(error) => error.into(),
+            })
+    }
     pub fn finish_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
         self.state
             .execute_cleanup(CleanupCommand::Release {
@@ -478,19 +515,19 @@ impl LifecycleDriver {
     }
 }
 
-fn cleanup_control_error(error: CleanupError) -> Error {
+pub(crate) fn cleanup_control_error(error: CleanupError) -> Error {
     match error {
         CleanupError::Control(error) => error,
         CleanupError::Reply(error) => ledger_error(error),
     }
 }
-fn cleanup_completion_error(error: CleanupError) -> DriverError {
+pub(crate) fn cleanup_completion_error(error: CleanupError) -> DriverError {
     match error {
         CleanupError::Control(error) => error.into(),
         CleanupError::Reply(error) => completion_error(error),
     }
 }
-fn ledger_error(error: ActionError) -> Error {
+pub(crate) fn ledger_error(error: ActionError) -> Error {
     match error {
         ActionError::Capacity => Error::Capacity,
         ActionError::Pending | ActionError::WrongDomain | ActionError::Stale => Error::InvalidState,
@@ -516,7 +553,7 @@ fn kernel_kind(kind: ActionKind) -> KernelActionKind {
         ActionKind::Cleanup => KernelActionKind::Cleanup,
     }
 }
-fn kernel_ticket(ticket: &ActionTicket) -> KernelActionTicket {
+pub(crate) fn kernel_ticket(ticket: &ActionTicket) -> KernelActionTicket {
     KernelActionTicket {
         domain: ticket.domain,
         id: ticket.id,
@@ -525,7 +562,7 @@ fn kernel_ticket(ticket: &ActionTicket) -> KernelActionTicket {
         kind: kernel_kind(ticket.kind),
     }
 }
-fn host_ticket(ticket: KernelActionTicket) -> ActionTicket {
+pub(crate) fn host_ticket(ticket: KernelActionTicket) -> ActionTicket {
     ActionTicket {
         domain: ticket.domain,
         id: ticket.id,
@@ -538,13 +575,13 @@ fn host_ticket(ticket: KernelActionTicket) -> ActionTicket {
     }
 }
 
-fn allocate_domain() -> Result<u64, DriverError> {
+pub(crate) fn allocate_domain() -> Result<u64, DriverError> {
     let domain = NEXT_DOMAIN
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .issue()
         .map_err(|_| DriverError::new("Capacity", "domain identity exhausted"))?;
-    Ok(domain)
+    Ok(domain.get())
 }
-fn decision(state: &LifecycleState, id: usize, status: HostStatus) -> Option<Decision> {
+pub(crate) fn decision(state: &LifecycleState, id: usize, status: HostStatus) -> Option<Decision> {
     let kernel = state.kernel();
     match kernel.phase(id)? {
         Phase::Loading | Phase::Active

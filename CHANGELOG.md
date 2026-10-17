@@ -4,6 +4,371 @@ Changes are recorded before release. Runtime previews are distributed through Gi
 
 ## Unreleased
 
+- Add `Plugin::native_function` for stored root/Child bodies that mix verified
+  scalar effects and typed service replacement. The actual interpreter binds
+  declarations and installed arguments, follows real outcomes, explains
+  rejection and retains the exact mixed inverse queue. Full-carrier grammar and
+  conditional named-port laws connect to actual execution/return witnesses;
+  local/foreign/local sequences preserve every prior local cause. Include a
+  runnable conflict/retry example and bilingual proof-review case. This closes
+  the finite managed-function package; complete host/Node/configuration R2
+  refinement remains in progress.
+
+- Connect actual typed cleanup issue, locked read, optional restoration and
+  acknowledgement with authenticated receipts. Prove continuous ticket custody,
+  committed-provider retention and completed-ticket non-reuse across the real
+  interleaved history. Blocked/retired attempts preserve their inverse and use
+  read checkpoints rather than fabricated writes. General R2 semantics remain
+  in progress.
+
+- Add `Setup::replace_service` / `AsyncSetup::replace_service` for native typed
+  payloads. Checked restoration retains the real inverse and service slot,
+  blocks conflicting cleanup and uses the existing retry protocol. A separate
+  monotone read revision prevents stale checks after restoration; a checked
+  capacity reserve keeps matching inverses executable. Forward writes and
+  restoration are explicit Journal transitions with actual inverse registration.
+  General callback and whole-R2 refinement remain in progress.
+
+- Move actual non-scalar service payloads into a verified shared owner. Native
+  provide/publication factories select the Episode Journal; reads, replacements
+  and predicate reply checks retain that same allocation. Complete typed history
+  and service-map projections join payload versions to scalar values, lifecycle,
+  work and cleanup. Replacement frames unrelated aliases and returns old payloads
+  for destruction after host locks. Explicit checked retirement drains the lock
+  on final slot release and records a terminal state; retained read Arcs keep
+  their own lifetime. Arbitrary payload interiors and destructor execution remain
+  outside the interpreted state.
+
+- Classify every actual native Journal commit over all record kinds and pending
+  inverse obligations. Real snapshots and registered root/Child returns now
+  connect exact state framing, scalar operation/inverse laws and lifecycle or
+  explicit host transitions; projection equality cannot hide a recorded change.
+  Returned finite functions also prove their own local inverse obligations
+  settled across interleavings, with duplicate settlement excluded.
+
+- Preserve the exact shared status link across 61 execution, root/Child,
+  value-program, cleanup and lifecycle methods. Authenticate observations from
+  their real allocation and classify every intervening Host step, proving
+  immutable provenance and monotone progress without a runtime history log.
+
+- Make shared effect status an actual `Execution`-owned resource. Initialization
+  and retirement select the stored Journal-bound link; raw retirement also records
+  completion. Receipt-backed observations distinguish live progress from historical
+  reports, while erased permissions connect exclusive error payloads to the same
+  cell without retaining them in the execution. Whole-Episode host aliasing remains
+  outside this checked ownership contract.
+
+- Use verified atomic issuance for native service keys, realms, Episode generations
+  and cleanup/shared-driver domains. Prove exact returned identities, no reuse within one
+  issuer, finite CAS retry progress and permanent exhaustion without wraparound.
+  Proof histories erase; shared allocation ownership remains an explicit boundary.
+
+- Capture Node callback ancestry in an opaque native path. Prove exact selected
+  parent preservation, real issuance origins and complete wait queries in the
+  existing execution history. Completion consumes only its own receipt; escaped
+  paths do not retain completed ledger records. Binding scope protocol 2 requires
+  a matching addon; JS parent selection and arbitrary callback/HMR meaning remain
+  explicit boundaries.
+
+- Preserve Loader's actual runtime identity with a `RuntimeAccess` operation view;
+  mutation and saved futures remain available, while replacing the runtime through
+  `runtime_mut()` is rejected by Rust. Construct configuration from the checked
+  native owner and capture native/configuration/source histories in one Journal
+  read. Prove complete projections; full Loader/Component meaning remains open.
+
+- Bind production source/checkpoint state to its actual configuration owner.
+  Authenticate load, clear and save in the same Journal epoch; derive each retained
+  merge base's real origin and exact accepted configuration state, including
+  same-revision recovery/refresh. Reject source changes during pending recovery,
+  retain failed-sync checkpoints and keep callbacks outside the Journal lock.
+
+- Record production configuration phases and exact typed protocol states in the
+  same execution Journal as native lifecycle, recipes, values and cleanup.
+  Preserve real Pending/error payload changes through composed callback contracts;
+  prove complete trace projection and accepted-state origins. User callbacks
+  remain outside the Journal lock; complete source/Component meaning is still pending.
+
+- Move actual Loader source records and logical merge checkpoints into the
+  verified owner. Bind the original review to the save cursor, derive checkpoint
+  updates from its consumed I/O phases, retain failed directory-sync retries and
+  frame untouched files. Keep reports read-only and trace retained bases to real
+  loads/saves; JSON/merge and full Component semantics remain explicit boundaries.
+
+- Move Node profile freezing, mount/seal admission and Harness notification
+  retry selection into the executable verification kernel. Record exact command
+  sequences and failure prefixes in the existing history; retain cleanup failures,
+  unrelated episodes and their resources. The real Driver uses these contracts.
+
+- Join actual finite Value/Service function effects to their invocation return
+  in the common Journal. Retain authenticated write, inverse-registration and
+  failure witnesses; prove each local witness precedes the returned Call commit.
+  Preserve foreign history identities and erase evidence from runtime artifacts.
+
+- Connect exact native registration/recipe history to the common execution
+  Journal, including SharedChild registration, replacement/removal and actual
+  callback, Value-root and Service-root returns. Derive installed-version origins
+  and complete trace projection; certify call identity against the real native
+  Episode. Erase old bodies and proof histories from runtime snapshots.
+
+- Move batch adoption of actual configuration recipes into the verified native
+  owner. Preflight every target, duplicate and revision capacity before mutation;
+  install exact bodies and metadata in input order and return displaced values
+  after the batch, preserving active episodes/publications. Reject the entire
+  batch unchanged on preflight failure. General callback/destructor semantics
+  and full Component/Journal interpretation remain explicit boundaries.
+
+- Move the production configuration planner traversal into the executable
+  verification kernel. Cover the complete structured input, bind children to
+  their actual parent-returned context, store real callback recipes and stop on
+  the exact failed call. Failed partial plans cannot be accepted as trees.
+  Module/schema/context meaning and full Component interpretation remain open.
+
+- Run recursive group/include expansion in the executable verification kernel.
+  Preserve actual payloads, child order and complete read provenance; check
+  acyclic native-byte file identities and total nesting depth across includes.
+  Use the same path for file loads and save preflight, and retain actual parsed
+  checkpoints before runtime commit. JSON/filesystem and complete Component
+  interpretation remain explicit boundaries.
+
+- Use checked parent-local configuration keys and inherited enabled status in the
+  real Loader. Reject duplicate allocation ownership; execute exact old/new
+  retirement selections and complete saved-recipe reconstruction in the kernel,
+  retaining failed prefixes and current parent identities. Remove the duplicate
+  snapshot order list. Group/include meaning and joint host history remain open;
+  new integrated runtime/negative acceptance is pending.
+
+- Move actual Node interfaces and dynamic declaration ownership into the verified
+  runtime. Derive parent/dependency correspondence and mount/declaration origins;
+  check the real publication admission and complete provider-handoff loop,
+  preserving committed consumers and exact partial-failure prefixes. Remove
+  duplicate driver maps. New integrated runtime/negative evidence remains pending.
+
+- Route actual Node service reads through the verified protocol owner. Prove
+  retained Begin leases, exact publication/value/version selection, cleanup-view
+  provenance and the read-only context lift. Preserve committed slots across
+  replacement, withdrawal and failed cleanup, and reject stale generations.
+  Keep JavaScript object methods and adapter serialization outside this guarantee.
+
+- Move the actual Node handle-release queue and its retained-slot filter into the
+  verified protocol owner. Connect delivered handles to real writes and successful
+  retirement, prove queue retention and complete enqueueing, and exclude handles
+  still present in any slot, including withdrawn versions. Preserve delivery
+  order and multiplicity; JavaScript object deletion remains an adapter boundary.
+
+- Move actual Node callback scopes and cleanup lookup selections into the checked
+  protocol history. Derive complete release manifests from the real publication
+  registry; prove publication/callback origin, scope non-reuse and complete batch
+  withdrawal while retaining handles and leases. Remove the driver's duplicate
+  scope owner and publication lists; keep JavaScript ancestry and callback effects
+  as explicit host boundaries.
+
+- Retain Node admissions and real preparation, failure/restart, seal and cleanup
+  status in the verified protocol owner. Derive pending actions directly from
+  its ledger. Prove that retained admissions originate at a real Begin and survive
+  until successful release; reject old error replies without poisoning a new
+  generation. Keep JS object/Fiber/HMR and adapter-cache semantics explicit.
+
+- Compose the production Node lifecycle, publication handles/versions, leases and
+  availability protocol in one verified owner with an erased continuous history.
+  Connect actual results and control-step classification; prove that intervening
+  replacements invalidate old checks even when the same handle returns. Preserve
+  cleanup failure/retry behavior and reject release that bypasses resource leases.
+
+- Execute file-save plans through a checked owner of the actual documents and
+  I/O phases. Preserve exact partial progress and distinguish successful
+  replacement from confirmed durability. Reject stale save plans after a
+  configuration A→B→A change or transfer to another runtime, even when tree
+  contents and numeric revisions match.
+
+- Put actual Loader update plans and their forward/inverse Futures in checked
+  owners. Gate commit and recovery on real outcomes, retain cancelled/failed
+  inverses, and reject stale runtime/activation/recipe targets. Keep whole-tree
+  reconstruction, callback effect laws and persistence refinement explicit.
+
+- Store complete multi-service native root/Child bodies with
+  `Plugin::native_service_program`. Resolve every key from the registered recipe,
+  preserve actual operations/branches and settle the root from its real result.
+  Connect whole finite function semantics, rejected final instructions and the
+  actual retained inverse queue; qualify allocations by their Journal identity.
+  Keep general callbacks, original-carrier Component composition, Node and
+  configuration integration as open R2 work.
+
+- Connect native extensible effects to checked declaration/owner capture, actual
+  input checkpoints, unlocked calculation and guarded inverse registration.
+  Interpret built-in and computed writes through one allocation-key library;
+  prove dynamic alias observations, exact conditional single-key refinement and
+  strict independence for different allocations. Keep retained targets across
+  slot replacement and explicitly delimit the paper's single-key assumption.
+
+- Add native multi-service finite bodies to `Setup`/`AsyncSetup`, including
+  whole-body declaration checks, actual outcome-selected branches and retained
+  failed prefixes. Connect cross-object calls and same-domain inverse registration
+  to real Journal histories; derive dynamic alias footprints without assuming
+  independent service names. Keep arbitrary callbacks and complete dynamic
+  function refinement as explicit open obligations.
+
+- Resolve native scalar reads/writes and finite programs inside the checked
+  Begin owner for ordinary roots, Child callbacks and effect groups. Add
+  `observe_reversible`; connect captured slot receipts to actual read/write
+  history and lift registered instructions to production object state and
+  alias-aware service frames. Keep alias closure explicit for port-level
+  independence; general callback semantics remain an open R2 obligation.
+
+- Require actual target-object receipts at reversible slot allocation and
+  replacement. Derive local reference integrity throughout the shared execution
+  history and complete production service observations, with explicit opaque and
+  foreign boundaries. Connect alias writes/restores and retained old-object
+  resolution to the same trace; keep the proof histories erased.
+
+- Retain registered realm maps and owner anchors through native Begin and the
+  common publication history. Use checked immutable realm resolution in native
+  and static contexts. Issue root/effect scopes from the actual Execution;
+  reject a foreign scope before calling its iterator and check live scope
+  membership before resource registration. The production plugin checkpoint
+  certifies that scope alongside control, slots, work and cleanup. Host pointer
+  association, fresh-ID allocation and arbitrary callback meaning remain explicit.
+
+- Share native Begin identities, committed bindings and declarations through one
+  immutable checked context. Keep setup context and mutable Episode in the same
+  host allocation; clones no longer copy their maps/vectors. Native effect
+  admission reads the real Begin bindings and connects them to the shared queue
+  history. Export actual retry admission and exact rejection retention through
+  the polling wrapper. Static host context and ordinary pointer association
+  remain explicit boundaries.
+
+- Connect actual polling failures and restart intent to the common execution
+  Journal. Checked native Begin/retry/Unload own control binding and reset paths;
+  restart preserves retained cleanup failure. Include control in the actual
+  slot/episode checkpoint. Check handle Begin/work provenance and exact Weak
+  Episode association before polling or cancellation, without retaining Episode
+  payloads. Arc/Mutex aliasing, callback meaning and whole-R2 acceptance remain
+  explicit boundaries.
+
+- Move actual effect/service handle status into a checked owner sharing the
+  native execution Journal. Connect effect initialization to the real queue and
+  completion to actual runner retirement, retain errors through failed cleanup
+  and retry, and distinguish external service reports. Add handle checkpoints,
+  concurrent/pending/failure regressions and strict completion controls. Ordinary
+  handle/Episode association, scheduling and remaining host flags stay explicit
+  R2 obligations.
+
+- Connect actual managed publication and Begin-import slots to the shared
+  execution checkpoint. Bind captures to their exact slot/revision/object
+  commit; collect retained publication and episode slots before the Journal
+  read lock. Route the production host through these contracts, preserve aliases
+  and foreign references, and avoid retaining opaque payloads. Add failure/retry,
+  concurrent replacement and strict provenance/omission controls. Whole R2
+  interpretation and integration acceptance remain open.
+
+- Join actual native publication and episode-owner changes to the common
+  execution Journal. Index the exact typed publication history completely,
+  including interleavings; prove retained values originate at Finish and remain
+  until Unload. Add publication checkpoints and a real host entry observing
+  work, live cleanup groups and native ownership in one read epoch. Evidence is
+  erased and does not retain service Arcs; full host/Node/configuration semantics
+  and R2 integration acceptance remain open.
+
+- Connect actual live cleanup group membership, stable queue identities and
+  sticky consumed failure to the common execution history. Guard removal and
+  sealing with real queue records under one write epoch; prove removed IDs stay
+  absent and sealed owners stay empty in later history. Exercise native stage
+  cancellation, retained failure, retry, consumed completion and final release.
+  Publication/host composition and full R2 acceptance remain open.
+
+- Prove the typed scalar cleanup responsibility persists at every intervening
+  joint state, with no duplicate dispatch, retry or early acknowledgement.
+  Completed attempts remain inactive in later authentic snapshots, including
+  after a retry of the same slot. Connect the interval to the real producer
+  contract using the existing queue counter and transition checks; add three
+  strict interval/freshness controls. Whole-host resource membership, arbitrary
+  callback semantics and full R2 acceptance remain open.
+
+- Connect typed scalar cleanup to authentic issue, guarded restore/block and
+  acknowledgement receipts. Export exact inverse/ticket/source and ordered
+  same-domain trace contracts through the production execution owner, retain
+  failed inverses, and forbid hiding a completed cleanup behind a no-action
+  return. Add four strict controls and migrate existing controls with their
+  implementations. Full issued-payload interval custody and host/Node/configuration
+  composition remain open.
+
+- Bind managed scalar returns to authentic producer receipts: actual writes,
+  rejection causes and registered inverses must agree. Preserve the erased
+  attempt history through native lifecycle and finite root/Child calls; prove
+  that real rejection commits stutter the joint state and pending map. Strengthen
+  cursor error provenance and finite-program failed-prefix returns. Seven new
+  strict controls include the previously accepted discard-write/return-error
+  variant, now rejected by its contract. Issued cleanup and complete host/Node/
+  configuration composition remain open.
+
+- Track pending managed scalar inverses in the real joint commit using erased
+  linear capabilities held by the executor. Queue insertion consumes the
+  capability in the same commit; the checked trace preserves its obligation at
+  every intermediate state. Cover direct writes, prepared effects, finite
+  programs, cursors and their registered finite root/Child callers. Raw and
+  foreign-domain paths remain explicit; issued cleanup, complete host state
+  and paper-step composition remain open.
+
+- Authenticate each managed scalar inverse against its actual forward commit
+  and record same-domain write-to-cleanup registration edges in the joint
+  trajectory. Preserve per-instruction evidence through failed prefixes,
+  cursors and registered finite root/Child reports. Keep foreign/unlinked
+  domains explicit. Add a mixed-path restoration regression and a causal-edge
+  negative control. Evidence is erased; complete host observation and paper-step composition
+  remain separate obligations.
+
+- Connect actual native work and cleanup queue mutations to the shared execution
+  trajectory, including dynamic groups, retained failures and fresh retry tickets.
+  Observe work and every live queue under one journal read guard, preserving
+  earlier program snapshots. Add an integrated inverse-failure regression and
+  compiling negative controls for omitted work/cleanup commits. Whole-host
+  observation, paper-step grouping and Node/configuration integration remain open.
+
+- Add a shared native execution domain connecting actual object writes/restores,
+  typed slot replacements and lifecycle commits. Value/program snapshots retain
+  matching joint evidence and cursor refresh preserves both histories. Add
+  `Runtime::reversible_value` and `Plugin::native_value_program` for real finite
+  root/Child bodies, with failed-prefix and concurrent-domain regressions.
+  The journal uses real synchronization with erased history; full host state,
+  Node integration and performance remain open.
+- Store finite root/Child bodies directly in checked registrations. Bind their
+  execution to the real recipe version, registered realm, issued owner and
+  computed completion. Derive ordered instruction/rejection/cursor positions in
+  the shared trajectory, with erased evidence. Add isolated-Child, hot-update,
+  wrong-owner/stale-version and static-host rejection regressions. Full host
+  state, arbitrary callbacks and alias-aware declared footprints remain open.
+
+- Add episode-bound `ValueProgramCursor` execution to `Setup` and `AsyncSetup`.
+  Preserve the actual outcome-selected continuation across interleaved writes,
+  retain every inverse before return, and connect snapshots with erased
+  persistent history evidence. Add a real Child/interference/cleanup-retry probe
+  and document the remaining cross-port aliasing and whole-host proof boundaries.
+- Connect native committed service selection to actual typed slot versions and
+  object identities. Retain the original slot/object binding in value cursors;
+  replacement updates later reads while old cleanup restores its original
+  allocation. Add alias-aware object-history interpretation, dynamic publication
+  replacement regressions and stale/wrong-payload/wrong-realm negative controls.
+  Full live-host history and arbitrary callback interpretation remain open.
+
+- Compose Node availability, actual Begin targets and publication lease allocation
+  in executable Verus. Retain a private admission manifest through cleanup failure
+  and retry; release checks its original domain and generation, even for an empty
+  manifest. Rejected admission no longer allocates and rolls back partial leases.
+
+- Own actual service payloads and nonwrapping replacement versions together.
+  Move Node availability requests, notifications and reply acceptance into the
+  checked kernel, deriving freshness from real lifecycle and publication state.
+  Native predicates reject results after a reentrant slot replacement.
+- Store the loader's accepted snapshot, candidate, recovery payload and revision
+  in a checked transaction owner. Retain candidates across cancellation, commit
+  only the stored candidate, and reject revision exhaustion before applying work.
+
+- Add `Setup::update_reversible_with` and `AsyncSetup::update_reversible_with`
+  for extensible scalar effects, including checked `ScaleAdd`, `ThenScalar` and
+  `ChooseScalar`. Compute outside host/value locks, recheck captured state and
+  cleanup admission before writing, and retain the actual inverse for cleanup
+  and retry. Verus-verified implementations establish their scalar model law;
+  arbitrary Rust implementations and external I/O remain outside that proof.
+
 - Record JS setup, cleanup, task and effect ownership in a verified invocation
   ledger. Lifecycle waits check every supplied ancestor against live native
   records; cancellation does not complete a scope. Completed records are
@@ -288,6 +653,16 @@ Changes are recorded before release. Runtime previews are distributed through Gi
 The 0.1 API is experimental. Complete asynchronous runtime refinement and
 paper-wide liveness/confluence are not claimed. See `docs/semantics.md` for the
 current scope of the proofs and `docs/upstream-parity.md` for functional gaps.
+
+### Configuration execution
+
+- Put actual loader nodes and native allocation/parent evidence in a checked tree.
+  Validate path-cache lookups and reject child mounting before its parent exists.
+- Gate structural apply, adoption and reconstruction on actual successful phase
+  results. Retain progress across cancellation, and extract recovered snapshots
+  from the owned recovery payload without advancing the accepted revision.
+- Keep whole-R2 semantic obligations open; protocol and development evidence do
+  not establish general callback laws, Node object semantics or convergence.
 
 ### Lifecycle and operational hardening
 

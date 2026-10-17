@@ -126,3 +126,45 @@ fn stale_reserved_and_completed_failure_reports_do_not_poison_a_new_generation()
     driver.complete(next, true, None).unwrap();
     assert_eq!(driver.snapshot()["plugins"][0]["state"], "Active");
 }
+
+#[test]
+fn old_cleanup_failure_cannot_poison_a_restarted_generation_or_replace_its_ticket() {
+    let mut driver = Driver::new().unwrap();
+    let id = driver.mount(None, vec![], vec![]).unwrap();
+    let first = setup(&mut driver, id);
+    driver.complete(first, true, None).unwrap();
+    driver.restart(id).unwrap();
+    let inverse = cleanup(&mut driver, id);
+    driver
+        .complete(inverse.clone(), false, Some("cleanup failed".into()))
+        .unwrap();
+    let HostAction::Cleanup { ticket: retry, .. } = driver.retry_cleanup(id).unwrap() else {
+        panic!("retry")
+    };
+    let before = driver.snapshot();
+    assert_eq!(
+        driver
+            .complete(inverse.clone(), false, Some("old failure".into()))
+            .unwrap_err()
+            .code,
+        "StaleAction"
+    );
+    assert_eq!(driver.snapshot(), before);
+    driver.complete(retry.clone(), true, None).unwrap();
+    driver.restart(id).unwrap();
+    let next = setup(&mut driver, id);
+    let before = driver.snapshot();
+    assert_eq!(
+        driver
+            .complete(retry, false, Some("old retry".into()))
+            .unwrap_err()
+            .code,
+        "StaleAction"
+    );
+    assert_eq!(driver.snapshot(), before);
+    assert!(next.generation > inverse.generation);
+    driver.complete(next, true, None).unwrap();
+    assert_eq!(driver.snapshot()["plugins"][0]["state"], "Active");
+    assert!(driver.snapshot()["plugins"][0]["error"].is_null());
+    assert_eq!(driver.snapshot()["storage"]["pendingActions"], 0);
+}

@@ -227,6 +227,36 @@ class Gates(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "whole crate"):
             S.command("/verus", self.source, "compile", self.case["targets"], 1, artifact)
 
+    def test_multiple_required_diagnostics_expand_both_selected_commands(self):
+        expected = self.case["expectedFailures"] * 2
+        for source in [self.source, self.root / "mutant"]:
+            command = S.command("/verus", source, "selected", self.case["targets"], 1,
+                                self.root / "unused.rlib", expected_failures=expected)
+            self.assertEqual(command[command.index("--multiple-errors") + 1], "2")
+        ordinary = S.command("/verus", self.source, "selected", self.case["targets"], 1,
+                             self.root / "unused.rlib", expected_failures=self.case["expectedFailures"])
+        self.assertEqual(ordinary[ordinary.index("--multiple-errors") + 1], "0")
+
+    def test_replay_rejects_suppressed_required_diagnostics(self):
+        expected = self.case["expectedFailures"] * 2
+        command = S.command("/verus", self.source, "selected", self.case["targets"], 1,
+                            self.root / "unused.rlib", expected_failures=expected)
+        binding = {"verifierPath": "/verus", "threads": 1}
+        record = {"command": command}
+        S.validate_record_command(record, "selected", self.case["targets"], binding,
+                                  source_name="baseline", expected_failures=expected)
+        command[command.index("--multiple-errors") + 1] = "0"
+        with self.assertRaisesRegex(RuntimeError, "invocation flags"):
+            S.validate_record_command(record, "selected", self.case["targets"], binding,
+                                      source_name="baseline", expected_failures=expected)
+
+    def test_one_reported_error_cannot_satisfy_two_expected_errors(self):
+        extra = copy.deepcopy(self.case["expectedFailures"][0])
+        extra["diagnosticKind"] = "precondition not satisfied"
+        self.case["expectedFailures"].append(extra)
+        with self.assertRaisesRegex(RuntimeError, "diagnostic count"):
+            self.validate(self.rejection())
+
     def fake_runner(self, command, environment, prefix, timeout):
         source = Path(command[1]).parent
         if "--no-verify" in command:

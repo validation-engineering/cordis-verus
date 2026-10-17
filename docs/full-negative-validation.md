@@ -15,6 +15,13 @@ describes how to audit the mutation suite without weakening its own acceptance
 rules. Run it when reviewing contracts, mutation selectors, verifier tooling or
 toolchain changes, or for a periodic audit. No automatic schedule is configured.
 
+Shard counts are now computed from the actual canonical manifest and fixed
+per-control budgets. Every job still retains at least 30 minutes of cleanup
+headroom; mutant compilation/proof budgets and rejection criteria are unchanged.
+Use `python3 scripts/negative-shards.py plan --include-macos --include-macos-intel`
+for the current matrix. Existing measurement tables below describe their
+historical records.
+
 ## Execution and cleanup
 
 The runner defaults to one worker and a total budget of at most two available

@@ -48,7 +48,7 @@ impl LifecycleActions {
         id:usize,reservation:bool,leases:&[LeaseId],publications:&[PublicationId])
         ->(out:Result<Vec<ReleasedPublication>,CleanupReleaseError>)
         requires old(self).wf(),old(kernel).wf(),old(registry).wf(),
-        ensures final(self).wf(),final(kernel).wf(),final(registry).wf(),
+        ensures final(self).wf(),final(kernel).wf(),final(registry).wf(),final(registry).domain_id()==old(registry).domain_id(),
             out.is_ok()==(old(registry).domain_id()==Some(old(self).domain_id()) && old(self).resource_finish_enabled(old(kernel),id,reservation)
                 && old(registry).cleanup_batch_enabled(LeaseOwner {owner:id,generation:old(kernel).generation_of(id).unwrap()},leases@,publications@)),
             out.is_err() ==> final(self).same(old(self)) && final(kernel).unchanged(old(kernel))
@@ -63,7 +63,7 @@ impl LifecycleActions {
             final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
             final(kernel).commitments_frame(old(kernel),id),
     {
-        reveal(Kernel::commitments_frame);reveal(LifecycleActions::same);reveal(Kernel::unchanged);proof {registry.unchanged_reflexive();}
+        reveal(Kernel::commitments_frame);reveal(LifecycleActions::same);reveal(Kernel::unchanged);proof {registry.unchanged_reflexive();registry.unchanged_observations(registry);}
         if registry.domain()!=Some(self.domain()) {
             return Err(CleanupReleaseError::Publication(PublicationError::InvalidState));
         }

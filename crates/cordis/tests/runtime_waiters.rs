@@ -270,3 +270,38 @@ fn cancelling_an_unpolled_effect_never_constructs_its_first_stage() {
     assert_eq!(constructed.load(Ordering::SeqCst), 0);
     assert!(captured.lock().unwrap().as_ref().unwrap().finished());
 }
+
+#[test]
+fn shared_handle_observations_do_not_complete_a_pending_stage_or_inverse() {
+    bounded(|| {
+        let mut pending = PendingEffect::new();
+        let before = pending.handle.execution_snapshot();
+        let observer = pending.handle.clone();
+        std::thread::spawn(move || {
+            observer.cancel();
+            for _ in 0..32 {
+                let _ = observer.execution_snapshot();
+                assert!(!observer.initialized());
+                assert!(!observer.finished());
+            }
+        })
+        .join()
+        .unwrap();
+        assert_eq!(drive(&mut pending.runtime), Poll::Pending);
+        assert!(!pending.handle.initialized());
+        pending.stage.store(true, Ordering::SeqCst);
+        assert_eq!(drive(&mut pending.runtime), Poll::Pending);
+        assert!(pending.handle.initialized());
+        assert!(!pending.handle.finished());
+        assert_eq!(pending.next_stages.load(Ordering::SeqCst), 0);
+        let mut join = pending.handle.join();
+        assert_eq!(poll_join(&mut join, Waker::noop()), Poll::Pending);
+        pending.cleanup.store(true, Ordering::SeqCst);
+        assert_eq!(drive(&mut pending.runtime), Poll::Ready(Ok(())));
+        assert_eq!(poll_join(&mut join, Waker::noop()), Poll::Ready(Ok(())));
+        assert!(pending.handle.finished());
+        assert_eq!(pending.inverses.load(Ordering::SeqCst), 1);
+        let _ = pending.handle.execution_snapshot();
+        let _ = before.refresh();
+    });
+}

@@ -3,24 +3,29 @@
 //! Commands never execute callbacks. An executor receives owned actions after
 //! the mutable driver borrow ends and submits one completion for each ticket.
 //! This host adapter is ordinary Rust; kernel proofs do not prove its callbacks
-//! or JSON translation. Dynamic publication admission is filtered here until
-//! publication visibility has a full paper-model refinement.
+//! or JSON translation. Actual service admission, dynamic declaration ownership
+//! and provider reconciliation execute in the checked NodeRuntime. JavaScript
+//! object contents still need their own paper-model interpretation.
 
 mod availability;
+mod node;
 mod protocol;
 use availability::{Availability, Candidate};
 pub use availability::{CheckAction, CheckTicket};
 pub mod shared;
-use cordis_kernel::invocation_ledger::{InvocationLedger, ScopeError};
-use cordis_kernel::publication::values::PublicationStore;
-use cordis_kernel::publication::{LeaseId, PublicationError, PublicationId};
+use cordis_kernel::availability::admission::ResourceBinding;
+use cordis_kernel::invocation_ledger::ScopeError;
+use cordis_kernel::node_runtime::episode::{Command as EpisodeCommand, Episode, EpisodeError};
+pub use cordis_kernel::node_runtime::paths::Path as InvocationPath;
+use cordis_kernel::publication::{PublicationError, PublicationId};
 pub use cordis_kernel::request_ledger;
 use cordis_kernel::{Error as KernelError, Phase, Port};
+use node::NodeDriver;
 pub use protocol::{
     ActionKind, ActionTicket, Command, HostAction, Profile, RequestTicket, ScopeHandle, ServicePort,
 };
 use serde_json::{json, Value};
-use shared::{CleanupOutcome, Decision, HostStatus, LifecycleDriver};
+use shared::{Decision, HostStatus};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -68,60 +73,52 @@ impl From<PublicationError> for DriverError {
     }
 }
 
-#[derive(Clone, Copy)]
-struct ResourceBinding {
-    port: Port,
-    publication: PublicationId,
-    lease: LeaseId,
+impl From<EpisodeError> for DriverError {
+    fn from(error: EpisodeError) -> Self {
+        match error {
+            EpisodeError::Unknown => KernelError::Unknown.into(),
+            EpisodeError::Retired => Self::new("Retired", "cannot restart a retired plugin"),
+            EpisodeError::Stale => Self::new("StaleEpisode", "plugin generation is not current"),
+            EpisodeError::Closed => {
+                Self::new("AdmissionClosed", "episode cannot acquire new resources")
+            }
+        }
+    }
 }
-struct Node {
-    parent: Option<usize>,
-    provisions: Vec<Port>,
-    dependencies: Vec<ServicePort>,
-    sealed: bool,
-    prepared: bool,
-    prepared_cleanup: bool,
-    publications: Vec<PublicationId>,
-    restoring_publications: Vec<PublicationId>,
-    resources: Vec<ResourceBinding>,
-    pending: Option<ActionTicket>,
-    failed: Option<String>,
-    cleanup_failed: bool,
-    restart: bool,
+impl From<cordis_kernel::node_runtime::policy::PolicyError> for DriverError {
+    fn from(error: cordis_kernel::node_runtime::policy::PolicyError) -> Self {
+        use cordis_kernel::node_runtime::policy::PolicyError;
+        match error {
+            PolicyError::ProfileFrozen => Self::new(
+                "ProfileFrozen",
+                "profile must be selected once before mounting",
+            ),
+            PolicyError::ParentClosed => Self::new("ParentClosed", "parent cannot admit a child"),
+            PolicyError::AlreadySealed => {
+                Self::new("AlreadySealed", "plugin declaration was already sealed")
+            }
+            PolicyError::Kernel(error) => error.into(),
+            PolicyError::Episode(error) => error.into(),
+        }
+    }
 }
 
 /// One authoritative lifecycle domain. Values are opaque host-owned handles.
 pub struct Driver {
-    profile: Profile,
-    configured: bool,
     domain: u64,
-    kernel: LifecycleDriver,
-    publications: PublicationStore<u64>,
-    invocations: InvocationLedger,
-    nodes: BTreeMap<usize, Node>,
-    released: Vec<u64>,
-    checked: BTreeMap<usize, u64>,
+    kernel: NodeDriver,
     availability: Availability,
-    declarations: BTreeMap<(u64, u64), usize>,
     maintenance_changes: usize,
 }
 impl Driver {
     /// Allocate a process-unique domain identity, failing rather than wrapping.
     pub fn new() -> Result<Self, DriverError> {
-        let kernel = LifecycleDriver::new()?;
+        let kernel = NodeDriver::new()?;
         let domain = kernel.domain();
         Ok(Self {
-            profile: Profile::Cordis,
-            configured: false,
             domain,
             kernel,
-            publications: PublicationStore::for_domain(domain),
-            invocations: InvocationLedger::new(domain),
-            nodes: BTreeMap::new(),
-            released: Vec::new(),
-            checked: BTreeMap::new(),
-            availability: Availability::default(),
-            declarations: BTreeMap::new(),
+            availability: Availability::new(),
             maintenance_changes: 0,
         })
     }
@@ -152,45 +149,26 @@ impl Driver {
         dependencies: Vec<ServicePort>,
         provisions: Vec<ServicePort>,
     ) -> Result<usize, DriverError> {
-        if let Some(parent) = parent {
-            if !self.kernel.contains(parent)
-                || self.kernel.retired(parent)
-                || self.kernel.phase(parent) == Some(Phase::Unloading)
-            {
-                return Err(DriverError::new(
-                    "ParentClosed",
-                    "parent cannot admit a child",
-                ));
-            }
-        }
-        let provisions: Vec<Port> = provisions.into_iter().map(Into::into).collect();
-        let id = self.kernel.insert(
+        self.mount_sealed(parent, dependencies, provisions, true)
+    }
+
+    fn mount_sealed(
+        &mut self,
+        parent: Option<usize>,
+        dependencies: Vec<ServicePort>,
+        provisions: Vec<ServicePort>,
+        sealed: bool,
+    ) -> Result<usize, DriverError> {
+        self.kernel.mount(
             parent,
-            dependencies.iter().copied().map(Into::into).collect(),
-            provisions.clone(),
-        )?;
-        // A default profile is frozen by the first successful allocation,
-        // even after every node is later removed from this domain.
-        self.configured = true;
-        self.nodes.insert(
-            id,
-            Node {
-                parent,
-                provisions,
-                dependencies,
-                sealed: true,
-                prepared: false,
-                prepared_cleanup: false,
-                publications: Vec::new(),
-                restoring_publications: Vec::new(),
-                resources: Vec::new(),
-                pending: None,
-                failed: None,
-                cleanup_failed: false,
-                restart: false,
-            },
-        );
-        Ok(id)
+            dependencies.into_iter().map(Into::into).collect(),
+            provisions.into_iter().map(Into::into).collect(),
+            sealed,
+        )
+    }
+
+    fn profile(&self) -> Profile {
+        self.kernel.core.profile().into()
     }
 
     /// Request recursive ownership retirement. Pending actions remain owned and
@@ -205,17 +183,26 @@ impl Driver {
         Ok(())
     }
 
+    fn episode(&self, id: usize) -> &Episode {
+        self.kernel
+            .core
+            .episode(id)
+            .expect("registered node has an episode state")
+    }
+    fn resources(&self, id: usize) -> &[ResourceBinding] {
+        self.kernel
+            .core
+            .admission(id)
+            .map_or(&[], |admission| admission.resources())
+    }
+    fn episode_command(&mut self, command: EpisodeCommand) -> Result<(), DriverError> {
+        self.kernel
+            .core
+            .episode_command(command)
+            .map_err(Into::into)
+    }
     pub fn restart(&mut self, id: usize) -> Result<(), DriverError> {
-        if self.kernel.retired(id) {
-            return Err(DriverError::new(
-                "Retired",
-                "cannot restart a retired plugin",
-            ));
-        }
-        let node = self.nodes.get_mut(&id).ok_or(KernelError::Unknown)?;
-        node.failed = None;
-        node.restart = self.kernel.phase(id) != Some(Phase::Inactive);
-        Ok(())
+        self.episode_command(EpisodeCommand::Restart { id })
     }
 
     /// Latch a failure of the current host episode and close its admission.
@@ -229,60 +216,32 @@ impl Driver {
         generation: u64,
         error: String,
     ) -> Result<(), DriverError> {
-        self.validate(id, generation)?;
-        if !matches!(self.kernel.phase(id), Some(Phase::Loading | Phase::Active)) {
-            return Err(DriverError::new(
-                "AdmissionClosed",
-                "no active episode to fail",
-            ));
-        }
-        self.nodes.get_mut(&id).unwrap().failed.get_or_insert(error);
+        self.episode_command(EpisodeCommand::Fail {
+            id,
+            generation,
+            error,
+        })?;
         self.withdraw(id)
     }
 
     /// Admit host effects for a reserved fiber before its first activation.
     /// Retirement drains this journal through a generation-zero cleanup ticket.
     pub fn prepare(&mut self, id: usize) -> Result<u64, DriverError> {
-        if !self.kernel.contains(id) {
-            return Err(KernelError::Unknown.into());
-        }
-        if self.kernel.retired(id)
-            || self.kernel.phase(id) != Some(Phase::Inactive)
-            || self.kernel.episode_generation(id) != Some(0)
-        {
-            return Err(DriverError::new(
-                "AdmissionClosed",
-                "reservation cannot acquire new resources",
-            ));
-        }
-        self.nodes.get_mut(&id).unwrap().prepared = true;
+        self.episode_command(EpisodeCommand::Prepare { id })?;
         Ok(0)
     }
 
     /// Validate admission for new resource work, including escaped async calls.
     pub fn validate(&self, id: usize, generation: u64) -> Result<(), DriverError> {
-        if self.kernel.episode_generation(id) != Some(generation) {
-            return Err(DriverError::new(
-                "StaleEpisode",
-                "plugin generation is not current",
-            ));
-        }
-        if generation == 0
-            && !self.kernel.retired(id)
-            && self.kernel.phase(id) == Some(Phase::Inactive)
-            && self.nodes.get(&id).is_some_and(|node| node.prepared)
-        {
-            return Ok(());
-        }
-        if self.kernel.retired(id)
-            || !matches!(self.kernel.phase(id), Some(Phase::Loading | Phase::Active))
-        {
-            return Err(DriverError::new(
-                "AdmissionClosed",
-                "episode cannot acquire new resources",
-            ));
-        }
-        Ok(())
+        self.kernel
+            .core
+            .validate(id, generation)
+            .map_err(|error| match error {
+                EpisodeError::Stale => {
+                    DriverError::new("StaleEpisode", "plugin generation is not current")
+                }
+                _ => DriverError::new("AdmissionClosed", "episode cannot acquire new resources"),
+            })
     }
 
     /// Publish an opaque value while retaining the logical provider identity.
@@ -293,34 +252,21 @@ impl Driver {
         port: ServicePort,
         value: u64,
     ) -> Result<usize, DriverError> {
-        self.validate(id, generation)?;
-        let port: Port = port.into();
-        if self.publications.registry().resolve(port).is_some() {
-            return Err(PublicationError::Conflict.into());
-        }
-        if self.publications.registry().publication_records() == usize::MAX {
-            return Err(PublicationError::Capacity.into());
-        }
-        match self.kernel.declare_provision(id, port) {
-            Ok(()) => {
-                if !self.nodes[&id].provisions.contains(&port) {
-                    self.declarations.insert((port.key, port.realm), id);
+        use cordis_kernel::node_runtime::interfaces::PublishError;
+        self.kernel
+            .core
+            .publish_service(id, generation, port.into(), value)
+            .map(|publication| publication.0)
+            .map_err(|error| match error {
+                PublishError::Access(EpisodeError::Stale) => {
+                    DriverError::new("StaleEpisode", "plugin generation is not current")
                 }
-            }
-            Err(KernelError::Conflict)
-                if self.declarations.contains_key(&(port.key, port.realm)) => {}
-            Err(error) => return Err(error.into()),
-        }
-        let publication = self
-            .kernel
-            .publish_value(&mut self.publications, id, generation, port, value)
-            .map_err(|rejected| DriverError::from(rejected.error))?;
-        self.nodes
-            .get_mut(&id)
-            .unwrap()
-            .publications
-            .push(publication);
-        Ok(publication.0)
+                PublishError::Access(_) => {
+                    DriverError::new("AdmissionClosed", "episode cannot acquire new resources")
+                }
+                PublishError::Declaration(error) => error.into(),
+                PublishError::Publication(error) => error.into(),
+            })
     }
 
     fn owned_publication(
@@ -330,7 +276,8 @@ impl Driver {
         publication: usize,
     ) -> Result<cordis_kernel::publication::Publication, DriverError> {
         let entry = self
-            .publications
+            .kernel
+            .store()
             .registry()
             .entry(PublicationId(publication))
             .ok_or(PublicationError::Unknown)?;
@@ -359,24 +306,9 @@ impl Driver {
         if !entry.visible {
             return Err(PublicationError::Revoked.into());
         }
-        if let Some(revision) = self.checked.get_mut(&publication) {
-            *revision = revision
-                .checked_add(1)
-                .ok_or_else(|| DriverError::new("Capacity", "value revision exhausted"))?;
-        }
-        let previous = self
-            .kernel
-            .replace_value(
-                &mut self.publications,
-                PublicationId(publication),
-                id,
-                generation,
-                value,
-            )
+        self.kernel
+            .replace_value(PublicationId(publication), id, generation, value)
             .map_err(|rejected| DriverError::from(rejected.error))?;
-        if previous != value {
-            self.released.push(previous);
-        }
         Ok(())
     }
 
@@ -389,128 +321,43 @@ impl Driver {
         publication: usize,
     ) -> Result<(), DriverError> {
         self.owned_publication(id, generation, publication)?;
-        self.publications.revoke(PublicationId(publication))?;
-        self.nodes
-            .get_mut(&id)
-            .unwrap()
-            .restoring_publications
-            .retain(|id| id.0 != publication);
+        self.kernel.core.revoke(PublicationId(publication))?;
         Ok(())
     }
 
     /// Read a committed binding during setup, use, and cleanup. An unowned root
     /// lookup uses current visibility and confers no lifecycle consumer lease.
     pub fn resolve(
-        &self,
+        &mut self,
         port: ServicePort,
         consumer: Option<usize>,
         generation: Option<u64>,
     ) -> Result<Option<Value>, DriverError> {
-        let port: Port = port.into();
-        let publication = if let Some(consumer) = consumer {
-            let node = self.nodes.get(&consumer).ok_or(KernelError::Unknown)?;
-            if let Some(generation) = generation {
-                if self.kernel.episode_generation(consumer) != Some(generation) {
-                    return Err(DriverError::new(
-                        "StaleEpisode",
-                        "lookup belongs to an earlier episode",
-                    ));
+        use cordis_kernel::node_runtime::reads::ReadError;
+        let out = self
+            .kernel
+            .core
+            .resolve(port.into(), consumer, generation)
+            .map_err(|error| match error {
+                ReadError::Unknown => DriverError::from(KernelError::Unknown),
+                ReadError::Stale => {
+                    DriverError::new("StaleEpisode", "lookup belongs to an earlier episode")
                 }
-            }
-            if let Some(binding) = node.resources.iter().find(|binding| binding.port == port) {
-                let (publication, _) = self.publications.leased_value(binding.lease)?;
-                Some(publication)
-            } else {
-                self.publications
-                    .registry()
-                    .resolve(port)
-                    .filter(|publication| {
-                        self.publications
-                            .registry()
-                            .entry(*publication)
-                            .is_some_and(|entry| entry.owner == consumer)
-                    })
-                    .or_else(|| {
-                        node.restoring_publications
-                            .iter()
-                            .rev()
-                            .copied()
-                            .find(|publication| {
-                                self.publications
-                                    .registry()
-                                    .entry(*publication)
-                                    .is_some_and(|entry| entry.port == port && entry.retained)
-                            })
-                    })
-            }
-        } else {
-            self.publications
-                .registry()
-                .resolve(port)
-                .filter(|publication| {
-                    self.publications
-                        .registry()
-                        .entry(*publication)
-                        .is_some_and(|entry| {
-                            self.kernel.phase(entry.owner) == Some(Phase::Active)
-                                && !self.kernel.retired(entry.owner)
-                        })
-                })
-        };
-        let Some(publication) = publication else {
-            return Ok(None);
-        };
-        let entry = self
-            .publications
-            .registry()
-            .entry(publication)
-            .ok_or(PublicationError::Unknown)?;
-        let value = self.publications.value(publication).ok_or_else(|| {
-            DriverError::new("MissingValue", "retained publication has no host value")
-        })?;
-        Ok(Some(
-            json!({"publication":publication.0.to_string(),"value":value.to_string(),"owner":entry.owner.to_string()}),
-        ))
+            })?;
+        Ok(out.map(|read| {
+            json!({
+                "publication":read.publication.0.to_string(),
+                "value":read.value.to_string(),
+                "owner":read.owner.to_string(),
+            })
+        }))
     }
 
     fn reconcile_publications(&mut self) -> Result<(), DriverError> {
-        let declarations: Vec<_> = self
-            .declarations
-            .iter()
-            .map(|(&port, &owner)| (port, owner))
-            .collect();
-        for ((key, realm), owner) in declarations {
-            let port = Port { key, realm };
-            let visible = self
-                .publications
-                .registry()
-                .resolve(port)
-                .and_then(|id| self.publications.registry().entry(id));
-            if visible.is_some_and(|p| p.owner == owner) {
-                continue;
-            }
-            match self.kernel.release_provision(owner, port) {
-                Ok(()) => {
-                    self.declarations.remove(&(key, realm));
-                }
-                Err(KernelError::Relied) => continue,
-                Err(error) => return Err(error.into()),
-            }
-            if let Some(next) = visible {
-                if !self.kernel.retired(next.owner)
-                    && (matches!(
-                        self.kernel.phase(next.owner),
-                        Some(Phase::Loading | Phase::Active)
-                    ) || (self.kernel.phase(next.owner) == Some(Phase::Inactive)
-                        && self.kernel.episode_generation(next.owner) == Some(0)
-                        && self.nodes[&next.owner].prepared))
-                {
-                    self.kernel.declare_provision(next.owner, port)?;
-                    self.declarations.insert((key, realm), next.owner);
-                }
-            }
-        }
-        Ok(())
+        self.kernel
+            .core
+            .reconcile_declarations()
+            .map_err(Into::into)
     }
     fn reclaim(
         &mut self,
@@ -522,91 +369,62 @@ impl Driver {
         if !entry.retained {
             return Ok(true);
         }
-        let value = match self.publications.reclaim(PublicationId(publication)) {
-            Ok(value) => value,
+        match self.kernel.core.reclaim(PublicationId(publication)) {
+            Ok(_) => {}
             Err(PublicationError::Relied) => return Ok(false),
             Err(error) => return Err(error.into()),
         };
-        let node = self.nodes.get_mut(&id).unwrap();
-        node.publications.retain(|p| p.0 != publication);
-        node.restoring_publications.retain(|p| p.0 != publication);
-        self.checked.remove(&publication);
-        self.released.push(value);
+        self.kernel.core.set_checked(publication, false);
         self.reconcile_publications()?;
         Ok(true)
     }
 
     fn check_candidate(&self, consumer: usize, port: ServicePort) -> Option<Candidate> {
-        let node = self.nodes.get(&consumer)?;
-        if self.kernel.retired(consumer) || !node.dependencies.contains(&port) {
+        let node = self.kernel.core.interfaces().get(&consumer)?;
+        if self.kernel.retired(consumer) || !node.dependencies.contains(&port.into()) {
             return None;
         }
-        let publication = self.publications.registry().resolve(port.into())?;
-        let entry = self.publications.registry().entry(publication)?;
+        let publication = self.kernel.store().registry().resolve(port.into())?;
+        let entry = self.kernel.store().registry().entry(publication)?;
         if self.kernel.phase(entry.owner) != Some(Phase::Active) || self.kernel.retired(entry.owner)
         {
+            return None;
+        }
+        if !self.kernel.core.checked().contains(&publication.0) {
             return None;
         }
         Some(Candidate {
             consumer,
             port,
             publication: publication.0,
-            value: *self.publications.value(publication)?,
-            value_revision: *self.checked.get(&publication.0)?,
         })
     }
     pub fn check_actions(&mut self) -> Result<Vec<CheckAction>, DriverError> {
         let mut candidates = Vec::new();
-        for (&id, node) in &self.nodes {
+        for (&id, node) in self.kernel.core.interfaces() {
             for port in &node.dependencies {
-                if let Some(candidate) = self.check_candidate(id, *port) {
+                if let Some(candidate) = self.check_candidate(id, (*port).into()) {
                     candidates.push(candidate);
                 }
             }
         }
-        self.availability.request(self.domain, candidates)
+        self.availability.request(&mut self.kernel.core, candidates)
     }
 
     fn host_status(&self, id: usize) -> HostStatus {
         HostStatus {
-            available: self.nodes[&id].sealed && self.ready(id),
-            failed: self.nodes[&id].failed.is_some(),
-            restart: self.nodes[&id].restart,
+            available: self.episode(id).sealed && self.ready(id),
+            failed: self.episode(id).failed.is_some(),
+            restart: self.episode(id).restart,
         }
     }
 
     fn ready(&self, id: usize) -> bool {
-        self.kernel.target(id).is_some_and(|bindings| {
-            bindings.iter().all(|binding| {
-                self.publications
-                    .registry()
-                    .resolve(Port {
-                        key: binding.key,
-                        realm: binding.realm,
-                    })
-                    .is_some_and(|publication| {
-                        // No callback or mutation can interleave these observations.
-                        // Keep the resolved identity instead of rescanning visibility.
-                        self.publications
-                            .registry()
-                            .entry(publication)
-                            .is_some_and(|entry| {
-                                entry.owner == binding.provider
-                                    && !self.kernel.retired(entry.owner)
-                                    && (!self.checked.contains_key(&publication.0)
-                                        || self.availability.available(
-                                            id,
-                                            entry.port.into(),
-                                            publication.0,
-                                        ))
-                            })
-                    })
-            })
-        })
+        self.kernel.core.ready(id)
     }
 
     fn next_ticket(&mut self, id: usize, kind: ActionKind) -> Result<ActionTicket, DriverError> {
-        let ticket = self.kernel.pending_action(id).cloned().ok_or_else(|| {
+        let ticket = self.kernel.pending_action(id).ok_or_else(|| {
             DriverError::new("MissingAction", "shared driver did not register an action")
         })?;
         if ticket.kind != kind {
@@ -615,25 +433,11 @@ impl Driver {
                 "shared action kind differs",
             ));
         }
-        self.nodes.get_mut(&id).unwrap().pending = Some(ticket.clone());
         Ok(ticket)
     }
 
     fn withdraw_publications(&mut self, id: usize) -> Result<(), DriverError> {
-        self.nodes.get_mut(&id).unwrap().restoring_publications = self.nodes[&id]
-            .publications
-            .iter()
-            .copied()
-            .filter(|publication| {
-                self.publications
-                    .registry()
-                    .entry(*publication)
-                    .is_some_and(|entry| entry.visible)
-            })
-            .collect();
-        for publication in &self.nodes[&id].publications {
-            self.publications.revoke(*publication)?;
-        }
+        self.kernel.core.withdraw_publications(id)?;
         Ok(())
     }
 
@@ -653,7 +457,8 @@ impl Driver {
     pub fn drive(&mut self) -> Result<Vec<HostAction>, DriverError> {
         // At most one callback action per present node can be emitted without
         // an intervening completion. Reserve the entire batch before mutation.
-        self.kernel.ensure_action_capacity(self.nodes.len())?;
+        self.kernel
+            .ensure_action_capacity(self.kernel.core.interfaces().len())?;
         let mut actions = Vec::new();
         self.reconcile_publications()?;
         for _ in 0..256 {
@@ -679,12 +484,12 @@ impl Driver {
                 }
             }
             for id in self.kernel.ids() {
-                let node = &self.nodes[&id];
+                let episode = self.episode(id);
                 if self.kernel.phase(id) == Some(Phase::Unloading)
                     && self.kernel.decision(id, self.host_status(id))
                         == Some(Decision::BeginCleanup)
-                    && node.pending.is_none()
-                    && !node.cleanup_failed
+                    && self.kernel.pending_action(id).is_none()
+                    && !episode.cleanup_failed
                 {
                     match self.kernel.begin_cleanup(id) {
                         Ok(()) => {
@@ -700,16 +505,15 @@ impl Driver {
             // A never-activated fiber may still own synchronous observer
             // effects. Its ledger action must land before registry removal.
             for id in self.kernel.ids() {
-                let node = &self.nodes[&id];
-                if node.prepared
+                let episode = self.episode(id);
+                if episode.prepared
                     && self.kernel.retired(id)
                     && self.kernel.phase(id) == Some(Phase::Inactive)
-                    && node.pending.is_none()
-                    && !node.cleanup_failed
+                    && self.kernel.pending_action(id).is_none()
+                    && !episode.cleanup_failed
                 {
                     self.kernel.begin_reservation_cleanup(id)?;
                     self.withdraw_publications(id)?;
-                    self.nodes.get_mut(&id).unwrap().prepared_cleanup = true;
                     let ticket = self.next_ticket(id, ActionKind::Cleanup)?;
                     actions.push(HostAction::Cleanup { id, ticket });
                     progress = true;
@@ -717,14 +521,12 @@ impl Driver {
             }
             for id in self.kernel.ids().into_iter().rev() {
                 if self.kernel.phase(id) == Some(Phase::Inactive)
-                    && !self.nodes[&id].prepared
-                    && !self.nodes[&id].prepared_cleanup
+                    && !self.episode(id).prepared
+                    && !self.episode(id).prepared_cleanup
                     && self.kernel.decision(id, self.host_status(id)) == Some(Decision::Remove)
                 {
                     self.kernel.remove(id)?;
-                    self.nodes.remove(&id);
-                    self.declarations.retain(|_, owner| *owner != id);
-                    self.availability.remove_consumer(id);
+                    self.availability.remove_consumer(&mut self.kernel.core, id);
                     self.maintain_history();
                     actions.push(HostAction::Removed { id });
                     progress = true;
@@ -739,65 +541,23 @@ impl Driver {
                 // Initial observer publications are adopted without changing
                 // their identities. Preflight before acquiring any resources or
                 // registering Setup, so a rejected adoption is mutation-free.
-                let prepared_publications = if self.nodes[&id].prepared {
-                    self.nodes[&id].publications.clone()
+                let prepared_publications = if self.episode(id).prepared {
+                    self.kernel.core.publications(id)
                 } else {
                     Vec::new()
                 };
                 for publication in &prepared_publications {
-                    self.publications
+                    self.kernel
+                        .store()
                         .registry()
                         .can_adopt(*publication, id, 1)?;
                 }
-                let bindings = self
-                    .kernel
-                    .target(id)
-                    .ok_or(KernelError::MissingDependency)?;
-                let generation = self
-                    .kernel
-                    .episode_generation(id)
-                    .unwrap()
-                    .checked_add(1)
-                    .ok_or(KernelError::Capacity)?;
-                let mut resources = Vec::new();
-                for binding in bindings {
-                    let port = Port {
-                        key: binding.key,
-                        realm: binding.realm,
-                    };
-                    let publication = self
-                        .publications
-                        .registry()
-                        .resolve(port)
-                        .ok_or(PublicationError::Unknown)?;
-                    match self.publications.acquire_for(publication, id, generation) {
-                        Ok(lease) => resources.push(ResourceBinding {
-                            port,
-                            publication,
-                            lease,
-                        }),
-                        Err(error) => {
-                            for resource in resources {
-                                self.publications.release(resource.lease)?;
-                            }
-                            return Err(error.into());
-                        }
-                    }
-                }
-                if let Err(error) = self.kernel.begin(id) {
-                    for resource in resources {
-                        self.publications.release(resource.lease)?;
-                    }
-                    return Err(error.into());
-                }
+                self.kernel.begin_checked(id)?;
                 // No callbacks or lease acquisitions for this inactive owner
                 // can interleave with the preflight and first Begin above.
                 for publication in prepared_publications {
-                    self.publications.adopt(publication, id, 1)?;
+                    self.kernel.core.adopt(publication, id, 1)?;
                 }
-                let node = self.nodes.get_mut(&id).unwrap();
-                node.resources = resources;
-                node.prepared = false;
                 let ticket = self.next_ticket(id, ActionKind::Setup)?;
                 actions.push(HostAction::Setup { id, ticket });
                 progress = true;
@@ -823,46 +583,35 @@ impl Driver {
                 "action belongs to another driver",
             ));
         }
-        let node = self
-            .nodes
-            .get(&ticket.id)
-            .ok_or_else(|| DriverError::new("StaleAction", "action owner no longer exists"))?;
-        if node.pending.as_ref() != Some(&ticket) {
+        if self.kernel.pending_action(ticket.id).as_ref() != Some(&ticket) {
             return Err(DriverError::new(
                 "StaleAction",
                 "action is unknown or already completed",
             ));
         }
         let id = ticket.id;
-        match ticket.kind {
-            ActionKind::Setup => self.kernel.complete_action(&ticket)?,
-            ActionKind::Cleanup => self.kernel.complete_cleanup(
-                &ticket,
-                if success {
-                    CleanupOutcome::Succeeded
-                } else {
-                    CleanupOutcome::Failed
-                },
-            )?,
-        }
-        self.nodes.get_mut(&id).unwrap().pending = None;
+        let failure = if !success {
+            Some(error.unwrap_or_else(|| match ticket.kind {
+                ActionKind::Setup => "setup failed".to_owned(),
+                ActionKind::Cleanup => "cleanup failed".to_owned(),
+            }))
+        } else if ticket.kind == ActionKind::Setup
+            && self.kernel.phase(id) == Some(Phase::Loading)
+            && self.kernel.core.interfaces()[&id]
+                .provisions
+                .iter()
+                .any(|port| self.kernel.store().registry().resolve(*port).is_none())
+        {
+            Some("declared service was not published".to_owned())
+        } else {
+            None
+        };
+        self.kernel.complete(&ticket, failure)?;
         match ticket.kind {
             ActionKind::Setup => {
-                if !success {
-                    self.nodes.get_mut(&id).unwrap().failed =
-                        Some(error.unwrap_or_else(|| "setup failed".to_owned()));
-                }
                 if self.kernel.phase(id) == Some(Phase::Loading) {
-                    let missing = self.nodes[&id]
-                        .provisions
-                        .iter()
-                        .any(|port| self.publications.registry().resolve(*port).is_none());
-                    if missing && success {
-                        self.nodes.get_mut(&id).unwrap().failed =
-                            Some("declared service was not published".to_owned());
-                    }
-                    if self.nodes[&id].failed.is_none()
-                        && !self.nodes[&id].restart
+                    if self.episode(id).failed.is_none()
+                        && !self.episode(id).restart
                         && self.ready(id)
                     {
                         match self.kernel.finish(id) {
@@ -879,39 +628,17 @@ impl Driver {
             }
             ActionKind::Cleanup => {
                 if !success {
-                    let node = self.nodes.get_mut(&id).unwrap();
-                    node.cleanup_failed = true;
-                    node.failed = Some(error.unwrap_or_else(|| "cleanup failed".to_owned()));
                     return Ok(());
                 }
-                let prepared_cleanup = self.nodes[&id].prepared_cleanup;
-                let leases: Vec<_> = self.nodes[&id]
-                    .resources
-                    .iter()
-                    .map(|resource| resource.lease)
-                    .collect();
-                let released = self.kernel.finish_cleanup_values(
-                    &mut self.publications,
-                    id,
-                    prepared_cleanup,
-                    &leases,
-                    &self.nodes[&id].publications,
-                )?;
-                let node = self.nodes.get_mut(&id).unwrap();
-                if prepared_cleanup {
-                    node.failed = None;
-                }
-                node.prepared = false;
-                node.prepared_cleanup = false;
-                node.resources.clear();
-                node.publications.clear();
+                let prepared_cleanup = self.episode(id).prepared_cleanup;
+                let released = if prepared_cleanup {
+                    self.kernel.finish_reservation_values(id)?
+                } else {
+                    self.kernel.finish_admission_values(id)?
+                };
                 for resource in released {
-                    self.checked.remove(&resource.publication.0);
-                    self.released.push(resource.value);
+                    self.kernel.core.set_checked(resource.publication.0, false);
                 }
-                node.restoring_publications.clear();
-                node.restart = false;
-                node.cleanup_failed = false;
                 self.reconcile_publications()?;
                 self.maintain_history();
             }
@@ -922,10 +649,12 @@ impl Driver {
     /// Retry an inverse after a reported failure. The previous action ticket
     /// remains consumed; the executor receives a fresh ticket for this attempt.
     pub fn retry_cleanup(&mut self, id: usize) -> Result<HostAction, DriverError> {
-        let node = self.nodes.get(&id).ok_or(KernelError::Unknown)?;
-        if !node.cleanup_failed
-            || node.pending.is_some()
-            || !(self.kernel.cleanup_started(id) || node.prepared_cleanup)
+        if !self.kernel.core.interfaces().contains_key(&id) {
+            return Err(KernelError::Unknown.into());
+        }
+        if !self.episode(id).cleanup_failed
+            || self.kernel.pending_action(id).is_some()
+            || !(self.kernel.cleanup_started(id) || self.episode(id).prepared_cleanup)
         {
             return Err(DriverError::new(
                 "InvalidState",
@@ -934,15 +663,14 @@ impl Driver {
         }
         self.kernel.retry_cleanup(id)?;
         let ticket = self.next_ticket(id, ActionKind::Cleanup)?;
-        self.nodes.get_mut(&id).unwrap().cleanup_failed = false;
         Ok(HostAction::Cleanup { id, ticket })
     }
 
     fn phase_name(&self, id: usize) -> &'static str {
-        let node = &self.nodes[&id];
+        let episode = self.episode(id);
         match self.kernel.phase(id).unwrap() {
-            _ if node.prepared_cleanup => "Unloading",
-            Phase::Inactive if node.failed.is_some() => "Failed",
+            _ if episode.prepared_cleanup => "Unloading",
+            Phase::Inactive if episode.failed.is_some() => "Failed",
             Phase::Inactive => "Pending",
             Phase::Loading => "Loading",
             Phase::Active => "Active",
@@ -968,17 +696,18 @@ impl Driver {
             realm: binding.realm,
         };
         let publication = if committed {
-            self.nodes[&id]
-                .resources
+            self.resources(id)
                 .iter()
                 .find(|resource| resource.port == port)
                 .map(|resource| resource.publication)
         } else {
-            self.publications
+            self.kernel
+                .store()
                 .registry()
                 .resolve(port)
                 .filter(|publication| {
-                    self.publications
+                    self.kernel
+                        .store()
                         .registry()
                         .entry(*publication)
                         .is_some_and(|entry| entry.owner == binding.provider)
@@ -988,7 +717,8 @@ impl Driver {
         // resolver selects a different identity for the same port.
         let generation = if committed {
             publication.and_then(|publication| {
-                self.publications
+                self.kernel
+                    .store()
                     .registry()
                     .entry(publication)
                     .map(|entry| entry.generation)
@@ -1006,9 +736,9 @@ impl Driver {
 
     fn dependency_blocker(&self, id: usize, port: ServicePort) -> Option<Value> {
         let provider = self.kernel.resolve(port.into());
-        let publication = self.publications.registry().resolve(port.into());
+        let publication = self.kernel.store().registry().resolve(port.into());
         let entry =
-            publication.and_then(|publication| self.publications.registry().entry(publication));
+            publication.and_then(|publication| self.kernel.store().registry().entry(publication));
         let mut blocker = if let Some(provider) = provider {
             match entry {
                 None => json!({"code": "PublicationMissing", "provider": provider.to_string()}),
@@ -1022,13 +752,15 @@ impl Driver {
                 }
                 Some(entry) => {
                     let publication = publication.unwrap();
-                    if !self.checked.contains_key(&publication.0)
-                        || self.availability.available(id, port, publication.0)
+                    if !self.kernel.core.checked().contains(&publication.0)
+                        || self
+                            .availability
+                            .available(&self.kernel.core, id, port, publication.0)
                     {
                         return None;
                     }
                     let candidate = self.check_candidate(id, port)?;
-                    let mut blocker = self.availability.blocker(candidate);
+                    let mut blocker = self.availability.blocker(candidate, &self.kernel.core);
                     blocker["provider"] = json!(entry.owner.to_string());
                     blocker["publication"] = json!(publication.0.to_string());
                     blocker
@@ -1039,18 +771,20 @@ impl Driver {
             // visible publication in another realm is never a matching service.
             let mut providers = Vec::new();
             let mut realms = std::collections::BTreeSet::new();
-            for (&provider, node) in &self.nodes {
-                let ports =
-                    node.provisions
-                        .iter()
-                        .copied()
-                        .chain(node.publications.iter().filter_map(|publication| {
-                            self.publications
-                                .registry()
-                                .entry(*publication)
-                                .filter(|entry| entry.retained)
-                                .map(|entry| entry.port)
-                        }));
+            for (&provider, node) in self.kernel.core.interfaces() {
+                let publications = self.kernel.core.publications(provider);
+                let ports = node
+                    .provisions
+                    .iter()
+                    .copied()
+                    .chain(publications.iter().filter_map(|publication| {
+                        self.kernel
+                            .store()
+                            .registry()
+                            .entry(*publication)
+                            .filter(|entry| entry.retained)
+                            .map(|entry| entry.port)
+                    }));
                 let mut matches = false;
                 for candidate in ports.filter(|candidate| candidate.key == port.key) {
                     if candidate.realm == port.realm {
@@ -1080,14 +814,14 @@ impl Driver {
     }
 
     fn plugin_state(&self, id: usize) -> Value {
-        let node = &self.nodes[&id];
+        let node = &self.kernel.core.interfaces()[&id];
         json!({
             "id": id.to_string(),
             "generation": self.kernel.episode_generation(id).unwrap().to_string(),
             "parent": node.parent.map(|id| id.to_string()),
             "state": self.phase_name(id), "retired": self.kernel.retired(id),
-            "error": node.failed, "cleanupFailed": node.cleanup_failed,
-            "pendingAction": node.pending,
+            "error": self.episode(id).failed, "cleanupFailed": self.episode(id).cleanup_failed,
+            "pendingAction": self.kernel.pending_action(id),
         })
     }
 
@@ -1095,8 +829,14 @@ impl Driver {
     /// `snapshot`, this does not resolve targets, scan dependency histories, or
     /// construct diagnostics/storage. It carries no new admission authority.
     pub fn snapshot_state(&self) -> Value {
-        let plugins: Vec<_> = self.nodes.keys().map(|&id| self.plugin_state(id)).collect();
-        json!({"abi": 1, "profile": self.profile, "domain": self.domain.to_string(), "plugins": plugins})
+        let plugins: Vec<_> = self
+            .kernel
+            .core
+            .interfaces()
+            .keys()
+            .map(|&id| self.plugin_state(id))
+            .collect();
+        json!({"abi": 1, "profile": self.profile(), "domain": self.domain.to_string(), "plugins": plugins})
     }
 
     /// Diagnostic observations, not an independent lifecycle state machine.
@@ -1104,7 +844,7 @@ impl Driver {
     /// monotonic allocation count, including leases already released.
     pub fn snapshot(&self) -> Value {
         let mut consumers: BTreeMap<usize, Vec<Value>> = BTreeMap::new();
-        for &id in self.nodes.keys() {
+        for &id in self.kernel.core.interfaces().keys() {
             let mut providers = std::collections::BTreeSet::new();
             for binding in self.kernel.committed(id) {
                 if providers.insert(binding.provider) {
@@ -1115,29 +855,28 @@ impl Driver {
                 }
             }
         }
-        let plugins: Vec<_> = self
-            .nodes
+        let plugins: Vec<_> = self.kernel.core.interfaces()
             .iter()
             .map(|(&id, node)| {
                 let phase = self.kernel.phase(id).unwrap();
                 let committed = self.kernel.committed(id);
                 let target = self.kernel.target(id);
                 let mut blockers = Vec::new();
-                if node.cleanup_failed {
+                if self.episode(id).cleanup_failed {
                     blockers.push(
-                        json!({"code": "CleanupFailed", "error": node.failed, "retryable": true}),
+                        json!({"code": "CleanupFailed", "error": self.episode(id).failed, "retryable": true}),
                     );
-                } else if phase != Phase::Unloading && !node.prepared_cleanup {
-                    if let Some(error) = &node.failed {
+                } else if phase != Phase::Unloading && !self.episode(id).prepared_cleanup {
+                    if let Some(error) = &self.episode(id).failed {
                         blockers.push(json!({"code": "Failed", "error": error}));
                     }
                 }
                 if !self.kernel.retired(id) && phase != Phase::Unloading {
-                    if !node.sealed {
+                    if !self.episode(id).sealed {
                         blockers.push(json!({"code": "Unsealed"}));
                     }
                     for port in &node.dependencies {
-                        if let Some(blocker) = self.dependency_blocker(id, *port) {
+                        if let Some(blocker) = self.dependency_blocker(id, (*port).into()) {
                             blockers.push(blocker);
                         }
                     }
@@ -1149,7 +888,7 @@ impl Driver {
                 {
                     blockers.push(json!({"code": "TargetChanged"}));
                 }
-                if let Some(ticket) = &node.pending {
+                if let Some(ticket) = self.kernel.pending_action(id) {
                     blockers.push(json!({"code": "PendingAction", "ticket": ticket}));
                 }
                 if phase == Phase::Unloading {
@@ -1173,7 +912,7 @@ impl Driver {
                     }
                 }
                 let mut plugin = self.plugin_state(id);
-                plugin["dependencies"] = json!(node.dependencies);
+                plugin["dependencies"] = json!(node.dependencies.iter().copied().map(ServicePort::from).collect::<Vec<_>>());
                 plugin["committed"] = json!(committed
                     .into_iter()
                     .map(|binding| self.binding_snapshot(id, binding, true))
@@ -1187,20 +926,20 @@ impl Driver {
             })
             .collect();
         let storage = json!({
-            "registeredPlugins": self.nodes.len(),
+            "registeredPlugins": self.kernel.core.interfaces().len(),
             "identitySlots": self.kernel.identity_slots(),
             "declarationRecords": self.kernel.declaration_records(),
             "bindingRecords": self.kernel.binding_records(),
-            "liveBindings": self.nodes.keys().map(|id| self.kernel.committed(*id).len()).sum::<usize>(),
-            "publicationRecords": self.publications.registry().publication_records(),
-            "leaseRecords": self.publications.registry().lease_record_count(),
-            "leaseAllocations": self.publications.registry().lease_allocation_count(),
-            "liveLeases": self.nodes.values().map(|node| node.resources.len()).sum::<usize>(),
-            "publishedValues": self.publications.retained_count(),
-            "invocationScopes": self.invocations.live_count(),
-            "pendingActions": self.nodes.values().filter(|node| node.pending.is_some()).count(),
+            "liveBindings": self.kernel.core.interfaces().keys().map(|id| self.kernel.committed(*id).len()).sum::<usize>(),
+            "publicationRecords": self.kernel.store().registry().publication_records(),
+            "leaseRecords": self.kernel.store().registry().lease_record_count(),
+            "leaseAllocations": self.kernel.store().registry().lease_allocation_count(),
+            "liveLeases": self.kernel.core.interfaces().keys().map(|&id| self.resources(id).len()).sum::<usize>(),
+            "publishedValues": self.kernel.store().retained_count(),
+            "invocationScopes": self.kernel.core.invocation_count(),
+            "pendingActions": self.kernel.core.interfaces().keys().filter(|&&id| self.kernel.pending_action(id).is_some()).count(),
         });
-        json!({"abi":1,"diagnosticsSchema":"cordis.driver/v1","profile":self.profile,"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics(),"storage":storage})
+        json!({"abi":1,"diagnosticsSchema":"cordis.driver/v1","profile":self.profile(),"domain":self.domain.to_string(),"plugins":plugins,"checkErrors":self.availability.diagnostics(&self.kernel.core),"storage":storage})
     }
 
     /// Whether a fiber is in an episode's still-committed dependency closure.
@@ -1289,24 +1028,62 @@ impl Driver {
         self.command(input)
     }
 
+    /// Capture the selected callback ancestry once in the checked Node owner.
+    pub fn begin_invocation(
+        &mut self,
+        id: usize,
+        generation: u64,
+        parent: Option<&InvocationPath>,
+    ) -> Result<InvocationPath, DriverError> {
+        self.kernel
+            .core
+            .begin_invocation(id, generation, parent)
+            .map_err(Into::into)
+    }
+    pub fn finish_invocation(&mut self, path: &InvocationPath) -> Result<(), DriverError> {
+        self.kernel.core.finish_invocation(path).map_err(Into::into)
+    }
+    pub fn invocation_live(&mut self, path: &InvocationPath) -> Result<bool, DriverError> {
+        self.kernel.core.invocation_live(path).map_err(Into::into)
+    }
+    pub fn invocation_own_live(&mut self, path: &InvocationPath) -> Result<bool, DriverError> {
+        self.kernel
+            .core
+            .invocation_own_live(path)
+            .map_err(Into::into)
+    }
+    pub fn check_invocation_wait(
+        &mut self,
+        path: &InvocationPath,
+        target: usize,
+    ) -> Result<Value, DriverError> {
+        Ok(
+            match self.kernel.core.check_invocation_wait(path, target)? {
+                None => json!({"blocked":false}),
+                Some(block) => json!({"blocked":true,"scope":ScopeHandle::from(block.scope),
+                "owner":block.id.to_string(),"generation":block.generation.to_string(),
+                "retained":block.retained.to_string()}),
+            },
+        )
+    }
+
     pub fn execute(&mut self, command: Command) -> Result<Value, DriverError> {
         match command {
             Command::BeginScope { id, generation } => {
-                let scope: ScopeHandle =
-                    self.invocations.begin(&self.kernel, id, generation)?.into();
+                let scope: ScopeHandle = self.kernel.core.begin_scope(id, generation)?.into();
                 Ok(json!({"scope":scope}))
             }
             Command::FinishScope { scope } => {
-                self.invocations.finish(scope.into())?;
+                self.kernel.core.finish_scope(scope.into())?;
                 Ok(json!({}))
             }
             Command::ScopesLive { scopes } => {
                 let scopes: Vec<_> = scopes.into_iter().map(Into::into).collect();
-                Ok(json!({"live":self.invocations.any_live(&scopes)?}))
+                Ok(json!({"live":self.kernel.core.scopes_live(&scopes)?}))
             }
             Command::CheckScopeWait { scopes, target } => {
                 let scopes: Vec<_> = scopes.into_iter().map(Into::into).collect();
-                let block = self.invocations.check_wait(&self.kernel, &scopes, target)?;
+                let block = self.kernel.core.check_scope_wait(&scopes, target)?;
                 Ok(match block {
                     None => json!({"blocked":false}),
                     Some(block) => json!({"blocked":true,"scope":ScopeHandle::from(block.scope),
@@ -1331,14 +1108,7 @@ impl Driver {
                 target,
             } => Ok(json!({"reachable": self.committed_reaches(from,generation,target)?})),
             Command::Configure { profile } => {
-                if self.configured || !self.kernel.ids().is_empty() {
-                    return Err(DriverError::new(
-                        "ProfileFrozen",
-                        "profile must be selected once before mounting",
-                    ));
-                }
-                self.profile = profile;
-                self.configured = true;
+                self.kernel.core.configure_profile(profile.into())?;
                 Ok(json!({"profile":profile}))
             }
             Command::Mount {
@@ -1347,28 +1117,14 @@ impl Driver {
                 dependencies,
                 provisions,
             } => {
-                let id = self.mount(parent, dependencies, provisions)?;
-                self.nodes.get_mut(&id).unwrap().sealed = sealed;
+                let id = self.mount_sealed(parent, dependencies, provisions, sealed)?;
                 Ok(json!({"id":id.to_string()}))
             }
             Command::Prepare { id } => Ok(json!({"generation":self.prepare(id)?.to_string()})),
             Command::Seal { id, dependencies } => {
-                let node = self.nodes.get(&id).ok_or(KernelError::Unknown)?;
-                if node.sealed {
-                    return Err(DriverError::new(
-                        "AlreadySealed",
-                        "plugin declaration was already sealed",
-                    ));
-                }
-                if !self.kernel.retired(id) {
-                    self.kernel.configure_pending_dependencies(
-                        id,
-                        dependencies.iter().copied().map(Into::into).collect(),
-                    )?;
-                    let node = self.nodes.get_mut(&id).unwrap();
-                    node.dependencies = dependencies;
-                    node.sealed = true;
-                }
+                self.kernel
+                    .core
+                    .seal_declarations(id, dependencies.into_iter().map(Into::into).collect())?;
                 Ok(json!({}))
             }
             Command::Reclaim {
@@ -1379,7 +1135,7 @@ impl Driver {
             Command::Drive => {
                 let actions = self.drive()?;
                 Ok(
-                    json!({"actions":actions,"released":std::mem::take(&mut self.released).into_iter().filter(|value| !self.publications.contains_handle(*value)).map(|value|value.to_string()).collect::<Vec<_>>()}),
+                    json!({"actions":actions,"released":self.kernel.core.drain_released().into_iter().map(|value|value.to_string()).collect::<Vec<_>>()}),
                 )
             }
             Command::Complete {
@@ -1414,7 +1170,7 @@ impl Driver {
                 let publication =
                     self.publish(id, generation, ServicePort { key, realm }, value)?;
                 if check {
-                    self.checked.insert(publication, 0);
+                    self.kernel.core.set_checked(publication, true);
                 }
                 Ok(json!({"publication":publication.to_string()}))
             }
@@ -1445,24 +1201,12 @@ impl Driver {
                 .unwrap_or(Value::Null)),
             Command::Checks => Ok(json!({"checks":self.check_actions()?})),
             Command::Notify { ports } => {
-                self.availability.notify(&ports)?;
-                if self.profile == Profile::Harness {
-                    for node in self.nodes.values_mut() {
-                        if !node.cleanup_failed
-                            && node.dependencies.iter().any(|port| ports.contains(port))
-                        {
-                            node.failed = None;
-                        }
-                    }
-                }
+                self.availability.notify(&mut self.kernel.core, &ports)?;
                 Ok(json!({"checks":self.check_actions()?}))
             }
-            Command::ValidateCheck { ticket } => {
-                let candidate = self.check_candidate(ticket.consumer, ticket.port);
-                Ok(
-                    json!({"current":ticket.domain == self.domain && self.availability.current(&ticket,candidate)}),
-                )
-            }
+            Command::ValidateCheck { ticket } => Ok(
+                json!({"current":ticket.domain == self.domain && self.availability.current(&ticket, &self.kernel.core)}),
+            ),
             Command::CompleteCheck {
                 ticket,
                 available,
@@ -1474,9 +1218,8 @@ impl Driver {
                         "check belongs to another driver",
                     ));
                 }
-                let candidate = self.check_candidate(ticket.consumer, ticket.port);
                 Ok(
-                    json!({"accepted":self.availability.complete(ticket,candidate,available,error)?}),
+                    json!({"accepted":self.availability.complete(ticket, &mut self.kernel.core, available, error)?}),
                 )
             }
             Command::Snapshot => Ok(self.snapshot()),

@@ -345,3 +345,44 @@ fn harness_failure_stays_latched_until_a_relevant_external_notification() {
     command(&mut driver, json!({"op":"notify","ports":[port()]}));
     action(&mut driver, &consumer, "setup");
 }
+
+#[test]
+fn equal_opaque_handle_after_replacements_does_not_revive_an_old_check() {
+    let mut test = Checked::new();
+    for value in ["11", "10"] {
+        command(
+            &mut test.driver,
+            json!({"op":"set","id":test.provider,"generation":test.generation,"publication":test.publication,"value":value}),
+        );
+    }
+    assert_eq!(
+        command(
+            &mut test.driver,
+            json!({"op":"validate_check","ticket":test.ticket})
+        )["current"],
+        false
+    );
+    assert_eq!(
+        command(
+            &mut test.driver,
+            json!({"op":"complete_check","ticket":test.ticket,"available":true})
+        )["accepted"],
+        false
+    );
+    assert_eq!(
+        command(&mut test.driver, json!({"op":"drive"}))["actions"],
+        json!([])
+    );
+    let next =
+        command(&mut test.driver, json!({"op":"notify","ports":[port()]}))["checks"][0].clone();
+    assert_eq!(next["value"], "10");
+    assert_eq!(next["ticket"]["value_revision"], "2");
+    assert_eq!(
+        command(
+            &mut test.driver,
+            json!({"op":"complete_check","ticket":next["ticket"],"available":true})
+        )["accepted"],
+        true
+    );
+    action(&mut test.driver, &test.consumer, "setup");
+}

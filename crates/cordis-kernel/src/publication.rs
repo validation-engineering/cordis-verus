@@ -86,6 +86,11 @@ impl PublicationRegistry {
     pub proof fn unchanged_reflexive(&self)
         ensures self.unchanged(self),
     {}
+    pub proof fn unchanged_observations(&self,prior:&Self)
+        requires self.unchanged(prior),
+        ensures self.domain_id()==prior.domain_id(),self.publications()==prior.publications(),
+            self.lease_records()==prior.lease_records(),self.lease_allocations()==prior.lease_allocations(),
+    {}
     pub closed spec fn wf(&self) -> bool {
         &&& forall|i: int| 0 <= i < self.entries.len()
             ==> (self.entries[i].visible ==> self.entries[i].retained)
@@ -154,9 +159,22 @@ impl PublicationRegistry {
         None
     }
 
-    proof fn lease_at_position(&self, i: int)
-        requires self.wf(), 0 <= i < self.leases.len(),
-        ensures self.active_lease(self.leases[i].id) == Some(self.leases[i].lease),
+    /// Active leases name a real retained publication and a stored record.
+    pub proof fn active_lease_facts(&self, token: LeaseId)
+        requires self.wf(), self.active_lease(token).is_some(),
+        ensures self.active_lease(token).unwrap().publication.0 < self.publications().len(),
+            self.publications()[self.active_lease(token).unwrap().publication.0 as int].retained,
+            exists|i:int|0<=i<self.lease_records().len() && self.lease_records()[i].id==token
+                && self.lease_records()[i].lease==self.active_lease(token).unwrap(),
+    {
+        let i=choose|i:int|0<=i<self.leases.len() && self.leases[i].id==token;
+        assert(self.active_lease(token)==Some(self.leases[i].lease));
+        assert(0<=i<self.lease_records().len() && self.lease_records()[i].id==token && self.lease_records()[i].lease==self.active_lease(token).unwrap());
+    }
+
+    pub proof fn lease_at_position(&self, i: int)
+        requires self.wf(), 0 <= i < self.lease_records().len(),
+        ensures self.active_lease(self.lease_records()[i].id) == Some(self.lease_records()[i].lease),
     {
         let id = self.leases[i].id;
         assert(exists|j: int| 0 <= j < self.leases.len() && self.leases[j].id == id);
@@ -300,9 +318,17 @@ impl PublicationRegistry {
     }
 
     /// Unscoped leases cannot be consumed by managed episode cleanup.
+    pub open spec fn acquisition_enabled(&self,id:PublicationId)->bool {
+        id.0<self.publications().len() && self.publications()[id.0 as int].visible && self.lease_allocations()<usize::MAX
+    }
+    pub fn check_lease_capacity(&self,count:usize)->(out:Result<(),PublicationError>)
+        ensures out.is_ok()==(self.lease_allocations()+count<=usize::MAX),
+            out.is_err() ==> out==Err(PublicationError::Capacity),
+    {if count>usize::MAX-self.next_lease {Err(PublicationError::Capacity)} else {Ok(())}}
+
     pub fn acquire(&mut self, id: PublicationId) -> (out: Result<LeaseId, PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
+        ensures out.is_ok()==old(self).acquisition_enabled(id), final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> out.unwrap().0 == old(self).lease_allocations()
                 && final(self).lease_allocations() == old(self).lease_allocations() + 1
@@ -314,7 +340,7 @@ impl PublicationRegistry {
     pub fn acquire_for(&mut self, id: PublicationId, owner: usize, generation: u64)
         -> (out: Result<LeaseId, PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
+        ensures out.is_ok()==old(self).acquisition_enabled(id), final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> out.unwrap().0 == old(self).lease_allocations()
                 && final(self).lease_allocations() == old(self).lease_allocations() + 1
@@ -327,7 +353,7 @@ impl PublicationRegistry {
     /// has a fresh logical token, regardless of earlier physical record removal.
     fn acquire_tagged(&mut self, id: PublicationId, consumer: Option<LeaseOwner>) -> (out: Result<LeaseId, PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
+        ensures out.is_ok()==old(self).acquisition_enabled(id), final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).publications() == old(self).publications(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> out.unwrap().0 == old(self).lease_allocations()
                 && final(self).lease_allocations() == old(self).lease_allocations() + 1
@@ -413,7 +439,7 @@ impl PublicationRegistry {
     /// Idempotently remove from new lookup, retaining identity and value slot.
     pub fn revoke(&mut self, id: PublicationId) -> (out: Result<(), PublicationError>)
         requires old(self).wf(),
-        ensures final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).lease_records() == old(self).lease_records(),
+        ensures out.is_ok()==(id.0<old(self).publications().len()),final(self).wf(), final(self).domain_id()==old(self).domain_id(), final(self).lease_records() == old(self).lease_records(),
             final(self).lease_allocations() == old(self).lease_allocations(),
             out.is_err() ==> final(self).unchanged(old(self)),
             out.is_ok() ==> id.0 < old(self).publications().len()

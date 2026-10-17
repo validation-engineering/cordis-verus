@@ -188,6 +188,13 @@ impl NativeDriver {
         kind: ActionKind,
     ) -> std::result::Result<(), String> {
         let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
+        Self::valid_driver_ticket(&driver, ticket, kind)
+    }
+    fn valid_driver_ticket(
+        driver: &cordis_driver::Driver,
+        ticket: &ActionTicket,
+        kind: ActionKind,
+    ) -> std::result::Result<(), String> {
         if ticket.domain != driver.domain() || ticket.kind != kind {
             return Err("StaleAction".into());
         }
@@ -223,7 +230,10 @@ impl NativeDriver {
             (owner, generation, publication, port)
         };
         let (restoring, continuing) = {
-            let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
+            let mut driver = self
+                .driver
+                .try_borrow_mut()
+                .map_err(|_| "ReentrantCommand")?;
             let mut restored = false;
             let mut continuation = false;
             let resolved = if let Some(caller) = caller.as_ref() {
@@ -233,7 +243,7 @@ impl NativeDriver {
                     if ticket.id != id || ticket.generation != caller_generation {
                         return Err("StaleEpisode".into());
                     }
-                    self.valid_ticket(ticket, ActionKind::Cleanup)?;
+                    Self::valid_driver_ticket(&driver, ticket, ActionKind::Cleanup)?;
                     restored = true;
                 }
                 if let Some(authority) = &caller.authority {
@@ -401,7 +411,10 @@ impl NativeDriver {
                 }
                 let mut imports = Vec::new();
                 if let Some(descriptor) = descriptor {
-                    let driver = self.driver.try_borrow().map_err(|_| "ReentrantCommand")?;
+                    let mut driver = self
+                        .driver
+                        .try_borrow_mut()
+                        .map_err(|_| "ReentrantCommand")?;
                     let _ = descriptor;
                     let required = self
                         .backend

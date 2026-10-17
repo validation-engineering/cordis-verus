@@ -207,7 +207,7 @@ impl<P,X,G> SetupWork<ChildDispatch<P,X>,G> {
     pub fn enqueue_native_child<C,Y>(&mut self,cleanups:&mut CleanupGroups<ChildCleanup<C,Y>>,group:usize,payload:P)
         ->(out:Result<(SharedChild,usize),P>)
         requires old(self).wf(),old(cleanups).wf(),
-        ensures final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
+        ensures final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
             out.is_ok()==(old(self).origin().is_some() && old(self).owns(old(cleanups)) && old(self).accepts()
                 && old(self).next_id()<u64::MAX && old(cleanups).acquisition_open(group)),
             out.is_err() ==> out->Err_0==payload && *final(self)==*old(self) && *final(cleanups)==*old(cleanups),
@@ -251,7 +251,10 @@ impl<R,H> NativeHost<R,H> {
             out.result.is_ok() ==> out.after.state() is Assigned && out.after.state()->Assigned_0.child()==out.result->Ok_0
                 && final(self).entries().dom()==old(self).entries().dom().insert(out.result->Ok_0)
                 && (forall|n:usize| #[trigger] old(self).entries().contains_key(n) ==> final(self).entries()[n]==old(self).entries()[n])
+                && final(self).entries()[out.result->Ok_0].recipe().version()==0
                 && final(self).entries()[out.result->Ok_0].recipe().payload()==definition.payload()
+                && final(self).entries()[out.result->Ok_0].recipe().realms()==realms@
+                && final(self).entries()[out.result->Ok_0].recipe().anchor_port()==anchor
                 && final(self).entries()[out.result->Ok_0].bookkeeping()==host
                 && final(self).entries()[out.result->Ok_0].recipe().parent_id()==Some(child.owner())
                 && crate::refinement::step(old(self).state().control().paper(),final(self).state().control().paper(),out.result->Ok_0,crate::refinement::Rule::Insert),

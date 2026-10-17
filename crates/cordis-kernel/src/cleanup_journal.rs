@@ -55,12 +55,12 @@ impl CleanupJournal {
 
     pub fn register(&mut self,token:usize)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).waiting()==old(self).waiting().push(token),
+        ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).stage().cancellation()==old(self).stage().cancellation(),final(self).next_attempt()==old(self).next_attempt(),final(self).stage().pending()==old(self).stage().pending(),final(self).stage().settled()==old(self).stage().settled(),final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).waiting()==old(self).waiting().push(token),
             final(self).selected()==old(self).selected(),final(self).failed_spec()==old(self).failed_spec(),
     {self.stages.register(token);}
     pub fn land(&mut self,token:usize)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),out==old(self).stage().pending(),
+        ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).stage().cancellation()==old(self).stage().cancellation(),final(self).next_attempt()==old(self).next_attempt(),final(self).wf(),final(self).domain_id()==old(self).domain_id(),out==old(self).stage().pending(),
             final(self).selected()==old(self).selected(),final(self).failed_spec()==old(self).failed_spec(),
             out ==> final(self).waiting()==old(self).waiting().push(token)
                 && !final(self).stage().pending() && final(self).stage().settled()==old(self).stage().cancellation()
@@ -69,13 +69,13 @@ impl CleanupJournal {
             !out ==> final(self).same(old(self)),
     {self.stages.land(token)}
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
-        requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
+        requires old(self).wf(),ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).next_attempt()==old(self).next_attempt(),final(self).stage().settled()==!out,final(self).stage().cancellation()==(old(self).stage().cancellation() || !(target.is_some() && crate::episode::binding_set(target.unwrap()@)==crate::episode::binding_set(old(self).stage().committed_view()))),final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
             out==final(self).stage().pending(),
             out==(old(self).stage().pending() || (!old(self).stage().settled() && !old(self).stage().cancellation() && target.is_some() && crate::episode::binding_set(target.unwrap()@)==crate::episode::binding_set(old(self).stage().committed_view()))),
     {self.stages.admit(target)}
     pub fn end(&mut self)->(out:bool)
-        requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
+        requires old(self).wf(),ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).stage().cancellation()==old(self).stage().cancellation(),final(self).next_attempt()==old(self).next_attempt(),!out ==> final(self).same(old(self)),final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
             out==old(self).stage().pending(),
             out ==> !final(self).stage().pending() && final(self).stage().settled()
@@ -83,7 +83,7 @@ impl CleanupJournal {
                     if old(self).stage().cancellation() {AccumulatorRule::Divert(None)} else {AccumulatorRule::Finish}),
     {self.stages.end()}
     pub fn cancel(&mut self)
-        requires old(self).wf(),ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
+        requires old(self).wf(),ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).next_attempt()==old(self).next_attempt(),final(self).stage().settled()==!old(self).stage().pending(),final(self).wf(),final(self).domain_id()==old(self).domain_id(),final(self).selected()==old(self).selected(),
             final(self).waiting()==old(self).waiting(),final(self).failed_spec()==old(self).failed_spec(),
             final(self).stage().cancellation(),final(self).stage().pending()==old(self).stage().pending(),
     {self.stages.cancel();}
@@ -121,7 +121,7 @@ impl CleanupJournal {
     /// the retained receipt. An occupied receipt blocks any second selection.
     pub fn begin_restore(&mut self)->(out:Result<Option<RestoreTicket>,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).domain_id()==old(self).domain_id(),
+        ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).stage().cancellation()==old(self).stage().cancellation(),final(self).stage().pending()==old(self).stage().pending(),final(self).stage().settled()==old(self).stage().settled(),final(self).wf(),final(self).domain_id()==old(self).domain_id(),
             out.is_ok() && out.unwrap().is_some() ==> old(self).selected().is_none()
                 && old(self).stage().settled() && !old(self).stage().pending()
                 && old(self).waiting().len()>0
@@ -147,7 +147,7 @@ impl CleanupJournal {
     /// selected token and blocks it until retry; no report mutates waiting work.
     pub fn complete(&mut self,ticket:RestoreTicket,outcome:RestoreOutcome)->(accepted:bool)
         requires old(self).wf(),
-        ensures final(self).wf(),accepted==(old(self).selected()==Some(ticket) && !old(self).failed_spec()),
+        ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).stage().cancellation()==old(self).stage().cancellation(),final(self).next_attempt()==old(self).next_attempt(),final(self).stage().pending()==old(self).stage().pending(),final(self).stage().settled()==old(self).stage().settled(),final(self).wf(),accepted==(old(self).selected()==Some(ticket) && !old(self).failed_spec()),
             final(self).waiting()==old(self).waiting(),final(self).next_attempt()==old(self).next_attempt(),
             final(self).domain_id()==old(self).domain_id(),
             !accepted ==> final(self).same(old(self)),
@@ -164,7 +164,7 @@ impl CleanupJournal {
     /// fresh identity rejects any late completion from the previous attempt.
     pub fn retry(&mut self)->(out:Result<RestoreTicket,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok()==(old(self).failed_spec() && old(self).next_attempt()<u64::MAX),
+        ensures final(self).stage().committed_view()==old(self).stage().committed_view(),final(self).stage().cancellation()==old(self).stage().cancellation(),final(self).stage().pending()==old(self).stage().pending(),final(self).stage().settled()==old(self).stage().settled(),final(self).wf(),out.is_ok()==(old(self).failed_spec() && old(self).next_attempt()<u64::MAX),
             final(self).waiting()==old(self).waiting(),final(self).domain_id()==old(self).domain_id(),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> final(self).selected()==Some(out.unwrap()) && !final(self).failed_spec()

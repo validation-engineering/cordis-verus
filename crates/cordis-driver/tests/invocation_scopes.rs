@@ -204,3 +204,84 @@ fn scope_wire_preserves_large_identities_and_rejects_metadata_or_holding_overrid
     assert_eq!(wait(&mut driver, vec![scope], owner)["blocked"], true);
     finish(&mut driver, scope);
 }
+
+#[test]
+fn captured_path_retains_completed_ancestors_without_ledger_tombstones() {
+    let mut driver = Driver::new().unwrap();
+    let (owner, generation) = mount(&mut driver, None);
+    let (child, child_generation) = mount(&mut driver, Some(owner));
+    let root = driver.begin_invocation(owner, generation, None).unwrap();
+    let nested = driver
+        .begin_invocation(child, child_generation, Some(&root))
+        .unwrap();
+    let escaped = driver
+        .begin_invocation(child, child_generation, Some(&nested))
+        .unwrap();
+    driver.finish_invocation(&nested).unwrap();
+    driver.finish_invocation(&escaped).unwrap();
+    assert!(!driver.invocation_own_live(&escaped).unwrap());
+    assert!(driver.invocation_live(&escaped).unwrap());
+    let before = driver.snapshot();
+    let block = driver.check_invocation_wait(&escaped, owner).unwrap();
+    assert_eq!(block["blocked"], true);
+    assert_eq!(block["owner"], owner.to_string());
+    assert_eq!(driver.snapshot(), before);
+    driver.finish_invocation(&root).unwrap();
+    assert_eq!(driver.snapshot()["storage"]["invocationScopes"], 0);
+    // An escaped completed context is a valid parent. It cannot revive any of
+    // its ancestors, consume another callback or grow the live-record table.
+    for _ in 0..256 {
+        let current = driver
+            .begin_invocation(child, child_generation, Some(&escaped))
+            .unwrap();
+        assert_eq!(
+            driver.finish_invocation(&escaped).unwrap_err().code,
+            "StaleAuthority"
+        );
+        assert!(driver.invocation_own_live(&current).unwrap());
+        assert!(!driver.invocation_live(&escaped).unwrap());
+        assert_eq!(driver.snapshot()["storage"]["invocationScopes"], 1);
+        driver.finish_invocation(&current).unwrap();
+        assert_eq!(driver.snapshot()["storage"]["invocationScopes"], 0);
+    }
+    assert_eq!(
+        driver.check_invocation_wait(&escaped, owner).unwrap(),
+        json!({"blocked":false})
+    );
+}
+
+#[test]
+fn captured_paths_reject_foreign_parents_and_stale_live_generations() {
+    let mut a = Driver::new().unwrap();
+    let mut b = Driver::new().unwrap();
+    let (owner, generation) = mount(&mut a, None);
+    let (other, other_generation) = mount(&mut b, None);
+    let parent = a.begin_invocation(owner, generation, None).unwrap();
+    let foreign = b.begin_invocation(other, other_generation, None).unwrap();
+    let before = a.snapshot();
+    assert!(
+        matches!(a.begin_invocation(owner,generation,Some(&foreign)),Err(e) if e.code=="InvalidAuthority")
+    );
+    assert!(
+        matches!(a.begin_invocation(owner,generation+1,Some(&parent)),Err(e) if e.code=="StaleEpisode")
+    );
+    assert_eq!(
+        a.check_invocation_wait(&foreign, owner).unwrap_err().code,
+        "InvalidAuthority"
+    );
+    assert_eq!(a.snapshot(), before);
+    a.retire(owner).unwrap();
+    for action in a.drive().unwrap() {
+        if let HostAction::Cleanup { ticket, .. } = action {
+            a.complete(ticket, true, None).unwrap();
+        }
+    }
+    a.drive().unwrap();
+    assert_eq!(
+        a.check_invocation_wait(&parent, owner).unwrap_err().code,
+        "StaleEpisode"
+    );
+    a.finish_invocation(&parent).unwrap();
+    assert!(!a.invocation_live(&parent).unwrap());
+    b.finish_invocation(&foreign).unwrap();
+}

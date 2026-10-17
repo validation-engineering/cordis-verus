@@ -86,7 +86,7 @@ impl LifecycleState {
                 &&& final(slot).state()->Assigned_0.child()==plugin.owner()
                 &&& plugin.domain_id()==old(slot).domain_id() && plugin.parent_id()==Some(old(slot).owner())
                 &&& plugin.owner()==old(self).control().next_id() && plugin.payload()==definition.payload()
-                &&& plugin.anchor_port()==anchor && plugin.version()==0
+                &&& plugin.anchor_port()==anchor && plugin.realms()==realms@ && plugin.version()==0
                 &&& final(self).control().paper().fibers[plugin.owner()].parent==plugin.parent_id()
                 &&& (forall|p:Port| #[trigger] final(self).control().paper().fibers[plugin.owner()].dependencies.contains(p)==plugin.dependencies_spec().contains(p))
                 &&& (forall|p:Port| #[trigger] final(self).control().paper().fibers[plugin.owner()].provisions.contains(p)==(plugin.provisions_spec().contains(p) || p==anchor))

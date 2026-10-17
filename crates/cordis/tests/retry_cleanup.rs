@@ -549,3 +549,60 @@ fn distinct_failed_groups_keep_their_own_factories_and_drop_each_only_after_succ
     assert_eq!(*drops.lock().unwrap(), ["first", "second"]);
     assert!(!runtime.contains(id));
 }
+
+#[test]
+fn restart_keeps_cleanup_failure_until_checked_retry_and_rebinds_new_episode() {
+    let mut runtime = Runtime::new();
+    let setups = Arc::new(AtomicUsize::new(0));
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let contexts = Arc::new(Mutex::new(Vec::new()));
+    let (started, cleaned, escaped) = (setups.clone(), attempts.clone(), contexts.clone());
+    let id = runtime
+        .mount(
+            &Context::new(),
+            None,
+            Plugin::new("restart and retry", move |setup| {
+                started.fetch_add(1, Ordering::SeqCst);
+                escaped.lock().unwrap().push(setup.to_async());
+                let cleaned = cleaned.clone();
+                setup.on_cleanup_retryable(move || {
+                    if cleaned.fetch_add(1, Ordering::SeqCst) == 0 {
+                        Err("retained cleanup".into())
+                    } else {
+                        Ok(())
+                    }
+                });
+                Ok(())
+            }),
+        )
+        .unwrap();
+    assert_eq!(poll(&mut runtime), Poll::Ready(Ok(())));
+    let initial = runtime.plugin_execution_snapshot(id).unwrap();
+    runtime.restart(id).unwrap();
+    assert!(matches!(
+        poll(&mut runtime),
+        Poll::Ready(Err(RuntimeError::Cleanup { .. }))
+    ));
+    assert_eq!(setups.load(Ordering::SeqCst), 1);
+    assert_eq!(runtime.cleanup_failure(id), Some("retained cleanup"));
+    let failed = runtime.plugin_execution_snapshot(id).unwrap();
+    runtime.restart(id).unwrap();
+    assert_eq!(runtime.cleanup_failure(id), Some("retained cleanup"));
+    assert!(matches!(
+        poll(&mut runtime),
+        Poll::Ready(Err(RuntimeError::Cleanup { .. }))
+    ));
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    runtime.retry_cleanup(id).unwrap();
+    assert_eq!(poll(&mut runtime), Poll::Ready(Ok(())));
+    assert_eq!(setups.load(Ordering::SeqCst), 2);
+    assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    assert!(runtime.cleanup_failure(id).is_none());
+    assert!(contexts.lock().unwrap()[0].is_cancelled());
+    assert!(!contexts.lock().unwrap()[1].is_cancelled());
+    let _ = (
+        initial.refresh(),
+        failed.refresh(),
+        runtime.plugin_execution_snapshot(id).unwrap(),
+    );
+}

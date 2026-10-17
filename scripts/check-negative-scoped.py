@@ -341,8 +341,12 @@ def validate_rejection(record, directory, case, source, expected_tool=None, *, d
     return stats
 
 
-def command(binary, source, kind, targets, threads, artifact):
+def command(binary, source, kind, targets, threads, artifact, *, expected_failures=()):
     result = [str(binary), str(source / "lib.rs"), *BASE_FLAGS, "--num-threads", str(threads)]
+    # A case can require multiple diagnostics from its one failing function.
+    # Ask for enough output in both selected runs; never discard expectations.
+    if kind == "selected" and len(expected_failures) > 1:
+        result[result.index("--multiple-errors") + 1] = str(len(expected_failures))
     if kind == "compile":
         require(not targets, "compile must be whole crate")
         result += ["--no-verify", "--compile", "-o", str(artifact)]
@@ -498,7 +502,7 @@ def binding(source, manifest, tool, threads, timeout, canonical_manifest_sha256=
             "flags": BASE_FLAGS, "threads": threads, "timeoutSeconds": timeout}
 
 
-def validate_record_command(record, kind, targets, run_binding, *, source_name):
+def validate_record_command(record, kind, targets, run_binding, *, source_name, expected_failures=()):
     argv = record.get("command")
     require(type(argv) is list and all(type(arg) is str for arg in argv) and len(argv) > 2,
             "missing invocation command")
@@ -507,7 +511,7 @@ def validate_record_command(record, kind, targets, run_binding, *, source_name):
             and source.is_absolute() and source.name == source_name
             and Path(argv[1]).name == "lib.rs", "invalid invocation paths")
     artifact = Path(argv[-1]) if kind == "compile" else source / "unused.rlib"
-    require(argv == command(argv[0], source, kind, targets, run_binding["threads"], artifact),
+    require(argv == command(argv[0], source, kind, targets, run_binding["threads"], artifact, expected_failures=expected_failures),
             "invocation flags or selected targets changed")
     return source
 
@@ -545,14 +549,14 @@ def validate_calibration(path, expected_binding, manifest, baseline, canonical_c
             require(result.get("targets") == case["targets"] and result.get("is-verifying-entire-crate") is False,
                     "calibration scope changed")
             require(validate_record_command(result["selectedPositive"], "selected", case["targets"], expected_binding,
-                                            source_name="baseline") == baseline_path,
+                                            source_name="baseline", expected_failures=case["expectedFailures"]) == baseline_path,
                     "selected positive used a different baseline tree")
             validate_positive(result["selectedPositive"], directory, entire=False, expected_tool=report["tool"],
                               targets=case["targets"], expected_failures=case["expectedFailures"])
             old_source = validate_record_command(result["wholeCompile"], "compile", (), expected_binding,
                                                  source_name=case["name"])
             require(validate_record_command(result["selectedMutant"], "selected", case["targets"], expected_binding,
-                                            source_name=case["name"]) == old_source,
+                                            source_name=case["name"], expected_failures=case["expectedFailures"]) == old_source,
                     "compiled and verified different mutant trees")
             compile_raw = output(result["wholeCompile"], directory)
             require(result["wholeCompile"]["returncode"] == 0 and not diagnostics(compile_raw["stderr"])
@@ -582,7 +586,7 @@ def execute(manifest, baseline, workspace, report_dir, binary, environment, tool
     report_path = report_dir / "scoped-report.json"
     def save():
         report_path.write_text(json.dumps(report, indent=2) + "\n")
-    def invoke(label, source, kind, targets=()):
+    def invoke(label, source, kind, targets=(), expected_failures=()):
         artifact = workspace / (label + ".rlib")
         require(digest(__file__) == HARNESS_SHA256 == run_binding["harnessSha256"],
                 "scoped harness changed during verification")
@@ -593,7 +597,7 @@ def execute(manifest, baseline, workspace, report_dir, binary, environment, tool
         if kind == "compile":
             require(not artifact.exists(), "compilation artifact is not fresh")
         verify_tool_artifacts(tool)
-        cmd = command(binary, source, kind, targets, threads, artifact)
+        cmd = command(binary, source, kind, targets, threads, artifact, expected_failures=expected_failures)
         record = runner(cmd, environment, report_dir / label, timeout)
         verify_tool_artifacts(tool)
         require(digest(__file__) == HARNESS_SHA256, "scoped harness changed during verification")
@@ -613,7 +617,7 @@ def execute(manifest, baseline, workspace, report_dir, binary, environment, tool
             name = case["name"]
             result = {"name": name, "targets": case["targets"], "is-verifying-entire-crate": False}
             report["cases"].append(result)
-            positive, _ = invoke(name + "-positive", baseline, "selected", case["targets"])
+            positive, _ = invoke(name + "-positive", baseline, "selected", case["targets"], case["expectedFailures"])
             result["selectedPositive"] = positive
             validate_positive(positive, report_dir, entire=False, expected_tool=tool, targets=case["targets"],
                               expected_failures=case["expectedFailures"])
@@ -626,7 +630,7 @@ def execute(manifest, baseline, workspace, report_dir, binary, environment, tool
             validate_compile(compiled, report_dir, artifact)
             require(source_hashes(mutated) == mutant_hashes, "mutant source changed during compilation")
             require(source_hashes(baseline) == expected_source, "baseline changed during mutant compilation")
-            failed, _ = invoke(name + "-mutant", mutated, "selected", case["targets"])
+            failed, _ = invoke(name + "-mutant", mutated, "selected", case["targets"], case["expectedFailures"])
             result["selectedMutant"] = failed
             validate_rejection(failed, report_dir, case, mutated, tool)
             require(source_hashes(mutated) == mutant_hashes, "mutant source changed during verification")

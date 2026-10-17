@@ -51,6 +51,16 @@ pub open spec fn authorizes(command:CleanupCommand,reply:CleanupReply,id:usize,g
 impl LifecycleState {
     /// Common contract shared by the executable dispatcher and managed release.
     pub open spec fn cleanup_step(&self,prior:&Self,command:CleanupCommand,reply:CleanupReply)->bool {
+        &&& if reply.is_err() {self.control().paper()==prior.control().paper()} else {
+            let a=prior.control().paper();let b=self.control().paper();
+            match command {
+                CleanupCommand::Withdraw {id}=>crate::refinement::step(a,b,id,crate::refinement::Rule::Restart),
+                CleanupCommand::Retire {id}=>crate::refinement::step(a,b,id,crate::refinement::Rule::Retire),
+                CleanupCommand::Remove {id}=>crate::refinement::step(a,b,id,crate::refinement::Rule::Remove),
+                CleanupCommand::Release {id,reservation:false}=>crate::refinement::step(a,b,id,crate::refinement::Rule::Unload),
+                _=>b==a,
+            }
+        }
         &&& prior.wf() && self.wf()
         &&& self.protocol().history_preserved(&prior.protocol())
         &&& self.bindings_except(prior,released(command,reply))
@@ -107,7 +117,7 @@ impl LifecycleState {
     /// Rust and Node lifecycle adapters dispatch their real cleanup API here.
     pub fn execute_cleanup(&mut self,command:CleanupCommand)->(reply:CleanupReply)
         requires old(self).wf(),
-        ensures final(self).cleanup_step(old(self),command,reply),
+        ensures final(self).cleanup_step(old(self),command,reply),final(self).control_history().extends(old(self).control_history()),
     {
         reveal(Kernel::unchanged);reveal(Kernel::same_bindings);reveal(Kernel::binding_recorded);
         let ghost prior=*self;
@@ -133,6 +143,7 @@ impl LifecycleState {
                 _=>{},
             }
             if reply.is_err() {self.same_observations(&prior);}
+            if self.kernel.unchanged(&prior.control()) {self.kernel.unchanged_observations(&prior.control());}
         }
         reply
     }

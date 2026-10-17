@@ -45,7 +45,7 @@ function nativeDriver(options) {
   if (info?.abi !== 1 || info?.profile !== 'cordis-4.0.0-rc.10-experimental' || info?.package !== 'cordis-node' || info?.values !== 'javascript-object-table') {
     throw new Error(`Incompatible Cordis addon at ${addon}: expected ABI 1 and profile cordis-4.0.0-rc.10-experimental with JavaScript object-table values`);
   }
-  if (info.scopeProtocol !== 1) throw new Error('Incompatible Cordis addon: invocation scope protocol 1 is required');
+  if (info.scopeProtocol !== 2) throw new Error('Incompatible Cordis addon: invocation scope protocol 2 is required');
   if (options.profile === 'harness' && !info.profiles?.includes('harness')) {
     throw new Error('Incompatible Cordis addon: Harness profile support is required');
   }
@@ -79,18 +79,24 @@ function assertCurrentInvocation(domain, operation = 'context operation') {
 // for setup/child dispatch; it is never an input to the wait decision.
 function beginInvocation(fiber, properties = {}) {
   const generation = properties.generation ?? fiber._generation;
-  const scope = fiber._domain.command({op:'begin_scope',id:fiber.id,generation}).scope;
-  return {...properties,fiber,generation,active:true,scopeAuthority:Object.freeze(scope)};
+  const parentInvocation = Object.hasOwn(properties, 'parentInvocation') ? properties.parentInvocation : invocation.getStore();
+  const scope = fiber._domain.scopeCommand('beginInvocation', fiber.id, generation, currentScope(fiber._domain, parentInvocation));
+  return {...properties,parentInvocation,fiber,generation,active:true,scopeAuthority:Object.freeze(scope)};
 }
 function finishInvocation(token) {
-  token.fiber._domain.command({op:'finish_scope',scope:token.scopeAuthority});
+  token.fiber._domain.scopeCommand('finishInvocation', token.scopeAuthority);
   token.active = false;
 }
 function localScopes(domain) {
   return [...invocationScopes()].filter(token => token.fiber._domain === domain);
 }
-function scopeHandles(scopes) {
-  return scopes.flatMap(token => token.scopeAuthority ? [token.scopeAuthority] : []);
+// Select one captured native path; never reconstruct a list at query time.
+// An effect's own scope contains the selected parent's complete native path.
+function currentScope(domain, token = invocation.getStore()) {
+  for (; token; token = token.parentInvocation) {
+    if (token.effectScope?.fiber._domain === domain) return token.effectScope.scopeAuthority;
+    if (token.fiber._domain === domain && token.scopeAuthority) return token.scopeAuthority;
+  }
 }
 
 // Effects preserve the caller's cleanup/Rust authority, while their initializer
@@ -119,13 +125,13 @@ function assertNotWaitingForAncestor(target, operation) {
   const domain = target._domain;
   assertCurrentInvocation(domain, operation);
   const scopes = localScopes(domain);
-  const js = scopeHandles(scopes);
+  const js = currentScope(domain);
   const reject = reply => {
     if (reply.blocked) throw new CordisError('REENTRANT_MUTATION',
       `Cannot await ${operation} from the current fiber action or its ancestor, or a provider retained by that action`,
       {operation,owner:reply.owner,generation:reply.generation,target:target.id,retained:reply.retained});
   };
-  if (js.length) reject(domain.command({op:'check_scope_wait',scopes:js,target:target.id}));
+  if (js) reject(JSON.parse(domain.scopeCommand('checkInvocationWait', js, target.id)));
   for (const token of scopes) {
     if (!token.rustAuthority) continue;
     reject({...domain.rust.command({op:'check_wait',authority:token.rustAuthority,target:target.id}),
@@ -135,8 +141,8 @@ function assertNotWaitingForAncestor(target, operation) {
 
 function liveInvocation(domain) {
   const scopes = localScopes(domain);
-  const js = scopeHandles(scopes);
-  const live = js.length && domain.command({op:'scopes_live',scopes:js}).live;
+  const js = currentScope(domain);
+  const live = js && domain.scopeCommand('invocationLive', js);
   return !!live || scopes.some(token => token.rustAuthority !== undefined);
 }
 
@@ -560,6 +566,12 @@ class Domain {
     if (this.closed || !this.acceptingMutations && !(mutation.getStore()?.domain === this && mutation.getStore().active) && !liveInvocation(this)) {
       throw new CordisError('DOMAIN_CLOSED', 'The domain is closing or closed');
     }
+  }
+  scopeCommand(method, ...args) {
+    // Scope bookkeeping preserves lifecycle admission. Faults must still dirty
+    // a previously quiescent pump, exactly like metadata-command failures.
+    try { return this.driver[method](...args); }
+    catch (error) { this.driverDirty = true; throw error; }
   }
   command(command) {
     // Checks/reclamation can change admission even when their public result looks
@@ -1160,7 +1172,7 @@ export class Fiber {
     return Object.freeze({
       promise, signal:controller.signal, cancel:reason => controller.abort(reason),
       join() {
-        if ([...invocationScopes()].includes(token) && fiber._domain.command({op:'scopes_live',scopes:[token.scopeAuthority]}).live) throw new CordisError('REENTRANT_MUTATION','A task cannot join itself');
+        if ([...invocationScopes()].includes(token) && fiber._domain.scopeCommand('invocationOwnLive', token.scopeAuthority)) throw new CordisError('REENTRANT_MUTATION','A task cannot join itself');
         return promise;
       },
     });

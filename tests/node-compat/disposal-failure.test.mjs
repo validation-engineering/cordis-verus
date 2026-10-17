@@ -93,6 +93,42 @@ for (const [profile, Context] of [['cordis', CordisContext], ['harness', Harness
     await ctx.dispose();
   });
 
+  test(`${profile}: replacement and failed cleanup retain the actual JS service for retry`, async () => {
+    const ctx = new Context();
+    let owner, fail = true;
+    const observed = [];
+    const provider = ctx.plugin(c => {
+      owner = c;
+      c.provide('resource', { version: 'first' });
+      return () => { observed.push(['provider', c.resource.version]); };
+    });
+    await provider;
+    const consumer = ctx.inject(['resource'], c => {
+      c.effect(() => () => {
+        observed.push(['consumer', c.resource.version]);
+        if (fail) throw new Error('inverse must retry');
+      });
+    });
+    await consumer;
+    // Each set allocates a new JS handle. The original slot and consumer lease
+    // remain, so cleanup must resolve its current actual object after pumping.
+    owner.set('resource', { version: 'second' });
+    await ctx.settle();
+    owner.set('resource', { version: 'first' });
+    await ctx.settle();
+    await assert.rejects(provider.dispose(), inverseFailure);
+    assert.deepEqual(observed, [['consumer', 'first']]);
+    ctx.reflect.notify(['resource']);
+    await ctx.settle();
+    await assert.rejects(provider.dispose(), inverseFailure);
+    assert.deepEqual(observed, [['consumer', 'first']]);
+    fail = false;
+    await consumer.retryCleanup();
+    await provider.dispose();
+    assert.deepEqual(observed, [['consumer', 'first'], ['consumer', 'first'], ['provider', 'first']]);
+    await ctx.dispose();
+  });
+
   test(`${profile}: an unrelated drained error does not prevent independent disposal`, async () => {
     const ctx = new Context();
     let fail = true, cleaned = false;

@@ -354,3 +354,20 @@ pub enum Profile {
     Cordis,
     Harness,
 }
+
+impl From<Profile> for cordis_kernel::node_runtime::policy::Profile {
+    fn from(profile: Profile) -> Self {
+        match profile {
+            Profile::Cordis => Self::Cordis,
+            Profile::Harness => Self::Harness,
+        }
+    }
+}
+impl From<cordis_kernel::node_runtime::policy::Profile> for Profile {
+    fn from(profile: cordis_kernel::node_runtime::policy::Profile) -> Self {
+        match profile {
+            cordis_kernel::node_runtime::policy::Profile::Cordis => Self::Cordis,
+            cordis_kernel::node_runtime::policy::Profile::Harness => Self::Harness,
+        }
+    }
+}

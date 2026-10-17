@@ -5,6 +5,7 @@
 //! cross-file transaction or a filesystem compare-and-swap against other editors.
 
 use crate::loader::{ConfigTree, Entry};
+use cordis_kernel::configuration_save::{Document, Stage, StepError};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -87,34 +88,36 @@ impl fmt::Display for SaveError {
 impl std::error::Error for SaveError {}
 
 /// Inspect `json()` before handing the plan back to `Loader::commit_save`.
+type FileData =
+    cordis_kernel::configuration_save::sources::Target<PathBuf, ConfigTree, Permissions>;
 #[derive(Debug)]
 pub struct PlannedFile {
-    path: PathBuf,
-    observed: String,
-    output: String,
-    pub(crate) ours: ConfigTree,
-    permissions: Permissions,
-    merged_external: bool,
-    retry_directory_sync: bool,
+    document: Document<FileData>,
 }
 impl PlannedFile {
     pub fn path(&self) -> &Path {
-        &self.path
+        &self.document.data().key
     }
     pub fn json(&self) -> &str {
-        &self.output
+        self.document.output()
     }
     pub fn will_write(&self) -> bool {
-        self.output != self.observed
+        self.document.will_write()
     }
     /// True for a replacement or a retry after an earlier durability barrier failure.
     /// Windows uses a write-through replacement and file flush, rather than directory fsync.
     pub fn requires_directory_sync(&self) -> bool {
-        self.will_write() || self.retry_directory_sync
+        self.document.requires_sync()
     }
     pub fn includes_external_edits(&self) -> bool {
-        self.merged_external
+        self.document.merged_external()
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct SaveOrigin {
+    pub(crate) registry_revision: u64,
+    pub(crate) configuration: cordis_kernel::configuration_transaction::SaveStamp,
 }
 
 /// A reviewable snapshot, invalidated by a loader mutation or a disk edit.
@@ -124,7 +127,7 @@ pub struct SavePlan {
     pub(crate) tree: ConfigTree,
     pub(crate) sources: BTreeMap<PathBuf, String>,
     pub(crate) checkpoints: BTreeMap<PathBuf, ConfigTree>,
-    pub(crate) registry_revision: u64,
+    pub(crate) origin: SaveOrigin,
     pub(crate) pending_sync: BTreeSet<PathBuf>,
     include_targets: BTreeMap<PathBuf, PathBuf>,
 }
@@ -135,13 +138,7 @@ impl SavePlan {
     pub(crate) fn merged_sources(&self) -> BTreeMap<PathBuf, String> {
         self.files
             .iter()
-            .map(|file| (file.path.clone(), file.output.clone()))
-            .collect()
-    }
-    pub(crate) fn desired(&self) -> BTreeMap<PathBuf, ConfigTree> {
-        self.files
-            .iter()
-            .map(|file| (file.path.clone(), file.ours.clone()))
+            .map(|file| (file.path().to_owned(), file.json().to_owned()))
             .collect()
     }
     pub(crate) fn prepare(
@@ -149,7 +146,7 @@ impl SavePlan {
         sources: BTreeMap<PathBuf, String>,
         checkpoints: BTreeMap<PathBuf, ConfigTree>,
         desired: BTreeMap<PathBuf, ConfigTree>,
-        registry_revision: u64,
+        origin: SaveOrigin,
         pending_sync: BTreeSet<PathBuf>,
         include_targets: BTreeMap<PathBuf, PathBuf>,
     ) -> Result<Self, SaveError> {
@@ -201,14 +198,15 @@ impl SavePlan {
                 )
             };
             let retry_directory_sync = pending_sync.contains(&path);
+            let merged_external = merged != ours;
             files.push(PlannedFile {
-                path,
-                observed,
-                output,
-                merged_external: merged != ours,
-                retry_directory_sync,
-                ours,
-                permissions,
+                document: Document::new(
+                    FileData::new(path, ours, permissions),
+                    observed,
+                    output,
+                    retry_directory_sync,
+                    merged_external,
+                ),
             });
         }
         Ok(Self {
@@ -216,96 +214,136 @@ impl SavePlan {
             tree,
             sources,
             checkpoints,
-            registry_revision,
+            origin,
             pending_sync,
             include_targets,
         })
     }
-    pub(crate) fn commit(self) -> Result<SaveReport, SaveError> {
-        self.commit_with(sync_parent)
-    }
-    fn commit_with(
+    pub(crate) fn commit<S, R, K, U>(
         self,
+        configuration: &mut cordis_kernel::configuration_recorded::Recorded<
+            S,
+            R,
+            K,
+            U,
+            PathBuf,
+            ConfigTree,
+        >,
+        domain: u64,
+    ) -> Result<SaveReport, SaveError> {
+        self.commit_with(configuration, domain, sync_parent)
+    }
+    fn commit_with<S, R, K, U>(
+        self,
+        configuration: &mut cordis_kernel::configuration_recorded::Recorded<
+            S,
+            R,
+            K,
+            U,
+            PathBuf,
+            ConfigTree,
+        >,
+        domain: u64,
         synchronize_parent: impl Fn(&Path) -> std::io::Result<()>,
     ) -> Result<SaveReport, SaveError> {
-        let mut report = SaveReport {
-            remaining: self.files.iter().map(|file| file.path.clone()).collect(),
-            ..SaveReport::default()
-        };
-        for file in self.files {
-            let result = (|| {
-                for (lexical, target) in &self.include_targets {
-                    let current_target =
-                        fs::canonicalize(lexical).map_err(|error| SaveError::io(lexical, error))?;
-                    if &current_target != target {
-                        return Err(SaveError::new(
-                            Some(lexical),
-                            SaveErrorKind::Topology(
-                                "include target changed after planning; reload before saving"
-                                    .into(),
-                            ),
-                        ));
-                    }
-                }
-                let (current, permissions) = read_regular(&file.path)?;
-                if current != file.observed || permissions != file.permissions {
-                    return Err(SaveError::new(
-                        Some(&file.path),
-                        SaveErrorKind::SourceChanged,
-                    ));
-                }
-                if file.merged_external {
-                    report.merged_external.push(file.path.clone());
-                }
-                if !file.will_write() {
-                    report.unchanged.push(file.path.clone());
-                    report.remaining.remove(0);
-                    if file.retry_directory_sync {
-                        if let Err(error) = synchronize_parent(&file.path) {
-                            report.durability_uncertain.push(file.path.clone());
-                            return Err(SaveError::io(&file.path, error));
+        if !configuration.accepts_save(domain, &self.origin.configuration) {
+            return Err(SaveError::new(None, SaveErrorKind::StalePlan));
+        }
+        let mut save = self
+            .origin
+            .configuration
+            .start(self.files.into_iter().map(|file| file.document).collect());
+        let mut temporary: Option<Temporary> = None;
+        let result = loop {
+            // The checked owner supplies the actual stored document and phase.
+            // The adapter executes I/O; it cannot acknowledge a replacement or
+            // advance to the next file by constructing a progress report.
+            let next = save.step(|stage, document| {
+                let file = document.data();
+                match stage {
+                    Stage::Check | Stage::Recheck => {
+                        if stage == Stage::Check {
+                            for (lexical, target) in &self.include_targets {
+                                let current = fs::canonicalize(lexical)
+                                    .map_err(|error| SaveError::io(lexical, error))?;
+                                if &current != target {
+                                    return Err(SaveError::new(
+                                        Some(lexical),
+                                        SaveErrorKind::Topology(
+                                            "include target changed after planning; reload before saving".into(),
+                                        ),
+                                    ));
+                                }
+                            }
                         }
+                        let (current, permissions) = read_regular(&file.key)?;
+                        if current != document.observed() || permissions != file.metadata {
+                            return Err(SaveError::new(Some(&file.key), SaveErrorKind::SourceChanged));
+                        }
+                        Ok(())
                     }
-                    return Ok(());
+                    Stage::Prepare => {
+                        let mut prepared = Temporary::new(&file.key)?;
+                        prepared.file.write_all(document.output().as_bytes())
+                            .map_err(|error| SaveError::io(&file.key, error))?;
+                        prepared.file.set_permissions(file.metadata.clone())
+                            .map_err(|error| SaveError::io(&file.key, error))?;
+                        prepared.file.sync_all()
+                            .map_err(|error| SaveError::io(&file.key, error))?;
+                        temporary = Some(prepared);
+                        Ok(())
+                    }
+                    Stage::Replace => {
+                        let prepared = temporary.as_mut().ok_or_else(||
+                            SaveError::io(&file.key, "replacement has no prepared temporary file"))?;
+                        replace_file(&prepared.path, &file.key)
+                            .map_err(|error| SaveError::io(&file.key, error))?;
+                        prepared.renamed = true;
+                        Ok(())
+                    }
+                    Stage::Sync => synchronize_parent(&file.key)
+                        .map_err(|error| SaveError::io(&file.key, error)),
+                    Stage::Done => unreachable!("completed files are not dispatched"),
                 }
-                let mut temporary = Temporary::new(&file.path)?;
-                temporary
-                    .file
-                    .write_all(file.output.as_bytes())
-                    .map_err(|error| SaveError::io(&file.path, error))?;
-                temporary
-                    .file
-                    .set_permissions(file.permissions.clone())
-                    .map_err(|error| SaveError::io(&file.path, error))?;
-                temporary
-                    .file
-                    .sync_all()
-                    .map_err(|error| SaveError::io(&file.path, error))?;
-                // Recheck after preparing the temporary file, as well as before it.
-                let (current, permissions) = read_regular(&file.path)?;
-                if current != file.observed || permissions != file.permissions {
-                    return Err(SaveError::new(
-                        Some(&file.path),
-                        SaveErrorKind::SourceChanged,
-                    ));
-                }
-                replace_file(&temporary.path, &file.path)
-                    .map_err(|error| SaveError::io(&file.path, error))?;
-                temporary.renamed = true;
-                report.written.push(file.path.clone());
-                report.remaining.remove(0);
-                if let Err(error) = synchronize_parent(&file.path) {
-                    report.durability_uncertain.push(file.path.clone());
-                    return Err(SaveError::io(&file.path, error));
-                }
-                Ok(())
-            })();
-            if let Err(mut error) = result {
-                error.report = Box::new(report);
-                return Err(error);
+            });
+            match next {
+                Ok(true) => break Ok(()),
+                Ok(false) => {}
+                Err(StepError::Callback(error)) => break Err(error),
+                Err(StepError::Halted) => unreachable!("failed saves return immediately"),
+            }
+        };
+        let mut report = SaveReport::default();
+        for (index, document) in save.files().iter().enumerate() {
+            let state = save.progress(index).expect("stored document index");
+            let path = &document.data().key;
+            if state.written {
+                report.written.push(path.clone());
+            }
+            if state.unchanged {
+                report.unchanged.push(path.clone());
+            }
+            if state.remaining {
+                report.remaining.push(path.clone());
+            }
+            if state.merged_external {
+                report.merged_external.push(path.clone());
+            }
+            if state.durability_uncertain {
+                report.durability_uncertain.push(path.clone());
             }
         }
-        Ok(report)
+        assert!(
+            configuration.accept_saved_sources(domain, save).is_ok(),
+            "the exclusively borrowed accepted configuration still matches the reviewed save"
+        );
+        match result {
+            Ok(()) => Ok(report),
+            Err(mut error) => {
+                error.report = Box::new(report);
+                Err(error)
+            }
+        }
     }
 }
 
@@ -560,20 +598,41 @@ mod tests {
         let base = ConfigTree::from_json(&base_text).unwrap();
         let mut ours = base.clone();
         ours.entries[0].config["n"] = Value::from(2);
-        let sources = BTreeMap::from([(path.clone(), base_text)]);
+        let sources = BTreeMap::from([(path.clone(), base_text.clone())]);
+        let mut configuration = cordis_kernel::configuration_recorded::Recorded::<
+            (),
+            (),
+            (),
+            (),
+            PathBuf,
+            ConfigTree,
+        >::new(());
+        configuration
+            .load_sources(cordis_kernel::configuration_recorded::Load {
+                root: path.clone(),
+                contents: sources.clone(),
+                checkpoints: vec![(path.clone(), base.clone())],
+                resolutions: BTreeMap::new(),
+            })
+            .unwrap();
         let desired = BTreeMap::from([(path.clone(), ours.clone())]);
         let plan = SavePlan::prepare(
             ours.clone(),
             sources.clone(),
             BTreeMap::from([(path.clone(), base)]),
             desired.clone(),
-            0,
+            SaveOrigin {
+                registry_revision: 0,
+                configuration: configuration.save_stamp(0).unwrap(),
+            },
             BTreeSet::new(),
             BTreeMap::new(),
         )
         .unwrap();
         let error = plan
-            .commit_with(|_| Err(std::io::Error::other("injected directory fsync failure")))
+            .commit_with(&mut configuration, 0, |_| {
+                Err(std::io::Error::other("injected directory fsync failure"))
+            })
             .unwrap_err();
         assert_eq!(error.report.written, vec![path.clone()]);
         assert_eq!(error.report.durability_uncertain, vec![path.clone()]);
@@ -582,13 +641,31 @@ mod tests {
             ConfigTree::from_json(&fs::read_to_string(&path).unwrap()).unwrap(),
             ours
         );
-        let pending_sync = BTreeSet::from([path.clone()]);
+        assert_eq!(configuration.sources().checkpoints()[&path].value, ours);
+        assert!(configuration.sources().checkpoints()[&path].pending_sync);
+        assert_eq!(configuration.sources().contents()[&path], base_text);
+        // Replan from the retained owner, not from the report or expected state.
+        let pending_sync = configuration
+            .sources()
+            .checkpoints()
+            .iter()
+            .filter_map(|(key, entry)| entry.pending_sync.then_some(key.clone()))
+            .collect();
+        let checkpoints = configuration
+            .sources()
+            .checkpoints()
+            .iter()
+            .map(|(key, entry)| (key.clone(), entry.value.clone()))
+            .collect();
         let retry = SavePlan::prepare(
             ours.clone(),
-            sources,
-            desired.clone(),
+            configuration.sources().contents().clone(),
+            checkpoints,
             desired,
-            0,
+            SaveOrigin {
+                registry_revision: 0,
+                configuration: configuration.save_stamp(0).unwrap(),
+            },
             pending_sync,
             BTreeMap::new(),
         )
@@ -596,13 +673,16 @@ mod tests {
         assert!(!retry.files()[0].will_write());
         let calls = Cell::new(0);
         let result = retry
-            .commit_with(|_| {
+            .commit_with(&mut configuration, 0, |_| {
                 calls.set(calls.get() + 1);
                 Ok(())
             })
             .unwrap();
         assert_eq!(calls.get(), 1);
-        assert_eq!(result.unchanged, vec![path]);
+        assert_eq!(result.unchanged, vec![path.clone()]);
+        assert_eq!(configuration.sources().checkpoints()[&path].value, ours);
+        assert!(!configuration.sources().checkpoints()[&path].pending_sync);
+        assert_eq!(configuration.sources().contents()[&path], base_text);
         assert!(result.written.is_empty());
         assert!(result.durability_uncertain.is_empty());
         fs::remove_dir_all(directory).unwrap();

@@ -25,7 +25,8 @@ Encoding a definition does not establish that a production component satisfies i
 
 R0 precedes R1. Once the representation is established, R2 and R3 can progress
 alongside one another; R4 combines their results, and R5 audits the full chain.
-Runtime cases and review evidence accumulate during each milestone.
+Implementation and proof work can span milestones before the runtime cases and
+full acceptance checks are completed for the integrated batch.
 
 ## Current work and next steps
 
@@ -72,12 +73,46 @@ publications, and repeated episodes/interior owner Unload. R4 follows with legal
 trace reordering and dynamic-registry progress under the resulting semantics.
 The [detailed technical roadmap](roadmap.md) retains the proof-specific obligations.
 
-## Acceptance for each increment
+## Implementation batches and acceptance
 
-Each increment identifies a paper obligation, closes a stated representation or
-execution gap, and records the actual public caller. It supplies a nonempty
-runtime case, the applicable proof and a targeted negative control where the
-contract changes. Proof and execution records must refer to the same source.
+R2–R4 prioritize connected executable code and proof composition. The
+[R2 delivery checklist](r2-execution.md#remaining-delivery-packages) includes the
+configuration workflow as well as runtime effects and host integration. Work
+follows semantic dependencies rather than a new test suite for every small change.
+
+1. Implement the actual callers, state owners, semantic interpretation and proof
+   bodies together. Keep compilation and targeted Verus checks in this phase to
+   resolve type, contract and solver failures while their causes are local. Broaden
+   proof checking when a shared contract changes; a selected pass covers only its
+   recorded scope, and an unexecuted proof body is not a verified result.
+2. Keep a short checklist of deferred runtime scenarios and contract mutations.
+   New tests, demonstrations, benchmarks and repeated full regressions do not gate
+   each intermediate patch. Use a minimal runtime probe earlier only when needed
+   to resolve an implementation blocker or an unknown host behavior.
+3. Once the related interfaces and proofs are integrated, add the necessary
+   regressions and fault cases. Prioritize actual adapter calls, concurrency,
+   cancellation, failure/retry, FFI and configuration transactions. Contract
+   mutations must still compile and fail the designated semantic obligation;
+   compiler errors or timeouts do not count as successful negative controls.
+4. Run `python3 scripts/record-development.py --offline` on the integrated source.
+   It already runs `check-development.sh`; do not run both consecutively on the
+   same source without a reason. Fix failures and rerun affected checks, then
+   refresh the complete record after the final fixes. Report selected negative
+   controls separately; the full suite remains independent and is `not_run`
+   unless actually executed.
+
+R3 implementation may use established R2 contracts before R2's runtime acceptance
+is complete; R4 may similarly use established R2/R3 results. Missing mathematical
+premises must be proved before using those results. Track code/proof progress,
+the verified scope and pending acceptance separately. Milestones stay
+`in_progress` until their exit criteria and applicable validation are met; a batch
+may integrate work from more than one milestone.
+
+Each accepted batch identifies its paper obligations and actual public callers,
+supplies the applicable proofs, nonempty runtime cases and necessary negative
+controls, and binds evidence to the same final source. Existing CI and release
+gates remain unchanged. Old evidence remains evidence for its recorded source;
+never refresh its hashes without rerunning the checks it claims.
 
 Every premise needs a source: an established invariant, a checked plugin effect
 contract, or an explicit environment obligation. Arbitrary JS callbacks and
@@ -94,13 +129,15 @@ refuted original claims; this plan does not weaken or replace it.
 
 Edit `paper-refinement-plan.json` for allocation, review paths and milestone
 criteria. Edit `paper-obligations.json` for original-paper evidence and scope.
-Regenerate their views and run the normal development checks:
+Regenerate their views during implementation:
 
 ```sh
 python3 scripts/check-paper-coverage.py --write
 python3 scripts/check-paper-refinement.py --write
-./scripts/check-development.sh --offline
 ```
+
+At integration acceptance, run `python3 scripts/record-development.py --offline`
+to execute and record the complete development checks.
 
 The refinement-plan checker requires all 81 items exactly once, all four
 integration obligations, an acyclic milestone graph and existing source symbols

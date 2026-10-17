@@ -230,3 +230,82 @@ fn malformed_programs_are_rejected_before_execution() {
     assert!(report.outcomes.is_empty());
     assert_eq!(value.snapshot().depth(), 0);
 }
+
+#[test]
+fn aliases_and_retained_cleanup_follow_allocations_after_concurrent_slot_replacement() {
+    use cordis_kernel::reversible_value::{joint::Journal, slot::Slot};
+    use std::sync::{mpsc, Arc};
+    use std::time::Duration;
+
+    let journal = Journal::new();
+    let original = Arc::new(ReversibleValue::new_in(&journal, 10));
+    let replacement = Arc::new(ReversibleValue::new_in(&journal, 100));
+    let first = Arc::new(Slot::new(original.clone()));
+    let alias = Slot::new(original.clone());
+    let retained = first.capture();
+    let write = apply(retained.value(), Operation::Add(5));
+    assert_eq!(first.capture().observe_value().value(), 15);
+    assert_eq!(alias.capture().observe_value().value(), 15);
+    let before = retained.execution_snapshot();
+
+    let worker_slot = first.clone();
+    let worker_value = replacement.clone();
+    let (done, completed) = mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let replaced = worker_slot.replace(worker_value).ok().unwrap();
+        let (old, new) = replaced.observations();
+        assert_eq!((old.revision(), new.revision()), (0, 1));
+        let _ = new.execution_snapshot();
+        done.send(()).unwrap();
+    });
+    completed.recv_timeout(Duration::from_secs(10)).unwrap();
+    worker.join().unwrap();
+    let _ = before.refresh();
+    let _ = retained.execution_snapshot();
+    assert_eq!(first.capture().observe_value().value(), 100);
+    assert_eq!(alias.capture().revision(), 0);
+    assert_eq!(alias.capture().observe_value().value(), 15);
+    assert!(!retained.check_result(true).accepted());
+
+    assert!(write.inverse.restore().is_ok());
+    assert_eq!(retained.observe_value().value(), 10);
+    assert_eq!(alias.capture().observe_value().value(), 10);
+    assert_eq!(
+        (
+            replacement.snapshot().value(),
+            replacement.snapshot().depth()
+        ),
+        (100, 0)
+    );
+    let _ = retained.execution_snapshot();
+}
+
+#[test]
+fn foreign_slot_target_keeps_its_own_inverse_after_return_to_local_object() {
+    use cordis_kernel::reversible_value::{joint::Journal, slot::Slot};
+    use std::sync::Arc;
+
+    let journal = Journal::new();
+    let local = Arc::new(ReversibleValue::new_in(&journal, 7));
+    let foreign = Arc::new(ReversibleValue::new(7));
+    let slot = Slot::new(local.clone());
+    let local_capture = slot.capture();
+    slot.replace(foreign.clone()).ok().unwrap();
+    let foreign_capture = slot.capture();
+    let write = apply(foreign_capture.value(), Operation::Add(3));
+    let _ = foreign_capture.execution_snapshot();
+    slot.replace(local.clone()).ok().unwrap();
+    let _ = foreign_capture.execution_snapshot();
+    let _ = local_capture.execution_snapshot();
+    assert_eq!(slot.capture().revision(), 2);
+    assert_eq!(slot.capture().observe_value().value(), 7);
+    assert_eq!(foreign_capture.observe_value().value(), 10);
+    assert!(write.inverse.restore().is_ok());
+    assert_eq!((local.snapshot().value(), local.snapshot().depth()), (7, 0));
+    assert_eq!(
+        (foreign.snapshot().value(), foreign.snapshot().depth()),
+        (7, 0)
+    );
+    assert!(!local_capture.check_result(true).accepted());
+    assert!(!foreign_capture.check_result(true).accepted());
+}

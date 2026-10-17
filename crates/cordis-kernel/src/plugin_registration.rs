@@ -5,6 +5,8 @@ use super::LifecycleState;
 use crate::action_ledger::{ActionKind, ActionTicket};
 #[cfg(verus_keep_ghost)]
 use crate::distinct_ports;
+use crate::realm_context::RealmContext;
+use crate::reversible_value::function::Body;
 use crate::setup_work::{SetupWork, WorkItem, WorkReceipt, WorkTicket};
 use crate::{Error, Kernel, Phase, Port};
 use std::collections::BTreeMap;
@@ -165,7 +167,7 @@ impl<T> PluginDefinition<T> {
 
 /// Created only by successful registration of this actual callback payload.
 pub struct RegisteredPlugin<T> {
-    domain:u64,id:usize,parent:Option<usize>,anchor:Port,
+    domain:u64,id:usize,parent:Option<usize>,anchor:Port,realms:RealmContext,
     dependencies:Vec<Port>,provisions:Vec<Port>,revision:u64,payload:T,
 }
 #[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]
@@ -185,19 +187,22 @@ impl<A> RegisteredInvocation<A> {
     pub closed spec fn lifecycle(&self)->ActionTicket {self.lifecycle}
     pub fn lifecycle_ticket(&self)->(out:ActionTicket) ensures out==self.lifecycle(), {self.lifecycle}
     pub fn ticket(&self)->(out:WorkTicket) ensures out==self.work().origin(), {self.item.ticket()}
+    pub(crate) fn into_work(self)->(out:WorkItem<A>) ensures out==self.work(), {self.item}
 }
 impl<T> RegisteredPlugin<T> {
     pub closed spec fn domain_id(&self)->u64 {self.domain}
     pub closed spec fn owner(&self)->usize {self.id}
     pub closed spec fn parent_id(&self)->Option<usize> {self.parent}
     pub closed spec fn anchor_port(&self)->Port {self.anchor}
+    pub closed spec fn realms(&self)->Map<u64,u64> {self.realms.mapping()}
+    pub fn realm_context(&self)->(out:RealmContext) ensures out.mapping()==self.realms(), {self.realms.clone()}
     pub closed spec fn dependencies_spec(&self)->Seq<Port> {self.dependencies@}
     pub closed spec fn provisions_spec(&self)->Seq<Port> {self.provisions@}
     pub closed spec fn version(&self)->u64 {self.revision}
     pub closed spec fn payload(&self)->T {self.payload}
     pub open spec fn same_identity(&self,prior:&Self)->bool {
         self.domain_id()==prior.domain_id() && self.owner()==prior.owner() && self.parent_id()==prior.parent_id()
-            && self.anchor_port()==prior.anchor_port() && self.dependencies_spec()==prior.dependencies_spec()
+            && self.anchor_port()==prior.anchor_port() && self.realms()==prior.realms() && self.dependencies_spec()==prior.dependencies_spec()
             && self.provisions_spec()==prior.provisions_spec()
     }
     pub fn domain_id_exec(&self)->(out:u64) ensures out==self.domain_id(), {self.domain}
@@ -213,6 +218,23 @@ impl<T> RegisteredPlugin<T> {
     {self.parent.map(|parent:usize| -> (out:ChildIdentity)
         ensures out.domain_id()==self.domain_id() && out.owner()==parent && out.child()==self.owner(),
         {ChildIdentity {domain:self.domain,parent,id:self.id}})}
+    pub fn payload_ref(&self)->(out:&T) ensures *out==self.payload(), {&self.payload}
+    pub fn revision(&self)->(out:u64) ensures out==self.version(), {self.revision}
+    /// Explicit dependencies precede inherited aliases. Return the first
+    /// registered port for this key, never a port supplied at invocation time.
+    pub fn dependency_port(&self,key:u64)->(out:Option<Port>)
+        ensures out.is_some()==(exists|i:int| 0<=i<self.dependencies_spec().len() && self.dependencies_spec()[i].key==key),
+            out.is_some() ==> out.unwrap().key==key && self.dependencies_spec().contains(out.unwrap())
+                && exists|i:int| 0<=i<self.dependencies_spec().len() && self.dependencies_spec()[i]==out.unwrap()
+                    && forall|j:int| 0<=j<i ==> self.dependencies_spec()[j].key!=key,
+    {
+        let mut i=0;
+        while i<self.dependencies.len()
+            invariant i<=self.dependencies.len(),forall|j:int| 0<=j<i ==> self.dependencies_spec()[j].key!=key,
+            decreases self.dependencies.len()-i,
+        {let port=self.dependencies[i];if port.key==key {assert(self.dependencies_spec().contains(port));return Some(port);}i+=1;}
+        None
+    }
     pub fn can_replace(&self)->(out:bool) ensures out==(self.version()<u64::MAX), {self.revision<u64::MAX}
     pub fn can_replace_count(&self,count:u64)->(out:bool)
         ensures out==(self.version()+count<=u64::MAX),
@@ -244,6 +266,24 @@ impl<T> RegisteredPlugin<T> {
     }
 
 
+}
+
+impl<C,F> RegisteredPlugin<Body<C,F>> {
+    /// Opaque callbacks retain the original admission/version checks. A stored
+    /// finite body cannot accidentally be dispatched through this callback path.
+    pub fn call_opaque<A,O>(&mut self,invocation:RegisteredInvocation<A>)->(out:Result<WorkReceipt<O>,RegisteredInvocation<A>>)
+        where C:FnMut(A)->O,
+        requires old(self).payload().callback_requires::<A,O>(invocation.work().value()),
+        ensures final(self).same_identity(old(self)),final(self).version()==old(self).version(),
+            out.is_ok()==(invocation.domain_id()==old(self).domain_id() && invocation.owner()==old(self).owner()
+                && invocation.version()==old(self).version() && old(self).payload() is Callback),
+            out.is_err() ==> *final(self)==*old(self) && out->Err_0==invocation,
+            out.is_ok() ==> out->Ok_0.origin()==invocation.work().origin()
+                && old(self).payload().callback_ensures::<A,O>(invocation.work().value(),out->Ok_0.value()),
+    {
+        if invocation.domain!=self.domain || invocation.id!=self.id || invocation.revision!=self.revision {return Err(invocation);}
+        match &mut self.payload {Body::Callback(callback)=>Ok(invocation.item.run(callback)),Body::Value(_)|Body::Services(_)|Body::Managed(_)=>Err(invocation)}
+    }
 }
 
 pub open spec fn registered_dependencies(state:crate::refinement::State,parent:Option<usize>,keys:Seq<u64>,provided:Seq<u64>,realms:Map<u64,u64>,p:Port)->bool {
@@ -291,7 +331,7 @@ impl LifecycleState {
             out.is_ok() ==> {
                 let plugin=out->Ok_0;
                 &&& plugin.domain_id()==old(self).protocol().domain_id() && plugin.owner()==old(self).control().next_id()
-                &&& plugin.parent_id()==parent && plugin.anchor_port()==anchor && plugin.version()==0 && plugin.payload()==definition.payload()
+                &&& plugin.parent_id()==parent && plugin.anchor_port()==anchor && plugin.realms()==realms@ && plugin.version()==0 && plugin.payload()==definition.payload()
                 &&& plugin.provisions_spec()==definition.provisions().map(|_i:int,key:u64|resolved(realms@,key))
                 &&& crate::refinement::step(old(self).control().paper(),final(self).control().paper(),plugin.owner(),crate::refinement::Rule::Insert)
                 &&& final(self).control().paper().fibers[plugin.owner()].parent==parent
@@ -361,13 +401,13 @@ impl LifecycleState {
                 vstd::seq_lib::lemma_seq_contains_after_push(provisions@,anchor,p);
             }
         }
-        Ok(RegisteredPlugin {domain,id,parent,anchor,dependencies,provisions,revision:0,payload:definition.payload})
+        Ok(RegisteredPlugin {domain,id,parent,anchor,realms:RealmContext::from_map(realms.clone()),dependencies,provisions,revision:0,payload:definition.payload})
     }
 
     pub fn admit_registered_root<T,C,G,A>(&self,plugin:&RegisteredPlugin<T>,work:&mut SetupWork<C,G>,argument:A)
         ->(out:Result<RegisteredInvocation<A>,A>)
         requires self.wf(),old(work).wf(),
-        ensures final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
+        ensures final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
             out.is_ok() ==> out->Ok_0.domain_id()==plugin.domain_id() && out->Ok_0.owner()==plugin.owner()
                 && out->Ok_0.version()==plugin.version() && out->Ok_0.work().value()==argument
                 && out->Ok_0.lifecycle()==old(work).origin().unwrap()
@@ -377,7 +417,8 @@ impl LifecycleState {
                 && self.control().generation_of(plugin.owner())==Some(old(work).origin().unwrap().generation)
                 && self.protocol().recorded(old(work).origin().unwrap())
                 && final(work).root_status()==crate::setup_work::RootStatus::Queued
-                && out->Ok_0.work().origin().domain_id()==old(work).domain_id(),
+                && out->Ok_0.work().origin().domain_id()==old(work).domain_id()
+                && out->Ok_0.work().origin().request_id()==0 && out->Ok_0.work().origin().request_kind()==crate::setup_work::WorkKind::Root,
     {
         let ticket=match work.lifecycle_ticket() {Some(ticket)=>ticket,None=>return Err(argument)};
         if plugin.domain!=self.domain() || ticket.domain!=plugin.domain || ticket.id!=plugin.id

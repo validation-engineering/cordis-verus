@@ -12,6 +12,11 @@
 变异套件自身的严格验收规则。审查合同、变异选择器、验证工具或工具链变更时，以及
 维护者定期审计时，可以独立运行。此次调整不配置自动定时任务。
 
+分片数量现在由实际 canonical manifest 和固定单例预算计算，不再固定为某次历史用例数。
+每个任务仍保留至少 30 分钟清理余量，单个 mutant 的编译／证明预算与拒绝标准不变。
+运行 `python3 scripts/negative-shards.py plan --include-macos --include-macos-intel`
+可查看当前矩阵；下文既有测量表属于对应历史记录。
+
 ## 执行与回收
 
 执行器默认使用一个 worker，总 CPU 预算不超过两个可用核心，并考虑进程 affinity 与

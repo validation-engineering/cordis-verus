@@ -110,15 +110,21 @@ def regression_plan(manifest=None, *, include_macos=False, include_macos_intel=F
             'Negative-control manifest is empty or has duplicate names')
     # Wall-clock budgets, not SMT resource limits. Intel's 90-minute allowance is
     # engineering headroom after a 40-minute timeout, not a measured proof time.
-    configuration = [('ubuntu-24.04', 2400, 28, 'linux-x64-gnu-napi8')]
+    configuration = [('ubuntu-24.04', 2400, 'linux-x64-gnu-napi8')]
     if include_macos:
-        configuration.append(('macos-15', 3600, 38, 'darwin-arm64-napi8'))
+        configuration.append(('macos-15', 3600, 'darwin-arm64-napi8'))
     if include_macos_intel:
-        configuration.append(('macos-15-intel', 5400, 64, 'darwin-x64-napi8'))
+        configuration.append(('macos-15-intel', 5400, 'darwin-x64-napi8'))
     platforms, shards = [], []
-    for os_name, timeout, count, target in configuration:
-        row = {'os': os_name, 'target': target, 'timeout': timeout, 'compileTimeout': 300, 'threads': 2,
-               'shardCount': count, 'preflightMinutes': timeout // 60 + 15, 'shardMinutes': 360}
+    for os_name, timeout, target in configuration:
+        # Size the matrix from the actual canonical manifest. Keep each mutant's
+        # proof/compile budget and the job's cleanup headroom unchanged.
+        compile_timeout, shard_minutes = 300, 360
+        per_shard = ((shard_minutes - 30) * 60) // (timeout + compile_timeout)
+        require(per_shard >= 1, 'Platform cannot fit one complete control: ' + os_name)
+        count = (len(manifest) + per_shard - 1) // per_shard
+        row = {'os': os_name, 'target': target, 'timeout': timeout, 'compileTimeout': compile_timeout, 'threads': 2,
+               'shardCount': count, 'preflightMinutes': timeout // 60 + 15, 'shardMinutes': shard_minutes}
         pieces = [assigned(manifest, index, count) for index in range(count)]
         maximum = max(map(len, pieces))
         require(maximum * (timeout + row['compileTimeout']) <= (row['shardMinutes'] - 30) * 60,

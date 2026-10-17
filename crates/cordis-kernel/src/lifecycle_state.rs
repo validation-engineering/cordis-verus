@@ -29,6 +29,13 @@ impl LifecycleState {
     pub closed spec fn same(&self,prior:&Self)->bool {
         self.kernel.unchanged(&prior.kernel) && self.actions.same(&prior.actions)
     }
+    pub proof fn same_components(&self,prior:&Self)
+        requires self.same(prior),
+        ensures self.control().unchanged(&prior.control()),self.protocol().same(&prior.protocol()),
+    {}
+    pub proof fn same_reflexive(&self)
+        ensures self.same(self),self.control().unchanged(&self.control()),self.protocol().same(&self.protocol()),
+    {reveal(Kernel::unchanged);self.actions.same_reflexive();}
     pub open spec fn bindings_except(&self,prior:&Self,released:Option<usize>)->bool {
         forall|id:usize,b:Binding| released!=Some(id) ==>
             self.control().binding_recorded(id,b)==prior.control().binding_recorded(id,b)
@@ -42,6 +49,7 @@ impl LifecycleState {
 
     pub fn new(domain:u64)->(out:Self)
         ensures out.wf(),out.protocol().domain_id()==domain,out.control().paper().fibers.dom().is_empty(),
+            out.protocol().next_id()==1,forall|id:usize|!out.protocol().blocked_spec(id),
     {let kernel=Kernel::new();let ghost states=seq![kernel.paper()];
         Self {kernel,actions:LifecycleActions::new(domain),history:Ghost(History {states,labels:Seq::empty()})}}
 
@@ -115,7 +123,7 @@ impl LifecycleState {
 
     pub fn declare_provision(&mut self,id:usize,port:Port)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(self).protocol().same(&old(self).protocol()),
+        ensures final(self).control_history().labels.last()==if out.is_ok() {Label::Declare {actor:id,port}} else {Label::Internal},final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(self).protocol().same(&old(self).protocol()),
             final(self).control().same_control(&old(self).control()),final(self).control().same_bindings(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> final(self).control().declares_provision(id,port),
@@ -133,10 +141,10 @@ impl LifecycleState {
 
     pub fn configure_pending_dependencies(&mut self,id:usize,dependencies:Vec<Port>)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(self).protocol().same(&old(self).protocol()),
+        ensures final(self).control_history().labels.last()==if out.is_ok() {Label::Dependencies {actor:id,ports:dependencies@.to_set().to_iset()}} else {Label::Internal},final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(self).protocol().same(&old(self).protocol()),
             final(self).control().same_control(&old(self).control()),final(self).control().same_bindings(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> final(self).control().pending_dependencies_configured(&old(self).control(),id,dependencies@),
+            out.is_ok() ==> old(self).control().registered(id) && final(self).control().pending_dependencies_configured(&old(self).control(),id,dependencies@),
     {
         let ghost prior=self.control();let ghost ports=dependencies@;
         proof {self.actions.same_reflexive();}
@@ -151,7 +159,7 @@ impl LifecycleState {
 
     pub fn release_provision(&mut self,id:usize,port:Port)->(out:Result<(),Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(self).protocol().same(&old(self).protocol()),
+        ensures final(self).control_history().labels.last()==if out.is_ok() {Label::Release {actor:id,port}} else {Label::Internal},final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(self).protocol().same(&old(self).protocol()),
             final(self).control().same_control(&old(self).control()),final(self).control().same_bindings(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> final(self).control().provision_released_from(&old(self).control(),id,port) && !final(self).control().declares_provision(id,port) && final(self).control().other_interfaces_preserved(&old(self).control(),id,port),
@@ -178,6 +186,8 @@ impl LifecycleState {
                 && out.unwrap().id==id && out.unwrap().domain==old(self).protocol().domain_id()
                 && final(self).protocol().recorded(out.unwrap())
                 && final(self).control().generation_of(id)==Some(out.unwrap().generation)
+                && old(self).control().generation_of(id).is_some()
+                && out.unwrap().generation as nat==old(self).control().generation_of(id).unwrap() as nat+1
                 && final(self).control().committed_from(&old(self).control(),id)
                 && crate::refinement::step(old(self).control().paper(),final(self).control().paper(),id,crate::refinement::Rule::Begin),
     {
@@ -487,7 +497,7 @@ impl LifecycleState {
         reservation:bool,leases:&[LeaseId],publications:&[PublicationId])
         ->(out:Result<Vec<ReleasedPublication>,CleanupReleaseError>)
         requires old(self).wf(),old(registry).wf(),
-        ensures final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(registry).wf(),
+        ensures final(self).wf(),final(self).control_history().extends(old(self).control_history()),final(registry).wf(),final(registry).domain_id()==old(registry).domain_id(),
             out.is_ok()==(old(registry).domain_id()==Some(old(self).protocol().domain_id())
                 && old(self).protocol().resource_finish_enabled(&old(self).control(),id,reservation)
                 && old(registry).cleanup_batch_enabled(LeaseOwner {owner:id,generation:old(self).control().generation_of(id).unwrap()},leases@,publications@)),
