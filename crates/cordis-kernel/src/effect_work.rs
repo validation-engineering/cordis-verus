@@ -116,7 +116,14 @@ impl<P> EffectRun<P> {
     {&mut self.payload}
     pub fn admit<T>(&mut self,groups:&mut CleanupGroups<T>,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),old(groups).wf(),
-        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
+        ensures old(groups).live(old(self).identity().group_id()) ==> final(groups).queues()[old(self).identity().group_id()].slots()==old(groups).queues()[old(self).identity().group_id()].slots(),
+            old(groups).live(old(self).identity().group_id()) ==> {
+                let id=old(self).identity().group_id();
+                &&& final(groups).queues()[id].link()==old(groups).queues()[id].link()
+                &&& final(groups).queues()[id].issued()==old(groups).queues()[id].issued()
+                &&& final(groups).queues()[id].protocol().selected()==old(groups).queues()[id].protocol().selected()
+            },
+            final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
             final(self).payload()==old(self).payload(),final(groups).origin()==old(groups).origin(),
             final(groups).frame(old(groups),old(self).identity().group_id()),
             out ==> old(self).identity().matches(old(groups)) && old(self).current().is_none()
@@ -176,7 +183,20 @@ impl<P> EffectRun<P> {
     pub fn land<T,E>(&mut self,groups:&mut CleanupGroups<T>,reply:EffectReply<T,E>)
         ->(out:Result<Option<StageReport<E>>,EffectReply<T,E>>)
         requires old(self).wf(),old(groups).wf(),
-        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
+        ensures old(groups).live(old(self).identity().group_id()) ==> final(groups).queues()[old(self).identity().group_id()].slots()==
+                if out.is_ok() && reply.result() is Ready && reply.result()->Ready_0.is_ok() && reply.result()->Ready_0->Ok_0.is_some()
+                {old(groups).queues()[old(self).identity().group_id()].slots().push(reply.result()->Ready_0->Ok_0)}
+                else {old(groups).queues()[old(self).identity().group_id()].slots()},
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().token==
+                if reply.result() is Ready && reply.result()->Ready_0.is_ok() && reply.result()->Ready_0->Ok_0.is_some()
+                {Some(old(groups).queues()[old(self).identity().group_id()].slots().len() as usize)} else {None},
+            old(groups).live(old(self).identity().group_id()) ==> {
+                let id=old(self).identity().group_id();
+                &&& final(groups).queues()[id].link()==old(groups).queues()[id].link()
+                &&& final(groups).queues()[id].issued()==old(groups).queues()[id].issued()
+                &&& final(groups).queues()[id].protocol().selected()==old(groups).queues()[id].protocol().selected()
+            },
+            final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(self).wf(),final(groups).wf(),final(self).identity()==old(self).identity(),
             final(self).payload()==old(self).payload(),final(self).next()==old(self).next(),
             final(groups).origin()==old(groups).origin(),final(groups).frame(old(groups),old(self).identity().group_id()),
             out.is_err() ==> *final(self)==*old(self) && *final(groups)==*old(groups) && out->Err_0==reply,

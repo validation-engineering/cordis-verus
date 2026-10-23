@@ -105,7 +105,8 @@ impl LifecycleState {
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> old(self).execution_matches(id,work,groups) && groups.any_failed()
                 && work.idle() && !groups.any_pending() && !groups.any_issued()
-                && !final(self).protocol().eligible(id,work.origin().unwrap().generation),
+                && !final(self).protocol().eligible(id,work.origin().unwrap().generation)
+                && final(self).protocol().failed(id,work.origin().unwrap().generation),
     {
         proof {reveal(Kernel::unchanged);self.actions.same_reflexive();}
         if !self.matches_execution(id,work,groups) || !work.is_idle() || groups.has_pending()
@@ -121,7 +122,10 @@ impl LifecycleState {
     /// A preflight failure cannot consume a lifecycle action or another group.
     pub fn retry_execution<C,G,T>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&mut CleanupGroups<T>)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),work.wf(),old(groups).wf(),
-        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(groups).wf(),final(self).control().unchanged(&old(self).control()),
+        ensures out.is_ok() ==> !final(groups).any_issued(),
+            final(groups).next_id()==old(groups).next_id(),
+            final(groups).same_slots(old(groups)),out.is_ok() ==> final(groups).retried_failed(old(groups)),
+            final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(groups).wf(),final(self).control().unchanged(&old(self).control()),
             out.is_err() ==> final(self).same(old(self)) && *final(groups)==*old(groups),
             out.is_ok() ==> old(self).execution_matches(id,work,old(groups)) && old(groups).retries_ready()
                 && !final(groups).any_failed() && final(self).protocol().cleanup_reply_enabled(out->Ok_0)
@@ -143,7 +147,8 @@ impl LifecycleState {
     pub fn release_execution<C,G,T>(&mut self,id:usize,work:&mut SetupWork<C,G>,groups:&mut CleanupGroups<T>)
         ->(out:Result<CleanupOutcome,Error>)
         requires old(self).wf(),old(work).wf(),old(groups).wf(),
-        ensures final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).control().generations_preserved(&old(self).control()), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(work).wf(),final(groups).wf(),
+        ensures final(groups).next_id()==old(groups).next_id(),
+            final(groups).link()==old(groups).link(),final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).control().generations_preserved(&old(self).control()), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(work).wf(),final(groups).wf(),
             out.is_err() ==> final(self).same(old(self)) && *final(work)==*old(work) && *final(groups)==*old(groups),
             out.is_ok() ==> old(self).execution_matches(id,old(work),old(groups)) && old(work).idle() && old(groups).all_drained()
                 && old(self).control().is_restoring(id)

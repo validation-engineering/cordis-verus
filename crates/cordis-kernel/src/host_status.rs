@@ -365,7 +365,10 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     /// installed, always completes here; no entry can be silently abandoned.
     pub(crate) fn retire_with_status(&mut self,run:EffectRun<G>)->(out:Result<(G,Option<Observation>),EffectRun<G>>)
         requires old(self).wf(),run.wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).value_attempts()==old(self).value_attempts(),
+        ensures out.is_ok() ==> old(self).cleanup_state().live(run.identity().group_id())
+                && crate::cleanup_groups::drained(old(self).cleanup_state().queues()[run.identity().group_id()])
+                && final(self).cleanup_state().queues()==old(self).cleanup_state().queues().remove(run.identity().group_id()),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).value_attempts()==old(self).value_attempts(),
             final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),final(self).effect_state()==old(self).effect_state(),
             final(self).cleanup_state().frame(&old(self).cleanup_state(),run.identity().group_id()),
@@ -409,7 +412,9 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     }
     pub fn retire_observed_effect(&mut self,run:EffectRun<G>)->(out:Result<(G,Observation),EffectRun<G>>)
         requires old(self).wf(),run.wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).capture()==old(self).capture(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),run.identity().group_id()),
+            out.is_ok() ==> crate::cleanup_groups::drained(old(self).cleanup_state().queues()[run.identity().group_id()]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).capture()==old(self).capture(),
             final(self).phase_spec()==old(self).phase_spec(),final(self).value_attempts()==old(self).value_attempts(),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==run,
             out.is_ok() ==> out->Ok_0.0==run.payload() && !final(self).cleanup_state().live(run.identity().group_id())

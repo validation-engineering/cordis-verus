@@ -1,5 +1,9 @@
 # Whole-paper refinement milestones
 
+**Remaining work is now indexed in the [paper-to-code inventory](paper-mapping-inventory.md).** R1–R4 are technical layers; the inventory tracks 31 fixed closure units, their existing results, premise sources and dependencies across all 81 items and four integration obligations. These units are not iteration estimates or a completion percentage.
+
+Current R3 acceptance work and dependencies are tracked in [R3 remaining work](r3-remaining-work.md). The historical packages below are partial results, not a claim that only final tests remain.
+
 R2 is complete for the explicit [managed-production/v1 profile](r2-acceptance.md). R3/R4 remain in progress and R5 remains planned; original paper audit outcomes are unchanged.
 
 [简体中文](paper-refinement-roadmap.zh-CN.md)
@@ -29,6 +33,52 @@ R0 precedes R1. Once the representation is established, R2 and R3 can progress
 alongside one another; R4 combines their results, and R5 audits the full chain.
 Implementation and proof work can span milestones before the runtime cases and
 full acceptance checks are completed for the integrated batch.
+
+The [source-continuity path](r3-source-continuity.md) derives complete producer intervals, pre-interval obligations and recovery from actual scalar/typed storage histories. The [first remaining R3 package](r3-final-recovery.md) now composes those intervals with actual native Unload, foreign restoration and every original Child obligation at one real snapshot. The executable capture returns a proof-only obstruction or the combined endpoint guarantee; a nonempty terminal-owner/Child client derives foreign and Child closure. Validation is source-bound in the [development record](development-report.json), with two independent selected negative controls. [Package 2](r3-observation-recovery.md) now completes native intermediate publication/owner/pending source reconstruction and recovery queries at the same actual cut. [Package 3](r3-host-recovery.md) connects ordinary Rust host mutations to the recorded owner. Recovery of Node's separate protocol and legal surviving production executions remain open; R3 is not complete.
+
+[Closed-region deletion](r3-closed-region-deletion.md) now adds an admitted owner-created Child/consumer case to both Mixed and Fresh script reports. It constructs retained lifecycle steps and transports original partial inverses, with a nonempty proof client. Fresh also supplies verified executable name compaction, source-bound Insert payloads and a legal trace for the actual command plan, with a 39-to-25 transition replay regression. Cross-region shared writes, Mixed/Fresh episode-specific selection, fixed-name transport and full production transport remain open; package 4 adds a separate native observation-window construction.
+
+Fresh now also derives complete Active publications and exact validated, duplicate-free blueprint declarations from real execution, and preserves them through compaction. All seven dispatcher commands have exact success domains. Exact successors, synchronous Divert transport and actual generation/cleanup metadata now compose into whole finite-script completeness for this Fresh profile. The original runner completes each admitted compacted plan with the same records and final represented state; a 26-to-21 regression also covers retained Loading departure and consumer reactivation.
+
+## Current R3 batch
+
+[All-episode recovery](r3-episode-recovery.md) now connects every actual Mixed/Fresh
+episode cut and interior Unload to Equations (55)/(56), including the returned
+machine's stored inverse receipts. [Production recovery](r3-production-recovery.md)
+now derives strict mixed inverse words from authentic scalar/typed histories and
+quiet allocation gaps, and explains actual typed cleanup failures.
+[Interleaved recovery](r3-interleaved-recovery.md) now constructs local managed
+acknowledgement coverage from recorded dispatch/retry and uses the actual
+removal/release boundaries to recover Begin values under explicit source and
+foreign-closure conditions. A recorded owner now carries those histories through
+its real root-return, dispatch, native retry and release path, including later
+registration, new group origins and guarded synchronous/awaited host acknowledgement.
+Work/effect/Child admission and subsequent managed forward observations also
+preserve the owned histories. Authentic return checkpoints now connect managed
+invocations and actual managed cleanup reads/acknowledgements, including failures
+and retries, within the same Journal. The [native Child bridge](r3-child-recovery.md)
+now connects the persistent shared-slot decision to the exact Child episode's own
+Unload. An ordinary Rust entry composes actual retirement and guarded release;
+its Unload follows both retirement and cleanup seal. The creating-episode query
+binds this evidence to the retained Child inverse. Actual registration, retirement
+and managed release now automatically retain birth/parent and terminal sources.
+Completeness is checked against all original native inverses, rather than inferred
+from parent drain. The [common-cut composition](r3-common-recovery-cut.md) now
+uses actual allocation freshness to preserve terminal Child states, combines them
+with restored invocation values, and derives absence of that invocation's pending
+forward registrations at one actual native snapshot. The [observed-owner
+path](r3-observed-recovery.md) now derives foreign restoration from registered
+steps and actual terminal groups; its executable call/dispatch entries maintain
+existing observation coverage across failures and retries. [Package 2](r3-observation-recovery.md) extends native publication/owner/pending recovery across intermediate cuts; [package 3](r3-host-recovery.md) connects ordinary Rust host ownership. General legal deletion, Node protocol recovery and the combined review remain open;
+R3 is still in progress.
+
+The checkpoints below describe earlier implementation stages. R2's current
+completion scope is the acceptance page linked above.
+
+[Package 4](r3-native-deletion.md) now constructs an interior native lifecycle/publication/owner deletion from the actual snapshot, retaining other Episodes, source births and commit provenance. It shares the managed recovery cut. Full effect-trajectory transport, executable generation/allocation replay, Node recovery and combined R3 acceptance remain open.
+
+
+[Executable native control replay](r3-control-replay.md) now connects source-admitted window deletion to the actual production Kernel methods. It compacts registry IDs and parent/provider references, regenerates Kernel generations from retained Begin calls, and proves every actual intermediate control state. A real native regression exercises 24→13 steps, shifted later allocations and generation 3→2. [Automatic source association](r3-source-chain.md) now derives control commands from actual transitions, proves complete Unload-source coverage, and binds them to the existing managed recovery cut in the same Journal. Full Journal/typed payload/action/work ticket transport, Node recovery and R3 joint acceptance remain open.
 
 ## Historical implementation checkpoints and next steps
 
@@ -179,3 +229,7 @@ callback runs. Continuous-history induction establishes the Begin origin and
 retention of those owner records. Shared adapter locks, arbitrary function
 semantics and the complete Node/native R1 interpretation remain open; see the
 [R2 ownership contract](r2-execution.md#issued-episode-ownership-and-delayed-root-calls).
+
+[Package 5](r3-effect-deletion.md) now constructs a legal surviving full Journal relation from a source-admitted native window and effect mask, preserving actual guard reads, slot references, scalar inverse origins and pending registration indices. It shares the recovery cut. Executable allocation/generation replay, complete typed producer transport, broader shared writes, Node recovery and combined R3 acceptance remain open.
+
+[Real managed target execution](r3-target-execution.md) now preserves one actual invocation and runs its body through a fresh target Begin, the original interpreter and recorded cleanup owner. Source/target tickets are separated; matching-input step transport is proved. Full selected-Journal scheduling and cross-invocation input/reference/ticket transport remain open.

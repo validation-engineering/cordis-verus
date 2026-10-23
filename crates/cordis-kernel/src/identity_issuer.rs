@@ -2,6 +2,7 @@
 //! one atomic counter; allocation permissions and progress witnesses erase.
 //! Namespaces are independent: equal integers from different issuers need not
 //! name the same object. Allocation identity is not Arc/Weak pointer identity.
+use std::marker::PhantomData;
 use vstd::atomic_ghost::{AtomicInvariantPredicate, AtomicU64};
 use vstd::prelude::*;
 use vstd::resource::map::{GhostMapAuth, GhostPersistentPointsTo, GhostPointsTo};
@@ -9,14 +10,14 @@ use vstd::resource::Loc;
 
 verus! {
 #[allow(dead_code)] // Authority and progress state erase from the executable.
-tracked struct State {
-    issued:GhostMapAuth<u64,()>,
+tracked struct State<T> {
+    issued:GhostMapAuth<u64,T>,
     progress:GhostMapAuth<u64,()>,
     frontier:GhostPersistentPointsTo<u64,()>,
 }
-struct Predicate;
-impl AtomicInvariantPredicate<(Loc,Loc),u64,State> for Predicate {
-    closed spec fn atomic_inv(source:(Loc,Loc),next:u64,state:State)->bool {
+struct Predicate<T>(PhantomData<T>);
+impl<T> AtomicInvariantPredicate<(Loc,Loc),u64,State<T>> for Predicate<T> {
+    closed spec fn atomic_inv(source:(Loc,Loc),next:u64,state:State<T>)->bool {
         &&& next>0
         &&& state.issued.id()==source.0 && state.progress.id()==source.1
         &&& forall|id:u64| #[trigger] state.issued@.contains_key(id) ==> 0<id<next
@@ -25,14 +26,16 @@ impl AtomicInvariantPredicate<(Loc,Loc),u64,State> for Predicate {
     }
 }
 
-pub struct IdentityIssuer {next:AtomicU64<(Loc,Loc),State,Predicate>}
+pub type IdentityIssuer = ValueIssuer<()>;
+pub struct ValueIssuer<T> {next:AtomicU64<(Loc,Loc),State<T>,Predicate<T>>}
 /// A non-cloneable permission for one successful allocation. Copying its u64
 /// does not allocate another identity and gives no new allocation permission.
 #[allow(dead_code)]
-pub struct Identity {value:u64,point:Tracked<GhostPointsTo<u64,()>>}
+pub struct Identity<T=()> {value:u64,point:Tracked<GhostPointsTo<u64,T>>}
 #[allow(dead_code)]
 pub struct Exhausted {witness:Tracked<GhostPersistentPointsTo<u64,()>>}
-impl Identity {
+impl<T> Identity<T> {
+    pub closed spec fn meaning(&self)->T {self.point@.value()}
     pub closed spec fn value(&self)->u64 {self.value}
     pub closed spec fn source(&self)->Loc {self.point@.id()}
     pub closed spec fn wf(&self)->bool {0<self.value<u64::MAX && self.point@.key()==self.value}
@@ -48,7 +51,7 @@ impl Exhausted {
     pub closed spec fn source(&self)->Loc {self.witness@.id()}
     pub closed spec fn wf(&self)->bool {self.witness@.key()==u64::MAX}
 }
-impl IdentityIssuer {
+impl<T> ValueIssuer<T> {
     pub closed spec fn source(&self)->Loc {self.next.constant().0}
     pub closed spec fn progress_source(&self)->Loc {self.next.constant().1}
     #[verifier::type_invariant]
@@ -65,7 +68,7 @@ impl IdentityIssuer {
     const fn from_nonzero(first:u64)->(out:Self)
         requires first>0,
     {
-        let tracked (issued,_)=GhostMapAuth::new(Map::<u64,()>::empty());
+        let tracked (issued,_)=GhostMapAuth::new(Map::<u64,T>::empty());
         let tracked (mut progress,_)=GhostMapAuth::new(Map::<u64,()>::empty());
         let tracked frontier=progress.insert(first,()).persist();
         let ghost source=(issued.id(),progress.id());
@@ -78,8 +81,8 @@ impl IdentityIssuer {
     }
     /// Strong CAS retries consume a strictly increasing observation, so the
     /// loop has a finite numeric variant. This does not prove scheduler fairness.
-    pub fn issue(&self)->(out:Result<Identity,Exhausted>)
-        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.source()==self.source(),
+    pub fn issue_value(&self,Ghost(meaning):Ghost<T>)->(out:Result<Identity<T>,Exhausted>)
+        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.source()==self.source() && out->Ok_0.meaning()==meaning,
             out.is_err() ==> out->Err_0.wf() && out->Err_0.source()==self.progress_source(),
     {
         proof {use_type_invariant(self);}
@@ -93,13 +96,13 @@ impl IdentityIssuer {
             decreases u64::MAX-next,
         {
             if next==u64::MAX {return Err(Exhausted {witness:Tracked(observed.tracked_unwrap())});}
-            let tracked mut issued:Option<GhostPointsTo<u64,()>>=None;
+            let tracked mut issued:Option<GhostPointsTo<u64,T>>=None;
             let result=vstd::atomic_with_ghost!(&self.next => compare_exchange(next,next+1);
                 update before -> after; returning result; ghost state => {
                 observed.tracked_borrow().agree(&state.progress);
                 assert(before>=next);
                 if result.is_ok() {
-                    issued=Some(state.issued.insert(next,()));
+                    issued=Some(state.issued.insert(next,meaning));
                     state.frontier=state.progress.insert((next+1) as u64,()).persist();
                 }
                 observed=Some(state.frontier.duplicate());
@@ -122,5 +125,41 @@ impl IdentityIssuer {
         value==u64::MAX
     }
 }
-impl Default for IdentityIssuer {fn default()->Self {Self::new()}}
+impl<T> Default for ValueIssuer<T> {fn default()->Self {Self::new()}}
+impl ValueIssuer<()> {
+    pub fn issue(&self)->(out:Result<Identity,Exhausted>)
+        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.source()==self.source(),
+            out.is_err() ==> out->Err_0.wf() && out->Err_0.source()==self.progress_source(),
+    {self.issue_value(Ghost(()))}
+}
+/// A persistent name bound to a ghost meaning at its real atomic issuance.
+/// Sharing this receipt does not create another allocation permission.
+#[allow(dead_code)]
+pub struct Named<T> {value:u64,point:Tracked<GhostPersistentPointsTo<u64,T>>}
+impl<T> Named<T> {
+    pub closed spec fn source(&self)->Loc {self.point@.id()}
+    pub closed spec fn meaning(&self)->T {self.point@.value()}
+    pub closed spec fn value(&self)->u64 {self.value}
+    pub closed spec fn wf(&self)->bool {0<self.value<u64::MAX && self.point@.key()==self.value}
+    pub fn get(&self)->(out:u64) ensures out==self.value(), {self.value}
+    pub proof fn agrees(tracked &self,tracked other:&Self)
+        requires self.wf(),other.wf(),self.source()==other.source(),self.value()==other.value(),
+        ensures self.meaning()==other.meaning(),
+    {
+        let tracked mut point=self.point.borrow().duplicate();
+        point.intersection_agrees(other.point.borrow());
+    }
+}
+impl<T> ValueIssuer<T> {
+    pub fn name(&self,meaning:Ghost<T>)->(out:Result<Named<T>,Exhausted>)
+        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.source()==self.source()
+            && out->Ok_0.meaning()==meaning@,
+            out.is_err() ==> out->Err_0.wf() && out->Err_0.source()==self.progress_source(),
+    {
+        match self.issue_value(meaning) {
+            Err(e)=>Err(e),
+            Ok(identity)=>Ok(Named {value:identity.value,point:Tracked(identity.point.get().persist())}),
+        }
+    }
+}
 } // verus!

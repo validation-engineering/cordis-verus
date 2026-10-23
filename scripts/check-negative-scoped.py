@@ -123,10 +123,11 @@ def selectors(targets):
                     and target["function"].startswith(CRATE + "::")
                     and not target.get("descendants", False),
                     "single-function selection needs one exact module and full function name")
-            # Pinned Verus lists functions relative to the selected module;
-            # timing JSON keeps the full crate/module/type path.
+            # Match pinned Verus friendly_fun_name_crate_relative: extension
+            # impls retain their full type path when it is outside the owning
+            # module. Exact timed function AND owning-module checks below still
+            # reject an empty, unrelated, or broadened verification selection.
             prefix = CRATE + ("::" + target["path"] if target["kind"] == "module" else "") + "::"
-            require(target["function"].startswith(prefix), "function is not in the named module")
             flags.extend(["--verify-function", target["function"].removeprefix(prefix)])
     return flags
 

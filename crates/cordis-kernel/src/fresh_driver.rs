@@ -151,6 +151,32 @@ proof fn instruction_receipt_metadata(bank:Seq<super::Blueprint>,blueprint:usize
 
 pub struct FreshDriver {inner:super::MixedDriver}
 impl FreshDriver {
+    pub closed spec fn generation_available(&self,actor:usize)->bool {
+        self.inner.kernel.generation_of(actor).is_some() && self.inner.kernel.generation_of(actor).unwrap()<u64::MAX
+    }
+    pub closed spec fn cleanup_idle(&self,actor:usize)->bool {!self.inner.kernel.is_restoring(actor)}
+    pub closed spec fn metadata_bound(&self,steps:nat)->bool {self.inner.kernel.metadata_bound(steps)}
+    pub closed spec fn metadata_step(&self,prior:&Self)->bool {self.inner.kernel.synchronous_metadata(&prior.inner.kernel,true)}
+    pub closed spec fn service_values(&self)->IMap<Port,u64> {crate::projection::project(self.inner.primitive_state(),ISet::full())}
+    /// The arrays accepted by real registration contain no duplicate ports.
+    pub closed spec fn unique_declarations(&self)->bool {
+        forall|n:int| #![trigger self.inner.rows[n].blueprint] 0<=n<self.inner.rows.len() ==> {
+            let bp=self.inner.blueprints[self.inner.rows[n].blueprint as int];
+            crate::distinct_ports(bp.dependencies()) && crate::distinct_ports(bp.provisions())
+        }
+    }
+    /// Inactive and removed rows contain no inverse work. This is maintained
+    /// by real commands, separately from the general driver representation.
+    pub closed spec fn quiescent_journals(&self)->bool {
+        forall|n:int| #![trigger self.inner.rows[n].journal] 0<=n<self.inner.rows.len()
+            && (!r::registered(self.control(),n as usize) || self.control().fibers[n as usize].phase==Phase::Inactive)
+            ==> self.inner.rows[n].journal.len()==0
+    }
+    /// Includes the actual scan of historical rows for retained Child receipts.
+    pub closed spec fn remove_enabled(&self,actor:usize)->bool {
+        self.inner.kernel.removal_enabled(actor) && self.inner.table(actor).is_empty() && self.inner.unreferenced(actor)
+    }
+
     pub closed spec fn control(&self)->r::State {self.inner.control()}
     pub closed spec fn ack(&self,after:&Self,actor:usize,rule:r::Rule,selected:Option<usize>)->bool {self.inner.fresh_ack(&after.inner,actor,rule,selected)}
     pub closed spec fn wf(&self)->bool {self.inner.wf()}
@@ -158,6 +184,8 @@ impl FreshDriver {
     pub closed spec fn journal(&self,actor:usize)->Seq<super::Receipt> {self.inner.journal(actor)}
     pub closed spec fn table(&self,actor:usize)->IMap<Port,u64> {self.inner.table(actor)}
     pub closed spec fn next_id(&self)->nat {self.inner.rows.len() as nat}
+    /// Historical allocation bound; removing a plugin never reuses its identity.
+    pub fn allocation_bound(&self)->(out:usize) ensures out==self.next_id(), {self.inner.rows.len()}
     /// Preserve the concrete insertion checks, including the full valid bank prefix.
     pub closed spec fn insertion_enabled(&self,parent:Option<usize>,blueprint:usize)->bool {
         self.inner.insertion_enabled(parent,blueprint)
@@ -291,7 +319,7 @@ impl FreshDriver {
     pub closed spec fn bank(&self)->Seq<super::Blueprint> {self.inner.blueprints@}
     pub closed spec fn represents(&self,bank:Seq<super::Blueprint>,a:mx::Configuration<u64,Index>)->bool {self.inner.represents(bank,a)}
     pub fn new(blueprints:Vec<Blueprint>)->(out:Self)
-        ensures out.wf(),out.represents(out.bank(),mx::empty()),
+        ensures out.metadata_bound(0),out.unique_declarations(),out.quiescent_journals(), out.wf(),out.next_id()==0,out.represents(out.bank(),mx::empty()),
             super::bank_same(out.bank(),blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
             out.represents(blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),mx::empty()),
     {
@@ -303,12 +331,24 @@ impl FreshDriver {
         let out=Self {inner:super::MixedDriver::new(compiled)};
         assert(super::bank_same(out.bank(),blueprints@.map(|_:int,bp:Blueprint|bp.compiled())));out
     }
+    pub closed spec fn insertion_record(&self,t:Transition)->bool {
+        match t {Transition::Insert {actor,parent,blueprint}=>
+            r::registered(self.control(),actor) && actor<self.inner.rows.len()
+                && self.inner.rows[actor as int].blueprint==blueprint && self.control().fibers[actor].parent==parent,
+            _=>true}
+    }
+    pub proof fn insertion_source(&self,t:Transition,bank:Seq<super::Blueprint>,z:mx::Configuration<u64,Index>)
+        requires self.represents(bank,z),self.insertion_record(t),
+        ensures allocation::payload(t,z),
+    {match t {Transition::Insert {actor,..}=>{assert(z.roots[actor]==(Index {blueprint:self.inner.rows[actor as int].blueprint,pc:0}));},_=>{}}}
     pub fn insert(&mut self,parent:Option<usize>,blueprint:usize)->(out:Result<usize,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).insertion_enabled(parent,blueprint),
             out.is_ok()==super::context::insertion_enabled(old(self).reified(),parent,blueprint),
-            out.is_ok() ==> old(self).ack(final(self),out.unwrap(),r::Rule::Insert,None),
+            out.is_ok() ==> final(self).insertion_record(Transition::Insert {parent,blueprint,actor:out.unwrap()}),
+            out.is_ok() ==> out.unwrap()==old(self).next_id() && final(self).next_id()==old(self).next_id()+1
+                && old(self).ack(final(self),out.unwrap(),r::Rule::Insert,None),
     {
         proof {self.inner.reified_insertion_domain(parent,blueprint);}
         let mut draft=self.inner.duplicate();
@@ -320,7 +360,7 @@ impl FreshDriver {
     }
     pub fn begin(&mut self,id:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), final(self).wf(),final(self).next_id()==old(self).next_id(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).begin_enabled(id),
             out.is_ok() ==> old(self).ack(final(self),id,r::Rule::Begin,None),
     {
@@ -336,21 +376,23 @@ impl FreshDriver {
     }
     pub fn retire(&mut self,id:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), out.is_ok()==r::registered(old(self).control(),id), final(self).wf(),final(self).next_id()==old(self).next_id(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> old(self).ack(final(self),id,r::Rule::Retire,None),
     {
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
+        proof {draft.kernel.unchanged_observations(&self.inner.kernel);draft.kernel.paper_observations(id);}
         match draft.kernel.retire(id) {Err(e)=>Err(DriverError::Kernel(e)),Ok(())=>{proof {draft.fresh_administrative_simulation(&initial,id,r::Rule::Retire);reveal(MixedDriver::fresh_ack);}*self=Self {inner:draft};Ok(())}}
     }
     pub fn depart(&mut self,id:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), final(self).journal(id)==old(self).journal(id), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), out.is_ok()==old(self).depart_enabled(id), final(self).wf(),final(self).next_id()==old(self).next_id(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> r::registered(old(self).control(),id) && old(self).ack(final(self),id,if old(self).control().fibers[id].phase==Phase::Loading {r::Rule::Divert} else {r::Rule::Leave},None),
     {
         if !self.inner.registered(id) {return Err(DriverError::Unknown);}
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
+        proof {draft.kernel.unchanged_observations(&self.inner.kernel);draft.kernel.paper_observations(id);}
         match draft.kernel.leave_if_changed(id) {
             Err(e)=>Err(DriverError::Kernel(e)),
             Ok(())=>{draft.rows[id].current=None;proof {draft.fresh_administrative_simulation(&initial,id,if initial.control().fibers[id].phase==Phase::Loading {r::Rule::Divert} else {r::Rule::Leave});reveal(MixedDriver::fresh_ack);}*self=Self {inner:draft};Ok(())},
@@ -358,7 +400,7 @@ impl FreshDriver {
     }
     pub fn unload(&mut self,actor:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), final(self).wf(),final(self).next_id()==old(self).next_id(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).unload_enabled(actor),
             old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor),
             old(self).owner_table_recovery() && out.is_ok() ==> final(self).table(actor).is_empty(),
@@ -377,15 +419,27 @@ impl FreshDriver {
         let ghost initial=draft;
         proof {draft.same_unload_domain(&self.inner,actor);draft.same_owner_table_recovery(&self.inner);}
         match draft.unload_inner(actor) {Err(e)=>Err(e),Ok(())=>{
-            proof {draft.fresh_unload_simulation(&initial,actor);reveal(MixedDriver::fresh_ack);}
+            proof {
+                dispatch::restore_control_frame(initial.journal(actor),initial.primitive_state());
+                if self.quiescent_journals() {
+                    assert forall|n:int|0<=n<draft.rows.len() && (!r::registered(draft.control(),n as usize) || draft.control().fibers[n as usize].phase==Phase::Inactive)
+                        implies draft.rows[n].journal.len()==0 by {
+                        if n!=actor {assert(initial.rows[n]==draft.rows[n]);}
+                    }
+                }
+                draft.fresh_unload_simulation(&initial,actor);reveal(MixedDriver::fresh_ack);
+            }
             *self=Self {inner:draft};Ok(())
         }}
     }
+    #[verifier::spinoff_prover]
     pub fn remove(&mut self,id:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), out.is_ok()==old(self).remove_enabled(id), final(self).wf(),final(self).next_id()==old(self).next_id(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> old(self).ack(final(self),id,r::Rule::Remove,None),
     {
+        proof {reveal(crate::Kernel::removal_enabled);}
+
         if !self.inner.registered(id) {return Err(DriverError::Unknown);}
         if !self.inner.table_empty(id) {return Err(DriverError::NonemptyTable);}
         let mut owner=0;
@@ -410,7 +464,7 @@ impl FreshDriver {
         }
         let mut draft=self.inner.duplicate();
         let ghost initial=draft;
-        proof {assert(initial.unreferenced(id));}
+        proof {assert(initial.unreferenced(id));draft.kernel.unchanged_observations(&self.inner.kernel);}
         match draft.kernel.remove(id) {Err(e)=>Err(DriverError::Kernel(e)),Ok(())=>{
             proof {draft.fresh_administrative_simulation(&initial,id,r::Rule::Remove);reveal(MixedDriver::fresh_ack);}
             *self=Self {inner:draft};Ok(())
@@ -420,7 +474,7 @@ impl FreshDriver {
     #[verifier::rlimit(20)]
     pub fn step(&mut self,actor:usize)->(out:Result<Outcome,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             out.is_ok()==old(self).step_enabled(actor),
             out.is_err() ==> final(self).run_budget(actor)==old(self).run_budget(actor)
                 && final(self).step_enabled(actor)==old(self).step_enabled(actor)
@@ -428,6 +482,7 @@ impl FreshDriver {
             out.is_ok() ==> if super::outcome_rule(out.unwrap())==r::Rule::Iter {
                 final(self).run_budget(actor)<old(self).run_budget(actor)
             } else {final(self).run_finished(actor)},
+            out.is_ok() ==> final(self).next_id()==old(self).next_id()+(if choice(out.unwrap()).is_some() {1nat} else {0nat}),
             out.is_ok() ==> final(self).journal(actor).len()==old(self).journal(actor).len()+1
                 && (choice(out.unwrap()).is_some() ==> choice(out.unwrap()).unwrap()==old(self).next_id())
                 && old(self).ack(final(self),actor,super::outcome_rule(out.unwrap()),choice(out.unwrap())),
@@ -450,6 +505,7 @@ impl FreshDriver {
         proof {assert(old(self).run_budget(actor)==(length-pc) as nat+1);}
         let template=if pc==length {super::Instruction::Unit} else {draft.blueprints[blueprint].code[pc]};
         let instruction=instantiate_template(&draft,template);
+        proof {if let super::Instruction::Child {blueprint:child,..}=instruction {initial.reified_insertion_domain(Some(actor),child);}}
         proof {
             assert(initial.ready(actor));
             assert(template==initial.installed_instruction(actor));
@@ -463,7 +519,10 @@ impl FreshDriver {
         if let Some(next)=next {if next<=pc || next>length {return Err(DriverError::InvalidInstruction);}}
         let receipt=draft.execute(actor,blueprint,instruction)?;
         let ghost landed=draft;
-        proof {instruction_receipt_metadata(initial.blueprints@,blueprint,instruction,initial.primitive_state(),actor,receipt);}
+        proof {
+            instruction_receipt_metadata(initial.blueprints@,blueprint,instruction,initial.primitive_state(),actor,receipt);
+            dispatch::primitive_control_frame(initial.blueprints@,blueprint,instruction,initial.primitive_state(),actor);
+        }
         draft.commit_landing(actor,receipt,next)?;
         let outcome=match receipt.inverse {
             super::Inverse::Child {child}=>Outcome::Child {child,finished:next.is_none()},
@@ -472,6 +531,16 @@ impl FreshDriver {
         proof {
             draft.fresh_landing_simulation(&initial,&landed,actor,blueprint,pc,template,instruction,receipt,next,outcome);
             reveal(MixedDriver::fresh_ack);
+        }
+        proof {
+            if self.quiescent_journals() {
+                assert forall|n:int|0<=n<draft.rows.len() && (!r::registered(draft.control(),n as usize) || draft.control().fibers[n as usize].phase==Phase::Inactive)
+                    implies draft.rows[n].journal.len()==0 by {
+                    assert(n!=actor);
+                    if n<initial.rows.len() {assert(landed.rows[n]==initial.rows[n]);assert(draft.rows[n]==landed.rows[n]);}
+                    else {assert(n==initial.rows.len());}
+                }
+            }
         }
         *self=Self {inner:draft};
         proof {
@@ -488,7 +557,7 @@ impl FreshDriver {
     /// Dispatch through the same checked executable methods used individually.
     pub fn apply(&mut self,command:Command)->(out:Result<Transition,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_err() ==> final(self).same(old(self)),
+        ensures final(self).metadata_step(old(self)), out.is_ok() ==> old(self).applied(final(self),out.unwrap()), old(self).unique_declarations() ==> final(self).unique_declarations(), old(self).quiescent_journals() ==> final(self).quiescent_journals(), out.is_ok()==old(self).command_enabled(command), final(self).wf(),out.is_err() ==> final(self).same(old(self)),
             preparation::preparation_command(command) ==> out.is_ok()==old(self).preparation_enabled(command),
             match command {Command::Unload {actor}=>out.is_ok()==old(self).unload_enabled(actor)
                 && (old(self).unit_child_recovery() && old(self).unit_child_journal(actor)
@@ -497,6 +566,7 @@ impl FreshDriver {
                     ==> out.is_ok()==old(self).cleanup_permitted(actor))
                 && (old(self).journal_recovery() ==> out.is_ok()==old(self).cleanup_permitted(actor))
                 && (old(self).owner_table_recovery() && out.is_ok() ==> final(self).table(actor).is_empty()),_=>true},
+            out.is_ok() ==> allocation::advance(old(self).next_id(),out.unwrap(),final(self).next_id()) && final(self).insertion_record(out.unwrap()),
             out.is_ok() ==> out.unwrap().command()==command
                 && old(self).ack(final(self),label(out.unwrap()).0,label(out.unwrap()).1,label(out.unwrap()).2),
     {
@@ -855,7 +925,8 @@ impl ScriptReport {
     pub closed spec fn refines(&self,bank:Seq<super::Blueprint>)->bool {
         exists|states:Seq<mx::Configuration<u64,Index>>| {
             &&& fs::execution(super::library(),programs(bank),states,labels(self.transitions@)) && states.first()==mx::empty::<u64,Index>()
-            &&& self.machine.represents(bank,states.last())
+            &&& self.machine.represents(bank,states.last()) && allocation::payloads(self.transitions@,states) && dispatch::shape::trace(bank,states) && dispatch::exact::trace(states,self.transitions@)
+            &&& allocation::history(self.transitions@,self.machine.next_id())
             &&& forall|i:int|0<=i<states.len() ==> fs::well_formed(super::library(),programs(bank),states[i]) && crate::preservation::resource_safe(states[i].state)
         }
     }
@@ -863,24 +934,25 @@ impl ScriptReport {
     /// including the safe prefix returned when a checked command fails.
     pub proof fn source_execution(&self,bank:Seq<super::Blueprint>)->(states:Seq<mx::Configuration<u64,Index>>)
         requires self.refines(bank),
-        ensures fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),
-            states.first()==mx::empty::<u64,Index>(),self.machine.represents(bank,states.last()),
+        ensures compaction::source::witness(self,bank,states),fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),
+            states.first()==mx::empty::<u64,Index>(),self.machine.represents(bank,states.last()),allocation::payloads(self.transitions@,states),dispatch::shape::trace(bank,states),dispatch::exact::trace(states,self.transitions@),
             forall|i:int|0<=i<states.len() ==> fs::well_formed(super::library(),programs(bank),states[i])
                 && crate::preservation::resource_safe(states[i].state),
     {
         choose|states:Seq<mx::Configuration<u64,Index>>| {
             &&& fs::execution(super::library(),programs(bank),states,labels(self.transitions@))
                 && states.first()==mx::empty::<u64,Index>()
-            &&& self.machine.represents(bank,states.last())
+            &&& self.machine.represents(bank,states.last()) && allocation::payloads(self.transitions@,states) && dispatch::shape::trace(bank,states) && dispatch::exact::trace(states,self.transitions@)
+            &&& allocation::history(self.transitions@,self.machine.next_id())
             &&& forall|i:int|0<=i<states.len() ==> fs::well_formed(super::library(),programs(bank),states[i])
                 && crate::preservation::resource_safe(states[i].state)
         }
     }
     proof fn establish(&self,bank:Seq<super::Blueprint>,states:Seq<mx::Configuration<u64,Index>>)
-        requires self.machine.wf(),fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
+        requires self.machine.wf(),dispatch::shape::trace(bank,states),dispatch::exact::trace(states,self.transitions@),allocation::history(self.transitions@,self.machine.next_id()),allocation::payloads(self.transitions@,states),fs::execution(super::library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
         ensures self.refines(bank),self.machine.unit_child_recovery(),self.machine.provision_recovery(),self.machine.journal_recovery(),
-            self.machine.owner_table_recovery(),self.terminal_recovery(bank),
+            self.machine.owner_table_recovery(),self.terminal_recovery(bank),self.recovery_history(bank),
     {
         weak_theory();fs::from_empty_safe(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
         self.machine.unit_child_recovery_from_source(bank,states.last());
@@ -891,23 +963,29 @@ impl ScriptReport {
         pc::fresh_from_empty(|_:Port,x:u64,y:u64|x==y,super::library(),programs(bank),states,labels(self.transitions@));
         self.machine.owner_table_recovery_from_source(bank,states.last());
         self.establish_terminal_recovery(bank,states);
+        self.establish_recovery_history(bank,states);
     }
 }
 
 /// Executes until the first checked error. The successful prefix refines one
 /// source execution from new/empty, with no caller-supplied model or history.
-/// A failed Insert/Begin/Step is disabled in the returned machine under its
-/// exact implementation domain. A failed Unload has a disabled kernel cleanup
-/// guard: every actual inverse variant has a domain derived from the constructed
-/// history. Other commands and individual error variants remain
-/// outside these domains. Checked errors preserve the machine.
+/// Every failed command is disabled in the returned machine under its exact
+/// implementation domain. A failed Unload has a disabled kernel cleanup guard:
+/// every actual inverse variant has a domain derived from the constructed
+/// history. Individual error variants are not classified here. Checked errors
+/// preserve the machine; every source state retains its executable runtime shape.
+/// Conversely, an admitted synchronous source path for these commands implies
+/// complete execution with exactly its records and final represented state.
+/// Capacity and cleanup-idle conditions follow from actual command metadata.
 #[verifier::spinoff_prover]
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
-    ensures out.machine.wf(),out.machine.unit_child_recovery(),out.machine.provision_recovery(),out.machine.journal_recovery(),
-        out.machine.owner_table_recovery(),out.terminal_recovery(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
-        out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.transitions.len()<=commands.len(),
+    ensures out.replays(blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),commands@),
+        replay::admitted(blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),commands@) ==> out.error.is_none(),
+        out.machine.unique_declarations(),out.machine.quiescent_journals(),out.machine.wf(),out.machine.unit_child_recovery(),out.machine.provision_recovery(),out.machine.journal_recovery(),
+        out.machine.owner_table_recovery(),out.terminal_recovery(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),out.recovery_history(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
+        out.refines(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),allocation::history(out.transitions@,out.machine.next_id()),out.transitions.len()<=commands.len(),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
-        out.error.is_some() ==> out.transitions.len()<commands.len(),
+        out.error.is_some() ==> out.transitions.len()<commands.len() && !out.machine.command_enabled(commands[out.transitions.len() as int]),
         out.error.is_some() && preparation::preparation_command(commands[out.transitions.len() as int])
             ==> !out.machine.preparation_enabled(commands[out.transitions.len() as int]),
         out.error.is_some() ==> match commands[out.transitions.len() as int] {
@@ -925,27 +1003,36 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
         forall|i:int|0<=i<out.transitions.len() ==> out.transitions[i].command()==commands[i],
 {
     let ghost bank=blueprints@.map(|_:int,bp:Blueprint|bp.compiled());
+    let ghost target=if replay::admitted(bank,commands@) {
+        choose|target:(Seq<mx::Configuration<u64,Index>>,Seq<Transition>)|replay::path(bank,commands@,target.0,target.1)
+    } else {(Seq::empty(),Seq::empty())};
+    proof {if replay::admitted(bank,commands@) {replay::well_formed(bank,commands@,target.0,target.1);}}
     let mut machine=FreshDriver::new(blueprints);let mut transitions:Vec<Transition>=Vec::new();let mut i=0;
     let ghost mut states=seq![mx::empty::<u64,Index>()];
     proof {fs::empty_well_formed(super::library(),programs(bank));}
     while i<commands.len()
-        invariant i<=commands.len(),transitions.len()==i,machine.wf(),bank==blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),
+        invariant i<=commands.len(),transitions.len()==i,machine.metadata_bound(i as nat),
+            replay::admitted(bank,commands@) ==> replay::path(bank,commands@,target.0,target.1)
+                && machine.represents(bank,target.0[i as int]) && transitions@==target.1.take(i as int)
+                && (forall|j:int|0<=j<target.0.len() ==> fs::well_formed(super::library(),programs(bank),target.0[j])),machine.wf(),machine.quiescent_journals(),machine.unique_declarations(),allocation::history(transitions@,machine.next_id()),bank==blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),
             forall|j:int|0<=j<i ==> transitions[j].command()==commands[j],
             states.first()==mx::empty::<u64,Index>(),fs::execution(super::library(),programs(bank),states,labels(transitions@)),
-            machine.represents(bank,states.last()),fs::well_formed(super::library(),programs(bank),states.last()),
+            machine.represents(bank,states.last()),fs::well_formed(super::library(),programs(bank),states.last()),allocation::payloads(transitions@,states),dispatch::shape::trace(bank,states),dispatch::exact::trace(states,transitions@),
         decreases commands.len()-i,
     {
         let ghost before=machine;
+        proof {if replay::admitted(bank,commands@) {machine.source_call_at(bank,commands@,target.0,target.1,i as int);}}
         match machine.apply(commands[i]) {
             Err(error)=>{
                 proof {
                     machine.same_representation(&before,bank,states.last());
+                    machine.same_command_domain(&before,commands[i as int]);
                     machine.same_preparation_domain(&before,commands[i as int]);
                     if let Command::Unload {actor}=commands[i as int] {machine.same_unload_domain(&before,actor);}
                 }
                 let out=ScriptReport {machine,transitions,error:Some(error)};
                 proof {
-                    out.establish(bank,states);
+                    out.establish(bank,states);out.establish_replay(bank,commands@);
                     if let Command::Unload {actor}=commands[i as int] {
                         out.machine.journal_unload_domain(actor);
                         if out.machine.unit_child_journal(actor) {out.machine.unit_child_unload_domain(actor);}
@@ -958,10 +1045,20 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
                 let ghost previous=transitions@;
                 transitions.push(transition);
                 proof {
-                    let z=before.advance_source(&machine,bank,states.last(),label(transition).0,label(transition).1,label(transition).2);
+                    machine.metadata_progress(&before,i as nat);
+                    if replay::admitted(bank,commands@) {
+                        before.exact_successor(&machine,bank,target.0[i as int],target.0[i as int+1],target.1[i as int],transition);
+                        assert(target.1.take(i as int+1)==target.1.take(i as int).push(transition));
+                    }
+                    allocation::append(previous,before.next_id(),transition,machine.next_id());
+                    let z=before.advance_command_source(&machine,bank,states.last(),transition);
+                    dispatch::exact::append(states,previous,z,transition);
+                    machine.insertion_source(transition,bank,z);
+                    allocation::append_payload(previous,states,transition,z);
                     let full=states.push(z);
                     assert(labels(transitions@)==labels(previous).push(label(transition)));
                     append_source(bank,states,labels(previous),z,label(transition));
+                    machine.source_runtime_shape(bank,z);dispatch::shape::append(bank,states,z);
                     states=full;
                 }
                 i+=1;
@@ -969,7 +1066,7 @@ pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptRep
         }
     }
     let out=ScriptReport {machine,transitions,error:None};
-    proof {out.establish(bank,states);}out
+    proof {out.establish(bank,states);out.establish_replay(bank,commands@);}out
 }
 
 proof fn append_source(bank:Seq<super::Blueprint>,states:Seq<mx::Configuration<u64,Index>>,prefix:Seq<fs::Label>,z:mx::Configuration<u64,Index>,label:fs::Label)
@@ -1004,3 +1101,24 @@ pub mod terminal_replay;
 #[path = "inspected_run.rs"]
 pub mod inspected;
 pub use inspected::{run_inspected, InspectedReport};
+
+#[path = "fresh_episode_replay.rs"]
+pub mod episode_replay;
+
+#[path = "fresh_region_deletion.rs"]
+pub mod deletion;
+
+#[path = "fresh_allocation_history.rs"]
+pub mod allocation;
+
+#[path = "allocation_names.rs"]
+pub mod names;
+
+#[path = "fresh_compaction.rs"]
+pub mod compaction;
+
+#[path = "fresh_dispatch.rs"]
+pub mod dispatch;
+
+#[path = "fresh_script_completeness.rs"]
+pub mod replay;

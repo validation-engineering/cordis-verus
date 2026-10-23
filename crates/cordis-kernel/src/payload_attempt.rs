@@ -39,6 +39,7 @@ impl<T:?Sized> Read<T> {
 pub tracked struct Attempt<T:?Sized> {
     pub(super) read:Read<T>,pub(super) write:Option<joint::Receipt>,
     pub(super) ghost inverse:Inverse<T>,pub(super) ghost result:Result<Restored<T>,Failure<T>>,
+    pub(super) history:Option<crate::reversible_value::history::Witness<super::super::State<T>>>,
 }
 impl<T:?Sized> Attempt<T> {
     pub(super) proof fn representation(&self)
@@ -49,9 +50,38 @@ impl<T:?Sized> Attempt<T> {
     pub closed spec fn inverse(&self)->Inverse<T> {self.inverse}
     pub closed spec fn result(&self)->Result<Restored<T>,Failure<T>> {self.result}
     pub open spec fn endpoint(&self)->joint::Receipt {match self.write() {Some(write)=>write,None=>self.read().checkpoint()}}
+    pub open spec fn states(&self)->Seq<super::super::State<T>> {
+        if self.result().is_ok() {self.result()->Ok_0.after().states}
+        else if self.read().value().is_some() {self.read().value().unwrap().states} else {Seq::empty()}
+    }
+    #[verifier::opaque]
+    pub closed spec fn witnessed(&self)->bool {
+        self.history.is_some()==self.read().value().is_some()
+            && (self.history.is_some() ==> self.history.unwrap().wf()
+                && self.history.unwrap().source()==self.inverse().owner().source()
+                && self.history.unwrap().events()==self.states())
+    }
+    pub(super) proof fn establish_witness(&self)
+        requires self.history.is_some()==self.read().value().is_some(),
+            self.history.is_some() ==> self.history.unwrap().wf()
+                && self.history.unwrap().source()==self.inverse().owner().source() && self.history.unwrap().events()==self.states(),
+        ensures self.witnessed(),
+    {reveal(Attempt::witnessed);}
+    /// Captured while the real payload write lock is held, including failures.
+    pub proof fn history_witness(tracked &self)->(tracked out:Option<crate::reversible_value::history::Witness<super::super::State<T>>>)
+        requires self.wf(),
+        ensures out.is_some()==self.read().value().is_some(),out.is_some()==(self.states().len()>0),
+            out.is_some() ==> out.unwrap().wf() && out.unwrap().source()==self.inverse().owner().source() && out.unwrap().events()==self.states(),
+    {
+        self.facts();reveal(Attempt::witnessed);
+        if self.result().is_ok() {self.result()->Ok_0.source_history();}
+        match &self.history {Some(witness)=>Some(witness.duplicate()),None=>None}
+    }
     pub open spec fn details(&self)->bool {
+        &&& self.witnessed()
         &&& self.inverse().wf() && self.read().wf() && self.read().owner()==self.inverse().owner()
         &&& self.read().checkpoint().covers(&self.inverse().after().commit)
+        &&& self.read().value().is_some() ==> self.read().value().unwrap().extends(self.inverse().after())
         &&& self.write().is_some()==self.result().is_ok()
         &&& match self.result() {
             Ok(restored)=>restored.wf() && self.read().value()==Some(restored.before())
@@ -107,6 +137,22 @@ impl<T:?Sized> Attempt<T> {
             self.result().is_err() ==> self.endpoint().same(&self.read().checkpoint()),
     {self.facts();self.endpoint().classify();}
 }
+impl<T:?Sized> super::super::Cell<T> {
+    fn evidence_for_inverse(&self,inverse:&Inverse<T>)->(out:Ghost<Observation<T>>)
+        requires self.belongs(inverse.owner()),inverse.wf(),
+        ensures out@.wf(),out@.extends(inverse.after()),out@.owner==inverse.owner(),
+            out@.state()==self.state(),out@.history==self.value.history(),out@.states==self.authority@.events(),
+            out@.revision==self.value.revision_spec(),out@.positions==self.positions@,out@.commit.events()==self.member.events(),
+    {
+        proof {self.authority.borrow().extends(inverse.witness.borrow());}
+        let out=self.evidence(&inverse.owner);
+        proof {
+            assert(out@.states.take(inverse.after().states.len() as int)==inverse.after().states);
+            assert(out@.history.take(inverse.after().history.len() as int) =~= inverse.after().history);
+        }
+        out
+    }
+}
 impl<T:?Sized> Inverse<T> {
     /// Holds the real payload lock, then takes one common read epoch. The
     /// journal is retained in the inverse so retirement cannot erase access to
@@ -116,6 +162,7 @@ impl<T:?Sized> Inverse<T> {
             match _storage.live {Some(cell)=>cell.belongs(self.owner()),None=>_storage.retired@.is_some()
                 && self.owner().receipt_matches(_storage.retired@.unwrap()) && _storage.retired@.unwrap().event().after is RetiredPayload},
         ensures out@.wf(),out@.owner()==self.owner(),out@.checkpoint().covers(&self.after().commit),
+            out@.value().is_some() ==> out@.value().unwrap().extends(self.after()),
             cause.is_some() && cause.unwrap().journal()==self.owner().journal_spec() ==> out@.checkpoint().covers(&cause.unwrap()),
             out@.value().is_some()==_storage.live.is_some(),
             _storage.live.is_some() ==> out@.value().unwrap().state()==_storage.live.unwrap().state()
@@ -131,7 +178,7 @@ impl<T:?Sized> Inverse<T> {
             match cause {Some(receipt)=>receipts.tracked_insert(1,receipt.duplicate()),None=>{}}
         }
         let _value=match &_storage.live {Some(cell)=>{
-            let _value=cell.evidence(&self.owner);proof {receipts.tracked_insert(2,cell.member.receipt());}Ghost(Some(_value@))
+            let _value=cell.evidence_for_inverse(self);proof {receipts.tracked_insert(2,cell.member.receipt());}Ghost(Some(_value@))
         },None=>{proof {receipts.tracked_insert(2,_storage.retired.borrow().tracked_borrow().duplicate());}Ghost(None)}};
         let view=self.journal.read();
         if let Some(cell)=&_storage.live {cell.member.certify(&view);}
@@ -157,3 +204,6 @@ impl<T:?Sized> Inverse<T> {
 
 #[path = "payload_restoration.rs"]
 pub mod protocol;
+
+#[path = "payload_recovery.rs"]
+pub mod recovery;

@@ -37,6 +37,7 @@ pub use cordis_kernel::reversible_value::effect::{
 use cordis_kernel::reversible_value::function::{
     Body as CheckedRootBody, Error as ValueFunctionError, Function as ValueFunction,
 };
+use cordis_kernel::reversible_value::managed::interleaving::history::lifecycle::callbacks::HostAction;
 use cordis_kernel::reversible_value::payload::SharedPayload;
 pub use cordis_kernel::reversible_value::program::{
     Instruction as ValueInstruction, Program as ValueProgram,
@@ -87,7 +88,9 @@ impl ManagedInstruction {
     ) -> Self {
         Self {
             key: key.id,
-            effect: cordis_kernel::reversible_value::managed::Effect::Scalar(operation),
+            effect: cordis_kernel::reversible_value::managed::Effect::Kernel(
+                cordis_kernel::reversible_value::effect::Instruction::Operation(operation),
+            ),
             branch,
         }
     }
@@ -431,14 +434,24 @@ type PayloadCompletion = cordis_kernel::cleanup_groups::payload::Completion<
     ChildHandle,
 >;
 type CleanupAction = ChildCleanup<CleanupCallback, ChildHandle>;
-type EpisodeExecution = Execution<ServiceSlot, ChildRequest, GroupState, CleanupAction>;
+type RawEpisodeExecution = Execution<ServiceSlot, ChildRequest, GroupState, CleanupAction>;
+type EpisodeExecution =
+    cordis_kernel::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution<
+        ChildRequest,
+        GroupState,
+        Cleanup,
+        RetryCleanup,
+        dyn Any + Send + Sync,
+        ServiceMetadata,
+        ChildHandle,
+    >;
 struct Cleanups {
     protocol: EpisodeExecution,
 }
 impl Cleanups {
     fn new() -> Self {
         Self {
-            protocol: Execution::new(fresh(&NEXT_CLEANUP)),
+            protocol: EpisodeExecution::new(Execution::new(fresh(&NEXT_CLEANUP))),
         }
     }
     fn contains(&self, group: usize) -> bool {
@@ -453,7 +466,7 @@ impl Cleanups {
     }
     fn pop(&mut self, group: usize) -> Option<PayloadDispatch> {
         self.protocol
-            .dispatch_payload_cleanup(group)
+            .dispatch(group)
             .expect("live cleanup group and available attempt identity")
     }
     #[allow(clippy::type_complexity)]
@@ -472,7 +485,7 @@ impl Cleanups {
             group,
             ticket,
             result,
-            retry.map(|retry| CleanupAction::Callback(CleanupCallback::Retryable(retry))),
+            retry.map(HostAction::Retryable),
             policy,
         )
     }
@@ -483,8 +496,7 @@ impl Cleanups {
         retry: Option<RetryCleanup>,
         policy: CleanupPolicy,
     ) -> Result<CleanupReport<CallbackError, CleanupAction>, RejectedCleanup> {
-        let retry =
-            retry.map(|factory| CleanupAction::Callback(CleanupCallback::Retryable(factory)));
+        let retry = retry.map(HostAction::Retryable);
         match reply {
             CleanupReply::Awaited(completion) => self
                 .protocol
@@ -1093,7 +1105,7 @@ impl Episode {
         self.cleanups.protocol.phase()
     }
     fn withdraw(&mut self) {
-        self.cleanups.protocol.withdraw();
+        self.cleanups.protocol.withdraw_work();
     }
     fn seal(&mut self) -> bool {
         self.cleanups.protocol.seal_external()
@@ -2492,7 +2504,7 @@ impl RootSetup {
             Self::Queued(ticket, future) if withdrawing => {
                 {
                     let mut state = lock(&episode.state);
-                    state.cleanups.protocol.withdraw();
+                    state.cleanups.protocol.withdraw_work();
                     assert!(
                         state.cleanups.protocol.cancel_queued_root(ticket),
                         "only an unpolled root is discarded"
@@ -2856,7 +2868,7 @@ impl Default for Runtime {
     }
 }
 impl Runtime {
-    fn begin_controlled(&mut self, id: PluginId) -> Result<EpisodeExecution, KernelError> {
+    fn begin_controlled(&mut self, id: PluginId) -> Result<RawEpisodeExecution, KernelError> {
         let mut control = self.kernel.host_mut(id).unwrap().control.take().unwrap();
         let result = self
             .kernel
@@ -2881,7 +2893,7 @@ impl Runtime {
         let mut control = self.kernel.host_mut(id).unwrap().control.take().unwrap();
         let result = self
             .kernel
-            .release_controlled_execution(id, execution, &mut control);
+            .release_recorded_controlled(id, execution, &mut control);
         self.kernel.host_mut(id).unwrap().control = Some(control);
         result
     }
@@ -3228,7 +3240,7 @@ impl Runtime {
         let mut control = self.kernel.host_mut(id).unwrap().control.take().unwrap();
         let retried =
             self.kernel
-                .retry_controlled_execution(id, &mut state.cleanups.protocol, &mut control);
+                .retry_recorded_controlled(id, &mut state.cleanups.protocol, &mut control);
         self.kernel.host_mut(id).unwrap().control = Some(control);
         let (_, discarded) = retried.map_err(kernel_error)?;
         let wake = state.driver.take();
@@ -3363,7 +3375,7 @@ impl Runtime {
         }
         if let Some(episode) = self.kernel.host(id).unwrap().episode.clone() {
             self.kernel
-                .withdraw_managed_execution(id, &mut lock(&episode.state).cleanups.protocol, true)
+                .withdraw_recorded_execution(id, &mut lock(&episode.state).cleanups.protocol, true)
                 .map_err(kernel_error)?;
         } else {
             self.kernel.retire(id).map_err(kernel_error)?;
@@ -3700,7 +3712,7 @@ impl Runtime {
     fn leave(&mut self, id: PluginId) -> Result<(), RuntimeError> {
         if let Some(episode) = self.kernel.host(id).unwrap().episode.clone() {
             self.kernel
-                .withdraw_managed_execution(id, &mut lock(&episode.state).cleanups.protocol, false)
+                .withdraw_recorded_execution(id, &mut lock(&episode.state).cleanups.protocol, false)
                 .map_err(kernel_error)?;
         } else {
             self.kernel.leave(id).map_err(kernel_error)?;
@@ -3744,7 +3756,7 @@ impl Runtime {
             .record_setup_failure(message);
         drop(discarded);
     }
-    fn start(&mut self, id: PluginId, cx: &mut TaskContext<'_>, protocol: EpisodeExecution) {
+    fn start(&mut self, id: PluginId, cx: &mut TaskContext<'_>, mut protocol: RawEpisodeExecution) {
         let (association, native_context) =
             cordis_kernel::host_context::Association::native(&protocol)
                 .expect("native Begin carries its checked context");
@@ -3760,8 +3772,25 @@ impl Runtime {
         if let Some(handler) = plugin.next_config_update.take() {
             plugin.config_update = handler;
         }
+        for child in plugin.owned.drain(..) {
+            protocol
+                .register(
+                    0,
+                    CleanupAction::Native(SharedChild::from_identity(child).0),
+                )
+                .ok()
+                .expect("fresh root accepts owned Child inverses");
+        }
+        // Attach the returned queue prefix once. Every later mutation keeps
+        // this same owner, including callback writes and cleanup retries.
+        let (protocol, managed_report) = if self.kernel.has_managed_root(id) {
+            let (owner, report) = self.kernel.run_recorded_root(id, protocol);
+            (owner, Some(report))
+        } else {
+            (EpisodeExecution::new(protocol), None)
+        };
         let cleanups = Cleanups { protocol };
-        let mut state = Episode {
+        let state = Episode {
             // Retain precisely the committed dependencies until restoration
             // finishes; unrelated services must not gain implicit Arc owners.
             values: EpisodeValues::default(),
@@ -3773,12 +3802,6 @@ impl Runtime {
             service_updates: None,
             unsupported: None,
         };
-        for child in plugin.owned.drain(..) {
-            state.cleanups.push(
-                0,
-                CleanupAction::Native(SharedChild::from_identity(child).0),
-            );
-        }
         let episode = AsyncSetup {
             state: Arc::new(SharedEpisode {
                 association,
@@ -3790,12 +3813,10 @@ impl Runtime {
             }),
             scope,
         };
+        let plugin = self.kernel.host_mut(id).unwrap();
         plugin.episode = Some(episode.clone());
         plugin.root_setup = RootSetup::Done;
-        if self.kernel.has_managed_root(id) {
-            let result = self
-                .kernel
-                .run_managed_root(id, &mut lock(&episode.state).cleanups.protocol);
+        if let Some(result) = managed_report {
             let result = result
                 .map_err(|error| {
                     CallbackError::from(format!("native function admission: {error:?}"))
@@ -3820,7 +3841,7 @@ impl Runtime {
         if self.kernel.has_service_root(id) {
             let result = self
                 .kernel
-                .run_service_root(id, &mut lock(&episode.state).cleanups.protocol);
+                .run_recorded_service_root(id, &mut lock(&episode.state).cleanups.protocol);
             let result = result
                 .map_err(|error| {
                     CallbackError::from(format!("native service root admission: {error:?}"))
@@ -3845,7 +3866,7 @@ impl Runtime {
         if self.kernel.has_value_root(id) {
             let result = self
                 .kernel
-                .run_value_root(id, &mut lock(&episode.state).cleanups.protocol);
+                .run_recorded_value_root(id, &mut lock(&episode.state).cleanups.protocol);
             let result = match result {
                 Ok(report) => report
                     .result
@@ -3885,7 +3906,7 @@ impl Runtime {
         }
         let invocation = self
             .kernel
-            .admit_managed_root(
+            .admit_recorded_root(
                 id,
                 &mut lock(&episode.state).cleanups.protocol,
                 episode.clone(),
@@ -4706,7 +4727,7 @@ impl Runtime {
                     } else {
                         let finished = self
                             .kernel
-                            .finish_managed_execution(id, &mut state.cleanups.protocol);
+                            .finish_recorded_execution(id, &mut state.cleanups.protocol);
                         drop(state);
                         match finished {
                             Ok(()) => {

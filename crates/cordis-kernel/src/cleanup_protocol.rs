@@ -315,3 +315,6 @@ pub proof fn failed_prefix_retains_dependencies(states:Seq<LifecycleState>,comma
     binding_at(states,commands,replies,owner,binding,states.len() as int-1);
 }
 }
+
+#[path = "cleanup_update.rs"]
+pub mod update;

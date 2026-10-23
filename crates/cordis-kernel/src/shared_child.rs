@@ -84,7 +84,41 @@ pub struct ChildSnapshot {
     state:ChildStatus<()>,source:Ghost<Loc>,
     witness:Tracked<Option<GhostPersistentPointsTo<(),ChildStatus<()>>>>,
 }
+/// A persistent copy of one real terminal shared-slot decision. This is an
+/// assignment/cancellation witness, not a certificate of lifecycle completion.
+#[allow(dead_code)]
+pub tracked struct Decision {witness:GhostPersistentPointsTo<(),ChildStatus<()>>}
+impl Decision {
+    pub proof fn agrees_decision(tracked &self,tracked other:&Self)
+        requires self.wf(),other.wf(),self.source()==other.source(),
+        ensures self.state()==other.state(),
+    {let tracked mut copy=self.witness.duplicate();copy.intersection_agrees(&other.witness);}
+
+    pub proof fn duplicate(tracked &self)->(tracked out:Self)
+        requires self.wf(),ensures out.wf(),out.state()==self.state(),out.source()==self.source(),
+    {Self {witness:self.witness.duplicate()}}
+
+    pub closed spec fn state(&self)->ChildStatus<()> {self.witness.value()}
+    pub closed spec fn source(&self)->Loc {self.witness.id()}
+    pub closed spec fn wf(&self)->bool {self.witness.key()==() && !(self.state() is Pending)}
+    pub proof fn agrees(tracked &self,tracked later:&ChildSnapshot)
+        requires self.wf(),later.wf(),self.source()==later.source(),!(later.state() is Pending),
+        ensures self.state()==later.state(),
+    {
+        let tracked mut copy=self.witness.duplicate();
+        match later.witness.borrow() {Some(other)=>{copy.intersection_agrees(other);},None=>{assert(false);}}
+    }
+}
 impl ChildSnapshot {
+    pub proof fn retain_decision(tracked &self)->(tracked out:Decision)
+        requires self.wf(),!(self.state() is Pending),
+        ensures out.wf(),out.state()==self.state(),out.source()==self.source(),
+    {
+        match self.witness.borrow() {
+            Some(witness)=>Decision {witness:witness.duplicate()},
+            None=>{assert(false);proof_from_false()},
+        }
+    }
     pub closed spec fn state(&self)->ChildStatus<()> {self.state}
     pub closed spec fn source(&self)->Loc {self.source@}
     pub closed spec fn wf(&self)->bool {
@@ -207,7 +241,11 @@ impl<P,X,G> SetupWork<ChildDispatch<P,X>,G> {
     pub fn enqueue_native_child<C,Y>(&mut self,cleanups:&mut CleanupGroups<ChildCleanup<C,Y>>,group:usize,payload:P)
         ->(out:Result<(SharedChild,usize),P>)
         requires old(self).wf(),old(cleanups).wf(),
-        ensures final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
+        ensures final(cleanups).frame(old(cleanups),group),
+            old(cleanups).live(group) ==> final(cleanups).queues()[group].link()==old(cleanups).queues()[group].link()
+                && final(cleanups).queues()[group].issued()==old(cleanups).queues()[group].issued()
+                && final(cleanups).queues()[group].protocol().selected()==old(cleanups).queues()[group].protocol().selected(),
+            final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
             out.is_ok()==(old(self).origin().is_some() && old(self).owns(old(cleanups)) && old(self).accepts()
                 && old(self).next_id()<u64::MAX && old(cleanups).acquisition_open(group)),
             out.is_err() ==> out->Err_0==payload && *final(self)==*old(self) && *final(cleanups)==*old(cleanups),
@@ -239,7 +277,7 @@ impl<R,H> NativeHost<R,H> {
     pub fn register_shared_child(&mut self,child:&SharedChild,realms:&BTreeMap<u64,u64>,anchor:Port,definition:PluginDefinition<R>,host:H)
         ->(out:ChildTransition<Result<usize,(Error,PluginDefinition<R>,H)>>)
         requires old(self).wf(),child.wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),out.wf(child),
+        ensures out.result.is_ok() ==> out.result->Ok_0==old(self).state().control().next_id(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),out.wf(child),
             out.result.is_ok()==(out.before.state() is Pending && child.domain_id()==old(self).state().protocol().domain_id()
                 && child.episode()==old(self).state().control().generation_of(child.owner())
                 && (old(self).state().control().phase_of(child.owner())==Some(crate::Phase::Loading)
@@ -272,12 +310,16 @@ impl<R,H> NativeHost<R,H> {
         requires old(self).wf(),child.wf(),
         ensures out.result.is_ok() && out.result->Ok_0.is_none() ==> final(self).state().same(&old(self).state()), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),out.wf(child),
             out.result.is_err() ==> final(self).state().same(&old(self).state()) && out.after.state()==out.before.state(),
-            out.result.is_ok() ==> !(out.after.state() is Pending)
+            out.result.is_ok() ==> out.result->Ok_0.is_some()==(out.after.state() is Assigned)
+                && child.domain_id()==old(self).state().protocol().domain_id()
+                && !(out.after.state() is Pending)
                 && (if out.before.state() is Pending {out.after.state() is Cancelled && out.result->Ok_0.is_none()}
                     else {out.after.state()==out.before.state()})
                 && (out.result->Ok_0.is_some() ==> out.after.state()==ChildStatus::<()>::Assigned(out.result->Ok_0.unwrap())
+                    && out.result->Ok_0.unwrap().domain_id()==child.domain_id() && out.result->Ok_0.unwrap().owner()==child.owner()
                     && (if old(self).state().control().registered(out.result->Ok_0.unwrap().child()) {
-                        crate::refinement::step(old(self).state().control().paper(),final(self).state().control().paper(),out.result->Ok_0.unwrap().child(),crate::refinement::Rule::Retire)
+                        old(self).state().control().paper().fibers[out.result->Ok_0.unwrap().child()].parent==Some(child.owner())
+                            && crate::refinement::step(old(self).state().control().paper(),final(self).state().control().paper(),out.result->Ok_0.unwrap().child(),crate::refinement::Rule::Retire)
                     } else {final(self).state().same(&old(self).state())})),
     {
         proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}

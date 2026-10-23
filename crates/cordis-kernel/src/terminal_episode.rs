@@ -147,4 +147,37 @@ pub proof fn fresh_installed_interval<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:
     }
 }
 
+/// Installation at any actual episode cut, including an open final prefix.
+/// No successful future Unload or caller-provided installed interval is needed.
+pub proof fn mixed_open_interval<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:mx::Programs<A,X,U,B,I>,states:Seq<mx::Configuration<U,I>>,labels:Seq<(usize,r::Rule)>,owner:usize,begin:int,end:int)
+    requires d::primitive_theory(eq,lib),mx::execution(lib,programs,states,labels),
+        states.first()==mx::empty::<U,I>(),0<=begin<end<=labels.len(),
+        labels[begin]==(owner,r::Rule::Begin),forall|i:int| begin<i<end ==> labels[i]!=(owner,r::Rule::Unload),
+    ensures forall|i:int| begin<i<=end ==> gr::installed(states[i].state,owner),
+{
+    mx::empty_well_formed(lib,programs);mx::execution_preservation(eq,lib,programs,states,labels);
+    assert(mx::step(lib,programs,states[begin],states[begin+1],owner,r::Rule::Begin));
+    assert(gr::installed(states[begin+1].state,owner));
+    assert forall|i:int| begin<i<=end implies gr::installed(states[i].state,owner) by {
+        mixed_installed_at(eq,lib,programs,states,labels,owner,begin+1,i);
+    }
+}
+
+/// Installation at any actual episode cut, including an open final prefix.
+/// No successful future Unload or caller-provided installed interval is needed.
+pub proof fn fresh_open_interval<A,X,U,B,I>(eq:spec_fn(Port,U,U)->bool,lib:mx::Library<A,X,U,B>,programs:fs::Programs<A,X,U,B,I>,states:Seq<mx::Configuration<U,I>>,labels:Seq<fs::Label>,owner:usize,begin:int,end:int)
+    requires d::primitive_theory(eq,lib),fs::execution(lib,programs,states,labels),
+        states.first()==mx::empty::<U,I>(),0<=begin<end<=labels.len(),
+        (labels[begin].0,labels[begin].1)==(owner,r::Rule::Begin),forall|i:int| begin<i<end ==> (labels[i].0,labels[i].1)!=(owner,r::Rule::Unload),
+    ensures forall|i:int| begin<i<=end ==> gr::installed(states[i].state,owner),
+{
+    og::exact_theory(eq,lib);
+    fs::empty_well_formed(lib,programs);fs::execution_preservation(eq,lib,programs,states,labels);
+    assert(fs::step(lib,programs,states[begin],states[begin+1],owner,r::Rule::Begin,None));
+    assert(gr::installed(states[begin+1].state,owner));
+    assert forall|i:int| begin<i<=end implies gr::installed(states[i].state,owner) by {
+        fresh_installed_at(eq,lib,programs,states,labels,owner,begin+1,i);
+    }
+}
+
 }

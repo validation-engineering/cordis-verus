@@ -103,6 +103,14 @@ class NativeEvidenceInputTests(unittest.TestCase):
         self.assertEqual(counts["suites"], {"host_unit": 2, "kernel_unit": 3, "cordis_driver_unit": 5, "cordis_node_unit": 7})
         self.assertEqual(counts["total"], 17)
 
+    def test_same_named_integration_suites_retain_both_crates_counts(self):
+        lines = []
+        for binary, count in (("managed_function-0123", 9), ("managed_function-abcd", 6)):
+            lines.extend([f"Running tests/managed_function.rs (target/debug/deps/{binary})",
+                          f"test result: ok. {count} passed; 0 failed;"])
+        counts = RECORD.test_counts("\n".join(lines))
+        self.assertEqual(counts["suites"], {"managed_function": 15})
+        self.assertEqual(counts["total"], 15)
 
 
 class ReleaseRecordingTests(unittest.TestCase):
@@ -289,10 +297,11 @@ class CheckScriptRoutingTests(unittest.TestCase):
                         environment["CORDIS_FULL_NEGATIVE_SHARDS"] = str(shards)
                     subprocess.run(["bash", str(scripts / "check.sh")], env=environment, check=True, capture_output=True, text=True)
                     lines = trace.read_text().splitlines()
-                    self.assertEqual(len(lines), 4)
+                    self.assertEqual(len(lines), 5)
                     self.assertEqual(json.loads(lines[0]), ["scripts/check-positive.py"])
                     self.assertEqual(lines[1:], ["cargo test --workspace --all-features --locked",
                                                 "cargo run --locked -p cordis-kernel --example semantic_context",
+                                                "cargo run --locked -p cordis-kernel --example update_recovery_native",
                                                 "cargo run --locked --all-features -p cordis-verus --example demo"])
 
 

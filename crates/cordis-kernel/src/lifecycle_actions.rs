@@ -257,7 +257,7 @@ impl LifecycleActions {
 
     pub fn begin(&mut self, kernel: &mut Kernel, id: usize) -> (out: Result<ActionTicket, Error>)
         requires old(self).wf(), old(kernel).wf(),
-        ensures (forall|n:usize| n!=id ==> final(kernel).generation_of(n)==old(kernel).generation_of(n)), final(self).wf(), final(kernel).wf(),
+        ensures final(kernel).next_id()==old(kernel).next_id(),(forall|n:usize| n!=id ==> final(kernel).generation_of(n)==old(kernel).generation_of(n)), final(self).wf(), final(kernel).wf(),
             out.is_ok() == (old(self).admission_enabled(id) && old(kernel).begin_enabled(id)),
             out.is_err() ==> final(self).same(old(self)) && final(kernel).unchanged(old(kernel)),
             out.is_ok() ==> out.unwrap().kind == ActionKind::Setup
@@ -382,7 +382,7 @@ impl LifecycleActions {
             out.is_err() ==> final(self).same(old(self)),
             out.is_ok() ==> final(self).eligible(ticket.id, ticket.generation) == (outcome != CleanupOutcome::Failed),
             out.is_ok() && outcome == CleanupOutcome::Failed
-                ==> !final(self).eligible(ticket.id, ticket.generation),
+                ==> !final(self).eligible(ticket.id, ticket.generation) && final(self).failed(ticket.id,ticket.generation),
             final(self).history_preserved(old(self)),
             forall|id:usize,g:u64| final(self).eligible(id,g) ==> old(self).eligible(id,g)
                 || (out.is_ok() && id==ticket.id && g==ticket.generation && outcome!=CleanupOutcome::Failed),

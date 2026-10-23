@@ -78,6 +78,12 @@ pub open spec fn insertion_domain(s: State, parent: Option<usize>, provisions: I
         ==> !provisions.contains(p)
 }
 
+/// Registry removal checks retirement, inactivity and live ownership references.
+pub open spec fn removal_domain(a:State,n:usize)->bool {
+    &&& registered(a,n) && a.fibers[n].retired && a.fibers[n].phase==Phase::Inactive
+    &&& forall|m:usize|registered(a,m) ==> a.fibers[m].parent!=Some(n)
+}
+
 /// Each constructor states an independent relational rule. No implementation
 /// buffers, tombstones, restoring flags, or declaration order occur here.
 pub open spec fn step(a: State, z: State, n: usize, rule: Rule) -> bool {

@@ -1106,7 +1106,7 @@ mod association_tests {
             let mut state = shared.episode.lock().unwrap();
             std::mem::replace(
                 &mut state.cleanups.protocol,
-                Execution::new(fresh(&NEXT_CLEANUP)),
+                EpisodeExecution::new(Execution::new(fresh(&NEXT_CLEANUP))),
             )
         };
         let rejected =

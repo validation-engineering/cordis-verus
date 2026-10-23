@@ -11,6 +11,13 @@ use cordis_kernel::lifecycle_state::registration::{
     ChildIdentity, PluginDefinition, RegisteredInvocation, RegisteredPlugin,
 };
 use cordis_kernel::lifecycle_state::services::ReleasedNativeValues;
+use cordis_kernel::reversible_value::managed::{
+    interleaving::history::lifecycle::{
+        native::{ReleaseOutcome, RootOutcome},
+        RecordedExecution,
+    },
+    Owner, Slot,
+};
 use cordis_kernel::setup_work::WorkReceipt;
 use cordis_kernel::{Error, Kernel, Port};
 use std::collections::BTreeMap;
@@ -31,6 +38,26 @@ impl<R, H, V> NativeDriver<R, H, V> {
         Ok(Self {
             state: NativeRuntime::new(allocate_domain()?),
         })
+    }
+    /// Opt in to a bounded transcript of actual native control transitions.
+    /// Exhaustion disables source certification without failing lifecycle calls.
+    pub fn new_recorded(limit: usize) -> Result<Self, DriverError> {
+        Ok(Self {
+            state: NativeRuntime::new_recorded(allocate_domain()?, limit),
+        })
+    }
+    pub fn control_recording_status(
+        &self,
+    ) -> cordis_kernel::lifecycle_state::native::runtime::control_source::Status {
+        self.state.control_recording_status()
+    }
+    pub fn control_source_snapshot(
+        &self,
+    ) -> Result<
+        cordis_kernel::lifecycle_state::native::runtime::control_source::Capture<V>,
+        cordis_kernel::lifecycle_state::native::runtime::control_source::Error,
+    > {
+        self.state.control_source_snapshot()
     }
     pub fn execution_journal(&self) -> cordis_kernel::reversible_value::joint::Journal {
         self.state.execution_journal()
@@ -487,5 +514,112 @@ impl<R, H, E: cordis_kernel::reversible_value::effect::ScalarEffect + Copy, T: ?
         cordis_kernel::reversible_value::managed::root::AdmissionError,
     > {
         self.state.run_managed_root(id, execution)
+    }
+}
+
+impl<P, H, T: ?Sized, M> NativeDriver<P, H, Slot<T, M>> {
+    pub fn finish_recorded_execution<C, G, A, R, X>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+    ) -> Result<(), Error> {
+        owner.finish(&mut self.state, id)
+    }
+    pub fn withdraw_recorded_execution<C, G, A, R, X>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+        retiring: bool,
+    ) -> Result<(), Error> {
+        owner.withdraw(&mut self.state, id, retiring)
+    }
+    pub fn retry_recorded_controlled<C, G, A, R, X, E>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+        control: &mut cordis_kernel::poll_control::PollControl<E>,
+    ) -> Result<(cordis_kernel::action_ledger::ActionTicket, Option<E>), Error> {
+        owner.retry_controlled(&mut self.state, id, control)
+    }
+    pub fn release_recorded_controlled<C, G, A, R, X, E>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+        control: &mut cordis_kernel::poll_control::PollControl<E>,
+    ) -> Result<(CleanupOutcome, ReleasedNativeValues<Slot<T, M>>), Error> {
+        self.release_recorded_controlled_observed(id, owner, control)
+            .0
+    }
+    pub fn admit_recorded_root<C, G, A, R, X, B>(
+        &self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+        argument: B,
+    ) -> Result<RegisteredInvocation<B>, B> {
+        owner.admit_root(&self.state, id, argument)
+    }
+}
+impl<P, H, E: cordis_kernel::reversible_value::effect::ScalarEffect + Copy, T: ?Sized, M>
+    NativeDriver<
+        cordis_kernel::reversible_value::function::Body<
+            P,
+            cordis_kernel::reversible_value::managed::Function<E, T>,
+        >,
+        H,
+        Slot<T, M>,
+    >
+{
+    /// Attach the actual root-return prefix to the owner used for later cleanup.
+    pub fn run_recorded_root<C, G, A, R, X>(
+        &mut self,
+        id: usize,
+        owner: Owner<C, G, A, R, T, M, X>,
+    ) -> RootOutcome<C, G, A, R, T, M, X, E> {
+        self.state.run_recorded_root(id, owner)
+    }
+}
+impl<P, H, F, T: ?Sized, M>
+    NativeDriver<cordis_kernel::reversible_value::function::Body<P, F>, H, Slot<T, M>>
+{
+    pub fn run_recorded_value_root<C, G, A, R, X>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+    ) -> Result<
+        cordis_kernel::reversible_value::function::RegisteredReport,
+        cordis_kernel::reversible_value::function::AdmissionError,
+    > {
+        owner.run_value_root(&mut self.state, id)
+    }
+    pub fn run_recorded_service_root<C, G, A, R, X>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+    ) -> Result<
+        cordis_kernel::reversible_value::service_function::RegisteredReport,
+        cordis_kernel::reversible_value::service_function::AdmissionError,
+    > {
+        owner.run_service_root(&mut self.state, id)
+    }
+}
+
+impl<P, H, T: ?Sized, M> NativeDriver<P, H, Slot<T, M>> {
+    /// Proof-only intermediate observation query. `before` must be an earlier
+    /// snapshot from this driver's native Journal; this does not execute rollback.
+    pub fn recovery_snapshot(
+        &self,
+        before: &cordis_kernel::reversible_value::joint::Snapshot,
+    ) -> cordis_kernel::lifecycle_state::native::runtime::history::recovery::Capture<Slot<T, M>>
+    {
+        self.state.recovery_snapshot(before)
+    }
+    /// Keep the authentic Unload and terminal queue evidence with the result.
+    pub fn release_recorded_controlled_observed<C, G, A, R, X, E>(
+        &mut self,
+        id: usize,
+        owner: &mut RecordedExecution<C, G, A, R, T, M, X>,
+        control: &mut cordis_kernel::poll_control::PollControl<E>,
+    ) -> ReleaseOutcome<A, R, T, M, X> {
+        owner.release_controlled(&mut self.state, id, control)
     }
 }

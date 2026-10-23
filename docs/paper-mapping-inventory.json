@@ -1,0 +1,5016 @@
+{
+  "schema": "cordis-verus.paper-mapping-inventory/v1",
+  "baseline": "2026-10-20.v1",
+  "paper": {
+    "arxiv": "2608.25512v1",
+    "pdfSha256": "390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0"
+  },
+  "ledger": "docs/paper-obligations.json",
+  "plan": "docs/paper-refinement-plan.json",
+  "purpose": {
+    "en": "An inventory of remaining end-state obligations, not a new proof, a completion percentage, or a replacement for the original-paper gate.",
+    "zh-CN": "最终剩余义务盘点，不是新证明、完成百分比，也不替代原论文门槛。"
+  },
+  "completionClaims": {
+    "originalPaperProved": false,
+    "implementationMappingComplete": false,
+    "milestonesReclassified": false,
+    "newVerificationRun": false
+  },
+  "targets": [
+    {
+      "id": "original-audit",
+      "description": {
+        "en": "Audit every original statement under its actual hypotheses. Preserve refutations and unresolved original interpretations. The existing original-proof gate remains unchanged.",
+        "zh-CN": "按实际前提审计每项原陈述，保留反例和未解决原文解释；既有原文证明门槛保持不变。"
+      }
+    },
+    {
+      "id": "implementation-mapping",
+      "description": {
+        "en": "Complete production mapping for explicitly stated original or revised contracts across the required surfaces. Each revision must identify changed clauses and downstream consequences; it cannot silently narrow the original target.",
+        "zh-CN": "在必需执行范围内完成明确原文或修订合同的生产映射；每项修订须标明改变条款及下游影响，不能静默缩小原目标。"
+      }
+    }
+  ],
+  "retainedBaselines": [
+    {
+      "id": "R1",
+      "profile": "finite-strict-context/v1",
+      "source": "docs/r1-semantics.md",
+      "note": {
+        "en": "Completed scoped semantics; S01–S03 track whole-paper interpretation consequences, not a rewrite of R1.",
+        "zh-CN": "已完成范围内语义；S01–S03 跟踪整篇解释影响，不要求重做 R1。"
+      }
+    },
+    {
+      "id": "R2",
+      "profile": "managed-production/v1",
+      "source": "docs/r2-acceptance.md",
+      "note": {
+        "en": "Completed scoped production refinement; P04 reuses it for the strengthened final carrier.",
+        "zh-CN": "已完成范围内生产精化；P04 将其复用到加强后的最终载体。"
+      }
+    }
+  ],
+  "premises": [
+    {
+      "id": "M01",
+      "title": {
+        "en": "One consistent context and failure interpretation",
+        "zh-CN": "统一的上下文与失败解释"
+      },
+      "kind": "specification",
+      "source": {
+        "en": "R1 proves finite-strict-context/v1; its three revisions do not establish the original unrestricted Gamma.",
+        "zh-CN": "R1 已证明 finite-strict-context/v1；三项明确修订不等于原文无限制 Γ。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "reified_representation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "no_single_recovery_and_admission_relation"
+        }
+      ]
+    },
+    {
+      "id": "M02",
+      "title": {
+        "en": "Primitive recovery and declared access",
+        "zh-CN": "原语恢复与声明访问范围"
+      },
+      "kind": "code_contract",
+      "source": {
+        "en": "Built-in scalar and typed replacement laws exist. Complete admitted-effect coverage and prevention of hidden shared writes are still required.",
+        "zh-CN": "已有内置标量与类型化替换定律；仍需覆盖全部纳入保证的效果，并防止隐藏共享写入。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "symbol": "commit_calculation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_semantics.rs",
+          "symbol": "primitive_theory"
+        }
+      ]
+    },
+    {
+      "id": "M03",
+      "title": {
+        "en": "Authentic source and ownership history",
+        "zh-CN": "真实来源与所有权历史"
+      },
+      "kind": "code_contract",
+      "source": {
+        "en": "Recorded owners retain actual calls, registrations, releases and producer evidence; general closed selection must be derived from them.",
+        "zh-CN": "记录型 owner 保留实际调用、登记、释放与生产者证据；一般闭合选择仍须由这些证据推出。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/native_source_chain.rs",
+          "symbol": "inverse_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_producer_recovery.rs",
+          "symbol": "recorded_census"
+        }
+      ]
+    },
+    {
+      "id": "M04",
+      "title": {
+        "en": "Target identity and current-state correspondence",
+        "zh-CN": "目标身份与当前状态对应"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "Actual allocation receipts establish an injective Bank map. Guarded scalar primitives check actual versioned selections before writing; typed cursors derive capacity and fresh head transport, including later calls after real restoration. Ownership preserving the full current heap throughout automatic root/Child execution, general bindings and complete reference transport remain undischarged.",
+        "zh-CN": "实际分配收据建立 Bank 单射映射；受守卫标量基本操作在写入前检查实际版本化选择，typed 游标推导容量与新鲜 head 迁移，包含真实恢复后的后续调用。自动 root／Child 执行全程保持完整当前堆的所有权、一般绑定及完整引用迁移仍未解除。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "symbol": "bind"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_transport.rs",
+          "symbol": "pair_step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_selection.rs",
+          "symbol": "check_scalar_replay"
+        }
+      ]
+    },
+    {
+      "id": "M05",
+      "title": {
+        "en": "Independence includes domains and continuations",
+        "zh-CN": "独立性包含定义域与续体"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "Strict grammar results require concrete shared-key laws; declarations alone do not prove commutation or callback purity.",
+        "zh-CN": "严格语法结果需要具体共享键定律；声明本身不能证明交换性或回调纯度。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "grammar_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "strict_source_commutative_key"
+        }
+      ]
+    },
+    {
+      "id": "M06",
+      "title": {
+        "en": "Foreign producers and original Child obligations close",
+        "zh-CN": "外部生产者与原始 Child 义务闭合"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "Actual census and terminal evidence exist; complete closure across selected episodes is still a theorem obligation.",
+        "zh-CN": "已有实际 census 与终态证据；跨选定 Episode 的完整闭合仍是待证明义务。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "symbol": "closed_from_owners"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_child_completion.rs",
+          "symbol": "native_child_endpoint"
+        }
+      ]
+    },
+    {
+      "id": "M07",
+      "title": {
+        "en": "Admission is distinct from eventual completion",
+        "zh-CN": "准入与最终完成分开"
+      },
+      "kind": "code_contract",
+      "source": {
+        "en": "Tickets bind real admissions and reject stale landings. Intervening calls may invalidate an operation domain; completion is not implied by issuance.",
+        "zh-CN": "票据绑定真实准入并拒绝旧落地；中间调用可能改变操作定义域，发出票据不蕴含完成。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "no_single_recovery_and_admission_relation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/stage_landing.rs",
+          "symbol": "land_result"
+        }
+      ]
+    },
+    {
+      "id": "M08",
+      "title": {
+        "en": "Quiescence hypotheses have producers",
+        "zh-CN": "静止性前提有真实来源"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "Acyclic precedence, finite names, iterator bounds and total provision need code certificates or exact application obligations.",
+        "zh-CN": "无环先行关系、有限名称、迭代界与完全发布需要代码证书或精确的应用义务。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "precedence_ranking"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "totality_is_not_a_current_state_test"
+        },
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "control_no_deadlock"
+        }
+      ]
+    },
+    {
+      "id": "M09",
+      "title": {
+        "en": "Host scheduling and eventual responses",
+        "zh-CN": "宿主调度与最终响应"
+      },
+      "kind": "environment",
+      "source": {
+        "en": "Fair scheduling and termination of opaque futures are not kernel invariants. State them only for conclusions that need them.",
+        "zh-CN": "公平调度及不透明 Future 终止不是内核不变量；只在依赖它们的结论中明确列出。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/configuration_future.rs",
+          "symbol": "poll_apply"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "symbol": "complete_future"
+        }
+      ]
+    },
+    {
+      "id": "M10",
+      "title": {
+        "en": "External effects and host representation truth",
+        "zh-CN": "外部效果与宿主表示真实性"
+      },
+      "kind": "environment",
+      "source": {
+        "en": "JS/Rust callback effects, mutable payload interiors, FFI conversions and filesystem truth need resource-specific contracts; an acknowledgement is not such a proof.",
+        "zh-CN": "JS/Rust 回调效果、可变载荷内部、FFI 转换及文件系统真实性需要逐资源合同；确认消息不能替代证明。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "as_paper_entry"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "complete"
+        }
+      ]
+    },
+    {
+      "id": "M11",
+      "title": {
+        "en": "Complete frozen function-field observations",
+        "zh-CN": "完整的固定函数字段观察"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "Real receipts have denotations. Token equality or a stronger control-sensitive relation cannot silently replace the paper's all-input observation.",
+        "zh-CN": "真实收据已有函数解释；不能把票据相同或更强的控制敏感关系默认为原文的任意输入观察。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "function_correspondence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs",
+          "symbol": "pure_table_self_relation_fails"
+        }
+      ]
+    },
+    {
+      "id": "M12",
+      "title": {
+        "en": "Full inputs and historical names are transported",
+        "zh-CN": "完整输入与历史名称一同迁移"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "Fresh closed programs have structural naturality; arbitrary callbacks and literal external names do not inherit it.",
+        "zh-CN": "Fresh 封闭程序已有结构自然性；任意回调与字面外部名称不会自动继承该性质。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "natural_execution_inputs"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_compaction.rs",
+          "symbol": "compact"
+        }
+      ]
+    },
+    {
+      "id": "M13",
+      "title": {
+        "en": "Failure and capacity are explicit domains",
+        "zh-CN": "失败与容量属于明确的定义域"
+      },
+      "kind": "code_contract",
+      "source": {
+        "en": "Overflow, exhausted identities, failed prefixes and cleanup retries remain observable outcomes; successful admission is not totality.",
+        "zh-CN": "溢出、身份耗尽、失败前缀和清理重试保留为可观察结果；准入成功不等于总性。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "symbol": "failed_report"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "symbol": "instantiate_controlled"
+        }
+      ]
+    },
+    {
+      "id": "M14",
+      "title": {
+        "en": "Support uses the actual origin discipline",
+        "zh-CN": "支持关系使用真实出生来源"
+      },
+      "kind": "undischarged",
+      "source": {
+        "en": "External insertion and lifecycle-created children differ; provider acyclicity does not imply the parent/provider union is well founded.",
+        "zh-CN": "外部插入与生命周期创建的子组件有区别；provider 无环不蕴含父子/provider 并关系良基。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "actual_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained_protocol_quiet_support"
+        }
+      ]
+    },
+    {
+      "id": "M15",
+      "title": {
+        "en": "Evidence is bound to the checked scope and source",
+        "zh-CN": "证据绑定检查范围与源码"
+      },
+      "kind": "acceptance",
+      "source": {
+        "en": "Inventory consistency is not verification. Existing development and selected-negative records cannot be relabeled as fresh or paper-wide passes.",
+        "zh-CN": "清单一致性不是验证；既有开发及选定负控记录不能改称新鲜验收或整篇通过。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/inspected_run.rs",
+          "symbol": "run_inspected"
+        }
+      ]
+    }
+  ],
+  "obligations": [
+    {
+      "id": "S01",
+      "title": {
+        "en": "Resolve the context model and propagate the interpretation",
+        "zh-CN": "确定上下文模型并贯通解释"
+      },
+      "category": "semantics",
+      "stage": "specification",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        28,
+        48,
+        49,
+        50,
+        55,
+        56,
+        57,
+        58
+      ],
+      "dependsOn": [],
+      "premises": [
+        "M01",
+        "M11"
+      ],
+      "current": {
+        "en": "R1 has a nontrivial finite code/receipt model and a checked obstruction to the unrestricted set/function reading.",
+        "zh-CN": "R1 已有非平凡的有限代码／收据模型，以及无限制集合／函数读法的已验证障碍。"
+      },
+      "remaining": {
+        "en": "The original model question and the downstream effect of choosing the strict revision are not closed for the whole paper.",
+        "zh-CN": "原文模型问题，以及采用严格修订后对整篇下游结论的影响，尚未闭合。"
+      },
+      "closeWhen": [
+        {
+          "en": "State the exact context, carriers and observation relations used by every final theorem, with no assumed recursive type equation.",
+          "zh-CN": "为每个最终定理固定上下文、载体和观察关系，不假设未经建立的递归类型等式。"
+        },
+        {
+          "en": "For item 28, give a precise audited disposition under each claimed reading; list revised downstream statements separately from original claims.",
+          "zh-CN": "对第 28 项各项声称采用的读法给出精确审计结论；逐项区分修订后的下游陈述与原文。"
+        }
+      ],
+      "validation": {
+        "en": "Review the diagonal obstruction and an inhabited implementation model; reject a model that equates arbitrary function fields with tokens.",
+        "zh-CN": "审查对角线障碍与可居留的实现模型；拒绝把任意函数字段等同于票据的模型。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/recursive_context.rs",
+          "symbol": "unrestricted_accumulator_obstruction"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "reified_representation"
+        }
+      ],
+      "paths": [
+        "semantics"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "S02",
+      "title": {
+        "en": "Close strict domains, confinement and the Child exception",
+        "zh-CN": "闭合严格定义域、约束范围与 Child 例外"
+      },
+      "category": "semantics",
+      "stage": "specification",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        29,
+        30,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        52,
+        55,
+        56,
+        57
+      ],
+      "dependsOn": [
+        "S01"
+      ],
+      "premises": [
+        "M01",
+        "M02",
+        "M05",
+        "M13"
+      ],
+      "current": {
+        "en": "R1 proves parent/Child/continuation membership under separate admission and recovery observations; the two observations cannot generally be collapsed. The native operation audit lists the real read/write/restore entry points, observations and boundary obligations: [operation contracts](native-operation-contracts.md).",
+        "zh-CN": "R1 在分开的准入与恢复观察下证明父／Child／续体成员资格；两种观察一般不能合并。 [原生操作合同表](native-operation-contracts.zh-CN.md)已列出真实读写／恢复入口、观察和边界义务。"
+      },
+      "remaining": {
+        "en": "Original total-domain independence and Reads, including absent foreign names and guarded Child insertion, need explicit disposition and replacement statements.",
+        "zh-CN": "原文总定义域独立性与 Reads，包含外部名称缺失及有守卫的 Child 插入，仍需明确审计与替代陈述。"
+      },
+      "closeWhen": [
+        {
+          "en": "Specify both forward and inverse domains on the entire stated carrier, including rejection, not only successful prefixes.",
+          "zh-CN": "在整个声明载体上规定正向与逆向定义域，包含拒绝，不能只覆盖成功前缀。"
+        },
+        {
+          "en": "Carry the revised read/write and Child rules into every recovery and reordering theorem without an implicit partial-to-total conversion.",
+          "zh-CN": "将修订后的读写与 Child 规则带入全部恢复、重排定理，不隐式把部分操作转成总操作。"
+        }
+      ],
+      "validation": {
+        "en": "Keep the equal-table/different-Child-domain witness and check the actual insertion guard against the selected interpretation.",
+        "zh-CN": "保留表相同但 Child 定义域不同的见证，并核对实际插入守卫与所选解释。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "no_single_recovery_and_admission_relation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/guarded_components.rs",
+          "symbol": "member_is_component"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "mixed",
+        "fresh",
+        "native"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "S03",
+      "title": {
+        "en": "Connect full function observations and name transport",
+        "zh-CN": "贯通完整函数观察与名称迁移"
+      },
+      "category": "semantics",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        31,
+        32,
+        33,
+        34,
+        35,
+        37,
+        49,
+        58,
+        60,
+        61,
+        78,
+        80
+      ],
+      "dependsOn": [
+        "S01",
+        "S02"
+      ],
+      "premises": [
+        "M11",
+        "M12"
+      ],
+      "current": {
+        "en": "Closed-data paper contracts now relate real root/current data functions at arbitrary paired inputs and strict data inverse words; immutable stored/historical/future references use an injective allocation projection. The source/target sealed component word work is not yet a full parent/Child function theorem.",
+        "zh-CN": "封闭数据论文合同已关联任意成对输入上的真实 root／current 数据函数及严格数据逆操作字；不可变存储／历史／未来引用使用单射分配投影。源／目标封闭组件逆操作字工作尚不是完整父／Child 函数定理。"
+      },
+      "remaining": {
+        "en": "Compose whole parent/Child control and inverse functions, including all admission/failure domains, and propagate the explicit strict Equation (54) revision. Original refutations and S01/S02 obligations remain.",
+        "zh-CN": "仍需组合完整父／Child 控制及逆操作函数，包含全部准入／失败定义域，并贯通显式严格公式 (54) 修订。原反例及 S01／S02 义务保留。"
+      },
+      "closeWhen": [
+        {
+          "en": "Relate actual roots, current continuations and accumulated inverses at arbitrary admissible test inputs, including failures.",
+          "zh-CN": "在任意允许测试输入上关联实际根、当前续体与累积逆操作，包含失败。"
+        },
+        {
+          "en": "Construct name/reference transport for stored values, retired identities and future inputs; audit precisely whether Equation (54) or a revision is obtained.",
+          "zh-CN": "构造存储值、已退休身份和未来输入的名称／引用迁移；明确审计得到的是公式 (54) 还是修订关系。"
+        }
+      ],
+      "validation": {
+        "en": "Use different real inverse words with related observations; reject literal-name reuse that changes a future input.",
+        "zh-CN": "使用逆操作字不同而观察相关的真实执行；拒绝改变未来输入含义的字面名称复用。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "function_correspondence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs",
+          "symbol": "pure_table_self_relation_fails"
+        },
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "natural_execution_inputs"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "S04",
+      "title": {
+        "en": "Close the disposition of vestigial-entry Lemma 62",
+        "zh-CN": "闭合残留条目引理 62 的处理"
+      },
+      "category": "audit",
+      "stage": "composition",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        52,
+        62,
+        78,
+        79,
+        80
+      ],
+      "dependsOn": [],
+      "premises": [
+        "M12",
+        "M14"
+      ],
+      "current": {
+        "en": "The original lemma is refuted; guarded erasure and retained-entry results already exist.",
+        "zh-CN": "原引理已有反例；已有带守卫擦除及条目保留结果。"
+      },
+      "remaining": {
+        "en": "A downstream-wide replacement has not been audited and connected to every deletion/normalization caller.",
+        "zh-CN": "尚未完成面向全部下游结论的替代审计，也未接通每个删除／正规化调用者。"
+      },
+      "closeWhen": [
+        {
+          "en": "Enumerate the parent, provision reservation, historical inverse and freshness exceptions in the replacement statement.",
+          "zh-CN": "在替代陈述中列全父关系、provision 预留、历史逆操作和新鲜性例外。"
+        },
+        {
+          "en": "Remove reliance on the false unconditional rule from final proofs, while keeping item 62 refuted.",
+          "zh-CN": "最终证明不再依赖错误的无条件规则，同时保持第 62 项 refuted。"
+        }
+      ],
+      "validation": {
+        "en": "Retain the reachable counterexample and a nonempty suffix transport through the actual retention guard.",
+        "zh-CN": "保留可达反例，以及经过实际保留守卫的非空后缀迁移。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/deletion.rs",
+          "symbol": "child_retirement_erases"
+        },
+        {
+          "file": "crates/cordis-kernel/src/typed_child_domain.rs",
+          "symbol": "kernel_domain"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "mixed",
+        "fresh",
+        "native"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "S05",
+      "title": {
+        "en": "Close the completion clause of Theorem 71",
+        "zh-CN": "闭合定理 71 的完成性条款"
+      },
+      "category": "audit",
+      "stage": "specification",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        58,
+        69,
+        71,
+        73
+      ],
+      "dependsOn": [],
+      "premises": [
+        "M07",
+        "M09"
+      ],
+      "current": {
+        "en": "A total Unit component gives a finite-prefix counterexample to unconditional episode closure.",
+        "zh-CN": "总 Unit 组件给出了无条件 Episode 闭合的有限前缀反例。"
+      },
+      "remaining": {
+        "en": "The replacement must separate an actual closing event, extendibility and eventual closure under additional conditions.",
+        "zh-CN": "替代陈述必须区分实际结束事件、可扩展性，以及附加条件下的最终闭合。"
+      },
+      "closeWhen": [
+        {
+          "en": "Preserve the proved coherence clauses and state exactly which completion clause changes.",
+          "zh-CN": "保留已证明的解析一致性条款，明确修改哪条完成性陈述。"
+        },
+        {
+          "en": "Trace every eventual-completion use to the progress and host-response premises rather than a finite-prefix theorem.",
+          "zh-CN": "把每处最终完成性使用追溯到进展及宿主响应前提，不能从有限前缀定理推出。"
+        }
+      ],
+      "validation": {
+        "en": "Keep the four-step counterexample and arbitrary legal delay; distinguish successful future extension from closure of the given trace.",
+        "zh-CN": "保留四步反例与任意合法延迟；区分未来可成功扩展与给定轨迹已经闭合。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/resolution_completion_counterexample.rs",
+          "symbol": "actual_counterexample"
+        },
+        {
+          "file": "crates/cordis-kernel/src/resolution_completion_counterexample.rs",
+          "symbol": "arbitrary_delay"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "async"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "S06",
+      "title": {
+        "en": "Close support well-foundedness Lemma 75",
+        "zh-CN": "闭合支持良基引理 75 的处理"
+      },
+      "category": "audit",
+      "stage": "specification",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        72,
+        74,
+        75,
+        80
+      ],
+      "dependsOn": [],
+      "premises": [
+        "M08",
+        "M14"
+      ],
+      "current": {
+        "en": "A reachable total Unit example has acyclic provider precedence and a cyclic parent/provider union.",
+        "zh-CN": "可达的总 Unit 案例中 provider 先行关系无环，父子／provider 并关系仍有环。"
+      },
+      "remaining": {
+        "en": "Choose and justify a corrected support theorem without assuming that provider rank also ranks parent edges.",
+        "zh-CN": "需要确定并证明修订的支持定理，不能假设 provider 排名同时约束父边。"
+      },
+      "closeWhen": [
+        {
+          "en": "State whether the needed result is a support solution, uniqueness or a genuine union ranking; prove the exact claim under sourced premises.",
+          "zh-CN": "明确所需结论是支持解、唯一性还是真正的并关系排名，并在有来源的前提下证明。"
+        },
+        {
+          "en": "Audit canonical-form uses of the invalid well-foundedness inference while preserving the original counterexample.",
+          "zh-CN": "审计规范形证明中对错误良基推断的使用，同时保留原反例。"
+        }
+      ],
+      "validation": {
+        "en": "Check the original total-component witness and exercise the corrected theorem on a nontrivial reachable registry.",
+        "zh-CN": "核对原文总组件见证，并在非平凡可达注册表上实例化修订定理。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "actual_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "quiet_active_unique_by_precedence"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "S07",
+      "title": {
+        "en": "Close quiescent support Lemma 77",
+        "zh-CN": "闭合静止支持引理 77 的处理"
+      },
+      "category": "audit",
+      "stage": "specification",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        52,
+        74,
+        76,
+        77,
+        80,
+        81
+      ],
+      "dependsOn": [],
+      "premises": [
+        "M14"
+      ],
+      "current": {
+        "en": "An externally inserted child under a retired parent refutes the original claim; origin-aware corrections exist.",
+        "zh-CN": "在已退休父组件下外部插入子组件可反驳原结论；已有区分出生来源的修订。"
+      },
+      "remaining": {
+        "en": "The general support/configuration theorem must use the actual origin distinction rather than silently banning legal external insertion.",
+        "zh-CN": "一般支持／配置定理需使用真实出生来源区别，不能静默禁止合法外部插入。"
+      },
+      "closeWhen": [
+        {
+          "en": "State the support equation for external and lifecycle-created fibers and establish actual source classification.",
+          "zh-CN": "给出外部与生命周期创建 fiber 的支持方程，并建立实际来源分类。"
+        },
+        {
+          "en": "Connect the corrected quiet/Active statement to parent, provider and configuration observations.",
+          "zh-CN": "把修订后的 quiet／Active 结论连接到父关系、provider 与配置观察。"
+        }
+      ],
+      "validation": {
+        "en": "Retain the five-step counterexample and test the actual external-insert versus Child paths.",
+        "zh-CN": "保留五步反例，并覆盖实际外部插入与 Child 两条路径。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained_protocol_quiet_support"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_child_completion.rs",
+          "symbol": "native_child_endpoint"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "configuration"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "P01",
+      "title": {
+        "en": "Enforce the complete controlled-effect boundary",
+        "zh-CN": "落实完整的受控效果边界"
+      },
+      "category": "production",
+      "stage": "integration",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        29,
+        30,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        44,
+        45,
+        46,
+        55,
+        56,
+        57
+      ],
+      "dependsOn": [
+        "S02"
+      ],
+      "premises": [
+        "M02",
+        "M13"
+      ],
+      "current": {
+        "en": "The original protected interpreter supports mixed closed scalar/typed operations. closed::Value rejects hidden payload effects and all callback instructions. Sealed owners retain native Child and data inverses; ordinary Arc<T> and callbacks remain explicit compatibility boundaries.",
+        "zh-CN": "原受保护解释器已支持混合封闭 scalar／typed 操作。closed::Value 排除隐藏载荷效果，并拒绝全部回调指令。封闭 owner 保留原生 Child 与数据逆操作；普通 Arc<T> 和回调仍属显式兼容边界。"
+      },
+      "remaining": {
+        "en": "Whole admitted component access, verified public namespace producers and the all-entry footprint/domain audit remain required. The update-recovery case validates selected managed primitives and protocol safety without claiming this complete boundary.",
+        "zh-CN": "完整准入组件访问、公共命名空间的已验证生产者及全部入口读写范围／定义域审查仍需完成。更新恢复案例验收所选受管原语与协议安全，不宣称完整边界关闭。"
+      },
+      "closeWhen": [
+        {
+          "en": "Enumerate every read/write/restore entry for admitted resources and ensure each has the selected footprint, exact domain and real inverse law.",
+          "zh-CN": "列全纳入保证的资源读／写／恢复入口，确保每条具备所选读写范围、精确定义域和真实逆操作定律。"
+        },
+        {
+          "en": "Prevent or explicitly reject untracked aliases and hidden effects on the guaranteed path; require a checked extension mechanism for new primitives.",
+          "zh-CN": "保证路径须阻止或明确拒绝未跟踪别名和隐藏效果；新原语必须经受验证的扩展机制加入。"
+        }
+      ],
+      "validation": {
+        "en": "Use the existing hidden-write fixture; add bypass/alias and inverse-substitution controls only after the complete interface is connected.",
+        "zh-CN": "使用现有隐藏写入夹具；完整接口接通后补旁路／别名及替换逆操作的必要负控。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "symbol": "commit_calculation"
+        },
+        {
+          "file": "crates/cordis-kernel/src/controlled_effect.rs",
+          "symbol": "apply_controlled_effect"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "symbol": "controlled_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_observation.rs",
+          "symbol": "is_scalar_program"
+        },
+        {
+          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "symbol": "prepare_instruction_observed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed.rs",
+          "symbol": "apply"
+        }
+      ],
+      "paths": [
+        "native",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "P02",
+      "title": {
+        "en": "Compose the complete admitted component carrier",
+        "zh-CN": "组合完整的准入组件载体"
+      },
+      "category": "production",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        17,
+        18,
+        29,
+        30,
+        37,
+        39,
+        40,
+        41,
+        48,
+        49,
+        52,
+        55,
+        56,
+        57,
+        76
+      ],
+      "dependsOn": [
+        "S02",
+        "P01"
+      ],
+      "premises": [
+        "M01",
+        "M02",
+        "M11",
+        "M13"
+      ],
+      "current": {
+        "en": "R1 covers closed parents/children; managed functions cover heterogeneous scalar/replacement bodies with actual results and queue interpretation.",
+        "zh-CN": "R1 覆盖封闭父／子组件；managed 函数已有标量／替换混合函数、实际结果和队列解释。"
+      },
+      "remaining": {
+        "en": "One admitted carrier must compose provision, Child, real continuations and all supported effects across arbitrary admissible inputs.",
+        "zh-CN": "统一准入载体仍须在任意允许输入上组合 provision、Child、真实续体及全部支持效果。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive root, continuation and dynamically created Child membership from the installed body and primitive library, not caller-supplied membership.",
+          "zh-CN": "从已安装函数体和原语库推导根、续体与动态 Child 成员资格，不由调用者提供成员假设。"
+        },
+        {
+          "en": "Connect body execution, publication completeness and returned inverse ownership to the same carrier; preserve exact failure domains.",
+          "zh-CN": "把函数执行、完整发布和返回逆操作归属接到同一载体，保留精确失败定义域。"
+        }
+      ],
+      "validation": {
+        "en": "Exercise a parent with a real Child, mixed values, provision and a failure prefix; reject a wrong continuation or inverse.",
+        "zh-CN": "运行包含真实 Child、混合值、provision 和失败前缀的父组件；拒绝错误续体或逆操作。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_semantics.rs",
+          "symbol": "component"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "symbol": "execute_call"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "symbol": "root_component"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "P03",
+      "title": {
+        "en": "Close aliases, dynamic bindings and value observations",
+        "zh-CN": "闭合别名、动态绑定与值观察"
+      },
+      "category": "production",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        33,
+        44,
+        45,
+        46,
+        47,
+        50,
+        51,
+        53,
+        55,
+        56,
+        61
+      ],
+      "dependsOn": [
+        "S02",
+        "P01"
+      ],
+      "premises": [
+        "M02",
+        "M04",
+        "M05",
+        "M12"
+      ],
+      "current": {
+        "en": "Closed replay includes actual slot alias tracking, compare-and-swap replacement, declared but unvisited slots, early/late provision and grouped multi-service publication ownership. Begin-captured providers remain distinct from current targets.",
+        "zh-CN": "封闭重放已包含真实槽位别名追踪、CAS 替换、声明但未访问的槽、早／晚 provision 及多服务 publication 的共同 owner；仍区分 Begin 捕获 provider 与当前 target。"
+      },
+      "remaining": {
+        "en": "Complete the general shared read/write/recovery interpretation and whole-component proof composition; retain exact named-key premises and the explicit alias-aware extension.",
+        "zh-CN": "仍需一般共享读写／恢复解释及完整组件证明组合；保留具名键投影的精确前提与显式别名扩展。"
+      },
+      "closeWhen": [
+        {
+          "en": "Track actual allocation identity through alias creation, slot replacement, revoke/reprovide and multi-version publication.",
+          "zh-CN": "在别名创建、槽替换、撤销／重新发布及多版本 publication 中跟踪实际分配身份。"
+        },
+        {
+          "en": "Derive the exact named-key projection when its premises hold; specify the alias-aware extension otherwise, without imposing an unstated alias ban.",
+          "zh-CN": "满足前提时推出精确的具名键投影；否则明确别名扩展，不暗中禁止别名。"
+        }
+      ],
+      "validation": {
+        "en": "Use shared aliases and same-value/new-allocation replacements; reject duplicated target storage or stale version acceptance.",
+        "zh-CN": "覆盖共享别名及相同值的新分配替换；拒绝目标存储被复制或错误接受旧版本。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_semantics.rs",
+          "symbol": "alias_frame"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_semantics.rs",
+          "symbol": "single_key_projection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_history.rs",
+          "symbol": "publication_retained"
+        },
+        {
+          "file": "crates/cordis-kernel/src/value_slot.rs",
+          "symbol": "initial_selection"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_host.rs",
+          "symbol": "provide"
+        },
+        {
+          "file": "crates/cordis-kernel/src/execution.rs",
+          "symbol": "provide"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_binding.rs",
+          "symbol": "prepare_mapped_scalar"
+        }
+      ],
+      "paths": [
+        "native",
+        "node",
+        "configuration"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "P04",
+      "title": {
+        "en": "Close production-step composition for the final scope",
+        "zh-CN": "闭合最终范围的生产步骤组合"
+      },
+      "category": "production",
+      "stage": "composition",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        48,
+        49,
+        50,
+        51,
+        53,
+        54,
+        58,
+        59,
+        63,
+        64,
+        70,
+        71,
+        81
+      ],
+      "dependsOn": [
+        "S03",
+        "P02",
+        "P03"
+      ],
+      "premises": [
+        "M03",
+        "M07",
+        "M11",
+        "M13"
+      ],
+      "current": {
+        "en": "R2 managed-production/v1 is accepted: actual arguments, returns, queue origins, native/configuration history and Node protocol steps are interpreted.",
+        "zh-CN": "R2 managed-production/v1 已验收：实际参数、返回、队列来源、native／配置历史及 Node 协议步骤已有解释。"
+      },
+      "remaining": {
+        "en": "The strengthened controlled APIs and all final recovery/scheduling paths must instantiate that interpretation together, including failure and extension steps.",
+        "zh-CN": "加强后的受控 API 及最终恢复／调度全部路径，仍须共同实例化该解释，包含失败及扩展步骤。"
+      },
+      "closeWhen": [
+        {
+          "en": "Audit every mutating public path and state field against its owner and classified transition; identify the exact path coverage without restarting R2's completed work.",
+          "zh-CN": "逐项核对公开修改路径和状态字段的所有者及分类转换；精确列出覆盖范围，复用 R2 已完成工作。"
+        },
+        {
+          "en": "Construct the complete applicable production trajectory from actual calls; no supplied expected outputs, fabricated stutters or artificial global order across independent Journals.",
+          "zh-CN": "从实际调用构造完整适用生产轨迹；不得预设期望输出、伪造观察停顿或为独立 Journal 捏造全局顺序。"
+        }
+      ],
+      "validation": {
+        "en": "Extend the existing R2 source-bound acceptance only where the guaranteed carrier changes; check missing producer and false-stutter mutations.",
+        "zh-CN": "仅在保证载体变化处扩展既有 R2 源码绑定验收；检查遗漏生产者与伪造停顿的变异。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/joint_classification.rs",
+          "symbol": "classify_history"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "symbol": "run_function"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_source_history.rs",
+          "symbol": "complete_projection"
+        }
+      ],
+      "paths": [
+        "native",
+        "node",
+        "configuration",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "P05",
+      "title": {
+        "en": "Audit and enforce host and external-resource contracts",
+        "zh-CN": "审计并落实宿主与外部资源合同"
+      },
+      "category": "boundary",
+      "stage": "integration",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        8,
+        17,
+        18,
+        23,
+        29,
+        48,
+        54,
+        55,
+        58,
+        68,
+        69,
+        70,
+        73,
+        81
+      ],
+      "dependsOn": [
+        "P01"
+      ],
+      "premises": [
+        "M09",
+        "M10"
+      ],
+      "current": {
+        "en": "The cleanup protocol proves retention, fresh retries and stale rejection; adapters test callbacks, FFI, reference handling and persistence.",
+        "zh-CN": "清理协议证明保留、新重试及旧回复拒绝；适配器测试覆盖回调、FFI、引用处理与持久化。"
+      },
+      "remaining": {
+        "en": "A complete boundary inventory and resource-specific evidence must distinguish external restoration from an accepted host report.",
+        "zh-CN": "仍须有完整边界清单及逐资源证据，区分外部恢复事实与被接受的宿主报告。"
+      },
+      "closeWhen": [
+        {
+          "en": "List every trusted conversion, callback, mutable payload interior, destructor and external effect relevant to a claimed guarantee, with its actual caller and required contract.",
+          "zh-CN": "列全每项保证涉及的可信转换、回调、可变载荷内部、析构和外部效果，标明实际调用者及所需合同。"
+        },
+        {
+          "en": "Enforce verified/opaque path boundaries; prove internal obligations rather than moving target success or ownership closure into environment assumptions.",
+          "zh-CN": "落实受验证／不透明路径边界；内部义务由证明承担，不能把目标成功或所有权闭合转嫁给环境。"
+        }
+      ],
+      "validation": {
+        "en": "Keep FnOnce consumed failure, retained FnMut retry and Node acknowledgement distinct; demonstrate one real resource adapter and its limits.",
+        "zh-CN": "区分 FnOnce 已消耗失败、FnMut 保留重试及 Node 确认；展示一个真实资源适配器及其边界。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "complete"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "symbol": "complete_future"
+        },
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "as_paper_entry"
+        }
+      ],
+      "paths": [
+        "host",
+        "node",
+        "async",
+        "configuration"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R01",
+      "title": {
+        "en": "Derive the shared target heap and cross-call inputs",
+        "zh-CN": "推导共享目标堆与跨调用输入"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        23,
+        29,
+        30,
+        49,
+        50,
+        51,
+        58,
+        61,
+        68,
+        69,
+        79
+      ],
+      "dependsOn": [
+        "P01",
+        "P03",
+        "S03"
+      ],
+      "premises": [
+        "M03",
+        "M04",
+        "M12",
+        "M13"
+      ],
+      "current": {
+        "en": "Closed-data Session now combines real mixed scalar/typed root execution, historical restore/resume, shared allocation and head mappings, declaration aliases, publication finalization and repeated source plugin identities. The sealed component captures the original data/Child inverse word. General whole-function composition and public source-namespace production remain open. The separately scoped provider-consumer-one-child delivery does not close R01.",
+        "zh-CN": "封闭数据 Session 已组合真实 scalar／typed 混合 root、历史恢复后继续执行、共享分配和 head 映射、声明别名、publication 完成及重复源插件身份。封闭组件捕获原数据／Child 逆操作字。一般完整函数组合与公共入口的来源命名空间生产仍开放。独立的 provider／consumer／一层 Child 交付不关闭 R01。"
+      },
+      "remaining": {
+        "en": "Complete whole-component root/current/inverse correspondence, automatic namespace provenance, registration-failure identity retention, and the unchanged P01/P03/S03 dependencies. Generality is deferred behind the named update-recovery delivery; no acceptance criterion is removed.",
+        "zh-CN": "仍需完整组件 root／current／inverse 对应、自动命名空间来源、登记失败身份保留及不变的 P01／P03／S03 依赖。通用性后置于具名更新恢复交付；不删除验收条件。"
+      },
+      "closeWhen": [
+        {
+          "en": "Construct one injective source/target allocation map and first-input selection from actual provenance, retaining aliases and historical references.",
+          "zh-CN": "从实际来源构造单射的源／目标分配映射及首次输入选择，保留别名与历史引用。"
+        },
+        {
+          "en": "Maintain scalar value/depth and typed value/head/revision correspondence by actual execution; derive each retained successful operation's target domain.",
+          "zh-CN": "通过实际执行保持标量值／深度和 typed 值／head／revision 对应，推出每个保留成功操作的目标定义域。"
+        }
+      ],
+      "validation": {
+        "en": "Use repeated calls, alias changes, outstanding inverses and version restoration; reject invented depth, copied source revisions and assumed target success.",
+        "zh-CN": "覆盖重复调用、别名变化、未完成逆操作和版本恢复；拒绝虚构深度、复制源 revision 及假设目标成功。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "symbol": "bind"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "run_controlled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_transport.rs",
+          "symbol": "pair_step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "symbol": "mapping_injective"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "symbol": "seed_following"
+        },
+        {
+          "file": "crates/cordis-kernel/src/joint_execution.rs",
+          "symbol": "allocate_following"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value.rs",
+          "symbol": "new_in_following"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_payload.rs",
+          "symbol": "new_in_following"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_continuity.rs",
+          "symbol": "check"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "symbol": "continues"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_payload_history.rs",
+          "symbol": "continues_payload"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_observation.rs",
+          "symbol": "check_scalar_observations"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "run_checked_scalar"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "symbol": "instantiate"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_selection.rs",
+          "symbol": "check_scalar_replay"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "symbol": "find"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "scalar_aliases"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_binding.rs",
+          "symbol": "prepare_mapped_scalar"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed.rs",
+          "symbol": "apply"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_scalar.rs",
+          "symbol": "land"
+        },
+        {
+          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "symbol": "prepare_instruction_observed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_effect.rs",
+          "symbol": "prepare_instruction_at"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_payload.rs",
+          "symbol": "land"
+        },
+        {
+          "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+          "symbol": "apply_payload_captured_following"
+        },
+        {
+          "file": "crates/cordis-kernel/src/payload_inverse.rs",
+          "symbol": "apply_captured_following"
+        },
+        {
+          "file": "crates/cordis-kernel/src/shared_payload.rs",
+          "symbol": "same_head"
+        },
+        {
+          "file": "crates/cordis-kernel/src/value_slot.rs",
+          "symbol": "same_revision"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "symbol": "duplicate"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_payload_history.rs",
+          "symbol": "same_payload_before"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "symbol": "first_input"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_selection.rs",
+          "symbol": "check_payload_capture"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "symbol": "input_spec"
+        },
+        {
+          "file": "crates/cordis-kernel/src/protected_value.rs",
+          "symbol": "acquire_exclusive"
+        },
+        {
+          "file": "crates/cordis-kernel/src/protected_slot.rs",
+          "symbol": "acquire_exclusive"
+        },
+        {
+          "file": "crates/cordis-kernel/src/protected_function.rs",
+          "symbol": "execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_protected.rs",
+          "symbol": "check_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_protected.rs",
+          "symbol": "instantiate_protected"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "run_exclusive"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "exclusive_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "symbol": "run_function_with"
+        },
+        {
+          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "symbol": "commit_calculation_in"
+        },
+        {
+          "file": "crates/cordis-kernel/src/protected_payload.rs",
+          "symbol": "apply"
+        },
+        {
+          "file": "crates/cordis-kernel/src/protected_typed_function.rs",
+          "symbol": "apply"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed_protected.rs",
+          "symbol": "check_initial_entry"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "run_exclusive_typed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "symbol": "run_function_in"
+        },
+        {
+          "file": "crates/cordis-kernel/src/payload_inverse.rs",
+          "symbol": "apply_captured_in"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed_tracker.rs",
+          "symbol": "prepare"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed_tracker.rs",
+          "symbol": "advance"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed_correspondence.rs",
+          "symbol": "compose"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed_correspondence.rs",
+          "symbol": "certify"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed_correspondence.rs",
+          "symbol": "inverse"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "typed_replay_matches"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "typed_aliases"
+        }
+      ],
+      "paths": [
+        "native"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R02",
+      "title": {
+        "en": "Execute the complete surviving native lifecycle",
+        "zh-CN": "执行完整的剩余 native 生命周期"
+      },
+      "category": "recovery",
+      "stage": "integration",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        49,
+        50,
+        52,
+        53,
+        54,
+        58,
+        59,
+        68,
+        69,
+        70,
+        79
+      ],
+      "dependsOn": [
+        "R01",
+        "P02",
+        "P04"
+      ],
+      "premises": [
+        "M03",
+        "M04",
+        "M07",
+        "M13"
+      ],
+      "current": {
+        "en": "Kernel control replay and real retained-root invocations exist, with separate target ticket domains and real cleanup owners. Checked scalar replay shares run_ordered with ordinary batch execution; observation failure returns the actual report and cleanup owner before starting a later call. Existing publication entries now provably survive actual Finish calls through every native host layer. The original root execution retains Begin value-state capture, and instantiate exports that connection to the checked batch. Selection rejection keeps the executed call and its cleanup owner.",
+        "zh-CN": "已有 Kernel 控制重放及真实保留根调用，使用独立目标票据域和真实清理 owner。 检查型标量重放与普通 batch 共用 run_ordered；观察不一致时返回真实报告和清理所有者，不再启动后续调用。 现已贯通各原生宿主层，证明实际 Finish 保留已有发布项；原 root 执行保留 Begin 的值状态捕获，instantiate 将其导出给检查型 batch。选择拒绝保留已执行调用及其清理 owner。"
+      },
+      "remaining": {
+        "en": "Registration, Begin, calls, Finish, departure, cleanup/retry and Unload are not yet one complete producer-derived target execution.",
+        "zh-CN": "登记、Begin、调用、Finish、离开、清理／重试和 Unload 尚未组成一条完整的生产者驱动目标执行。"
+      },
+      "closeWhen": [
+        {
+          "en": "Schedule all retained events through the original public executor and reconstruct actual publication payloads.",
+          "zh-CN": "经原公开执行器调度全部保留事件，并重建实际 publication 载荷。"
+        },
+        {
+          "en": "Derive action, work, Journal and inverse maps from target returns, including rejection, capacity and successful-prefix ownership.",
+          "zh-CN": "从目标返回推导 action、work、Journal 和 inverse 映射，包含拒绝、容量及成功前缀所有权。"
+        }
+      ],
+      "validation": {
+        "en": "Run an update with cleanup failure/retry and an interior Unload; a control-only replay or a precomputed expected target trace cannot satisfy this task.",
+        "zh-CN": "执行包含清理失败／重试及中间 Unload 的更新；仅控制重放或预先给定期望目标轨迹不能关闭本项。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/kernel_replay.rs",
+          "symbol": "from_registration"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "symbol": "instantiate_controlled"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_source_cleanup.rs",
+          "symbol": "unload_at"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "symbol": "run_ordered"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_values.rs",
+          "symbol": "finish_native_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_host.rs",
+          "symbol": "finish_native_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_native.rs",
+          "symbol": "finish_managed_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_runtime.rs",
+          "symbol": "finish_managed_execution"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_lifecycle_native.rs",
+          "symbol": "finish"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_lifecycle_native.rs",
+          "symbol": "run_recorded_root"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_selection.rs",
+          "symbol": "preserve_providers"
+        }
+      ],
+      "paths": [
+        "native",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R03",
+      "title": {
+        "en": "Derive complete selection from producer ownership",
+        "zh-CN": "从生产者所有权推导完整选择"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        8,
+        9,
+        16,
+        48,
+        52,
+        54,
+        58,
+        67,
+        68,
+        69,
+        79
+      ],
+      "dependsOn": [
+        "P01",
+        "P04"
+      ],
+      "premises": [
+        "M03",
+        "M06"
+      ],
+      "current": {
+        "en": "Producer histories, census, before-interval inverse obligations and matching real release evidence are available.",
+        "zh-CN": "已有生产者历史、census、区间前逆操作义务及匹配的真实释放证据。"
+      },
+      "remaining": {
+        "en": "General multi-owner closed selection still needs automatic coverage of all foreign effects, later producers and unique inverse consumption.",
+        "zh-CN": "一般多 owner 闭合选择仍需自动覆盖全部外部效果、后续生产者和逆操作唯一消费。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive the selected effect set and every outstanding pre-interval obligation from actual ownership history, including retired and destructive producers.",
+          "zh-CN": "从实际所有权历史导出选定效果集合及每项区间前未完成义务，包含已退休和破坏性生产者。"
+        },
+        {
+          "en": "Prove complete creation/consumption coverage without a caller-provided complete census or expected restored state.",
+          "zh-CN": "证明完整创建／消费覆盖，不要求调用者提供完整 census 或期望恢复状态。"
+        }
+      ],
+      "validation": {
+        "en": "Use destructive and retired producers, failed prefixes and duplicate replies; reject omission of a required producer or double consumption.",
+        "zh-CN": "覆盖破坏性及已退休生产者、失败前缀和重复回复；拒绝遗漏必要生产者或重复消费。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_producer_recovery.rs",
+          "symbol": "recorded_census"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_source_obligations.rs",
+          "symbol": "available"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "symbol": "closed_from_owners"
+        }
+      ],
+      "paths": [
+        "native",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R04",
+      "title": {
+        "en": "Compose Child, consumers and repeated episodes",
+        "zh-CN": "组合 Child、consumer 与重复 Episode"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        48,
+        52,
+        54,
+        58,
+        62,
+        67,
+        68,
+        69,
+        70,
+        79
+      ],
+      "dependsOn": [
+        "R02",
+        "R03",
+        "S04"
+      ],
+      "premises": [
+        "M03",
+        "M06",
+        "M14"
+      ],
+      "current": {
+        "en": "Actual Child birth, retirement and own Unload witnesses join managed recovery at common cuts; restricted closed-region examples include consumers.",
+        "zh-CN": "真实 Child 出生、退休及自身 Unload 见证已在共同切点连接 managed 恢复；受限闭合区域案例包含 consumer。"
+      },
+      "remaining": {
+        "en": "The same general executable selected interval must support owner-created children, real consumers, reactivation and interior owner Unload together.",
+        "zh-CN": "同一一般可执行选定区间仍须共同支持 owner 创建 Child、真实 consumer、重新激活及中间 owner Unload。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive child/consumer closure for every original inverse and preserve surviving owners and later episodes.",
+          "zh-CN": "为每个原始逆操作推导 Child／consumer 闭合，并保留其他 owner 与后续 Episode。"
+        },
+        {
+          "en": "Use the Child's actual terminal evidence, not parent drainage or a service dependency mistaken for ownership.",
+          "zh-CN": "使用 Child 自身的实际终态证据，不从父组件排空或服务依赖推断所有权闭合。"
+        }
+      ],
+      "validation": {
+        "en": "Combine dynamic Child, consumer cleanup failure, later reactivation and an independent survivor in one execution.",
+        "zh-CN": "在同一执行中组合动态 Child、consumer 清理失败、后续激活和独立保留组件。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/managed_child_completion.rs",
+          "symbol": "native_child_endpoint"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_recovery_cut.rs",
+          "symbol": "unload_recovers_with_children"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_unload_census.rs",
+          "symbol": "unload_census"
+        }
+      ],
+      "paths": [
+        "native",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R05",
+      "title": {
+        "en": "Transport selected episodes through Mixed and Fresh",
+        "zh-CN": "迁移 Mixed／Fresh 的选定 Episode"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        30,
+        52,
+        58,
+        61,
+        68,
+        69,
+        78,
+        79
+      ],
+      "dependsOn": [
+        "S03",
+        "S04",
+        "R03"
+      ],
+      "premises": [
+        "M03",
+        "M06",
+        "M12"
+      ],
+      "current": {
+        "en": "Closed synchronous regions and Fresh compacted-script completeness are proved; actual replay examples are available.",
+        "zh-CN": "已有封闭同步区域及 Fresh 压缩脚本完备性证明，也有实际重放案例。"
+      },
+      "remaining": {
+        "en": "Episode-specific selection, Mixed fixed-name code transport and more general cross-region sharing still need composition.",
+        "zh-CN": "按 Episode 选择、Mixed 固定名称代码迁移及更一般跨区域共享仍需组合。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive the selected episode plan from actual script history and transport full code/input/name support.",
+          "zh-CN": "从实际脚本历史推出选定 Episode 计划，并迁移完整代码／输入／名称支撑。"
+        },
+        {
+          "en": "Have the original executor run the plan with derived acceptance and preserved real inverse words.",
+          "zh-CN": "让原执行器运行计划，推导准入成立并保留真实逆操作字。"
+        }
+      ],
+      "validation": {
+        "en": "Cover reused logical names, removed historical records, provision consumers and a retained failing prefix.",
+        "zh-CN": "覆盖逻辑名称复用、已移除历史记录、provision consumer 和保留的失败前缀。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/fresh_compaction.rs",
+          "symbol": "compact"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_script_completeness.rs",
+          "symbol": "establish_replay"
+        },
+        {
+          "file": "crates/cordis-kernel/src/closed_region_execution.rs",
+          "symbol": "step"
+        }
+      ],
+      "paths": [
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R06",
+      "title": {
+        "en": "Connect admitted async landing and interval cleanup",
+        "zh-CN": "接通已准入异步落地与区间清理"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        17,
+        18,
+        29,
+        54,
+        57,
+        58,
+        68,
+        69,
+        70,
+        71,
+        73
+      ],
+      "dependsOn": [
+        "R02",
+        "R03",
+        "P05"
+      ],
+      "premises": [
+        "M02",
+        "M07",
+        "M09",
+        "M13"
+      ],
+      "current": {
+        "en": "Actual admission/result tickets, landing Divert and stale rejection are checked; finite cleanup histories preserve failed work.",
+        "zh-CN": "实际准入／结果票据、落地 Divert 及旧回复拒绝已验证；有限清理历史保留失败工作。"
+      },
+      "remaining": {
+        "en": "All admitted asynchronous paths and allowed simultaneous admissions need recovery transport across intervening operations.",
+        "zh-CN": "全部纳入范围的异步路径及允许的同时准入，仍需跨中间操作的恢复迁移。"
+      },
+      "closeWhen": [
+        {
+          "en": "Bind actual yielded results and inverses to the selected source/target call; derive domain preservation or explicitly modeled rejection.",
+          "zh-CN": "把实际返回结果及逆操作绑定到选定源／目标调用，推出定义域保持或明确建模的拒绝。"
+        },
+        {
+          "en": "Prove that split inverse execution over an interval has the claimed recovery observation; state eventual completion separately.",
+          "zh-CN": "证明跨区间分步执行逆操作具有所声称的恢复观察；另行规定最终完成条件。"
+        }
+      ],
+      "validation": {
+        "en": "Cover target changes while pending, cancellation, stale replies, partial cleanup and retry without assuming a future returns.",
+        "zh-CN": "覆盖 pending 时目标变化、取消、旧回复、部分清理与重试，不假设 Future 必然返回。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/stage_landing.rs",
+          "symbol": "land_result"
+        },
+        {
+          "file": "crates/cordis-kernel/src/async_completion.rs",
+          "symbol": "await_completion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "symbol": "complete_future"
+        }
+      ],
+      "paths": [
+        "async",
+        "native",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R07",
+      "title": {
+        "en": "Prove recovery for the separate Node protocol",
+        "zh-CN": "证明独立 Node 协议的恢复"
+      },
+      "category": "recovery",
+      "stage": "integration",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        23,
+        48,
+        50,
+        51,
+        53,
+        54,
+        58,
+        68,
+        69,
+        70,
+        79
+      ],
+      "dependsOn": [
+        "P03",
+        "P05",
+        "R03"
+      ],
+      "premises": [
+        "M03",
+        "M06",
+        "M07",
+        "M10"
+      ],
+      "current": {
+        "en": "Node protocol/reference trajectories, lease manifests, failed-cleanup retention and stale reply tests exist.",
+        "zh-CN": "已有 Node 协议／引用轨迹、lease 清单、失败清理保留及旧回复测试。"
+      },
+      "remaining": {
+        "en": "The independent Node history needs its own surviving-execution and recovery proof; native scalar recovery does not establish it.",
+        "zh-CN": "独立 Node 历史需要自身的剩余执行和恢复证明，native 标量恢复不能代替。"
+      },
+      "closeWhen": [
+        {
+          "en": "Construct actual protocol/reference recovery for dynamic publications, aliases, child consumers and reload generations.",
+          "zh-CN": "为动态 publication、别名、Child consumer 及重载代次构造实际协议／引用恢复。"
+        },
+        {
+          "en": "Keep JS object interiors and external callback effects under their exact contracts; do not infer external restoration from Succeeded alone.",
+          "zh-CN": "JS 对象内部与外部回调效果保留精确合同；不能仅从 Succeeded 推出外部恢复。"
+        }
+      ],
+      "validation": {
+        "en": "Use the real addon/Bridge path with replacement, cleanup failure, fresh retry and old reply rejection; verify the protocol theorem separately from JS behavior tests.",
+        "zh-CN": "使用真实 addon／Bridge 路径覆盖替换、清理失败、新重试及旧回复拒绝；区分协议定理与 JS 行为测试。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/node_runtime.rs",
+          "symbol": "snapshot"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime.rs",
+          "symbol": "replace"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime.rs",
+          "symbol": "apply_episode_command"
+        }
+      ],
+      "paths": [
+        "node",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R08",
+      "title": {
+        "en": "Compose the exact recovery expression at every cut",
+        "zh-CN": "组合每个切点的精确恢复式"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        43,
+        58,
+        67,
+        68,
+        69
+      ],
+      "dependsOn": [
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "G02"
+      ],
+      "premises": [
+        "M01",
+        "M02",
+        "M03",
+        "M04",
+        "M05",
+        "M06",
+        "M11"
+      ],
+      "current": {
+        "en": "Real history recovery, intermediate native observations and common final cuts are established in stated profiles. The actual Bank map now supports strict scalar forward/inverse transport on arbitrary related heaps; the relation at later real cuts is still a premise. Captured-source transport uses the actual retained instruction, branch and output. Checked source continuity now constructs a finite composable source word and its inverse-domain proof. Matching actual scalar reports also derive equality of their strict inverse states; this does not yet compose the general Equation (55). mapped_inverse couples the checked actual target allocation with the actual strict scalar inverse state. This is still a local completed-call result, not the general recovery equation.",
+        "zh-CN": "真实历史恢复、中间 native 观察及共同最终切点已在明确范围内建立。 真实 Bank 映射现可支持任意相关堆上的严格标量正向／逆向迁移；后续真实切点的状态关系仍是前提。 来源迁移已绑定实际保留的指令、分支和输出。 检查来源连续性现可构造有限的可组合来源词及其逆操作定义域证明；匹配的实际标量报告还能推出严格逆操作状态相等，但尚未组合一般式 (55)。 mapped_inverse 将检查后的实际目标分配与真实严格标量逆操作状态联系起来；这仍是已完成调用的局部结果，不是一般恢复式。"
+      },
+      "remaining": {
+        "en": "One end theorem must connect actual inverse definedness and observations to the source-frozen maps of Equation (55), then actual Unload to (56).",
+        "zh-CN": "仍需一个最终定理把实际逆操作有定义及观察连接到公式 (55) 的源固定映射，再把实际 Unload 接到 (56)。"
+      },
+      "closeWhen": [
+        {
+          "en": "For every admissible selected checkpoint, derive the real accumulator domain and the exact foreign-map composition at the opening state.",
+          "zh-CN": "对每个允许的选定检查点，推出真实累积逆操作定义域及起点上精确的外部映射组合。"
+        },
+        {
+          "en": "Prove equality/observational correspondence to actual cleanup results; explicitly justify any equivalence between recomputed target calls and source-frozen maps.",
+          "zh-CN": "证明与实际清理结果的相等／观察对应；明确证明重算目标调用与源固定映射之间的任何等价。"
+        }
+      ],
+      "validation": {
+        "en": "Check intermediate cuts and terminal Unload in the same actual Journal; reject a theorem that assumes inverse success or merely compares expected snapshots.",
+        "zh-CN": "在同一真实 Journal 检查中间切点与终态 Unload；拒绝假设逆操作成功或仅比较期望快照的定理。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/episode_replay.rs",
+          "symbol": "restored_observation_from_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_recovery_cut.rs",
+          "symbol": "unload_recovers_from_source_history"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_episode_replay.rs",
+          "symbol": "recover_cut"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_heap.rs",
+          "symbol": "scalar_contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_heap.rs",
+          "symbol": "captured_scalar_contract"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_continuity.rs",
+          "symbol": "recovery"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_observation.rs",
+          "symbol": "scalar_inverse"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_selection.rs",
+          "symbol": "mapped_inverse"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_typed.rs",
+          "symbol": "apply"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh",
+        "async",
+        "node"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "R09",
+      "title": {
+        "en": "Close legal episode deletion separately from recovery",
+        "zh-CN": "独立闭合合法的 Episode 删除"
+      },
+      "category": "recovery",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        52,
+        58,
+        62,
+        68,
+        69,
+        76,
+        79,
+        80
+      ],
+      "dependsOn": [
+        "R02",
+        "R04",
+        "R05",
+        "S04",
+        "G02"
+      ],
+      "premises": [
+        "M03",
+        "M04",
+        "M06",
+        "M12"
+      ],
+      "current": {
+        "en": "Several legal restricted deletions and real control replays exist; original Lemma 79 remains partial.",
+        "zh-CN": "已有若干合法受限删除及真实控制重放；原引理 79 仍为 partial。"
+      },
+      "remaining": {
+        "en": "The original theorem's total-provision, consumer and no-child-episode conditions must be audited separately from broader closed-region recovery goals.",
+        "zh-CN": "原定理的完全发布、consumer 和无 Child Episode 条件，必须与更广的闭合区域恢复目标分别审计。"
+      },
+      "closeWhen": [
+        {
+          "en": "Construct every surviving step and full suffix through the original executor under the exact selected deletion conditions.",
+          "zh-CN": "在精确选定删除条件下，通过原执行器构造每个保留步骤和完整后缀。"
+        },
+        {
+          "en": "State precisely which names, observations and episodes are removed/preserved. Prove the original statement or an explicitly justified revised deletion theorem connected to the implementation; merely recording a gap does not close this unit.",
+          "zh-CN": "精确规定删除／保留的名称、观察及 Episode。证明原陈述，或有明确依据且连接实现的修订删除定理；仅记录缺口不能关闭本项。"
+        }
+      ],
+      "validation": {
+        "en": "Use nonempty child/consumer and historical-name examples; do not identify a frozen-map equation with a legal lifecycle trace.",
+        "zh-CN": "使用非空 Child／consumer 及历史名称案例；不得把固定映射等式等同于合法生命周期轨迹。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/native_episode_deletion.rs",
+          "symbol": "transport"
+        },
+        {
+          "file": "crates/cordis-kernel/src/closed_region_execution.rs",
+          "symbol": "step"
+        },
+        {
+          "file": "crates/cordis-kernel/src/foreign_child_deletion_example.rs",
+          "symbol": "actual_closed_deletion"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G01",
+      "title": {
+        "en": "Compose preservation and lifecycle ordering",
+        "zh-CN": "组合保持性与生命周期排序"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        58,
+        59,
+        63,
+        64,
+        70
+      ],
+      "dependsOn": [
+        "P04",
+        "S02"
+      ],
+      "premises": [
+        "M03",
+        "M07",
+        "M13"
+      ],
+      "current": {
+        "en": "The Kernel and scoped mixed/native trajectories preserve invariants, commitments and provider retention.",
+        "zh-CN": "Kernel 及既有 mixed／native 轨迹保持不变量、committed 视图与 provider 保留。"
+      },
+      "remaining": {
+        "en": "The complete final component interpretation and all included extensions need one preservation/ordering composition.",
+        "zh-CN": "最终完整组件解释与全部纳入扩展仍需统一的保持性／排序组合。"
+      },
+      "closeWhen": [
+        {
+          "en": "Prove well-formedness and read/write frame invariants for every included actual transition and its source interpretation.",
+          "zh-CN": "为每条纳入的实际转换及源解释证明良构性与读写 frame 不变量。"
+        },
+        {
+          "en": "Derive fixed provider commitments, containing-episode order and guarded release from actual history, preserving target/committed differences.",
+          "zh-CN": "从真实历史推出固定 provider 提交、Episode 包含顺序及受守卫释放，保留 target／committed 的区别。"
+        }
+      ],
+      "validation": {
+        "en": "Check changed targets, retired registered children and multi-version resources; reject early provider release.",
+        "zh-CN": "覆盖目标变化、已退休仍注册 Child 及多版本资源；拒绝提前释放 provider。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_ordering.rs",
+          "symbol": "committed_prefix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/admitted_script.rs",
+          "symbol": "run_script"
+        },
+        {
+          "file": "crates/cordis-kernel/src/native_history.rs",
+          "symbol": "owner_retained"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh",
+        "node",
+        "async"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G02",
+      "title": {
+        "en": "Derive general independence from actual effect contracts",
+        "zh-CN": "从实际效果合同推导一般独立性"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        55,
+        56,
+        57,
+        65,
+        66,
+        67,
+        68,
+        78,
+        80
+      ],
+      "dependsOn": [
+        "P01",
+        "P02",
+        "P03",
+        "S03"
+      ],
+      "premises": [
+        "M02",
+        "M05",
+        "M11",
+        "M12"
+      ],
+      "current": {
+        "en": "Strict grammar independence and a shared-provider Iter diamond with suffix transport are proved. Bank-derived source/target separation now instantiates the scalar forward/inverse independence theorem without assuming an identity map.",
+        "zh-CN": "严格语法独立性及共享 provider 的 Iter 菱形／后缀迁移已证明。 已由 Bank 的源／目标分离实例化标量正向／逆向独立性，不再另行假设身份映射。"
+      },
+      "remaining": {
+        "en": "The actual general component family, including all arguments, results, inverses, continuations and dynamic Child identities, is not yet composed.",
+        "zh-CN": "实际一般组件族仍未完成组合，须包含全部参数、结果、逆操作、续体及动态 Child 身份。"
+      },
+      "closeWhen": [
+        {
+          "en": "Establish supported shared-key commutation and both yield-stability directions from concrete libraries and declared resolution.",
+          "zh-CN": "从具体库与声明解析建立支持的共享键交换性，以及两个方向的 yield 稳定性。"
+        },
+        {
+          "en": "Audit all historical components, not only scheduled calls; explicitly handle incompatible effects instead of assuming universal independence.",
+          "zh-CN": "审计全部历史组件而不只是已调度调用；明确处理不兼容效果，不能假设普遍独立。"
+        }
+      ],
+      "validation": {
+        "en": "Include overlapping aliases, different result types and child-dependent continuations; reject return-law-only purity.",
+        "zh-CN": "包含重叠别名、不同结果类型及依赖 Child 的续体；拒绝仅凭返回值定律推断纯度。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/dependent_independence.rs",
+          "symbol": "grammar_independence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "iteration_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/paper_trace_independence.rs",
+          "symbol": "strict_source_commutative_key"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "symbol": "scalar_independence"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G03",
+      "title": {
+        "en": "Produce total-provision and finiteness certificates",
+        "zh-CN": "产生完全发布与有限性证书"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        17,
+        18,
+        48,
+        57,
+        72,
+        73,
+        76,
+        80
+      ],
+      "dependsOn": [
+        "P02",
+        "G01"
+      ],
+      "premises": [
+        "M08",
+        "M13"
+      ],
+      "current": {
+        "en": "Finite single-program ranks, checked dispatch domains and actual Active completeness exist.",
+        "zh-CN": "已有有限单程序排名、分派定义域及实际 Active 完整发布。"
+      },
+      "remaining": {
+        "en": "A bound on all reachable dynamically created components and component-level total provision does not follow from one successful activation.",
+        "zh-CN": "全部可达动态创建组件的界及组件级完全发布，不能从一次成功激活推出。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive or explicitly admit verifiable application certificates for finite reachable names, iterator bounds and acyclic precedence.",
+          "zh-CN": "推导或明确接收可验证的应用证书，建立可达名称有限、迭代界与无环先行关系。"
+        },
+        {
+          "en": "Connect all-input component total provision to actual interleaved Finish/Active observations, separating capacity and primitive-domain failures.",
+          "zh-CN": "把全输入组件完全发布连接到实际交错 Finish／Active 观察，区分容量与原语定义域失败。"
+        }
+      ],
+      "validation": {
+        "en": "Use dynamic child creation and a partial provision counterexample; an Active-state snapshot alone must not establish total provision.",
+        "zh-CN": "使用动态 Child 创建及不完整发布反例；不能仅凭 Active 快照建立完全发布。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/paper_invariants.rs",
+          "symbol": "totality_is_not_a_current_state_test"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_script_completeness.rs",
+          "symbol": "source_call_at"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "terminal_replay"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G04",
+      "title": {
+        "en": "Prove dynamic progress and separate host liveness",
+        "zh-CN": "证明动态进展并区分宿主活性"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        17,
+        18,
+        53,
+        57,
+        58,
+        69,
+        71,
+        72,
+        73
+      ],
+      "dependsOn": [
+        "G03",
+        "G01",
+        "R08",
+        "S05",
+        "R06"
+      ],
+      "premises": [
+        "M07",
+        "M08",
+        "M09",
+        "M13"
+      ],
+      "current": {
+        "en": "Fixed-registry/control results and a terminating single-program executor exist; no general dynamic-host liveness is claimed.",
+        "zh-CN": "已有固定注册表／控制结果及终止的单程序执行器；尚未声称一般动态宿主活性。"
+      },
+      "remaining": {
+        "en": "General no-deadlock and maximal lifecycle termination must account for strict domains, child creation and actual inverse availability.",
+        "zh-CN": "一般无死锁与极大生命周期序列终止仍须处理严格定义域、Child 创建及真实逆操作可用性。"
+      },
+      "closeWhen": [
+        {
+          "en": "From sourced bounds and actual domains, derive an enabled step at every nonquiet admissible state and a global decreasing measure.",
+          "zh-CN": "从有来源的界和实际定义域，推出每个允许非静止状态的可执行步骤及全局递减度量。"
+        },
+        {
+          "en": "State separate host-level eventual-progress conditions, including response/fairness assumptions; retain legal nontermination and failure cases.",
+          "zh-CN": "另行规定宿主级最终推进条件，包含响应／公平性前提；保留合法不终止及失败情况。"
+        }
+      ],
+      "validation": {
+        "en": "Keep the blocked guarded-Child witness and pending-forever host boundary; demonstrate the positive dynamic theorem without assuming quiescence.",
+        "zh-CN": "保留有守卫 Child 阻塞见证及宿主永远 pending 边界；正向动态定理不得假设最终静止。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "control_no_deadlock"
+        },
+        {
+          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "symbol": "terminal_replay"
+        },
+        {
+          "file": "crates/cordis-kernel/src/resolution_completion_counterexample.rs",
+          "symbol": "arbitrary_delay"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh",
+        "async",
+        "host"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G05",
+      "title": {
+        "en": "Compose corrected support with actual quiet states",
+        "zh-CN": "组合修订支持关系与实际静止状态"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        52,
+        72,
+        74,
+        75,
+        76,
+        77,
+        80,
+        81
+      ],
+      "dependsOn": [
+        "S06",
+        "S07",
+        "G03"
+      ],
+      "premises": [
+        "M08",
+        "M14"
+      ],
+      "current": {
+        "en": "Origin-aware support and alternative quiet-control uniqueness avoid some invalid original inferences.",
+        "zh-CN": "区分出生来源的支持关系及替代静止控制唯一性避开了部分错误原推断。"
+      },
+      "remaining": {
+        "en": "A general support solution and its relation to actual active components must be available to canonical-form and configuration proofs.",
+        "zh-CN": "一般支持解及其与实际 Active 组件的关系，仍须提供给规范形与配置证明。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive the selected corrected support equation and its needed uniqueness/ranking properties for actual source registries.",
+          "zh-CN": "为实际来源注册表推导选定修订支持方程及所需唯一性／排名性质。"
+        },
+        {
+          "en": "Compose total provision and origin-aware parent rules to identify the supported live set at quiescence.",
+          "zh-CN": "组合完全发布及区分来源的父规则，在静止时识别被支持的存活集合。"
+        }
+      ],
+      "validation": {
+        "en": "Exercise both external insertions under retired parents and lifecycle children; do not reuse a provider-only rank for the union.",
+        "zh-CN": "同时覆盖已退休父下外部插入及生命周期 Child；不能把 provider 排名用于并关系。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/global.rs",
+          "symbol": "quiet_active_unique_by_precedence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/orchestration_support_cycle.rs",
+          "symbol": "support_still_unique"
+        },
+        {
+          "file": "crates/cordis-kernel/src/child_history.rs",
+          "symbol": "retained_protocol_quiet_support"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "configuration"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G06",
+      "title": {
+        "en": "Construct general legal transpositions and normalization",
+        "zh-CN": "构造一般合法交换与正规化"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        34,
+        42,
+        47,
+        58,
+        60,
+        61,
+        62,
+        65,
+        66,
+        67,
+        78,
+        79,
+        80
+      ],
+      "dependsOn": [
+        "S03",
+        "S04",
+        "G01",
+        "G02",
+        "R09"
+      ],
+      "premises": [
+        "M05",
+        "M11",
+        "M12"
+      ],
+      "current": {
+        "en": "Guarded local diamonds and finite suffix transport preserve actual receipts in several rule pairs.",
+        "zh-CN": "已有多个规则对的带守卫局部菱形和有限后缀迁移，保留实际收据。"
+      },
+      "remaining": {
+        "en": "All required exchanges must compose for the final component class, with complete external input and dynamic birth dependencies.",
+        "zh-CN": "最终组件类所需全部交换仍须组合，并保留完整外部输入及动态出生依赖。"
+      },
+      "closeWhen": [
+        {
+          "en": "Derive both target step domains and receipt/continuation transport for every needed rule pair.",
+          "zh-CN": "为每个必要规则对推出两个目标步骤的定义域及收据／续体迁移。"
+        },
+        {
+          "en": "Construct normalization of arbitrary eligible finite traces with an actual decreasing measure and legal complete suffixes.",
+          "zh-CN": "用真实递减度量及合法完整后缀构造任意符合条件有限轨迹的正规化。"
+        }
+      ],
+      "validation": {
+        "en": "Retain parent-created-by-prior-step and pending-child Remove obstructions; reject omitted dependency guards.",
+        "zh-CN": "保留父由前一步创建及 pending Child Remove 障碍；拒绝遗漏依赖守卫。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/administrative_orchestration.rs",
+          "symbol": "suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/unload_orchestration.rs",
+          "symbol": "restore_cross"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "suffix_transport"
+        }
+      ],
+      "paths": [
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "G07",
+      "title": {
+        "en": "Close canonical form and applicable confluence",
+        "zh-CN": "闭合规范形与适用的合流"
+      },
+      "category": "global",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        34,
+        49,
+        58,
+        60,
+        61,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ],
+      "dependsOn": [
+        "G04",
+        "G05",
+        "G06"
+      ],
+      "premises": [
+        "M05",
+        "M08",
+        "M11",
+        "M12",
+        "M14"
+      ],
+      "current": {
+        "en": "Restricted quiet confluence and single-trace normalization results exist; original item 80 remains partial.",
+        "zh-CN": "已有受限静止合流及单轨迹正规化；原文第 80 项仍为 partial。"
+      },
+      "remaining": {
+        "en": "General arbitrary eligible schedules, actual dynamic births and full function observations are not yet joined by one theorem.",
+        "zh-CN": "一般符合条件调度、实际动态出生及完整函数观察尚未由一个定理贯通。"
+      },
+      "closeWhen": [
+        {
+          "en": "Construct canonical executions and compare any two eligible source executions under exactly the same transported external inputs.",
+          "zh-CN": "构造规范执行，并在精确相同的迁移后外部输入下比较任意两条符合条件的源执行。"
+        },
+        {
+          "en": "Prove the chosen full observation relation, with exact renaming and failure exclusions; audit original versus corrected statement separately.",
+          "zh-CN": "证明选定完整观察关系，明确名称重命名及失败排除条件；分别审计原陈述与修订陈述。"
+        }
+      ],
+      "validation": {
+        "en": "Use distinct schedules with dynamic Child and shared providers, including the literal-input ambiguity; one local diamond is insufficient.",
+        "zh-CN": "使用含动态 Child 和共享 provider 的不同调度，并包含字面输入歧义；单个局部菱形不足以验收。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/providing_owner_examples.rs",
+          "symbol": "actual_providing_deletion"
+        },
+        {
+          "file": "crates/cordis-kernel/src/mixed_observational_transport.rs",
+          "symbol": "iteration_suffix"
+        },
+        {
+          "file": "crates/cordis-kernel/src/external_inputs.rs",
+          "symbol": "natural_execution_inputs"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "mixed",
+        "fresh"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "C01",
+      "title": {
+        "en": "Connect reconciliation and HMR to the final configuration",
+        "zh-CN": "把配置协调与 HMR 接到最终配置"
+      },
+      "category": "configuration",
+      "stage": "composition",
+      "status": "open",
+      "risk": "high",
+      "paperItems": [
+        19,
+        24,
+        26,
+        48,
+        52,
+        74,
+        76,
+        77,
+        80,
+        81
+      ],
+      "dependsOn": [
+        "P04",
+        "P05",
+        "R08",
+        "G05",
+        "G07"
+      ],
+      "premises": [
+        "M08",
+        "M10",
+        "M12",
+        "M14"
+      ],
+      "current": {
+        "en": "R2 proves structural configuration/source composition and real update/recovery workflows; Definition 81's record is formalized.",
+        "zh-CN": "R2 已证明结构配置／来源组合及真实更新／恢复工作流；定义 81 的记录已形式化。"
+      },
+      "remaining": {
+        "en": "Section 5's final-configuration convergence and HMR reasoning still need the global results and exact module/factory identity contracts.",
+        "zh-CN": "第 5 节的最终配置收敛及 HMR 推理，仍需全局结果及精确模块／工厂身份合同。"
+      },
+      "closeWhen": [
+        {
+          "en": "Relate incremental reconciliation, group/include elaboration and code revisions to an initial load of the same final declared configuration under stated conditions.",
+          "zh-CN": "在明确条件下，把增量协调、group／include 展开及代码修订关联到同一最终声明配置的初次加载。"
+        },
+        {
+          "en": "Separate structural state convergence from emissions, failed fibers and filesystem persistence; do not infer it from successful serialization.",
+          "zh-CN": "区分结构状态收敛、对外输出、失败 fiber 与文件系统持久性；不能从序列化成功推出收敛。"
+        }
+      ],
+      "validation": {
+        "en": "Compare real update/rollback/reload histories with a fresh load, preserving actual module versions and documented failure exclusions.",
+        "zh-CN": "比较真实更新／回滚／重载历史与全新加载，保留实际模块版本及明确的失败排除条件。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/configuration_source_history.rs",
+          "symbol": "accepted_configuration"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+          "symbol": "replace_configuration"
+        },
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "apply_prepared"
+        }
+      ],
+      "paths": [
+        "configuration",
+        "host",
+        "node"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "D01",
+      "title": {
+        "en": "Audit every final theorem's production premises",
+        "zh-CN": "审查每个最终定理的生产前提"
+      },
+      "category": "delivery",
+      "stage": "acceptance",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81
+      ],
+      "dependsOn": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "R08",
+        "R09",
+        "G01",
+        "G07",
+        "C01"
+      ],
+      "premises": [
+        "M01",
+        "M02",
+        "M03",
+        "M04",
+        "M05",
+        "M06",
+        "M07",
+        "M08",
+        "M09",
+        "M10",
+        "M11",
+        "M12",
+        "M13",
+        "M14",
+        "M15"
+      ],
+      "current": {
+        "en": "The original ledger, R1 revisions, R2 acceptance and source review paths provide a substantial audit base.",
+        "zh-CN": "原文台账、R1 修订、R2 验收及源码审查路径提供了大量审计基础。"
+      },
+      "remaining": {
+        "en": "No complete final premise-to-caller audit closes all 81 items, the unnumbered extension/configuration claims and four integration obligations.",
+        "zh-CN": "尚无完整的最终前提到调用者审计，闭合全部 81 项、无编号扩展／配置陈述及四项整体连接义务。"
+      },
+      "closeWhen": [
+        {
+          "en": "For each final requires clause, identify a proved caller invariant, checked application certificate or explicit environment contract; review their compatibility together.",
+          "zh-CN": "为每个最终 requires 指定已证明调用者不变量、受检应用证书或明确环境合同，并审查它们能共同成立。"
+        },
+        {
+          "en": "Publish original audit dispositions, revised statements and implemented scope separately; no paper item disappears and no refuted statement becomes proved by relabeling.",
+          "zh-CN": "分别发布原文审计结论、修订陈述和实现范围；不得遗漏条目，也不得改标签把反例变成已证明。"
+        }
+      ],
+      "validation": {
+        "en": "Review actual public paths and theorem instantiations, including nonempty clients; inventory symbol existence alone is not acceptance.",
+        "zh-CN": "审查实际公开路径及定理实例化，包含非空客户端；清单中符号存在不能作为验收。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/inspected_run.rs",
+          "symbol": "run_inspected"
+        },
+        {
+          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "symbol": "run_function"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "mixed",
+        "fresh",
+        "async",
+        "node",
+        "host",
+        "configuration"
+      ],
+      "closureEvidence": []
+    },
+    {
+      "id": "D02",
+      "title": {
+        "en": "Freeze and independently reproduce the complete mapping",
+        "zh-CN": "冻结并独立复现完整映射"
+      },
+      "category": "delivery",
+      "stage": "acceptance",
+      "status": "open",
+      "risk": "medium",
+      "paperItems": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81
+      ],
+      "dependsOn": [
+        "D01"
+      ],
+      "premises": [
+        "M15"
+      ],
+      "current": {
+        "en": "Whole-kernel development checks and selected strict controls exist, bound to their own source snapshots.",
+        "zh-CN": "已有绑定各自源码快照的全内核开发检查及选定严格负控。"
+      },
+      "remaining": {
+        "en": "A final common-source evidence set and an independent reproduction of the complete accepted mapping are still required.",
+        "zh-CN": "仍需最终同源码证据集，以及完整已验收映射的独立复现。"
+      },
+      "closeWhen": [
+        {
+          "en": "Run the required whole-kernel proofs, integrated scenarios and selected semantic controls on the final source; preserve all trusted-boundary and failure labels.",
+          "zh-CN": "在最终源码执行所需全内核证明、贯通案例及选定语义负控，保留全部可信边界和失败标记。"
+        },
+        {
+          "en": "Have an independent clean reproduction follow paper → contract → production call → result, and report packaging/platform release acceptance separately.",
+          "zh-CN": "由独立干净环境按论文→合同→生产调用→结果复现，并另行报告打包／平台发布验收。"
+        }
+      ],
+      "validation": {
+        "en": "Use the existing source-bound recorders; never accept a timeout, compile error or old hash as a successful negative control.",
+        "zh-CN": "使用既有源码绑定记录器；超时、编译失败或旧哈希不能算负控成功。"
+      },
+      "review": [
+        {
+          "file": "crates/cordis-kernel/src/inspected_run.rs",
+          "symbol": "run_inspected"
+        }
+      ],
+      "paths": [
+        "semantics",
+        "native",
+        "mixed",
+        "fresh",
+        "async",
+        "node",
+        "host",
+        "configuration"
+      ],
+      "closureEvidence": []
+    }
+  ],
+  "items": [
+    {
+      "paperItem": 1,
+      "implementationNote": {
+        "en": "Composition order and real inverse order must agree.",
+        "zh-CN": "组合顺序必须与真实逆操作顺序一致。"
+      },
+      "obligations": [
+        "P01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 2,
+      "implementationNote": {
+        "en": "Instantiate the abstract state with the shared runtime interpretation.",
+        "zh-CN": "用统一运行时解释实例化抽象状态。"
+      },
+      "obligations": [
+        "P01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 3,
+      "implementationNote": {
+        "en": "Connect tracking to actual issued and retained effects.",
+        "zh-CN": "把跟踪连接到实际发出并保留的效果。"
+      },
+      "obligations": [
+        "P01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 4,
+      "implementationNote": {
+        "en": "Reuse the projection theorem at real execution boundaries.",
+        "zh-CN": "在真实执行边界复用投影定理。"
+      },
+      "obligations": [
+        "P01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 5,
+      "implementationNote": {
+        "en": "Instantiate the homomorphism on complete actual histories.",
+        "zh-CN": "在完整真实历史上实例化同态。"
+      },
+      "obligations": [
+        "P01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 6,
+      "implementationNote": {
+        "en": "Fix the observation and inverse-definedness meaning of recovery.",
+        "zh-CN": "固定恢复的观察及逆操作有定义含义。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 7,
+      "implementationNote": {
+        "en": "Compose the tracked recovery theorem with actual cleanup results.",
+        "zh-CN": "把跟踪恢复定理与实际清理结果组合。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 8,
+      "implementationNote": {
+        "en": "Every admitted effect must supply its actual returned inverse law.",
+        "zh-CN": "每个准入效果须提供实际返回逆操作的定律。"
+      },
+      "obligations": [
+        "P01",
+        "P05",
+        "R03",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 9,
+      "implementationNote": {
+        "en": "Use the real heterogeneous inverse order and retained payloads.",
+        "zh-CN": "使用真实异构逆操作顺序与保留载荷。"
+      },
+      "obligations": [
+        "P01",
+        "R03",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 10,
+      "implementationNote": {
+        "en": "Reuse the algebra; production instantiation remains distinct.",
+        "zh-CN": "复用代数证明，并单独审查生产实例化。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 11,
+      "implementationNote": {
+        "en": "Derive composed witnesses from actual successive returns.",
+        "zh-CN": "从实际连续返回推导组合见证。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 12,
+      "implementationNote": {
+        "en": "Lift the same real state and accumulator, not a parallel model.",
+        "zh-CN": "提升同一真实状态与累积器，不能另建脱离执行的模型。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 13,
+      "implementationNote": {
+        "en": "Connect lifted composition to the actual sequence of calls.",
+        "zh-CN": "把提升后的组合连接到实际调用序列。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 14,
+      "implementationNote": {
+        "en": "Retain the projection relation after failures and retries.",
+        "zh-CN": "在失败与重试后保持投影关系。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 15,
+      "implementationNote": {
+        "en": "Audit accumulated-map recovery, not merely an empty queue.",
+        "zh-CN": "审查累积映射恢复，而不只是队列为空。"
+      },
+      "obligations": [
+        "P01",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 16,
+      "implementationNote": {
+        "en": "Instantiate finite composition over actual interleavings.",
+        "zh-CN": "在实际交错上实例化有限组合。"
+      },
+      "obligations": [
+        "P01",
+        "R03",
+        "R08",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 17,
+      "implementationNote": {
+        "en": "Cover the whole admitted iterator carrier and its continuations.",
+        "zh-CN": "覆盖完整准入迭代器载体及续体。"
+      },
+      "obligations": [
+        "P01",
+        "P02",
+        "P05",
+        "R06",
+        "G03",
+        "G04",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 18,
+      "implementationNote": {
+        "en": "Separate finite iterator denotation from opaque Future termination.",
+        "zh-CN": "区分有限迭代器解释与不透明 Future 终止。"
+      },
+      "obligations": [
+        "P01",
+        "P02",
+        "P05",
+        "R06",
+        "G03",
+        "G04",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 19,
+      "implementationNote": {
+        "en": "Connect dependent values to actual provider slots and payload kinds.",
+        "zh-CN": "把依赖值连接到实际 provider 槽及载荷类型。"
+      },
+      "obligations": [
+        "P03",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 20,
+      "implementationNote": {
+        "en": "Preserve exact absent-key and revoke domains in real operations.",
+        "zh-CN": "真实操作保留精确的缺失键及撤销定义域。"
+      },
+      "obligations": [
+        "P03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 21,
+      "implementationNote": {
+        "en": "Relate declarations to actual realm-resolved dependencies.",
+        "zh-CN": "把声明关联到实际按 realm 解析的依赖。"
+      },
+      "obligations": [
+        "P03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 22,
+      "implementationNote": {
+        "en": "Establish actual availability without substituting payload equality.",
+        "zh-CN": "建立实际可用性，不能用载荷相等替代。"
+      },
+      "obligations": [
+        "P03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 23,
+      "implementationNote": {
+        "en": "Map both derived scopes and in-place aliasing to their actual heaps.",
+        "zh-CN": "把派生作用域与原地别名分别映射到实际堆。"
+      },
+      "obligations": [
+        "P03",
+        "P05",
+        "R01",
+        "R07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 24,
+      "implementationNote": {
+        "en": "Transport fixed realm interpretation through actual registration.",
+        "zh-CN": "在实际登记中迁移固定 realm 解释。"
+      },
+      "obligations": [
+        "P03",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 25,
+      "implementationNote": {
+        "en": "Check isolation/provision effects against the same resolved keys.",
+        "zh-CN": "按相同解析键检查隔离及 provision 效果。"
+      },
+      "obligations": [
+        "P03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 26,
+      "implementationNote": {
+        "en": "Connect metadata interpretation to stored schema/interception inputs.",
+        "zh-CN": "把元数据解释连接到存储的 schema／拦截输入。"
+      },
+      "obligations": [
+        "P03",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 27,
+      "implementationNote": {
+        "en": "Preserve interception composition and real binding ownership.",
+        "zh-CN": "保持拦截组合及真实绑定归属。"
+      },
+      "obligations": [
+        "P03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 28,
+      "implementationNote": {
+        "en": "Resolve the recursive-model reading; retain the R1-CONTEXT distinction.",
+        "zh-CN": "处理递归模型读法，并保留 R1-CONTEXT 的区别。"
+      },
+      "obligations": [
+        "S01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 29,
+      "implementationNote": {
+        "en": "Use real operands, outcomes, domains and captured inverses.",
+        "zh-CN": "使用真实操作数、结果、定义域与捕获逆操作。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P02",
+        "P05",
+        "R01",
+        "R06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 30,
+      "implementationNote": {
+        "en": "Cover all admitted constructors and dependent continuations.",
+        "zh-CN": "覆盖全部准入构造及依赖续体。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P02",
+        "R01",
+        "R05",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 31,
+      "implementationNote": {
+        "en": "State exactly which actual observations and failures are compared.",
+        "zh-CN": "精确规定比较的实际观察与失败。"
+      },
+      "obligations": [
+        "S03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 32,
+      "implementationNote": {
+        "en": "Reuse the equivalence theorem without changing its test family.",
+        "zh-CN": "复用等价定理，不更换其测试族。"
+      },
+      "obligations": [
+        "S03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 33,
+      "implementationNote": {
+        "en": "Separate service observation, admission and full-state equivalence.",
+        "zh-CN": "区分服务观察、准入和完整状态等价。"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "P03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 34,
+      "implementationNote": {
+        "en": "Relate outputs, inverse maps and continuations, not only values.",
+        "zh-CN": "关联输出、逆映射和续体，不只比较值。"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 35,
+      "implementationNote": {
+        "en": "Instantiate the partial-equivalence laws on the selected carrier.",
+        "zh-CN": "在选定载体上实例化部分等价定律。"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 36,
+      "implementationNote": {
+        "en": "Discharge each primitive's observational recovery witness.",
+        "zh-CN": "履行每个原语的观察恢复见证。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 37,
+      "implementationNote": {
+        "en": "Derive full-carrier iterator witness membership.",
+        "zh-CN": "推导完整载体上的迭代器见证成员资格。"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "P01",
+        "P02",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 38,
+      "implementationNote": {
+        "en": "Transport concrete laws to the same production observation.",
+        "zh-CN": "把具体定律迁移到同一生产观察。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 39,
+      "implementationNote": {
+        "en": "Connect grammar admissibility to actual admitted programs.",
+        "zh-CN": "把语法可接受性连接到实际准入程序。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P02",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 40,
+      "implementationNote": {
+        "en": "Include every semantically reachable stage, not only executed ones.",
+        "zh-CN": "包含全部语义可达阶段，不只已执行阶段。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P02",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 41,
+      "implementationNote": {
+        "en": "Use generator closure for actual supported operation families.",
+        "zh-CN": "对实际支持操作族使用生成元闭包。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P02",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 42,
+      "implementationNote": {
+        "en": "Prove inverse-domain and continuation stability in both directions.",
+        "zh-CN": "证明两个方向的逆定义域及续体稳定性。"
+      },
+      "obligations": [
+        "S02",
+        "G02",
+        "G06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 43,
+      "implementationNote": {
+        "en": "Establish permutation premises before applying inverse recovery.",
+        "zh-CN": "应用逆操作重排恢复前先建立其前提。"
+      },
+      "obligations": [
+        "S02",
+        "R08",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 44,
+      "implementationNote": {
+        "en": "Derive shared-key commutation from actual operation laws.",
+        "zh-CN": "由实际操作定律推导共享键交换性。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P03",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 45,
+      "implementationNote": {
+        "en": "Distinct names are insufficient when they alias one allocation.",
+        "zh-CN": "名称不同不足以证明独立，它们可能指向同一分配。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P03",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 46,
+      "implementationNote": {
+        "en": "Supply the appropriate witnessed operation library per value kind.",
+        "zh-CN": "为每种值类型提供适用的带见证操作库。"
+      },
+      "obligations": [
+        "S02",
+        "P01",
+        "P03",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 47,
+      "implementationNote": {
+        "en": "Keep strict-domain independence separate from the original total claim.",
+        "zh-CN": "区分严格定义域独立性与原文总操作结论。"
+      },
+      "obligations": [
+        "S02",
+        "P03",
+        "G02",
+        "G06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 48,
+      "implementationNote": {
+        "en": "Prove actual parent/root/Child membership for the final carrier.",
+        "zh-CN": "为最终载体证明实际父／根／Child 成员资格。"
+      },
+      "obligations": [
+        "S01",
+        "P02",
+        "P04",
+        "P05",
+        "R03",
+        "R04",
+        "R07",
+        "G03",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 49,
+      "implementationNote": {
+        "en": "Interpret real roots, current code, tables and inverse functions.",
+        "zh-CN": "解释真实根、当前代码、表和逆操作函数。"
+      },
+      "obligations": [
+        "S01",
+        "S03",
+        "P02",
+        "P04",
+        "R01",
+        "R02",
+        "G01",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 50,
+      "implementationNote": {
+        "en": "Preserve publication, reservations and registration identities.",
+        "zh-CN": "保持 publication、预留及登记身份。"
+      },
+      "obligations": [
+        "S01",
+        "P03",
+        "P04",
+        "R01",
+        "R02",
+        "R07",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 51,
+      "implementationNote": {
+        "en": "Observe every registered table, including non-Active owners.",
+        "zh-CN": "观察所有已登记表，包含非 Active owner。"
+      },
+      "obligations": [
+        "P03",
+        "P04",
+        "R01",
+        "R07",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 52,
+      "implementationNote": {
+        "en": "The inverse retires its actual captured child; retirement is not removal.",
+        "zh-CN": "逆操作退休实际捕获的 Child；退休不等于移除。"
+      },
+      "obligations": [
+        "S02",
+        "S04",
+        "S07",
+        "P02",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R09",
+        "G01",
+        "G05",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 53,
+      "implementationNote": {
+        "en": "Keep actual target identity distinct from committed identity.",
+        "zh-CN": "区分实际 target 身份与 committed 身份。"
+      },
+      "obligations": [
+        "P03",
+        "P04",
+        "R02",
+        "R07",
+        "G01",
+        "G04",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 54,
+      "implementationNote": {
+        "en": "Derive retained consumer bindings and the real provider release guard.",
+        "zh-CN": "推导保留的 consumer 绑定及真实 provider 释放守卫。"
+      },
+      "obligations": [
+        "P04",
+        "P05",
+        "R02",
+        "R03",
+        "R04",
+        "R06",
+        "R07",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 55,
+      "implementationNote": {
+        "en": "Complete Writes and Reads, including strict domains and Child exceptions.",
+        "zh-CN": "补全 Writes 与 Reads，包含严格定义域和 Child 例外。"
+      },
+      "obligations": [
+        "S01",
+        "S02",
+        "P01",
+        "P02",
+        "P03",
+        "P05",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 56,
+      "implementationNote": {
+        "en": "Connect the lifted language's denotation to the chosen context model.",
+        "zh-CN": "把提升语言的解释连接到选定上下文模型。"
+      },
+      "obligations": [
+        "S01",
+        "S02",
+        "P01",
+        "P02",
+        "P03",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 57,
+      "implementationNote": {
+        "en": "Use full-carrier membership, not only successful-prefix safety.",
+        "zh-CN": "使用完整载体成员资格，不能只用成功前缀安全性。"
+      },
+      "obligations": [
+        "S01",
+        "S02",
+        "P01",
+        "P02",
+        "R06",
+        "G02",
+        "G03",
+        "G04",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 58,
+      "implementationNote": {
+        "en": "Preserve exact episodes, frozen maps and full function observations.",
+        "zh-CN": "保留精确 Episode、固定映射及完整函数观察。"
+      },
+      "obligations": [
+        "S01",
+        "S03",
+        "S05",
+        "P04",
+        "P05",
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "G01",
+        "G04",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 59,
+      "implementationNote": {
+        "en": "Compose existing frame facts at every included production transition.",
+        "zh-CN": "在每条纳入生产转换上组合已有 frame 事实。"
+      },
+      "obligations": [
+        "P04",
+        "R02",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 60,
+      "implementationNote": {
+        "en": "Prove rule transport for the selected full observation relation.",
+        "zh-CN": "为选定完整观察关系证明规则迁移。"
+      },
+      "obligations": [
+        "S03",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 61,
+      "implementationNote": {
+        "en": "Rename inputs, stored references and historical identities together.",
+        "zh-CN": "一同重命名输入、存储引用及历史身份。"
+      },
+      "obligations": [
+        "S03",
+        "P03",
+        "R01",
+        "R05",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 62,
+      "implementationNote": {
+        "en": "Keep the original refutation and connect guarded replacement uses.",
+        "zh-CN": "保留原反例，并接通带守卫替代结论的使用。"
+      },
+      "obligations": [
+        "S04",
+        "R04",
+        "R09",
+        "G06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 63,
+      "implementationNote": {
+        "en": "Tie well-formedness to actual source and successor states.",
+        "zh-CN": "把良构性绑定到实际源状态与后继状态。"
+      },
+      "obligations": [
+        "P04",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 64,
+      "implementationNote": {
+        "en": "Compose preservation for complete interpreted components and extensions.",
+        "zh-CN": "组合完整已解释组件及扩展的保持性。"
+      },
+      "obligations": [
+        "P04",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 65,
+      "implementationNote": {
+        "en": "Audit all historical component pairs and actual shared operations.",
+        "zh-CN": "审计全部历史组件对及实际共享操作。"
+      },
+      "obligations": [
+        "G02",
+        "G06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 66,
+      "implementationNote": {
+        "en": "Derive pairwise independence rather than infer it from declarations.",
+        "zh-CN": "推导成对独立性，不能仅从声明推断。"
+      },
+      "obligations": [
+        "G02",
+        "G06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 67,
+      "implementationNote": {
+        "en": "Close entangled effects and strict inverse domains across interleavings.",
+        "zh-CN": "闭合交错中的纠缠效果及严格逆定义域。"
+      },
+      "obligations": [
+        "R03",
+        "R04",
+        "R08",
+        "G02",
+        "G06",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 68,
+      "implementationNote": {
+        "en": "Prove Equation (55) for source-frozen maps at every admissible cut.",
+        "zh-CN": "对每个允许切点证明源固定映射的公式 (55)。"
+      },
+      "obligations": [
+        "P05",
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "G02",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 69,
+      "implementationNote": {
+        "en": "Connect Equation (56) and empty owner tables to actual Unload.",
+        "zh-CN": "把公式 (56) 及 owner 空表连接到实际 Unload。"
+      },
+      "obligations": [
+        "S05",
+        "P05",
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "G04",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 70,
+      "implementationNote": {
+        "en": "Derive episode containment and provider lifetime from actual traces.",
+        "zh-CN": "从实际轨迹推导 Episode 包含及 provider 生命周期。"
+      },
+      "obligations": [
+        "P04",
+        "P05",
+        "R02",
+        "R04",
+        "R06",
+        "R07",
+        "G01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 71,
+      "implementationNote": {
+        "en": "Preserve coherence, correct the false unconditional completion clause.",
+        "zh-CN": "保留解析一致性，修正错误的无条件完成条款。"
+      },
+      "obligations": [
+        "S05",
+        "P04",
+        "R06",
+        "G04",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 72,
+      "implementationNote": {
+        "en": "Source acyclicity/ranking; allocation order is not provider order.",
+        "zh-CN": "为无环／排名提供来源；分配顺序不是 provider 顺序。"
+      },
+      "obligations": [
+        "S06",
+        "G03",
+        "G04",
+        "G05",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 73,
+      "implementationNote": {
+        "en": "Derive dynamic no-deadlock and termination under sourced conditions.",
+        "zh-CN": "在有来源的条件下推导动态无死锁与终止。"
+      },
+      "obligations": [
+        "S05",
+        "P05",
+        "R06",
+        "G03",
+        "G04",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 74,
+      "implementationNote": {
+        "en": "Use an origin-aware support interpretation consistent with the code.",
+        "zh-CN": "使用与代码一致、区分出生来源的支持解释。"
+      },
+      "obligations": [
+        "S06",
+        "S07",
+        "G05",
+        "G07",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 75,
+      "implementationNote": {
+        "en": "Retain the counterexample; audit union-rank and uniqueness separately.",
+        "zh-CN": "保留反例；分别审计并关系排名与唯一性。"
+      },
+      "obligations": [
+        "S06",
+        "G05",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 76,
+      "implementationNote": {
+        "en": "Component total provision is stronger than a checked Active snapshot.",
+        "zh-CN": "组件完全发布强于已检查的 Active 快照。"
+      },
+      "obligations": [
+        "S07",
+        "P02",
+        "R09",
+        "G03",
+        "G05",
+        "G07",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 77,
+      "implementationNote": {
+        "en": "Retain the external-child counterexample and corrected origin rules.",
+        "zh-CN": "保留外部 Child 反例及修订的来源规则。"
+      },
+      "obligations": [
+        "S07",
+        "G05",
+        "G07",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 78,
+      "implementationNote": {
+        "en": "Construct legal exchanges and suffixes with all input dependencies.",
+        "zh-CN": "包含所有输入依赖，构造合法交换及后缀。"
+      },
+      "obligations": [
+        "S03",
+        "S04",
+        "R05",
+        "G02",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 79,
+      "implementationNote": {
+        "en": "Audit original deletion premises separately from broader recovery goals.",
+        "zh-CN": "分别审计原删除前提与更广的恢复目标。"
+      },
+      "obligations": [
+        "S04",
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R07",
+        "R09",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 80,
+      "implementationNote": {
+        "en": "Compose canonical execution and arbitrary eligible schedule equivalence.",
+        "zh-CN": "组合规范执行及任意符合条件调度的等价性。"
+      },
+      "obligations": [
+        "S03",
+        "S04",
+        "S06",
+        "S07",
+        "R09",
+        "G02",
+        "G03",
+        "G05",
+        "G06",
+        "G07",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    },
+    {
+      "paperItem": 81,
+      "implementationNote": {
+        "en": "Separate the six-field record from reconciliation/HMR convergence claims.",
+        "zh-CN": "区分六字段记录与协调／HMR 收敛陈述。"
+      },
+      "obligations": [
+        "S07",
+        "P04",
+        "P05",
+        "G05",
+        "C01",
+        "D01",
+        "D02"
+      ]
+    }
+  ],
+  "integration": [
+    {
+      "id": "whole-lifecycle",
+      "obligations": [
+        "P02",
+        "P04",
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ],
+      "closeWhen": {
+        "en": "Use one stated interpretation for actual recovery, ordering, progress and applicable confluence, with sourced premises for every included path.",
+        "zh-CN": "对实际恢复、排序、进展及适用合流使用统一声明解释，每条纳入路径的前提都有来源。"
+      }
+    },
+    {
+      "id": "corrected-specification",
+      "obligations": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "G05",
+        "G06",
+        "G07",
+        "D01"
+      ],
+      "closeWhen": {
+        "en": "Publish an original-item disposition and an explicit, consistently propagated implementation contract for every revision; preserve original refutations.",
+        "zh-CN": "为每项修订发布原条目处理结论及明确、一致贯通的实现合同，保留原反例。"
+      }
+    },
+    {
+      "id": "executable-simulation",
+      "obligations": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "R01",
+        "R02",
+        "R05",
+        "R06",
+        "R07",
+        "R08",
+        "R09",
+        "D01",
+        "D02"
+      ],
+      "closeWhen": {
+        "en": "Every claimed operation and transformed execution is produced by the original executable path under proved caller premises.",
+        "zh-CN": "每个声称成立的操作及变换后执行均由原可执行路径产生，调用者前提已证明。"
+      }
+    },
+    {
+      "id": "host-boundary",
+      "obligations": [
+        "P03",
+        "P04",
+        "P05",
+        "R06",
+        "R07",
+        "G04",
+        "C01",
+        "D01",
+        "D02"
+      ],
+      "closeWhen": {
+        "en": "Enumerate and enforce all host boundaries; prove the internal protocol and resource contracts actually claimed, with explicit remaining environmental obligations.",
+        "zh-CN": "列全并落实宿主边界，证明实际声称的内部协议与资源合同，明确剩余环境义务。"
+      }
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "semantics",
+      "title": {
+        "en": "Definitions and original claims",
+        "zh-CN": "定义与原文命题"
+      },
+      "obligations": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "G02",
+        "G05",
+        "G07",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§3–4; all 81 numbered entries"
+    },
+    {
+      "id": "native",
+      "title": {
+        "en": "Native managed production",
+        "zh-CN": "原生受管生产路径"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "S04",
+        "S06",
+        "S07",
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "R01",
+        "R02",
+        "R03",
+        "R04",
+        "R06",
+        "R08",
+        "R09",
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§4.2–4.3; §5.1"
+    },
+    {
+      "id": "mixed",
+      "title": {
+        "en": "Mixed fixed-name interpreter",
+        "zh-CN": "Mixed 固定名称解释器"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "S04",
+        "P02",
+        "R05",
+        "R08",
+        "R09",
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§4.2–4.3"
+    },
+    {
+      "id": "fresh",
+      "title": {
+        "en": "Fresh dynamic-name interpreter",
+        "zh-CN": "Fresh 动态名称解释器"
+      },
+      "obligations": [
+        "S02",
+        "S03",
+        "S04",
+        "S06",
+        "P02",
+        "R05",
+        "R08",
+        "R09",
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+        "G06",
+        "G07",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§4.2–4.3"
+    },
+    {
+      "id": "async",
+      "title": {
+        "en": "Admitted async and split cleanup",
+        "zh-CN": "已准入异步与分步清理"
+      },
+      "obligations": [
+        "S05",
+        "P05",
+        "R06",
+        "R08",
+        "G01",
+        "G04",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§4.4 Asynchrony / Failure"
+    },
+    {
+      "id": "node",
+      "title": {
+        "en": "Node protocol and reference bridge",
+        "zh-CN": "Node 协议与引用桥"
+      },
+      "obligations": [
+        "P03",
+        "P04",
+        "P05",
+        "R07",
+        "R08",
+        "G01",
+        "C01",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "Implementation realization; §4.4 / §5.1, not a separate numbered theorem"
+    },
+    {
+      "id": "configuration",
+      "title": {
+        "en": "Loader, configuration, isolation and HMR",
+        "zh-CN": "Loader、配置、隔离与 HMR"
+      },
+      "obligations": [
+        "S07",
+        "P03",
+        "P04",
+        "P05",
+        "G05",
+        "C01",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§4.4 Isolation / Configuration; §5.2; Definition 81"
+    },
+    {
+      "id": "host",
+      "title": {
+        "en": "Ordinary adapters and external-resource boundaries",
+        "zh-CN": "普通适配器与外部资源边界"
+      },
+      "obligations": [
+        "P01",
+        "P04",
+        "P05",
+        "R02",
+        "R03",
+        "R04",
+        "R06",
+        "R07",
+        "G04",
+        "C01",
+        "D01",
+        "D02"
+      ],
+      "paperLocation": "§4.4; §5.1; acquisition/emission distinction"
+    }
+  ],
+  "r3Packages": [
+    {
+      "id": "R3-A",
+      "obligations": [
+        "R01",
+        "R02"
+      ]
+    },
+    {
+      "id": "R3-B",
+      "obligations": [
+        "R03",
+        "R04"
+      ]
+    },
+    {
+      "id": "R3-C",
+      "obligations": [
+        "R05",
+        "R06",
+        "R07"
+      ]
+    },
+    {
+      "id": "R3-D",
+      "obligations": [
+        "R08",
+        "R09",
+        "D01",
+        "D02"
+      ]
+    }
+  ],
+  "priorityRisks": [
+    "S01",
+    "S02",
+    "P01",
+    "R01",
+    "R08",
+    "G02",
+    "G04",
+    "G07"
+  ],
+  "dependencyMeaning": {
+    "en": "Dependencies are closure prerequisites, not a ban on parallel implementation using already established local contracts.",
+    "zh-CN": "依赖是关闭前提，不禁止利用已建立的局部合同并行实施。"
+  },
+  "closureRule": {
+    "en": "Close a unit only after its stated conclusions and acceptance conditions are satisfied. Documenting a boundary, selecting a revision or adding a helper lemma is not by itself closure. Any unresolved subgoal must remain assigned to an open unit. Revised implementation theorems and original-paper audit outcomes remain distinct.",
+    "zh-CN": "只有列明的结论和验收条件全部满足才关闭单元。记录边界、选择修订或增加辅助引理本身不能算关闭；未解决子目标必须继续归属开放单元。修订实现定理与原论文审计结果保持区别。"
+  },
+  "estimation": {
+    "en": "No defensible whole-project percentage or iteration count yet. The 31 units are remaining closure obligations of unequal size, not 31 coding rounds. First close the high-risk semantic/access/target-state questions, then estimate implementation and acceptance work separately.",
+    "zh-CN": "目前没有可靠的整项目百分比或轮数。31 个单元是大小不同的剩余关闭义务，不是 31 轮编码；先处理高风险语义、访问边界和目标状态问题，再分别估算实现与验收工作。"
+  },
+  "changePolicy": {
+    "en": "Retain baseline IDs. Any split/addition or scope change requires a dated rationale, affected paper entries and dependencies; never hide growth by renumbering finished packages. A status change requires closure evidence, not a larger verified-function count.",
+    "zh-CN": "保留基线编号。拆分、增加或范围变化须记录日期、原因、受影响论文条目与依赖；不能靠重新编号已完成包隐藏增长。状态变更需要关闭证据，不能仅增加 verified 函数数。"
+  },
+  "changes": [
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "Initial complete allocation of 81 numbered items, four integration obligations and the required unnumbered execution surfaces; original and milestone statuses unchanged.",
+        "zh-CN": "首次完整分配 81 个编号条目、四项整体连接义务及必需无编号执行范围；不改变原文和里程碑状态。"
+      }
+    }
+  ],
+  "reviewInputSha256": {
+    "crates/cordis-kernel/src/administrative_orchestration.rs": "6793dc4b8d003f29862d7df8696555639467c1fe44339e380534838c0aca2a50",
+    "crates/cordis-kernel/src/admitted_fresh_driver.rs": "c69306bc939e6b00631071eb8f87ae7fdc7c29218085c6b1d9d408be43fcf0ee",
+    "crates/cordis-kernel/src/admitted_script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
+    "crates/cordis-kernel/src/allocation_inputs.rs": "b3a25966f428ae318b4fd7a42122de6179b901c41757c38146c8f90608ca5b55",
+    "crates/cordis-kernel/src/alpha.rs": "f453c4b6b3ee72e09763193c3be749242bc906f70f2d3921f737a2f7ce3a89dc",
+    "crates/cordis-kernel/src/async_completion.rs": "d82ef5d08d211240ceef40a1ed711be2fc0ed7a1691280774d50279678bb4b0a",
+    "crates/cordis-kernel/src/canonical.rs": "c1726a10742fb7396cd566b2b913181908fe87e1a77f4f1086c630b311f1483f",
+    "crates/cordis-kernel/src/causal_normalization.rs": "865013833416d6ce807ab7aec460f5fae853e503b252c452e48a8988244b4af1",
+    "crates/cordis-kernel/src/child_driver.rs": "e2471a811c766b115c6b1eff12442f95d6b1fc1cbe0ff3ab8922a6c771b4928e",
+    "crates/cordis-kernel/src/child_history.rs": "65fb3b5a81e0a2babef641de1506875b569f7a1415e645a3917522533e3c9dac",
+    "crates/cordis-kernel/src/cleanup_completion.rs": "5993ca0577e6dcd94c8ac05ee1e446ddc3e55700c557eb46106d1941c6cd6cd2",
+    "crates/cordis-kernel/src/cleanup_journal.rs": "64f20ed1b27e25a621b676792a4f226113ed4ea0b898d960c3b865946f41d340",
+    "crates/cordis-kernel/src/cleanup_protocol.rs": "0d2c47c4735845acedd6708fb8c932b508f433e72ac63a7273d5f0d1b566accd",
+    "crates/cordis-kernel/src/cleanup_queue.rs": "2b4e495d891e20ec382b94fff199c1fb83a2e25bfbe832857a2dbf4cfb2fa147",
+    "crates/cordis-kernel/src/cleanup_release.rs": "9d2fb72dfa5668240c35858556b63fc8918599cc6afe6bbe1aaaba37b2422c5e",
+    "crates/cordis-kernel/src/closed_region_execution.rs": "428d594c3314f0f2b7808acf2f6b9790d1d58bf93b588e408ebd7f20151044b6",
+    "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
+    "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
+    "crates/cordis-kernel/src/configuration_future.rs": "928bf664cd944573be28b0379d40ee157470c0ba54f189f0415a82c2e61c3f4c",
+    "crates/cordis-kernel/src/configuration_runtime.rs": "15646b74eeb1ab4dac45f47c12d2f1bbb823c9a02455d5a9a4fa2d2f5bd6c777",
+    "crates/cordis-kernel/src/configuration_source_history.rs": "4c07204f66d6f0ddc4edac844901e01b5d699cff283c7c52ff577153a0db1857",
+    "crates/cordis-kernel/src/contexts.rs": "72c32f067433e1a64e7e4196cb12c0ba5f7eed0d4d9f77255e57d58c7032aec8",
+    "crates/cordis-kernel/src/controlled_effect.rs": "802f5cda28ed064cfdd020637b8e754680a4819969e35cd6969729e0c80f0813",
+    "crates/cordis-kernel/src/deletion.rs": "1c44e19ce407f69e7411bb7ac2fc29940471c350020e60bb1bce462a0d9cbae3",
+    "crates/cordis-kernel/src/dependent_grammar.rs": "89016e4db79a21cff12b24aa73b1c3d03852cd931c4460e35e98914b0988629d",
+    "crates/cordis-kernel/src/dependent_independence.rs": "bf4fa296cef98066b9e3903b36455598fb7bd47201d5f62b496dc9b139d788bd",
+    "crates/cordis-kernel/src/dependent_independence_example.rs": "e30a431798dd92ac4e64dc3cd8659f3f3cb5a64001bb04b506cef16e39d2f41c",
+    "crates/cordis-kernel/src/dependent_lift.rs": "a7027a087915d476f41fe34a21ab2f148e52c0d1c57b08389dda8a15abe377d9",
+    "crates/cordis-kernel/src/driver.rs": "5505559d02d49417ccda359730ce94bf6c8f0e8fce13a8de8c826cea33995d2e",
+    "crates/cordis-kernel/src/dynamic_table_deletion.rs": "72ab5cbc4b74e756b65ca2fed364e88c28e598585421bb2468e341db0bffb5cf",
+    "crates/cordis-kernel/src/dynamic_table_deletion_example.rs": "238a5f3daf21a4686ce82a8e03f4dfbf4f09e0cd2d8ab9acdbd6df226d79329c",
+    "crates/cordis-kernel/src/dynamic_table_registry.rs": "d252c00bcd3e60cfe77cfebad2862cf8c0260915db77858a2946e3e9cc36122d",
+    "crates/cordis-kernel/src/effect_realization.rs": "ae12b213f3cb9827e2213c436b0559f3681ba44937f95489cf218d65ba8cc021",
+    "crates/cordis-kernel/src/entangled.rs": "ff5e821b638bb9153c34b2357f7614f7a8d4254a674bb74cfdecbcdd1b252080",
+    "crates/cordis-kernel/src/entangled_loading.rs": "9a0585f2be02be2c09b6c4faabced9448ec1ffddde7616d066ca78de20578ed6",
+    "crates/cordis-kernel/src/episode.rs": "d1e8140788859404158d56bd903a8d3936df74f80cbb17c9ef8815467f87d90c",
+    "crates/cordis-kernel/src/episode_replay.rs": "234b104b7e7c32f932bc74baad7ecc21d261fabb389387313e6e837284bdae32",
+    "crates/cordis-kernel/src/execution.rs": "0997d76ca0bd87d6f50b436d9419f5c73dbee89415a0aa79ff86d55a47eaa8b5",
+    "crates/cordis-kernel/src/external_inputs.rs": "a7491019af25e1d647220f5f9f0d649d197541d6336cb44072151d2a1425ebfb",
+    "crates/cordis-kernel/src/foreign_child_deletion.rs": "86e1977d590da9778254d77fc77444464068cb0f14e7ebe230893a8d58aae356",
+    "crates/cordis-kernel/src/foreign_child_deletion_example.rs": "ee63634237c5eb4996c594a792823222f5cc6b6137f898987322f1cd50426cbb",
+    "crates/cordis-kernel/src/foreign_child_transport.rs": "7724639072c808da256836f2a3ae74d7b77d9d27e56e98fe2fb6dbc5f44ce7ea",
+    "crates/cordis-kernel/src/foreign_child_transport_example.rs": "6d71b34fb2a48ef3a0bc329bced09e27ccfbfa05acedc46e8c2c9a4f8fc4a49f",
+    "crates/cordis-kernel/src/foreign_provision_transport.rs": "5b837c2c97458a940e52d0717bd7509fa296c3d29083f72773a0b5fbfc5357b4",
+    "crates/cordis-kernel/src/foreign_unload.rs": "c1e07e10f8eabc5fa48750c5249528be377bb68ef25d6a3264cacac5ef7e003f",
+    "crates/cordis-kernel/src/foundations.rs": "0b19e7afb7855da5312dc63a4303e26f6716159e57b41bd62ffa511c7aeb316d",
+    "crates/cordis-kernel/src/fresh_bootstrap.rs": "0cbc7e28adecba197f496bd7d20fe4fee2b4172600d4611d884f9704244dd319",
+    "crates/cordis-kernel/src/fresh_compaction.rs": "b8df825f8fde7dfad35bfe9acb332b35cd05898da57f27af919a83126b198f5a",
+    "crates/cordis-kernel/src/fresh_driver.rs": "5191d780a4f926e2430755a4d91a914639394dc05bccd5478329f11c777a7df3",
+    "crates/cordis-kernel/src/fresh_episode_replay.rs": "a37604edf07db325bbaad7718f6fb7f8b4a945fed5efaf6d16926fa1a05d24c6",
+    "crates/cordis-kernel/src/fresh_equivariance.rs": "e9074e2b56d1d130948d2af396bbb50b3e85e81e719c7b866c9456d223315227",
+    "crates/cordis-kernel/src/fresh_grammar.rs": "cce7d43aa00a054a75dca28403c03f8891bee70f9d7a346d79575e103627fce4",
+    "crates/cordis-kernel/src/fresh_preparation.rs": "9f611b3e96d2c829c5f40cd9521e5030c3bdb6e33e33a37e4c6f9d75beef62d7",
+    "crates/cordis-kernel/src/fresh_recovery.rs": "39212ace0e75f8d8d57f52c65452e8994fff03d3973ac09dadd598a327294335",
+    "crates/cordis-kernel/src/fresh_run.rs": "ea66d7937d30f5fcc951d925cb7aab551e442f9199dbbb7aca850657b124cdb8",
+    "crates/cordis-kernel/src/fresh_script_completeness.rs": "f694ea454b4037893e9914575f7d86502298fac96639c53dc26ac19b1f493567",
+    "crates/cordis-kernel/src/fresh_semantics.rs": "6a62efe07402fb5c31f88878d27299eb3b476bd0b223a28b115d7ebbbf0cd9d8",
+    "crates/cordis-kernel/src/fresh_terminal_replay.rs": "f113d47290376a7dafcf4556a1767e28c8e6a9884153742ea491373e291791f4",
+    "crates/cordis-kernel/src/functional_quotient.rs": "199e21e4e1150a8d9684ccb9f15a50f64eae119eb3c8077effe81ea380c87cf5",
+    "crates/cordis-kernel/src/generalized_table_deletion.rs": "1ccf02bd650dc5af48622dae412a2eb854270665a8c2a57cf35d0cc8ba55f945",
+    "crates/cordis-kernel/src/generalized_table_deletion_example.rs": "159dd24027cb18adeea3d0bcc9026e282f8f87a87aa308349ea23d25635f3f91",
+    "crates/cordis-kernel/src/global.rs": "bc49325a37fb08efae55dc7b1242a8310805ba924e796697c21ff0925aaeae2c",
+    "crates/cordis-kernel/src/grammar_lift.rs": "229713b5eba33d6a7d9685a676f7b29abd8a8cb1ad75685cd082a5f0aa2c9282",
+    "crates/cordis-kernel/src/grammar_ordering.rs": "02f8d10a6b1690bf71640d0684754d5fc9cce724dd94e9f658271d318dd79ddf",
+    "crates/cordis-kernel/src/grammar_recovery.rs": "4dacf54db0501a1ddf1af27fda5cd31255eed527bbd17aac587dec3039227f82",
+    "crates/cordis-kernel/src/guarded_child_domains.rs": "40ce966a9d9ffbab8ec11182350767a5c824bf50df0abc3909b1a36332b5983b",
+    "crates/cordis-kernel/src/guarded_components.rs": "b2b7297a2869f3a90ae12ae9de2451b318edfeefddf7a8201209ec41819f0f00",
+    "crates/cordis-kernel/src/history.rs": "c20f5087d8634e76fdeeeb222a352cec64d61d948dce8b998645df8768aa462d",
+    "crates/cordis-kernel/src/indexed_ordering.rs": "f9e8e23f48fb471f858909d6581ac536708af88cc41aa2da730956d67d98306e",
+    "crates/cordis-kernel/src/inspected_run.rs": "c8add9425fe97d33ff610d787a82aba895b1d0915f8878c02e75d19c90b88c88",
+    "crates/cordis-kernel/src/interface_observation.rs": "4e97e34839281d27aee6ee463cfbb4bb9aa0474c4faa470eae1bdefe04d21a07",
+    "crates/cordis-kernel/src/interface_observation_example.rs": "e663ec059cbcf0450f4d527ed70194cec2b400ac3252b2b5218caf15b43a3e88",
+    "crates/cordis-kernel/src/internal_old_unload.rs": "0f396eebd5d0c7c87966f7d2d39b6c4f698454873414f2a2cc20acf09d38a10b",
+    "crates/cordis-kernel/src/internal_old_unload_example.rs": "edbc23f1b5d94c78b55ced269093bafd25e40c1f85184782f69f66394b1b16b9",
+    "crates/cordis-kernel/src/internal_table_unload.rs": "6095cf33d09b236de4ff0018017778d7ee31f3161f07c49c2a5a8ae7f26d16c3",
+    "crates/cordis-kernel/src/internal_table_unload_example.rs": "825233c6ff3f4e10e0a714f955b6e828f4fb602d771398b51f6b96ba91a3e884",
+    "crates/cordis-kernel/src/isolated_deletion.rs": "4e45fd03380b0f44d0b44ffc1d378c94f97ee307128ff06959f9474d9459efd8",
+    "crates/cordis-kernel/src/iterator_bridge.rs": "3521e908dcc6a47c54470e8b8b8d967693a151c78061a8b3ffaa5e88c0554ac3",
+    "crates/cordis-kernel/src/iterator_independence.rs": "95c2c384036c43048b29023d26d076a0113c4cfa1cd778b5a63fb04c3d8e57dd",
+    "crates/cordis-kernel/src/iterators.rs": "1c3bc0cee83d69e2140354e51613ce6033d53171fc71b912ad682b234118f92d",
+    "crates/cordis-kernel/src/joint_classification.rs": "fef0c24b0de7fc6c498e76f7674ad9fc1cdf8a70c2ea91b329aee6c954447dc9",
+    "crates/cordis-kernel/src/joint_execution.rs": "a896bc72c5f328abe0b9122e7cc11e58de0b4e84c89ba61d011a6f1fced18bf1",
+    "crates/cordis-kernel/src/journal_recovery.rs": "d3a786a94ed64b8491522e31421544c083d03f1151ba0b1b726b558cc4933da7",
+    "crates/cordis-kernel/src/kernel_replay.rs": "f083dcc354ec0ebc58369ae88abd832f8f006a55189f358b5c84ae53e4cea1fe",
+    "crates/cordis-kernel/src/lib.rs": "c0e6c54261c22f7bd8776103b7d1b3b91955d8fe5a7ffbe1f498eb1d18f9dc25",
+    "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
+    "crates/cordis-kernel/src/lifecycle_state.rs": "cf8078d280e3e9c2d89cbe56f8e198334ad1c9bc48eb80ee103b55fb075ec4f8",
+    "crates/cordis-kernel/src/managed_child_completion.rs": "e2110e13acd891174395acc4d54b7370c6ae2672d74636471568fff5b77bb144",
+    "crates/cordis-kernel/src/managed_foreign_closure.rs": "ef877262e5d1e0bd32ee8a548bf716dcae225949673b5f8bf1b78b3fcd77295b",
+    "crates/cordis-kernel/src/managed_function.rs": "e551de8eb2406bee155780928c6404a12c64bf5bc939bb697b854d8bd8a9591c",
+    "crates/cordis-kernel/src/managed_host.rs": "61bd8e9fac340cf820506b6bb99b20fd86ec364e60deb07503d9ebcd4f7692ed",
+    "crates/cordis-kernel/src/managed_lifecycle_function.rs": "2630b4e165f76ef3a5ab8c9ff456b3af4d9dc8b58fbf585f6195f8cd44ba4add",
+    "crates/cordis-kernel/src/managed_lifecycle_native.rs": "5264076c9e0231fd2c6bad3156780e5312b470e0dcc938b1f4a033886639488b",
+    "crates/cordis-kernel/src/managed_native.rs": "de6f4710389d19f5d5391f73ce304aee9116eff2bb3a9950a1ea8af098236fee",
+    "crates/cordis-kernel/src/managed_producer_recovery.rs": "26a9ea7a1e52b71c6e2defebf77df726db445a372f3be9dc0170c60ed7771e26",
+    "crates/cordis-kernel/src/managed_recovery.rs": "24eeae5ddf5571d6c45549328b52d78eb113f073535bd461576befaef2c55744",
+    "crates/cordis-kernel/src/managed_recovery_cut.rs": "31fd8e9000034696856eb9169cef74cffaf28d944dd4fb969f0e55a936339721",
+    "crates/cordis-kernel/src/managed_recovery_word.rs": "2b3c7eab78daea3f19834f305d291c960076f0db00e129d6d37933b4ffd98341",
+    "crates/cordis-kernel/src/managed_replay.rs": "8ac4e656f4bca84d5e1f111f0172747f49cd699d6600adc3ab8479dedfbdd484",
+    "crates/cordis-kernel/src/managed_replay_bank.rs": "4d39c0d67dd648cfd0caf55a918ac7cd8841abc1610f396c0d288bcb1652ec85",
+    "crates/cordis-kernel/src/managed_replay_batch.rs": "7658c1e4e9500d0c2dd0d16e476227664dccd3c6f433734a9c12d9b30df3aba3",
+    "crates/cordis-kernel/src/managed_replay_binding.rs": "35e5d76051bca567bb7ec81df212dc6f696fd773d37005e5783786c77be42f3c",
+    "crates/cordis-kernel/src/managed_replay_continuity.rs": "58272819ecfdd57c298a97c7f581646af57c93c9aefe5210400f2f8d4370cf0e",
+    "crates/cordis-kernel/src/managed_replay_heap.rs": "e4a98717ec991aeabbd574b6ff4e945f382fb0aba1c12008e12218e03b7bdd01",
+    "crates/cordis-kernel/src/managed_replay_inputs.rs": "790f9f546097234f4b86a6038eba439c0bfaac7a456e9a45d11f3fedc2e69197",
+    "crates/cordis-kernel/src/managed_replay_observation.rs": "9b5ea9274cbd577bdbe12c48f3a864c8d893a42f3ce236cae82c7b2e64917fa9",
+    "crates/cordis-kernel/src/managed_replay_payload_history.rs": "aa10970c5a22430f190a25b91a3faa0031de441b622488154c02db916fe79b8f",
+    "crates/cordis-kernel/src/managed_replay_protected.rs": "8946dfd1489b59f41e4244868e58ebc5cbde7f724f6728d9fed1ed05fb4b4ce4",
+    "crates/cordis-kernel/src/managed_replay_scalar.rs": "8410b30ca09b313c13a7f6a40899109a3e7d2a195f04b01c865d28b2be5603c3",
+    "crates/cordis-kernel/src/managed_replay_selection.rs": "b247bec8fb9409bb8ce616629dd06d800ab97750a13d1dab2333066aece7886a",
+    "crates/cordis-kernel/src/managed_replay_transport.rs": "bf3ee1fa7bfd212fcafa7bd7fc4b6d96190bc6b56a88260fa3fa8eb66c5f7a4d",
+    "crates/cordis-kernel/src/managed_replay_typed.rs": "17088ce94d5eb85df9ea6ea8333f6d02b53a28957699666f4085af2adeb9d2d7",
+    "crates/cordis-kernel/src/managed_replay_typed_protected.rs": "70f3da42a132033885638dcfa73595dd29bc0e835d0b5023f4395192f0f2c2b7",
+    "crates/cordis-kernel/src/managed_semantics.rs": "a1efa6a929335bb47a1d9ecd69cb730385c80f81e09b815b7a04659c6f2597e9",
+    "crates/cordis-kernel/src/managed_source_obligations.rs": "c36f5d6d28be83dd1a16b4746d2b8fce8ec6c978de34ef9906a9b5d900c9dd52",
+    "crates/cordis-kernel/src/managed_unload_census.rs": "e0ac3eb60ca0aff0874ff48c043dc2d86732e1f6a5afb4d2d9300338810df77c",
+    "crates/cordis-kernel/src/mediated.rs": "c63d88166e35070b1f14d99b12f32b39daa4c714ae7ac500227dd0a8aa948f67",
+    "crates/cordis-kernel/src/mixed_age_unload.rs": "ed6c4ce0129d4a6081f8b5e87abc75b32e5e88c4d09771a2e8ead0eb05135fe7",
+    "crates/cordis-kernel/src/mixed_age_unload_example.rs": "c04c9fe655c154e8f107e04b6ed76f149685b0e1b10b13d8f7f728fabd1c4e43",
+    "crates/cordis-kernel/src/mixed_driver.rs": "56f1dc68f7fc7d42e9c0487f38c7081dd42d04a347c96ea976df9d9bd27d4548",
+    "crates/cordis-kernel/src/mixed_examples.rs": "fb19be7079d61a17d8492fc4da3db25c983d9cb0de8005aa7f34acab7b2763e2",
+    "crates/cordis-kernel/src/mixed_foreign_restore.rs": "0d340140fb1fa1476740772d5a82b5f3c35b84da30e760812790f5309d9e68e8",
+    "crates/cordis-kernel/src/mixed_grammar.rs": "3b376446197662fed016e1b04b492c644087e6cfe9f1ab8c755663de48d547ce",
+    "crates/cordis-kernel/src/mixed_iteration_exchange.rs": "94d88f2cd45a81bca3b793ff6425d11f11a5b225aa9101b6b9931c51eb9ee95b",
+    "crates/cordis-kernel/src/mixed_observational_runs.rs": "59b2420ccb4e816d857dc91b61a56dc49e31aab92a7860b08a8c5c85cea95ee2",
+    "crates/cordis-kernel/src/mixed_observational_transport.rs": "1c33c71c173ac67f12dbc711b1af0187dc56a4399cbe79b966b6b3b55cbfa385",
+    "crates/cordis-kernel/src/mixed_orchestration.rs": "0b26063c95c7546d7432658331f0acf72992dba946e07cf1138a76b5938befdc",
+    "crates/cordis-kernel/src/mixed_ordering.rs": "536593360b81397fdb4d9093f5a74ed452042f1a996c22f5897b969526427669",
+    "crates/cordis-kernel/src/mixed_recovery.rs": "fd5ce6bb8fbfaaf1aec66d0d8e78f5b27b12a72366ec1ad2973da094af8e7bd8",
+    "crates/cordis-kernel/src/mixed_syntax.rs": "20e09717be841c5b8b3736e873a199c5ec1166765c051fc1e2ef18159dd7519e",
+    "crates/cordis-kernel/src/mixed_transport.rs": "f0b6fe307377fac26e96f6a738ff09206856e8914c5cce52d84e721342a7eb1a",
+    "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
+    "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
+    "crates/cordis-kernel/src/native_effect.rs": "9fd527c3e42711543033efd2c72f1ad77b29ac518684bb920d16b5be03f5725b",
+    "crates/cordis-kernel/src/native_episode_deletion.rs": "c43580de5f362e64c461960118b06cede0a64b5be38f3e6e8b01da0a3e1e5d7c",
+    "crates/cordis-kernel/src/native_history.rs": "49ebeb34934cac19e326278cb47a583f908321d2994f9824a2da26b3afce064b",
+    "crates/cordis-kernel/src/native_host.rs": "33566b2917571d9a37b8df6a5869854b92b6c8448e7f953d3468a2234fd0bae1",
+    "crates/cordis-kernel/src/native_payload.rs": "9a65e0a382626d5e22018f06b646c12cebc0e3a9e4dad72146c36e2ed5378123",
+    "crates/cordis-kernel/src/native_runtime.rs": "607a7dcd058f782ebdff85fd429e599b01be2e5cf02904e2ec3929179aacef9c",
+    "crates/cordis-kernel/src/native_source_chain.rs": "c74c99fadc350e52eae3c7cb89abb6756be350da12a8b60b009218588f1bbd4c",
+    "crates/cordis-kernel/src/native_source_cleanup.rs": "0d20fac526af890518084174473823789dc348cef48276bf73a9160d20aa51f8",
+    "crates/cordis-kernel/src/native_values.rs": "35735a8f34879dcde10d27c88470d9595d120ed2657c6e556d715febbbbd4622",
+    "crates/cordis-kernel/src/node_runtime.rs": "ea30701aac3915601318f685a56318502d14dd65d1d86b467ea646fcdc8191c1",
+    "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
+    "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
+    "crates/cordis-kernel/src/observational_examples.rs": "212fba2609c8823aa12c9c1484aa7e877f38654bf879d4d3823d736aa27952db",
+    "crates/cordis-kernel/src/observational_execution.rs": "73f6831e528883b579e55c994d4e1a315305f15154c514d069e229d3d52f59eb",
+    "crates/cordis-kernel/src/observational_grammar.rs": "c3724c31751c622ed4dd969e48be6c8fb3f72855717d82ebee4302481159ae19",
+    "crates/cordis-kernel/src/observational_lift.rs": "d8721aa7b7bebe32d814783c2b4af1e871d61a8068d169937bc3f022da0d7950",
+    "crates/cordis-kernel/src/observational_permutation.rs": "57abe81c05c5c58275065eb93ca7cddeb55b01791913b665fc856d5bdbe78748",
+    "crates/cordis-kernel/src/observational_recovery.rs": "74130d3d2150b03058c998ea7edd6d7c629ec3d8b5e6e5225c793937a2c9d4b2",
+    "crates/cordis-kernel/src/old_journal_closed_example.rs": "2c9e5cdb133f331eb326dfb39c1ed1ff16e976e96ede35994c6d49ad6cd3c690",
+    "crates/cordis-kernel/src/old_journal_closure.rs": "f56357f039066684c48bb54baa364f08dc6df491e7eb4d3a29a61280ab10fa31",
+    "crates/cordis-kernel/src/old_journal_interleaving.rs": "c9e7b3d9e834e27a6dab893a3ac9783db0cf7ea76142f6c9fdad970cbfaa7c43",
+    "crates/cordis-kernel/src/old_journal_interleaving_example.rs": "63e1def3ec45eb130c32bf3678d8b04726096cb9049705ae09fa7902962bc87e",
+    "crates/cordis-kernel/src/old_journal_unload.rs": "706948f6ee80ffc326d8ecefe567e54f826a245c16f348bf5529a6638855db69",
+    "crates/cordis-kernel/src/old_provision_journal.rs": "62096cda7b70c467f7ce7b80bf0e75a6680fb229b35f23480beca08d9076e1f7",
+    "crates/cordis-kernel/src/old_provision_journal_example.rs": "2f8a892bb36ca6528525ed87e19314c65d810a75fb8238c7788e6f68a7aacedb",
+    "crates/cordis-kernel/src/old_provision_support.rs": "e00f9d8beba56a9486c09900d337ef6a27e92688a41e1fbc51aba78ea010863c",
+    "crates/cordis-kernel/src/old_receipt_support.rs": "400dbfce63c0c1c56c7422c2d7b57d7378b50945f584cf4d480443dde535a3e8",
+    "crates/cordis-kernel/src/operation_history.rs": "ab9985edbf759643e02b39ab35632ef09a161a381d611fea87459c087f5d97b6",
+    "crates/cordis-kernel/src/orchestration_support_cycle.rs": "16406acf722db08876eec71084f45723eae6a8db754dd14c69a3f53d59d58d47",
+    "crates/cordis-kernel/src/owner_table_recovery.rs": "76cb07c99d45682e5ebb03721ebcbd0c05e013ee38d995b6a72ee426c464b840",
+    "crates/cordis-kernel/src/ownership.rs": "577d5eae9ba3aad0568a6476aeb6d70668c9747c2e70dccc67a8d212eb385303",
+    "crates/cordis-kernel/src/paper_components.rs": "39d2bc1c7419a582aa40348ae278785264dbf27f24d67ed54550df5a54a1b45c",
+    "crates/cordis-kernel/src/paper_confinement.rs": "13fd2a182c446945cac1b756ec08852ae63f3b01426aac1231bca58741513887",
+    "crates/cordis-kernel/src/paper_counterexamples.rs": "064abae9ccd2c02d76314c052162279c6bf095e4fb878540a2b803d39dcc0732",
+    "crates/cordis-kernel/src/paper_instantiation.rs": "eb6cdb87c62ed8349111b6015da7374b6386614fecc3bd4439d191a6941c8f63",
+    "crates/cordis-kernel/src/paper_invariants.rs": "84be535a87dd7808ac90460c20778bd3fd6696882d36576c3953ae5657e21de2",
+    "crates/cordis-kernel/src/paper_observations.rs": "cbb227b44365f700c39e8d97d302832ddfee2f55a910cb5e0c111812f370ab9c",
+    "crates/cordis-kernel/src/paper_trace_independence.rs": "342ffe28831122c2df4ade7da60a3517e9e7396a45da320c09b3f3317b61d1ec",
+    "crates/cordis-kernel/src/paper_typed_context.rs": "0e6f50d6073c7125967559d3d9cc4c562eb1c8b674dfaa71f54677458625444f",
+    "crates/cordis-kernel/src/partial_domains.rs": "0f88ff591367886d93e0cbb3c41ee0ecf98bdf664610bbcba2844d9d8c8bfa8c",
+    "crates/cordis-kernel/src/partial_independence.rs": "62a65b3a4afc82fb09f77f4f132023737bbb994fc8a2d3981e7d4528d609f596",
+    "crates/cordis-kernel/src/payload_cleanup.rs": "04c8078bbcfffbb2a9d5ca2ef5cccdbeef9df8957647e035ba51ee6c21d9639b",
+    "crates/cordis-kernel/src/payload_inverse.rs": "85adf87436d0cb3c56c2d4b67033334ea522f5f75ada1f506b1fbf1356a191e5",
+    "crates/cordis-kernel/src/payload_recovery.rs": "8075ba061df0ec549af8491d23c43c6a476430b5f90f6963e347d5f6e5534ac5",
+    "crates/cordis-kernel/src/permutation.rs": "484a6976b16420a050c69388ef8cffba65e7771f1bf844da5dc377f844b32f19",
+    "crates/cordis-kernel/src/preservation.rs": "e15e6c12384c80ac100bf8812f35f01cd14285e3f561bfe737be2dcbf37e4b4d",
+    "crates/cordis-kernel/src/program.rs": "c20f9fdee4d01ce2b51eb0d84ad31fb6faf4c7265c4a8704b5bd9d55bffc76d3",
+    "crates/cordis-kernel/src/program_normal_form.rs": "d6c5bfbf6ac588080370d76950a563bbf3d60e11fda0ef8ae51b02c69a223cb1",
+    "crates/cordis-kernel/src/program_trace.rs": "750603b3ebb7bc52b5a0ce2d0dc4e1ae2712e9431e008811dfe8106e66e048a1",
+    "crates/cordis-kernel/src/projection.rs": "2d35fff9e3280069cd60198fc86dcd2583baddd8b4b17f831ddd5a4c1d377b8b",
+    "crates/cordis-kernel/src/protected_function.rs": "7923223b642c178b5fd4f6ffc97fadb91a9f547644394d8e30dd5717409d6dca",
+    "crates/cordis-kernel/src/protected_payload.rs": "6ce3b5930fb89bd0e491cba06eb531ab0d6e8cc3a31237426b40c7c680dc713d",
+    "crates/cordis-kernel/src/protected_slot.rs": "a51f447ef14294a7add17bf5eb4da4f310a9cee507344c4c4d9fd30969b41ab5",
+    "crates/cordis-kernel/src/protected_typed_function.rs": "379ad69205c4eaed564b60b8002ea370c7d9ed4da45b946837466a9f514064c1",
+    "crates/cordis-kernel/src/protected_value.rs": "a865f5e6d839bb6ed65d840e5eafd88827db937d500de2059661d5604f8f7622",
+    "crates/cordis-kernel/src/providing_owner_examples.rs": "9a834d887a3f471eae7af212da017ace137171e26a23e832da80c1820f789440",
+    "crates/cordis-kernel/src/providing_owner_execution.rs": "4b04784b13630dbaa5267601e44bc5d6268e60d8f4c49a076c9dbb0386063b6e",
+    "crates/cordis-kernel/src/provision_coverage.rs": "ec2cf7aeac71e3ddf1a7b7fb7be7ec9d37c3ee5569df79c0522982b48642bc66",
+    "crates/cordis-kernel/src/provision_history.rs": "b61e377e73456d5ac35292f0286514fe9b08c4c4a42398cf37438d5d9b7f4645",
+    "crates/cordis-kernel/src/provision_recovery.rs": "237127393bea388193bbb5372a6f9029856290f442906a523aa40e2925c7d289",
+    "crates/cordis-kernel/src/publication_cleanup.rs": "96f0edc47f8cab27a2b3bc04051f297a94284b63182054864b7d96336f8875c9",
+    "crates/cordis-kernel/src/quotient.rs": "295f0fa31f3ff1c7e18145ae8141c043dfcb5d4d90508073e72444dc6040b3d1",
+    "crates/cordis-kernel/src/recovery_examples.rs": "9414a8b078f0b9e616b363dd6d411d091b55d1915554b058cc30b016ccc0884e",
+    "crates/cordis-kernel/src/recursive_context.rs": "a032537ab661dce5392226e43a3174ad83f660008198084beb7d84f46cf955bc",
+    "crates/cordis-kernel/src/refinement.rs": "eee4ba6d36a662498723f05068462073ce0a8da34df5f4409067aae5e5726b26",
+    "crates/cordis-kernel/src/reified_context.rs": "b74f49f0058b44f614290deee2704521e8f43820531ebeffd19a774f10d1781f",
+    "crates/cordis-kernel/src/resolution_completion_counterexample.rs": "c7449f9259095cd1b9232e75c849e0e797cd109d0fac95f255fc7550bc8c3281",
+    "crates/cordis-kernel/src/reversible_value.rs": "788e4cd04b3f3cc7f89b30797221f07a09428b5d2f4830d3ce408e83dc1f5ad7",
+    "crates/cordis-kernel/src/rewrite_confluence.rs": "cc51dc14ef4973968f9a5c5ac6df2c7cc88b73f9ecb38bd784680108dd4433e4",
+    "crates/cordis-kernel/src/rule_frames.rs": "e34f0f98702955cc99775c106e04c6b0ba12066a1ffe1106d3ffabdf5f7b6055",
+    "crates/cordis-kernel/src/scalar_effect.rs": "d490e120f64e8536726a01ae21a928fb1894742677e17a347609d337e8956699",
+    "crates/cordis-kernel/src/semantics.rs": "5f8435c400d8272af930db537a3ae9d21adb027baf1cb9cf9397cd0ae4cee423",
+    "crates/cordis-kernel/src/shared_execution.rs": "588d136e940b1d31a94593b10eeb76a6b0869f9492ad241e7ff64379fd55af1a",
+    "crates/cordis-kernel/src/shared_payload.rs": "72df7955ff038316f9df69e0c6a60b9adcb6363f6dda0e4b66e42c404328d1c8",
+    "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
+    "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
+    "crates/cordis-kernel/src/shared_value_history.rs": "7550a29f9d9fad58a8e1d3df3f6dd0c9d5564d658498056e8233fe251eb740f4",
+    "crates/cordis-kernel/src/stage_landing.rs": "6bd9327b126fd13651df99b07cba3955a1359d850f107bdd3ce99d33d2aed1ba",
+    "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
+    "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
+    "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
+    "crates/cordis-kernel/src/strict_partial_quotient_boundary.rs": "21681292c6c7a568b2e40c6bb4d1fd2c7f7c7254bac0aa93f47fa5fbccf030c3",
+    "crates/cordis-kernel/src/strict_partial_quotient_example.rs": "e82014c379ae642a03b0608df261321f609c2b736b69d86fd46e04c7827aa2d2",
+    "crates/cordis-kernel/src/strict_partial_quotient_per.rs": "8f057c24cc527ba518aeb8539a5b68dcfdd8290ecf9e854eb7d6f93eb3c896a8",
+    "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs": "ebe8a3e72554a588d36ece0fa6448e645d8b2828f8568e12458d5b4f4dbbe421",
+    "crates/cordis-kernel/src/terminal_episode.rs": "946135efb881cb19d16be3bcd66b9dd80d4253097426f05775b41e1005bdf0e9",
+    "crates/cordis-kernel/src/terminal_replay.rs": "9d6900ee0630ff24dfdde21eefa8bdc79d452741689e4fa6f9b6d7133d9d5ac2",
+    "crates/cordis-kernel/src/termination.rs": "584437e136782e356eb6b4e959e33772e9248e5c3464bb42d1530e1b860f8e5e",
+    "crates/cordis-kernel/src/typed_child_domain.rs": "6f790f0aa427820969968c90f4878783a91b4c450d94114762902a91c7fa4347",
+    "crates/cordis-kernel/src/unit_child_recovery.rs": "b2b2b35fc08004dcfedb6139f3f104291fd3ba082fc559af07a23a9960d57e15",
+    "crates/cordis-kernel/src/unload_orchestration.rs": "c8e88175be5dc775aa3e767aff586317247356979194b6cba9dbc31d0b4715de",
+    "crates/cordis-kernel/src/value_slot.rs": "e7e93b12a8fa3855e50711b9f9369d631c39916f1674bc766abcc49d0456b9f2",
+    "crates/cordis-kernel/src/witnessed.rs": "fdbf689640871228463fb10af0fa97523f79272bdd942cca126334e41b57b8cd",
+    "crates/cordis-kernel/src/xor_recovery_algebra.rs": "0a31cfb01f88a52dd5688fb9a9362d48d289b8ea099aa31e4cf299fc34ad47ec",
+    "crates/cordis/src/loader.rs": "2a73818c8aa50c8f9e0bfdc67e191c9be06a0b0458f859b6d8aa3bb4fa948d44",
+    "docs/paper-obligations.json": "8ab0bbb44d4036a49cfcebdb3b2d9aff3514dd7e3792364f23d0a1f73d8cd60a",
+    "docs/paper-refinement-plan.json": "8cca34c566ccf3b7ebc743ff8845fc7fd8f0bbf69eec0db6c452bdd218ed32e6",
+    "docs/r1-semantics.md": "d4b48dea57fac2cb713324114004501abab5a20e57d8143f41a5385b79028056",
+    "docs/r2-acceptance.md": "4d665043f3a3376fd0efd05e044a9476664eb6954fd300d03d02dc5af40f33c5",
+    "docs/r3-controlled-effects.md": "234a4ced84cbb4ceb9adae23be637ab9b6a0f5dcd384f8565fa5b324b7eb6074",
+    "docs/r3-remaining-work.md": "e74911207471639e9a4cf76b702b6f67e3e6fb7b10a0365f0c53b9344db2071e",
+    "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418",
+    "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750",
+    "crates/cordis-kernel/src/managed_replay_typed_tracker.rs": "c9164555670a4225ea262f508686e31e08e86ab2ddd339e9bf50c93f49098482",
+    "crates/cordis-kernel/src/managed_replay_typed_correspondence.rs": "f7c59325dc7fa32b603c959f5304875791ae003be39e12f5b955530f9625e1b3"
+  }
+}

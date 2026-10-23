@@ -269,11 +269,11 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::identity_issuer::IdentityIssuer::issue",
+          "function": "cordis_negative::identity_issuer::ValueIssuer::issue_value",
           "module": "identity_issuer",
           "file": "identity_issuer.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_err() ==> out->Err_0.wf() && out->Err_0.source()==self.progress_source(),"
+          "uniqueSourceAnchor": "ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.source()==self.source() && out->Ok_0.meaning()==meaning,\n            out.is_err() ==> out->Err_0.wf() && out->Err_0.source()==self.progress_source(),"
         }
       ],
       "selectionRationale": "Mutate the actual CAS allocator used for native keys, realms, Episodes and cleanup domains. Require a matching selected positive, whole-mutant compilation and the exact issuance/exhaustion postcondition rejection. This does not prove Arc/Weak ownership or cross-issuer numeric identity."
@@ -2780,7 +2780,7 @@
           "module": "mixed_driver",
           "file": "mixed_driver.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "        ensures final(self).wf(),final(self).blueprints@==old(self).blueprints@,\n            out.is_ok()==old(self).primitive_enabled(actor,instruction),\n            final(self).rows.len()>=old(self).rows.len(),\n            forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],\n            out.is_ok() ==> final(self).fully_provided(actor)==old(self).complete_after(actor,instruction),\n            out.is_ok() ==> r::coherent(final(self).control(),actor)==r::coherent(old(self).control(),actor),\n            out.is_ok() ==> {\n                let y=mx::run(library(),instruction_node(old(self).blueprints@,_blueprint,instruction),old(self).primitive_state(),actor);\n                &&& y.is_some() && final(self).physical(y.unwrap().state) && out.unwrap().model()==y.unwrap().receipt\n                &&& out.unwrap().actor==actor\n                &&& match instruction {\n                    Instruction::Child {expected,blueprint,..}=>expected==old(self).rows.len() && final(self).rows.len()==old(self).rows.len()+1\n                        && final(self).rows[old(self).rows.len() as int].blueprint==blueprint\n                        && final(self).rows[old(self).rows.len() as int].current.is_none()\n                        && final(self).rows[old(self).rows.len() as int].journal.len()==0,\n                    _=>final(self).rows.len()==old(self).rows.len(),\n                }\n            },\n"
+          "uniqueSourceAnchor": "        ensures final(self).kernel.synchronous_metadata(&old(self).kernel,false), final(self).wf(),final(self).blueprints@==old(self).blueprints@,\n            out.is_ok()==old(self).primitive_enabled(actor,instruction),\n            final(self).rows.len()>=old(self).rows.len(),\n            forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],\n            out.is_ok() ==> final(self).fully_provided(actor)==old(self).complete_after(actor,instruction),\n            out.is_ok() ==> r::coherent(final(self).control(),actor)==r::coherent(old(self).control(),actor),\n            out.is_ok() ==> {\n                let y=mx::run(library(),instruction_node(old(self).blueprints@,_blueprint,instruction),old(self).primitive_state(),actor);\n                &&& y.is_some() && final(self).physical(y.unwrap().state) && out.unwrap().model()==y.unwrap().receipt\n                &&& out.unwrap().actor==actor\n                &&& match instruction {\n                    Instruction::Child {expected,blueprint,..}=>expected==old(self).rows.len() && final(self).rows.len()==old(self).rows.len()+1\n                        && final(self).rows[old(self).rows.len() as int].blueprint==blueprint\n                        && final(self).rows[old(self).rows.len() as int].current.is_none()\n                        && final(self).rows[old(self).rows.len() as int].journal.len()==0,\n                    _=>final(self).rows.len()==old(self).rows.len(),\n                }\n            },\n"
         }
       ],
       "selectionRationale": "The contract in cordis_negative::mixed_driver::MixedDriver::execute detects mixed-driver-xor-skips-payload. The mutation remains the exact canonical change to mixed_driver.rs; a fresh same-selector positive and a complete mutant compilation are required before accepting the diagnostic."
@@ -4206,9 +4206,16 @@
           "file": "cleanup_protocol.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures final(self).cleanup_step(old(self),command,reply),"
+        },
+        {
+          "function": "cordis_negative::lifecycle_state::LifecycleState::execute_cleanup",
+          "module": "lifecycle_state::cleanup",
+          "file": "cleanup_protocol.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "final(self).control_history().extends(old(self).control_history()),\n    {\n        reveal(Kernel::unchanged);reveal(Kernel::same_bindings);reveal(Kernel::binding_recorded);"
         }
       ],
-      "selectionRationale": "The actual shared dispatcher must require the acknowledged receipt before calling L-Unload. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance."
+      "selectionRationale": "The actual shared dispatcher must require the acknowledged receipt before calling L-Unload. A fresh matching positive and compiled mutant are required; this selected check is not full release acceptance. Require both the cleanup-step and control-history extension postconditions; retaining only the history diagnostic would not establish the intended protocol rejection."
     },
     {
       "name": "fresh-replay-omits-foreign-unload",
@@ -4999,8 +5006,8 @@
       "name": "r2-native-values-omit-imports",
       "mutation": {
         "file": "native_values.rs",
-        "old": "NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings}),owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}",
-        "new": "NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings}),owned:BTreeMap::new(),imports:BTreeMap::new(),closed:false,capture:Ghost(capture)}"
+        "old": "NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings,publications}),owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}",
+        "new": "NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings,publications}),owned:BTreeMap::new(),imports:BTreeMap::new(),closed:false,capture:Ghost(capture)}"
       },
       "targets": [
         {
@@ -5018,7 +5025,7 @@
           "uniqueSourceAnchor": "ensures out.wf() && !out.closed() && out.owned()==Map::empty()"
         }
       ],
-      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance."
+      "selectionRationale": "The native Runtime must capture every available committed slot, publish the actual complete episode and transfer only the matching generation after drain. Require a fresh selected positive, a fully compiled mutant and rejection of the named executable contract; this is not whole-host or full negative-regression acceptance. Refresh the unique source anchor after new publication fields/CAS replacement were added; preserve the same faulty behavior and rejection criteria."
     },
     {
       "name": "r2-native-values-incomplete-finish",
@@ -5225,7 +5232,7 @@
       "mutation": {
         "file": "shared_child.rs",
         "old": "let result=self.retire_child_slot(&mut cell.slot);",
-        "new": "let result=Ok(None);"
+        "new": "let result=Ok(None);proof {self.state().same_reflexive();}"
       },
       "targets": [
         {
@@ -5240,7 +5247,7 @@
           "module": "lifecycle_state::registration::shared_child",
           "file": "shared_child.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.result.is_ok() ==> !(out.after.state() is Pending)"
+          "uniqueSourceAnchor": "out.result.is_ok() ==> out.result->Ok_0.is_some()==(out.after.state() is Assigned)"
         }
       ],
       "selectionRationale": "The actual shared Child request and inverse must use the same verified lock; registration must implement its exact admission condition and retirement must actually close pending allocation. Require a fresh selected positive, full mutant compilation and the named executable postcondition rejection. This is scoped development evidence, not complete R2 or negative-regression acceptance."
@@ -5540,7 +5547,7 @@
           "module": "reversible_value",
           "file": "reversible_value.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state}),Ghost(false),Tracked(cause))"
+          "uniqueSourceAnchor": "cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state,origin:self.origin().at()}),Ghost(false),Tracked(cause),self.lease)"
         }
       ],
       "selectionRationale": "Mutate the actual reversible service value or its production cleanup owner. Require a fresh selected positive proof, a compiling whole-crate mutant, and rejection at this exact contract; a type error or timeout is not proof evidence. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract."
@@ -5712,11 +5719,11 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution",
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following",
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "if out.is_ok() {self.transition(Ghost(prior),Ghost(id),Ghost(Rule::Unload));}"
+          "uniqueSourceAnchor": "self.transition(Ghost(prior),id,Rule::Unload,Tracked(cause));"
         }
       ],
       "selectionRationale": "Require the actual native aggregate to preserve its joint registry/publication invariant and continuous history. A fresh selected positive proof, whole-mutant compilation and exact named contract rejection are required."
@@ -6075,7 +6082,7 @@
       "name": "r2-native-unload-keeps-owner",
       "mutation": {
         "file": "native_runtime.rs",
-        "old": "if out.is_ok() {self.owners.remove(&id);}",
+        "old": "self.owners.remove(&id);",
         "new": "// Negative: retain an owner after its episode has unloaded."
       },
       "targets": [
@@ -6087,7 +6094,7 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution",
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following",
           "module": "lifecycle_state::native::runtime",
           "file": "native_runtime.rs",
           "diagnosticKind": "assertion failed",
@@ -6634,8 +6641,8 @@
       "name": "r2-slot-replacement-borrows-old-object-receipt",
       "mutation": {
         "file": "value_slot.rs",
-        "old": "let (_domain,Tracked(target))=value.reference();",
-        "new": "let (_domain,Tracked(target))=self.capture().value().reference();"
+        "old": "let (_domain,Tracked(target))=value.reference();\n        let (mut cell,guard)=self.inner.acquire_write();\n        let previous=cell.capture(self);",
+        "new": "let (_domain,Tracked(target))=self.capture().value().reference();\n        let (mut cell,guard)=self.inner.acquire_write();\n        let previous=cell.capture(self);"
       },
       "targets": [
         {
@@ -6651,10 +6658,10 @@
           "module": "reversible_value::slot",
           "file": "value_slot.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "cell.joint.update_following(Ghost(joint::Record::Slot {source:self.source(),revision:cell.value.revision_spec(),object:value.object()}),\n                    Ghost(joint::Change::Replace),Tracked(Some(target)),Ghost(false),Tracked(None))"
+          "uniqueSourceAnchor": "cell.joint.update_following(Ghost(joint::Record::Slot {source:self.source(),revision:cell.value.revision_spec(),object:value.object()}),\n                    Ghost(joint::Change::Replace),Tracked(Some(target)),Ghost(false),Tracked(None));\n                let current=cell.capture(self);\n                proof {assert(current.history().take(previous.history().len() as int) =~= previous.history());}\n                guard.release_write(cell);\n                Ok(Replacement {previous,current})"
         }
       ],
-      "selectionRationale": "Actual slot commits require the target allocation receipt; current observations resolve the object selected by the slot and preserve aliases. Require a fresh selected positive, complete mutant compilation and exact named-contract rejection. Other modules and full-suite acceptance are outside this selected control."
+      "selectionRationale": "Actual slot commits require the target allocation receipt; current observations resolve the object selected by the slot and preserve aliases. Require a fresh selected positive, complete mutant compilation and exact named-contract rejection. Other modules and full-suite acceptance are outside this selected control. Refresh the unique source anchor after new publication fields/CAS replacement were added; preserve the same faulty behavior and rejection criteria."
     },
     {
       "name": "r2-slot-projection-reads-slot-as-object",
@@ -6788,8 +6795,8 @@
       "name": "r2-slot-substitutes-replacement",
       "mutation": {
         "file": "value_slot.rs",
-        "old": "let previous=cell.capture(self);",
-        "new": "let previous=cell.capture(self);let value=cell.value.get().clone();let (_domain,Tracked(target))=value.reference();"
+        "old": "let previous=cell.capture(self);\n        match cell.value.replace(value)",
+        "new": "let previous=cell.capture(self);let value=cell.value.get().clone();let (_domain,Tracked(target))=value.reference();\n        match cell.value.replace(value)"
       },
       "targets": [
         {
@@ -6814,7 +6821,7 @@
           "uniqueSourceAnchor": "out.is_err() ==> out->Err_0.value==value && out->Err_0.error==crate::versioned_value::ReplaceError::Capacity"
         }
       ],
-      "selectionRationale": "Check the actual typed slot boundary. The same-selector positive must pass, the complete mutant must compile, and the named contract must reject this canonical executable mutation. This development candidate is not full negative-regression acceptance. Substituting the supplied object violates both the successful replacement and capacity-rejection payload contracts; require both exact diagnostics from the same function."
+      "selectionRationale": "Check the actual typed slot boundary. The same-selector positive must pass, the complete mutant must compile, and the named contract must reject this canonical executable mutation. This development candidate is not full negative-regression acceptance. Substituting the supplied object violates both the successful replacement and capacity-rejection payload contracts; require both exact diagnostics from the same function. Refresh the unique source anchor after new publication fields/CAS replacement were added; preserve the same faulty behavior and rejection criteria."
     },
     {
       "name": "r2-slot-reads-wrong-realm",
@@ -6845,8 +6852,8 @@
       "name": "r2-joint-value-omits-commit",
       "mutation": {
         "file": "reversible_value.rs",
-        "old": "let pending=self.joint.update_following(Ghost(joint::Record::Object {source:self.authority@.source(),state:self.state}),Ghost(joint::Change::Value {event}),Tracked(cause),Ghost(managed),Tracked(None));\n        proof {\n            joint::append_indexed(events,self.positions@,frames,self.joint.events(),self.joint.key(),event);\n            let prior=self.positions@;\n            self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));\n            assert(self.positions@.take(prior.len() as int) =~= prior);\n        }",
-        "new": "// Negative: publish the real object change without its joint commit.\n        let pending=Tracked(None);\n        proof {self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));}"
+        "old": "let pending=self.joint.update_following(Ghost(joint::Record::Object {source:self.authority@.source(),state:self.state}),Ghost(joint::Change::Value {event}),Tracked(cause),Ghost(managed),Tracked(None));\n        proof {\n            joint::append_indexed(events,self.positions@,frames,self.joint.events(),self.joint.key(),event);\n            joint::ownership::commit(seq![self.birth@]+self.positions@,frames,self.joint.events(),self.joint.key());\n            if self.custody@.frames().len()>0 {assert(self.custody@.frames().last().at==self.positions@.last());}\n            lease=self.custody.borrow_mut().record(event,(self.joint.events().len()-1) as nat,restore);\n            let prior=self.positions@;\n            self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));\n            assert(self.positions@.take(prior.len() as int) =~= prior);\n        }",
+        "new": "// Negative: publish the real object change without its joint commit.\n        let pending=Tracked(None);\n        proof {lease=None;self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));}"
       },
       "targets": [
         {
@@ -6861,7 +6868,7 @@
           "module": "reversible_value",
           "file": "reversible_value.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>\n                cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),\n            joint::pending_matches(out@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),\n            final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),"
+          "uniqueSourceAnchor": "ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>\n                cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),\n            joint::pending_matches(out.0@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),\n            ownership::issued(out.1@,final(self).custody@.source(),event,(final(self).joint.events().len()-1) as nat),\n            final(self).custody@.source()==old(self).custody@.source(),final(self).birth==old(self).birth,\n            final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),"
         }
       ],
       "selectionRationale": "Check the real unified execution and stored finite body. Require a fresh same-selector positive, whole-mutant compilation, and rejection by this named contract; not full negative-regression acceptance. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract."
@@ -6922,7 +6929,7 @@
       "name": "r2-joint-control-omits-commit",
       "mutation": {
         "file": "native_runtime.rs",
-        "old": "self.joint.update(Ghost(joint::Record::Native {state:self.observation().project(self.execution_history().labels.len())}),Ghost(joint::Change::Native {actor:id,rule}));",
+        "old": "let _pending=self.joint.update_following(Ghost(joint::Record::Native {state:self.observation().project(self.execution_history().labels.len())}),Ghost(joint::Change::Native {actor:id,rule}),Tracked(cause),Ghost(false),Tracked(None));",
         "new": "// Negative: publish the real lifecycle change without its joint commit."
       },
       "targets": [
@@ -7089,7 +7096,7 @@
           "module": "reversible_value",
           "file": "reversible_value.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>\n                cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),\n            joint::pending_matches(out@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),\n            final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),"
+          "uniqueSourceAnchor": "ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>\n                cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),\n            joint::pending_matches(out.0@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),\n            ownership::issued(out.1@,final(self).custody@.source(),event,(final(self).joint.events().len()-1) as nat),\n            final(self).custody@.source()==old(self).custody@.source(),final(self).birth==old(self).birth,\n            final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),"
         }
       ],
       "selectionRationale": "Bind real registered code and computed completion to actual object history positions. Require a fresh same-selector positive, whole-mutant compilation and the named contract failure; selected development evidence only. The implementation moved into its causal-receipt helper; retain the same faulty behavior and require rejection by that helper contract."
@@ -7171,7 +7178,7 @@
           "module": "cleanup_queue",
           "file": "cleanup_queue.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "member.update_following(Ghost(joint::Record::Cleanup {state:after}),Ghost(change),Tracked(cause),Ghost(false),Tracked(pending))"
+          "uniqueSourceAnchor": "member.update_observing(Ghost(joint::Record::Cleanup {state:after}),Ghost(change),Tracked(cause),Ghost(false),Tracked(pending),Tracked(observed))"
         }
       ],
       "selectionRationale": "Reject loss of the authenticated write-to-registration edge in the actual queue instrumentation. Require a fresh same-selector positive and whole-mutant compilation; an erased-proof instrumentation mutation, not a runtime fault or full negative-regression result."
@@ -7180,8 +7187,8 @@
       "name": "r2-managed-write-omits-pending",
       "mutation": {
         "file": "reversible_value.rs",
-        "old": "let pending=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(managed),Tracked(cause));",
-        "new": "let pending=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(false),Tracked(cause));"
+        "old": "let (pending,lease)=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(managed),Tracked(cause),Tracked(None));",
+        "new": "let (pending,lease)=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(false),Tracked(cause),Tracked(None));"
       },
       "targets": [
         {
@@ -7395,11 +7402,11 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::reversible_value::effect::commit_calculated",
+          "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
           "module": "reversible_value::effect",
           "file": "scalar_effect.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),code,expected,out->Err_0)"
+          "uniqueSourceAnchor": "out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),code,calculation.input(final(attempts).event().before()),out->Err_0)"
         }
       ],
       "selectionRationale": "Misclassify an intervening shared write as rejection by the prepared scalar function. The real stale-computation event must determine the returned error. Require a fresh matching selected positive proof, whole-mutant compilation and strict rejection at the named contract. This is scoped development evidence, not full regression acceptance."
@@ -7458,8 +7465,8 @@
       "name": "r2-effect-omits-read-cause",
       "mutation": {
         "file": "scalar_effect.rs",
-        "old": "let pending=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(Some(cause.duplicate())));",
-        "new": "let pending=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(None));"
+        "old": "let (pending,lease)=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(Some(cause.duplicate())),Tracked(None));",
+        "new": "let (pending,lease)=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(None),Tracked(None));"
       },
       "targets": [
         {
@@ -7470,7 +7477,7 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::reversible_value::effect::commit_calculated",
+          "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
           "module": "reversible_value::effect",
           "file": "scalar_effect.rs",
           "diagnosticKind": "postcondition not satisfied",
@@ -7499,7 +7506,7 @@
           "module": "reversible_value",
           "file": "reversible_value.rs",
           "diagnosticKind": "precondition not satisfied",
-          "uniqueSourceAnchor": "cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state}),Ghost(false),Tracked(cause))"
+          "uniqueSourceAnchor": "cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state,origin:self.origin().at()}),Ghost(false),Tracked(cause),self.lease)"
         }
       ],
       "selectionRationale": "Keep the restore event and snapshot while removing the actual inverse write. Its real post-state must satisfy the strict inverse. Require a fresh matching selected positive, whole-mutant compilation and strict rejection at the named contract; no full-regression or whole-R2 claim."
@@ -7570,11 +7577,11 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::cleanup_queue::CleanupQueue::dispatch",
+          "function": "cordis_negative::cleanup_queue::CleanupQueue::dispatch_following",
           "module": "cleanup_queue::completion",
           "file": "cleanup_completion.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_err() || out==Ok(None) ==> final(self).same(old(self)) && final(self).trace()==old(self).trace(),"
+          "uniqueSourceAnchor": "            },\n            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),\n            out.is_err() || out==Ok(None) ==> final(self).same(old(self)) && final(self).trace()==old(self).trace(),"
         }
       ],
       "selectionRationale": "Execute and acknowledge the actual inverse but return no action. The no-action return must preserve queue state and its authentic trace. Require a fresh matching selected positive, whole-mutant compilation and strict rejection at the named contract; no full-regression or whole-R2 claim."
@@ -7931,7 +7938,7 @@
       ],
       "expectedFailures": [
         {
-          "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_managed_following",
+          "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_captured_in",
           "module": "reversible_value::payload::restoration",
           "file": "payload_inverse.rs",
           "diagnosticKind": "precondition not satisfied",
@@ -8064,6 +8071,773 @@
         }
       ],
       "selectionRationale": "Reject the exact production classification or provenance fault. Require a fresh matching positive, full mutant compilation and the named contract diagnostic; solver limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-replay-discards-foreign-history",
+      "mutation": {
+        "file": "episode_replay.rs",
+        "old": "e::foreign_state(mr::events(library(),programs(bank),states.subrange(begin+1,end+1),\n        labels(transitions).subrange(begin+1,end),owner),p::project(states[begin+1].state,ISet::full()))",
+        "new": "e::foreign_state(Seq::empty(),p::project(states[begin+1].state,ISet::full()))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_driver::episode_replay",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_driver::episode_replay::recover_cut",
+          "module": "mixed_driver::episode_replay",
+          "file": "episode_replay.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures recovered_at(bank,states,transitions,owner,begin,end),"
+        }
+      ],
+      "selectionRationale": "Reject an incorrect paper-to-code recovery observation: foreign execution must participate in value replay, and the observation must apply the stored inverse receipts. This is a semantic-contract mutation, not a runtime fault. Require a fresh selected positive, complete mutant compilation and the named postcondition failure; resource exhaustion is not evidence."
+    },
+    {
+      "name": "r3-recovery-discards-stored-receipts",
+      "mutation": {
+        "file": "episode_replay.rs",
+        "old": "match super::restore_receipts(self.journal(owner),self.primitive_state())",
+        "new": "match super::restore_receipts(Seq::empty(),self.primitive_state())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "mixed_driver::episode_replay",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::mixed_driver::MixedDriver::observe_restored",
+          "module": "mixed_driver::episode_replay",
+          "file": "episode_replay.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures self.restored_observation(owner)==Some(p::project(super::restore_receipts(self.journal(owner),self.primitive_state()).unwrap(),ISet::full())),"
+        }
+      ],
+      "selectionRationale": "Reject an incorrect paper-to-code recovery observation: foreign execution must participate in value replay, and the observation must apply the stored inverse receipts. This is a semantic-contract mutation, not a runtime fault. Require a fresh selected positive, complete mutant compilation and the named postcondition failure; resource exhaustion is not evidence."
+    },
+    {
+      "name": "r3-managed-gap-ignores-writes",
+      "mutation": {
+        "file": "managed_recovery.rs",
+        "old": "e.key!=key || joint::state_at(frames,i as nat).contains_pair(key,e.after)",
+        "new": "true || joint::state_at(frames,i as nat).contains_pair(key,e.after)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::recovery",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::recovery::quiet_record",
+          "module": "reversible_value::managed::recovery",
+          "file": "managed_recovery.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures joint::state_at(frames,end).contains_pair(key,joint::state_at(frames,start)[key]),"
+        }
+      ],
+      "selectionRationale": "Reject a real foreign mutation being treated as a quiet recovery gap, or executable restoration accepting an already consumed semantic head. Require a fresh matching positive, whole-mutant compilation and the exact named contract diagnostic; resource failures and unrelated errors do not count."
+    },
+    {
+      "name": "r3-typed-restores-consumed-head",
+      "mutation": {
+        "file": "payload_inverse.rs",
+        "old": "if cell.head!=self.expected {",
+        "new": "if cell.head>self.expected {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::payload::restoration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::payload::restoration::Inverse::restore_live",
+          "module": "reversible_value::payload::restoration",
+          "file": "payload_inverse.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(cell.state()==self.after().state());"
+        }
+      ],
+      "selectionRationale": "Reject a real foreign mutation being treated as a quiet recovery gap, or executable restoration accepting an already consumed semantic head. Require a fresh matching positive, whole-mutant compilation and the exact named contract diagnostic; resource failures and unrelated errors do not count."
+    },
+    {
+      "name": "r3-final-cut-skips-foreign",
+      "mutation": {
+        "file": "managed_unload_census.rs",
+        "old": "if exists|i:int|0<=i<interval.events.len() && (#[trigger] interval.events[i]).forward()\n            && !completion::later(interval.events,interval.events[i].inverse(),(i+1) as nat) {",
+        "new": "if false && (exists|i:int|0<=i<interval.events.len() && (#[trigger] interval.events[i]).forward()\n            && !completion::later(interval.events,interval.events[i].inverse(),(i+1) as nat)) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::interleaving::history::lifecycle::unload_census",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::root::RegisteredReport::unload_census",
+          "module": "reversible_value::managed::interleaving::history::lifecycle::unload_census",
+          "file": "managed_unload_census.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(completion::settled(interval.events,self.obligations(owner.baseline(),id,offset),self.return_values().dom()));"
+        }
+      ],
+      "selectionRationale": "Reject final recovery that skips an actual outstanding foreign creation or an original Child completion. Require a fresh matching positive, whole-mutant compilation and the exact named contract diagnostic. Resource failures and unrelated errors do not count."
+    },
+    {
+      "name": "r3-final-cut-skips-child",
+      "mutation": {
+        "file": "managed_unload_census.rs",
+        "old": "if exists|group:usize,token:int|(#[trigger] owner.native_child_source(group,token)).is_some()\n            && !(exists|resolution:Resolution|owner.native_child_completion(ledger,group,token,resolution)) {",
+        "new": "if false && (exists|group:usize,token:int|(#[trigger] owner.native_child_source(group,token)).is_some()\n            && !(exists|resolution:Resolution|owner.native_child_completion(ledger,group,token,resolution))) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::interleaving::history::lifecycle::unload_census",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::root::RegisteredReport::unload_census",
+          "module": "reversible_value::managed::interleaving::history::lifecycle::unload_census",
+          "file": "managed_unload_census.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(owner.native_children_resolved(ledger));owner.native_children_at_cut(ledger,cut);"
+        }
+      ],
+      "selectionRationale": "Reject final recovery that skips an actual outstanding foreign creation or an original Child completion. Require a fresh matching positive, whole-mutant compilation and the exact named contract diagnostic. Resource failures and unrelated errors do not count."
+    },
+    {
+      "name": "r3-observation-skips-publication",
+      "mutation": {
+        "file": "native_observation_recovery.rs",
+        "old": "if let Some(issue)=self.history().publication_registry().check(self.first,self.last(),scope.providers) {",
+        "new": "if let Some(issue)=Option::<registry::Issue>::None {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::recovery",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::recovery::Interval::check",
+          "module": "lifecycle_state::native::runtime::history::recovery",
+          "file": "native_observation_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.balanced(scope));"
+        }
+      ],
+      "selectionRationale": "Reject a recovery query that omits actual publication or pending obligations. Require a fresh matching positive, whole-mutant compilation and the named source-balance contract failure; resource limits and unrelated diagnostics are not evidence."
+    },
+    {
+      "name": "r3-observation-skips-pending",
+      "mutation": {
+        "file": "native_observation_recovery.rs",
+        "old": "if let Some(issue)=pending::check(self.frames(),self.start,self.end(),scope.objects) {",
+        "new": "if let Some(issue)=Option::<pending::Issue>::None {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::recovery",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::recovery::Interval::check",
+          "module": "lifecycle_state::native::runtime::history::recovery",
+          "file": "native_observation_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.balanced(scope));"
+        }
+      ],
+      "selectionRationale": "Reject a recovery query that omits actual publication or pending obligations. Require a fresh matching positive, whole-mutant compilation and the named source-balance contract failure; resource limits and unrelated diagnostics are not evidence."
+    },
+    {
+      "name": "r3-host-skips-append-history",
+      "mutation": {
+        "file": "managed_host.rs",
+        "old": "history.extend(queue);\n            assert(history.current()==queue.slots());",
+        "new": "assert(history.current()==queue.slots());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::interleaving::history::lifecycle::host",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::appended",
+          "module": "reversible_value::managed::interleaving::history::lifecycle::host",
+          "file": "managed_host.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(history.current()==queue.slots());"
+        }
+      ],
+      "selectionRationale": "Reject loss of appended inverse obligations or successful-release terminal queues in the actual host owner. Require a fresh matching positive baseline, whole-mutant compilation and the named assertion rejection; resource limits and unrelated failures do not count."
+    },
+    {
+      "name": "r3-host-drops-terminal-history",
+      "mutation": {
+        "file": "managed_lifecycle_native.rs",
+        "old": "self.terminal=Ghost(self.terminal@.union_prefer_right(out.2@.unwrap().queues()));\n                assert(self.terminal().dom()==self.histories().dom());",
+        "new": "self.terminal=Ghost(self.terminal@);\n                assert(self.terminal().dom()==self.histories().dom());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::interleaving::history::lifecycle::native",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::release_controlled",
+          "module": "reversible_value::managed::interleaving::history::lifecycle::native",
+          "file": "managed_lifecycle_native.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.terminal().dom()==self.histories().dom());"
+        }
+      ],
+      "selectionRationale": "Reject loss of appended inverse obligations or successful-release terminal queues in the actual host owner. Require a fresh matching positive baseline, whole-mutant compilation and the named assertion rejection; resource limits and unrelated failures do not count."
+    },
+    {
+      "name": "r3-deletion-retains-selected-actions",
+      "mutation": {
+        "file": "native_deletion_trace.rs",
+        "old": "i<self.start || self.end<=i || self.region.keep(label.0,label.1)",
+        "new": "i<self.start || self.end<=i || true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::deletion::trace",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::trace::Window::edge",
+          "module": "lifecycle_state::native::runtime::history::deletion::trace",
+          "file": "native_deletion_trace.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.keep(i,h.labels[i]) ==> super::super::step(self.at(h,i),self.at(h,i+1),h.labels[i].0,h.labels[i].1));"
+        }
+      ],
+      "selectionRationale": "Reject retaining erased lifecycle actions or dropping source Child-birth closure in the actual-snapshot deletion construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; timeouts, resource limits and unrelated diagnostics are not evidence."
+    },
+    {
+      "name": "r3-deletion-skips-child-birth",
+      "mutation": {
+        "file": "native_deletion_trace.rs",
+        "old": "if !self.births_closed(h) {",
+        "new": "if false {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::deletion::trace",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::trace::Window::check",
+          "module": "lifecycle_state::native::runtime::history::deletion::trace",
+          "file": "native_deletion_trace.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.admissible(h));"
+        }
+      ],
+      "selectionRationale": "Reject retaining erased lifecycle actions or dropping source Child-birth closure in the actual-snapshot deletion construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; timeouts, resource limits and unrelated diagnostics are not evidence."
+    },
+    {
+      "name": "r3-effect-deletion-skips-read",
+      "mutation": {
+        "file": "native_joint_deletion.rs",
+        "old": "if exists|i:nat|i<self.frames().len() && !self.read(i) {",
+        "new": "if false {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::deletion::joint",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::joint::Selection::check"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::joint::Selection::check",
+          "module": "lifecycle_state::native::runtime::history::deletion::joint",
+          "file": "native_joint_deletion.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.admissible());"
+        }
+      ],
+      "selectionRationale": "Reject omitted cross-record reads and stale inverse-registration indices in the source-bound full Journal construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; resource limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-effect-deletion-keeps-source-index",
+      "mutation": {
+        "file": "joint_erasure.rs",
+        "old": "Change::RegisterInverse {write:self.rank(write)}",
+        "new": "Change::RegisterInverse {write}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::joint::erasure",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::joint::erasure::Plan::registration_position"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::joint::erasure::Plan::registration_position",
+          "module": "reversible_value::joint::erasure",
+          "file": "joint_erasure.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.event(source,i).change->RegisterInverse_write<self.rank(i)\n            && self.positions(i)[self.event(source,i).change->RegisterInverse_write as int]==source[i as int].event.change->RegisterInverse_write);"
+        }
+      ],
+      "selectionRationale": "Reject omitted cross-record reads and stale inverse-registration indices in the source-bound full Journal construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; resource limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-control-replay-keeps-source-allocation",
+      "mutation": {
+        "file": "kernel_replay_names.rs",
+        "old": "names.pair(*actor,next);",
+        "new": "names.pair(*actor,*actor);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "kernel_replay::names",
+          "descendants": false,
+          "function": "cordis_negative::kernel_replay::names::prepare"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::kernel_replay::names::prepare",
+          "module": "kernel_replay::names",
+          "file": "kernel_replay_names.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(names.name_spec(*actor)==prior_next);"
+        }
+      ],
+      "selectionRationale": "Reject unchanged source allocation IDs and omission of the real Kernel Begin call. Require fresh matching positives, whole-mutant compilation and the designated semantic assertion. Timeouts, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-control-replay-skips-executable-begin",
+      "mutation": {
+        "file": "kernel_replay.rs",
+        "old": "r::Rule::Begin=>{self.begin(*actor)?;}",
+        "new": "r::Rule::Begin=>{}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "kernel_replay",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::replay_one",
+          "module": "kernel_replay",
+          "file": "kernel_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(r::step(prior.paper(),self.paper(),c.actor(),c.rule()));"
+        }
+      ],
+      "selectionRationale": "Verify the kernel_replay module and its name-preparation child module with the pinned verifier module filter. The full Rust method name is rooted at Kernel, while its defining timing module is kernel_replay. Require the exact replay_one control-step assertion to fail; retain strict scope, positive-baseline, compiling-mutant and diagnostic checks."
+    },
+    {
+      "name": "r3-source-chain-skips-command",
+      "mutation": {
+        "file": "native_control_source.rs",
+        "old": "let ghost before=self.commands@;self.commands.push(c);",
+        "new": "let ghost before=self.commands@;let _=c;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::control_source",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::control_source::Recorder::append"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::control_source::Recorder::append",
+          "module": "lifecycle_state::native::runtime::control_source",
+          "file": "native_control_source.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.commands.len()==next.labels.len());"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated source-correspondence or Unload-completeness failure. Omitting runtime command recording or the authentic release source must not certify a complete source chain. Timeouts, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-source-chain-skips-unload-source",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "self.children.borrow_mut().unload(end.duplicate(),before_collection.joint_events());",
+        "new": "// Mutation: omit the actual Unload source collection."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "control_source::cleanup::unload_collected(prior.child_records(),self.child_records(),prior.execution_history(),prior.history_positions(),self.execution_history(),self.history_positions(),end,id);"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated source-correspondence or Unload-completeness failure. Omitting runtime command recording or the authentic release source must not certify a complete source chain. Timeouts, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-target-execution-skips-interpreter",
+      "mutation": {
+        "file": "managed_replay.rs",
+        "old": "let (owner,report)=runtime.run_recorded_root(id,execution);",
+        "new": "let (owner,report)=(RecordedExecution::new(execution),Err::<RegisteredReport<E,T>,AdmissionError>(AdmissionError::NotAdmitted));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
+          "module": "reversible_value::managed::replay",
+          "file": "managed_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(report.is_ok());"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated successful-admission assertion. Skipping the actual interpreter and inventing an admission error must not certify the real target invocation."
+    },
+    {
+      "name": "r3-controlled-replay-admits-callback",
+      "mutation": {
+        "file": "managed_replay.rs",
+        "old": "if !self.is_controlled() {return Err(StartError::ExternalEffect {host:destination.host});}",
+        "new": "if false {return Err(StartError::ExternalEffect {host:destination.host});}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate_controlled"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate_controlled",
+          "module": "reversible_value::managed::replay",
+          "file": "managed_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.program().controlled());"
+        }
+      ],
+      "selectionRationale": "Require a fresh matching positive, compiling mutant and rejection at the designated actual controlled-execution assertion. A timeout, frontend failure, empty selection or unrelated rejection is not evidence."
+    },
+    {
+      "name": "r01-typed-call-ignores-source-history",
+      "mutation": {
+        "file": "managed_replay_typed_tracker.rs",
+        "old": "if !same {return Err(Error::SourceState {step});}",
+        "new": "if false {return Err(Error::SourceState {step});}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay::typed_tracker",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::typed_tracker::Tracker::advance"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::typed_tracker::Tracker::advance",
+          "module": "reversible_value::managed::replay::typed_tracker",
+          "file": "managed_replay_typed_tracker.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(input.source().before()->Payload_0==previous.state());"
+        }
+      ],
+      "selectionRationale": "Bypass the real retained-history check before a typed invocation. Require a matching fresh positive, whole-mutant compilation and exactly the designated assertion failure; no timeout, unrelated rejection, or full-regression claim."
+    },
+    {
+      "name": "r01-typed-seed-ignores-inverse-debt",
+      "mutation": {
+        "file": "managed_replay_typed_protected.rs",
+        "old": "if *depth!=0 {return Err(Error::OutstandingHistory {entry:i});}",
+        "new": "if false {return Err(Error::OutstandingHistory {entry:i});}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay::typed_protected",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry",
+          "module": "reversible_value::managed::replay::typed_protected",
+          "file": "managed_replay_typed_protected.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(first.source().before()->Payload_0.depth==0);"
+        }
+      ],
+      "selectionRationale": "Bypass a real typed prewrite admission guard. Require the same selected positive proof, complete mutant compilation and exactly the designated assertion failure. A timeout, unrelated failure or frontend error is not evidence; this is not full regression or R01 closure."
+    },
+    {
+      "name": "r01-typed-seed-ignores-revision",
+      "mutation": {
+        "file": "managed_replay_typed_protected.rs",
+        "old": "if current.revision()!=0 {return Err(Error::ChangedVersion {entry:i});}",
+        "new": "if false {return Err(Error::ChangedVersion {entry:i});}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay::typed_protected",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry",
+          "module": "reversible_value::managed::replay::typed_protected",
+          "file": "managed_replay_typed_protected.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(current.revision_spec()==0);"
+        }
+      ],
+      "selectionRationale": "Bypass a real typed prewrite admission guard. Require the same selected positive proof, complete mutant compilation and exactly the designated assertion failure. A timeout, unrelated failure or frontend error is not evidence; this is not full regression or R01 closure."
+    },
+    {
+      "name": "r01-exclusive-source-ignores-input",
+      "mutation": {
+        "file": "managed_replay_protected.rs",
+        "old": "if values[index].value!=expected.value || values[index].depth!=expected.depth {return Err(Error::SourceState {step:i});}",
+        "new": "if false {return Err(Error::SourceState {step:i});}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay::protected",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::protected::Context::check_source"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::protected::Context::check_source",
+          "module": "reversible_value::managed::replay::protected",
+          "file": "managed_replay_protected.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(values@[index as int]==*expected);"
+        }
+      ],
+      "selectionRationale": "Bypass the actual prewrite guard. Require a fresh matching selected positive, whole-mutant compilation and exactly the designated assertion rejection; no timeout, frontend error, unrelated rejection or full-regression claim."
+    },
+    {
+      "name": "r01-exclusive-source-ignores-allocation",
+      "mutation": {
+        "file": "managed_replay_protected.rs",
+        "old": "if mapped!=index {return Err(Error::SourceState {step:i});}",
+        "new": "if false {return Err(Error::SourceState {step:i});}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay::protected",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::protected::Context::check_source"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::protected::Context::check_source",
+          "module": "reversible_value::managed::replay::protected",
+          "file": "managed_replay_protected.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(mapped==index);"
+        }
+      ],
+      "selectionRationale": "Bypass the actual prewrite guard. Require a fresh matching selected positive, whole-mutant compilation and exactly the designated assertion rejection; no timeout, frontend error, unrelated rejection or full-regression claim."
+    },
+    {
+      "name": "r3-controlled-evaluation-uses-wrong-input",
+      "mutation": {
+        "file": "scalar_effect.rs",
+        "old": "Calculation::Kernel(instruction)=>(before,instruction.evaluate(before.value))",
+        "new": "Calculation::Kernel(instruction)=>(before,instruction.evaluate(0))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::effect",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::effect::commit_calculation_in"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
+          "module": "reversible_value::effect",
+          "file": "scalar_effect.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(decision==code(expected.value));"
+        }
+      ],
+      "selectionRationale": "Require a fresh matching positive, compiling mutant and rejection at the designated actual controlled-execution assertion. A timeout, frontend failure, empty selection or unrelated rejection is not evidence."
+    },
+    {
+      "name": "r3-source-call-fabricates-position",
+      "mutation": {
+        "file": "managed_replay_order.rs",
+        "old": "{Self {revision,stream}}",
+        "new": "{Self {revision:Some(0),stream}}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay::order",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::order::CallPosition::new"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::order::CallPosition::new",
+          "module": "reversible_value::managed::replay::order",
+          "file": "managed_replay_order.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.revision==revision,out.stream==stream,"
+        }
+      ],
+      "selectionRationale": "The real CallPosition stored by source capture must retain the actual non-wrapping recipe revision with its stream. The constructor is checked independently of the large invocation report; Source separately proves its completion-receipt link. Require a matching positive, compiling mutant and designated postcondition failure. Timeouts and frontend failures do not count."
+    },
+    {
+      "name": "r3-typed-landing-skips-version",
+      "mutation": {
+        "file": "payload_inverse.rs",
+        "old": "if revision!=expected.revision() {",
+        "new": "if false {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::payload::restoration",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_captured_in"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_captured_in",
+          "module": "reversible_value::payload::restoration",
+          "file": "payload_inverse.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(cell.authority@.events() =~= expected.observation().states);"
+        }
+      ],
+      "selectionRationale": "A captured typed input must still be current under the same write lock that performs the real mutation. Require a matching positive, a compiling mutant and rejection at the designated assertion. Timeouts, frontend errors and unrelated proof failures do not count."
+    },
+    {
+      "name": "r3-scalar-landing-ignores-depth",
+      "mutation": {
+        "file": "native_effect.rs",
+        "old": "if snapshot.value()!=expected.value || snapshot.depth()!=expected.depth {return Err(snapshot);}",
+        "new": "if snapshot.value()!=expected.value {return Err(snapshot);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::native_effect",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::native_effect::Capture::prepare_at"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::native_effect::Capture::prepare_at",
+          "module": "reversible_value::native_effect",
+          "file": "native_effect.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(snapshot.state()==expected);"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and rejection at the real captured-input equality assertion. Equal values with different outstanding inverse depth must not certify source-corresponding target input. Frontend failures, timeouts and unrelated proof failures are not evidence."
+    },
+    {
+      "name": "r3-target-execution-drops-source-body",
+      "mutation": {
+        "file": "managed_replay.rs",
+        "old": "Body::Managed(self.function.duplicate())",
+        "new": "Body::Managed(Function::<E,T> {code:Vec::new()})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
+          "module": "reversible_value::managed::replay",
+          "file": "managed_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(recipe.payload()->Managed_0.code()==self.program().code());"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated exact-source-program assertion in the real target registration path. Replacing the retained program with an empty executable body must not certify source correspondence. Frontend errors, timeouts and unrelated proof failures are not evidence."
     },
     {
       "name": "r2-node-confuses-control-stutter",

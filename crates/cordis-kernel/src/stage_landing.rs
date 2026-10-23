@@ -21,7 +21,10 @@ impl<T> CleanupQueue<T> {
     pub fn land_result<E>(&mut self,result:Result<Option<T>,E>)
         ->(out:Result<StageReport<E>,Result<Option<T>,E>>)
         requires old(self).wf(),
-        ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).protocol().stage().pending(),
+        ensures final(self).slots()==if out.is_ok() && result.is_ok() && result->Ok_0.is_some()
+                {old(self).slots().push(result->Ok_0)} else {old(self).slots()},
+            final(self).issued()==old(self).issued(),final(self).protocol().selected()==old(self).protocol().selected(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).protocol().stage().pending(),
             out.is_err() ==> out->Err_0==result && final(self).same(old(self)),
             out.is_ok() ==> {
                 let report=out->Ok_0;
@@ -31,6 +34,7 @@ impl<T> CleanupQueue<T> {
                 &&& match result {
                     Ok(Some(payload))=>{
                         &&& report.token==Some(old(self).slots().len() as usize)
+                        &&& report.token.is_some() && report.token.unwrap()==old(self).slots().len()
                         &&& final(self).slots()==old(self).slots().push(Some(payload))
                         &&& report.continue_iteration==!old(self).protocol().stage().cancellation()
                         &&& accumulator_step(old(self).protocol().stage().abstract_view(),final(self).protocol().stage().abstract_view(),

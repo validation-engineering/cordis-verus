@@ -1,6 +1,12 @@
 //! A common linearization point for the checked native execution domain.
 //! The lock orders real mutations; maps, trace and ownership tokens are erased.
 //! A foreign object remains an explicit external reference, never a guessed value.
+#[path = "joint_erasure.rs"]
+pub mod erasure;
+#[path = "joint_identity.rs"]
+pub mod identity;
+#[path = "joint_pending_recovery.rs"]
+pub mod pending_recovery;
 use super::history::{Authority, Witness};
 use super::{Event, ValueState};
 use crate::refinement as r;
@@ -261,13 +267,14 @@ pub proof fn append_indexed(events:Seq<Event>,positions:Seq<nat>,before:Seq<Fram
 }
 
 #[allow(dead_code)]
-struct Cell {auth:Tracked<GhostMapAuth<nat,Record>>,history:Tracked<Authority<Frame>>,pending:Tracked<GhostMapAuth<nat,nat>>,next:Ghost<nat>}
+struct Cell {issuer:&'static crate::identity_issuer::ValueIssuer<Option<super::service_composition::Address>>,names:Tracked<GhostMapAuth<nat,Option<u64>>>,auth:Tracked<GhostMapAuth<nat,Record>>,history:Tracked<Authority<Frame>>,pending:Tracked<GhostMapAuth<nat,nat>>,heads:Tracked<GhostMapAuth<nat,nat>>,next:Ghost<nat>}
 impl Cell {
     spec fn wf(&self)->bool {
-        self.history@.wf() && valid(self.history@.events())
+        (forall|key:nat| #[trigger] self.names@@.contains_key(key) <==> key<self.next@) && self.history@.wf() && valid(self.history@.events())
             && references::history(self.history@.events(),self.history@.source())
             && state_at(self.history@.events(),self.history@.events().len())==self.auth@@
             && pending_at(self.history@.events(),self.history@.events().len())==self.pending@@
+            && ownership::frontier(self.heads@@,self.history@.events())
             && forall|key:nat| #[trigger] self.auth@@.contains_key(key) <==> key<self.next@
     }
     proof fn transfer(tracked &mut self,journal:Journal,event:Step,tracked pending:Option<Pending>)->(tracked out:Option<Pending>)
@@ -277,7 +284,7 @@ impl Cell {
             event.settled==pending_index(pending),
             pending.is_some() ==> pending.unwrap().wf() && pending.unwrap().journal()==journal
                 && event.change==(Change::RegisterInverse {write:pending.unwrap().at()}),
-        ensures final(self).history==old(self).history,final(self).auth==old(self).auth,final(self).next==old(self).next,
+        ensures final(self).history==old(self).history,final(self).auth==old(self).auth,final(self).next==old(self).next,final(self).heads==old(self).heads,final(self).names==old(self).names,final(self).issuer==old(self).issuer,
             final(self).pending@.id()==old(self).pending@.id(),
             pending_step(old(self).pending@@,final(self).pending@@,event,old(self).history@.events().len()),
             pending_matches(out,journal,event.key,old(self).history@.events().len(),event.pending),
@@ -303,23 +310,26 @@ impl Cell {
             references::linked(prior,event.after,old(self).history@.source()),
             state_at(old(self).history@.events(),old(self).history@.events().len())==prior,
             step(prior,old(self).auth@@,event),caused(old(self).history@.events(),event),
+            ownership::ready(old(self).heads@@,old(self).history@.events(),event),
             pending_step(pending_at(old(self).history@.events(),old(self).history@.events().len()),old(self).pending@@,event,old(self).history@.events().len()),
         ensures final(self).history@.wf(),valid(final(self).history@.events()),
             references::history(final(self).history@.events(),final(self).history@.source()),
             state_at(final(self).history@.events(),final(self).history@.events().len())==final(self).auth@@,
             final(self).history@.source()==old(self).history@.source(),
-            final(self).auth==old(self).auth,final(self).pending==old(self).pending,final(self).next==old(self).next,
+            final(self).auth==old(self).auth,final(self).pending==old(self).pending,final(self).next==old(self).next,final(self).heads==old(self).heads,final(self).names==old(self).names,final(self).issuer==old(self).issuer,
+            ownership::frontier(final(self).heads@@,final(self).history@.events()),
             final(self).history@.events()==old(self).history@.events().push(Frame {event,state:final(self).auth@@,pending:final(self).pending@@}),
     {
+        ownership::append(self.heads@@,self.history@.events(),Frame {event,state:self.auth@@,pending:self.pending@@});
         references::append(self.history@.events(),Frame {event,state:self.auth@@,pending:self.pending@@},self.history@.source());
         append(self.history@.events(),event,self.auth@@,self.pending@@);
         self.history.borrow_mut().append(Frame {event,state:self.auth@@,pending:self.pending@@});
     }
 }
 #[allow(dead_code)]
-struct Predicate {source:Loc,history:Loc,pending:Loc}
+struct Predicate {issuer:Loc,names:Loc,source:Loc,history:Loc,pending:Loc,heads:Loc}
 impl RwLockPredicate<Cell> for Predicate {
-    closed spec fn inv(self,cell:Cell)->bool {cell.wf() && cell.auth@.id()==self.source && cell.history@.source()==self.history && cell.pending@.id()==self.pending}
+    closed spec fn inv(self,cell:Cell)->bool {cell.wf() && cell.issuer.source()==self.issuer && cell.names@.id()==self.names && cell.auth@.id()==self.source && cell.history@.source()==self.history && cell.pending@.id()==self.pending && cell.heads@.id()==self.heads}
 }
 /// Share this domain with native lifecycle and newly allocated values. No
 /// callback runs under this lock, and it never acquires a value or slot lock.
@@ -408,6 +418,7 @@ proof fn certify_reference(tracked authority:&Authority<Frame>,record:Record,tra
     }
 }
 impl Journal {
+    pub closed spec fn identity_namespace(&self)->Loc {self.inner.pred().issuer}
     /// Include all earlier instruction witnesses, even across A/B/A domain
     /// alternation. Only local histories enter this real read checkpoint.
     pub(crate) fn join_receipts<K>(&self,Tracked(receipts):Tracked<&Map<K,Receipt>>,Tracked(first):Tracked<Option<Receipt>>)->(out:Tracked<Option<Receipt>>)
@@ -462,6 +473,16 @@ impl Receipt {
     pub open spec fn event(&self)->Step {self.events().last().event}
     pub open spec fn covers(&self,earlier:&Self)->bool {self.journal()==earlier.journal()
         && earlier.events().len()<=self.events().len() && self.events().take(earlier.events().len() as int)==earlier.events()}
+    /// Persistent witnesses from one actual Journal have comparable prefixes.
+    /// This uses their linear provenance; wf ghost descriptions alone cannot
+    /// invoke this tracked operation or invent an order across Journals.
+    pub proof fn compare(tracked &self,tracked other:&Self)
+        requires self.wf(),other.wf(),self.journal()==other.journal(),
+        ensures self.covers(other) || other.covers(self),
+    {
+        if self.events().len()>=other.events().len() {self.witness.prefix(&other.witness);}
+        else {other.witness.prefix(&self.witness);}
+    }
     pub proof fn cover_through(&self,middle:&Self,earlier:&Self)
         requires self.covers(middle),middle.covers(earlier),
         ensures self.covers(earlier),
@@ -482,16 +503,41 @@ impl Receipt {
     {
         assert(step(state_at(self.events(),self.at()),self.events()[self.at() as int].state,self.event()));
     }
+    /// A historical cut keeps its actual persistent provenance.
+    pub proof fn prefix(tracked &self,n:nat)->(tracked out:Self)
+        requires self.wf(),0<n<=self.events().len(),
+        ensures out.wf(),out.journal()==self.journal(),out.events()==self.events().take(n as int),self.covers(&out),
+    {
+        let events=self.events();let cut=events.take(n as int);
+        assert forall|i:int|0<=i<cut.len() implies step(state_at(cut,i as nat),#[trigger] cut[i].state,cut[i].event)
+            && caused(cut.take(i),cut[i].event) && pending_step(pending_at(cut,i as nat),cut[i].pending,cut[i].event,i as nat) by {
+            assert(events[i]==cut[i]);
+            assert(step(state_at(events,i as nat),events[i].state,events[i].event));
+            assert(caused(events.take(i),events[i].event));
+            assert(pending_step(pending_at(events,i as nat),events[i].pending,events[i].event,i as nat));
+            assert(cut.take(i) =~= events.take(i));
+        }
+        Self {journal:self.journal,witness:self.witness.take(n)}
+    }
     pub proof fn duplicate(tracked &self)->(tracked out:Self)
         ensures out.wf()==self.wf(),out.same(self),
     {Self {journal:self.journal,witness:self.witness.duplicate()}}
 }
 #[allow(dead_code)]
-pub(crate) struct Member {journal:Journal,point:Tracked<GhostPointsTo<nat,Record>>,latest:Tracked<Witness<Frame>>}
+pub(crate) struct Member {identity:Arc<identity::AllocationIdentity>,journal:Journal,point:Tracked<GhostPointsTo<nat,Record>>,latest:Tracked<Witness<Frame>>,head:Tracked<GhostPointsTo<nat,nat>>}
 impl Member {
-    pub closed spec fn wf(&self)->bool {self.point@.id()==self.journal.inner.pred().source && self.latest@.wf()
+    pub closed spec fn wf(&self)->bool {self.identity.wf() && self.identity.address()==(super::service_composition::Address {journal:self.journal(),key:self.key()})
+        && self.point@.id()==self.journal.inner.pred().source
+        && self.head@.id()==self.journal.inner.pred().heads && self.head@.key()==self.key() && self.head@.value()+1==self.events().len() && self.latest@.wf()
         && self.latest@.source()==self.journal.inner.pred().history && self.events().len()>0 && valid(self.events())
         && self.events().last().event.key==self.key() && self.events().last().event.after==self.record()}
+    pub(crate) fn identity(&self)->(out:Arc<identity::AllocationIdentity>)
+        requires self.wf(),ensures out.wf(),out.address()==(super::service_composition::Address {journal:self.journal(),key:self.key()}),
+    {self.identity.clone()}
+    pub(crate) proof fn trace_record(&self)
+        requires self.wf(),ensures self.events().len()>0,valid(self.events()),
+            self.events().last().event.key==self.key(),self.events().last().event.after==self.record(),
+    {}
     pub proof fn receipt(tracked &self)->(tracked out:Receipt)
         requires self.wf(),ensures out.wf(),out.journal()==self.journal(),out.events()==self.events(),out.event().key==self.key(),out.event().after==self.record(),
     {Receipt {journal:self.journal,witness:self.latest.borrow().duplicate()}}
@@ -516,6 +562,7 @@ impl Member {
     /// Commit a cross-record transition only after its real members have been
     /// certified in this same held write epoch. No callback enters this scope.
     #[verifier::rlimit(20)]
+    #[verifier::spinoff_prover]
     pub(crate) fn update_guarded<'a>(&mut self,view:WriteView<'a>,Ghost(after):Ghost<Record>,Ghost(change):Ghost<Change>)->(out:WriteView<'a>)
         requires old(self).wf(),view.wf(),view.journal_spec()==old(self).journal(),
             changes(old(self).record(),after,change),change is Groups || change is Host || change is Control || change is Recipes || change is Sources,
@@ -526,6 +573,7 @@ impl Member {
             out.events().take(view.events().len() as int)==view.events(),
             final(self).events().last().event==(Step {key:old(self).key(),change,after,pending:false,settled:None}),
             old(self).events().len()<final(self).events().len(),final(self).events().take(old(self).events().len() as int)==old(self).events(),
+            ownership::quiet(final(self).events(),old(self).events().len(),(final(self).events().len()-1) as nat,old(self).key()),
     {
         let journal=view.journal;
         #[allow(unused_mut)] // The authority changes only in erased proof state.
@@ -533,6 +581,9 @@ impl Member {
         let guard=view.guard;
         proof {
             self.point.borrow().agree(cell.auth.borrow());
+            self.head.borrow().agree(cell.heads.borrow());
+            ownership::at(cell.heads@@,cell.history@.events(),self.key());
+            assert(ownership::quiet(cell.history@.events(),self.events().len(),cell.history@.events().len(),self.key()));
             cell.history.borrow().extends(self.latest.borrow());
             let prior=cell.auth@@;let key=self.key();let earlier=self.events();
             reveal(changes);assert(!(after is Slot));
@@ -544,6 +595,12 @@ impl Member {
             assert(cell.auth@@==prior.insert(key,after));
             let event=Step {key,change,after,pending:false,settled:None};
             assert(step(prior,cell.auth@@,event));
+            let heads=cell.heads@@;let frames=cell.history@.events();
+            ownership::prepare(heads,frames,event);
+            assert(ownership::quiet(frames,earlier.len(),frames.len(),key));
+            self.head.borrow_mut().update(cell.heads.borrow_mut(),frames.len());
+            assert(cell.heads@@==heads.insert(key,frames.len()));
+            assert(ownership::ready(cell.heads@@,frames,event));
             let _pending=cell.transfer(self.journal(),event,None);
             cell.record(event,prior);
             assert forall|k:nat| #[trigger] cell.auth@@.contains_key(k) <==> k<cell.next@ by {
@@ -560,22 +617,24 @@ impl Member {
         requires self.wf(),
         ensures out.certified(),out.journal_spec()==self.journal(),out.domain()==self.journal().source(),out.last().contains_key(self.key()),out.last()[self.key()]==self.record(),
             self.events().len()<=out.events().len(),out.events().take(self.events().len() as int)==self.events(),
+            ownership::quiet(out.events(),self.events().len(),out.events().len(),self.key()),
     {
         let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
-        proof {self.point.borrow().agree(_cell.auth.borrow());_cell.history.borrow().extends(self.latest.borrow());}
+        proof {self.point.borrow().agree(_cell.auth.borrow());self.head.borrow().agree(_cell.heads.borrow());ownership::at(_cell.heads@@,_cell.history@.events(),self.key());_cell.history.borrow().extends(self.latest.borrow());}
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();Snapshot {journal:self.journal.clone(),witness:Tracked(witness)}
     }
-    pub(crate) fn observe_following(&self,Tracked(earlier):Tracked<&Receipt>)->(out:Snapshot)
-        requires self.wf(),earlier.wf(),
-        ensures earlier.journal()==self.journal() ==> earlier.events().len()<=out.events().len()
-                && out.events().take(earlier.events().len() as int)==earlier.events(),
+    pub(crate) fn observe_caused(&self,Tracked(earlier):Tracked<Option<&Receipt>>)->(out:Snapshot)
+        requires self.wf(),earlier.is_some() ==> earlier.unwrap().wf(),
+        ensures earlier.is_some() && earlier.unwrap().journal()==self.journal() ==> earlier.unwrap().events().len()<=out.events().len()
+                && out.events().take(earlier.unwrap().events().len() as int)==earlier.unwrap().events(),
             out.certified(),out.journal_spec()==self.journal(),out.domain()==self.journal().source(),out.last().contains_key(self.key()),out.last()[self.key()]==self.record(),
             self.events().len()<=out.events().len(),out.events().take(self.events().len() as int)==self.events(),
+            ownership::quiet(out.events(),self.events().len(),out.events().len(),self.key()),
     {
         let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
-        proof {self.point.borrow().agree(_cell.auth.borrow());_cell.history.borrow().extends(self.latest.borrow());
-            if earlier.journal()==self.journal() {_cell.history.borrow().extends(&earlier.witness);}}
+        proof {self.point.borrow().agree(_cell.auth.borrow());self.head.borrow().agree(_cell.heads.borrow());ownership::at(_cell.heads@@,_cell.history@.events(),self.key());_cell.history.borrow().extends(self.latest.borrow());
+            if let Some(earlier)=earlier {if earlier.journal()==self.journal() {_cell.history.borrow().extends(&earlier.witness);}}}
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();Snapshot {journal:self.journal.clone(),witness:Tracked(witness)}
     }
@@ -586,9 +645,10 @@ impl Member {
         ensures out.certified(),out.extends(_earlier),out.journal_spec()==self.journal(),out.domain()==self.journal().source(),
             out.last().contains_key(self.key()),out.last()[self.key()]==self.record(),
             self.events().len()<=out.events().len(),out.events().take(self.events().len() as int)==self.events(),
+            ownership::quiet(out.events(),self.events().len(),out.events().len(),self.key()),
     {
         let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
-        proof {self.point.borrow().agree(_cell.auth.borrow());_cell.history.borrow().extends(_earlier.witness.borrow());_cell.history.borrow().extends(self.latest.borrow());}
+        proof {self.point.borrow().agree(_cell.auth.borrow());self.head.borrow().agree(_cell.heads.borrow());ownership::at(_cell.heads@@,_cell.history@.events(),self.key());_cell.history.borrow().extends(_earlier.witness.borrow());_cell.history.borrow().extends(self.latest.borrow());}
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();Snapshot {journal:self.journal.clone(),witness:Tracked(witness)}
     }
@@ -598,6 +658,7 @@ impl Member {
         requires old(self).wf(),changes(old(self).record(),after,change),!(after is Slot),!(change is RegisterInverse),!(change is Groups),!(change is Host) && !(change is Control) && !(change is Recipes) && !(change is Sources),
         ensures final(self).wf(),final(self).record()==after,final(self).journal()==old(self).journal(),final(self).key()==old(self).key(),
             old(self).events().len()<final(self).events().len(),final(self).events().take(old(self).events().len() as int)==old(self).events(),
+            ownership::quiet(final(self).events(),old(self).events().len(),(final(self).events().len()-1) as nat,old(self).key()),
             final(self).events().last().event==(Step {key:old(self).key(),change,after,pending:false,settled:None}),
     {let _pending=self.update_following(Ghost(after),Ghost(change),Tracked(None),Ghost(false),Tracked(None));}
     #[allow(unused_mut)] // Only the erased resources change under the real lock.
@@ -612,6 +673,31 @@ impl Member {
         ensures pending_matches(out@,old(self).journal(),old(self).key(),(final(self).events().len()-1) as nat,managed),
             final(self).wf(),final(self).record()==after,final(self).journal()==old(self).journal(),final(self).key()==old(self).key(),
             old(self).events().len()<final(self).events().len(),final(self).events().take(old(self).events().len() as int)==old(self).events(),
+            ownership::quiet(final(self).events(),old(self).events().len(),(final(self).events().len()-1) as nat,old(self).key()),
+            final(self).events().last().event==(Step {key:old(self).key(),change,after,pending:managed,settled:pending_index(pending)}),
+            cause.is_some() && cause.unwrap().journal()==old(self).journal() ==>
+                cause.unwrap().events().len()<final(self).events().len()
+                && final(self).events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
+    {self.update_observing(Ghost(after),Ghost(change),Tracked(cause),Ghost(managed),Tracked(pending),Tracked(None))}
+    /// Retain another exclusively owned record at this very commit. The
+    /// borrowed capability and its observation erase; the existing lock is used.
+    #[allow(unused_mut)] // Only the erased resources change under the real lock.
+    #[verifier::rlimit(20)]
+    #[verifier::spinoff_prover]
+    pub(crate) fn update_observing(&mut self,Ghost(after):Ghost<Record>,Ghost(change):Ghost<Change>,Tracked(cause):Tracked<Option<Receipt>>,Ghost(managed):Ghost<bool>,Tracked(pending):Tracked<Option<Pending>>,Tracked(observed):Tracked<Option<&Member>>)->(out:Tracked<Option<Pending>>)
+        requires observed.is_some() ==> observed.unwrap().wf() && observed.unwrap().journal()==old(self).journal()
+                && observed.unwrap().record()!=old(self).record(),
+            old(self).wf(),changes(old(self).record(),after,change),!(change is Groups),!(change is Host) && !(change is Control) && !(change is Recipes) && !(change is Sources),cause.is_some() ==> cause.unwrap().wf(),references::evidence(after,cause),
+            change is RegisterInverse ==> cause.is_some() && cause.unwrap().journal()==old(self).journal()
+                && cause.unwrap().forward() && cause.unwrap().at()==change->RegisterInverse_write,
+            managed ==> change is PayloadApply || change is Value && (change->Value_event is Forward || change->Value_event is Computed),
+            pending.is_some() ==> pending.unwrap().wf() && pending.unwrap().journal()==old(self).journal()
+                && change==(Change::RegisterInverse {write:pending.unwrap().at()}) && !managed,
+        ensures observed.is_some() ==> state_at(final(self).events(),final(self).events().len()).contains_pair(observed.unwrap().key(),observed.unwrap().record()),
+            pending_matches(out@,old(self).journal(),old(self).key(),(final(self).events().len()-1) as nat,managed),
+            final(self).wf(),final(self).record()==after,final(self).journal()==old(self).journal(),final(self).key()==old(self).key(),
+            old(self).events().len()<final(self).events().len(),final(self).events().take(old(self).events().len() as int)==old(self).events(),
+            ownership::quiet(final(self).events(),old(self).events().len(),(final(self).events().len()-1) as nat,old(self).key()),
             final(self).events().last().event==(Step {key:old(self).key(),change,after,pending:managed,settled:pending_index(pending)}),
             cause.is_some() && cause.unwrap().journal()==old(self).journal() ==>
                 cause.unwrap().events().len()<final(self).events().len()
@@ -621,6 +707,9 @@ impl Member {
         let tracked produced;
         proof {
             self.point.borrow().agree(cell.auth.borrow());
+            self.head.borrow().agree(cell.heads.borrow());
+            ownership::at(cell.heads@@,cell.history@.events(),self.key());
+            assert(ownership::quiet(cell.history@.events(),self.events().len(),cell.history@.events().len(),self.key()));
             cell.history.borrow().extends(self.latest.borrow());
             if let Some(ref earlier)=cause {
                 if earlier.journal()==self.journal() {cell.history.borrow().extends(&earlier.witness);}
@@ -629,6 +718,10 @@ impl Member {
             let earlier=self.events();let history=cell.history@.events();
             let prior=cell.auth@@;
             let key=self.key();
+            if let Some(member)=observed {
+                member.point.borrow().agree(cell.auth.borrow());
+                assert(member.key()!=key);
+            }
             assert(prior.contains_key(key));
             assert(prior[key]==self.record());
             assert(changes(prior[key],after,change));
@@ -640,6 +733,12 @@ impl Member {
             let event=Step {key:self.key(),change,after,pending:managed,settled};
             reveal(groups::guard);
             assert(step(prior,cell.auth@@,event));
+            let heads=cell.heads@@;let frames=cell.history@.events();
+            ownership::prepare(heads,frames,event);
+            assert(ownership::quiet(frames,earlier.len(),frames.len(),key));
+            self.head.borrow_mut().update(cell.heads.borrow_mut(),frames.len());
+            assert(cell.heads@@==heads.insert(key,frames.len()));
+            assert(ownership::ready(cell.heads@@,frames,event));
             if managed {reveal(changes);assert(forward(event));}
             produced=cell.transfer(self.journal(),event,pending);
             if change is RegisterInverse {
@@ -679,6 +778,10 @@ impl Snapshot {
         && self.witness@.source()==self.journal.inner.pred().history}
     pub open spec fn last(&self)->Map<nat,Record> {state_at(self.events(),self.events().len())}
     pub open spec fn pending(&self)->Map<nat,nat> {pending_at(self.events(),self.events().len())}
+    pub open spec fn covers(&self,receipt:&Receipt)->bool {
+        self.journal_spec()==receipt.journal() && receipt.events().len()<=self.events().len()
+            && self.events().take(receipt.events().len() as int)==receipt.events()
+    }
     /// Export the closed snapshot invariant to proof clients in other modules.
     pub proof fn valid_history(&self)
         requires self.certified(),ensures valid(self.events()),references::history(self.events(),self.domain()),
@@ -744,9 +847,12 @@ impl<'a> WriteView<'a> {
     pub closed spec fn events(&self)->Seq<Frame> {self.cell.history@.events()}
     pub closed spec fn wf(&self)->bool {
         self.guard.rwlock()==*self.journal.inner && self.cell.wf()
+            && self.cell.issuer.source()==self.journal.inner.pred().issuer
+            && self.cell.names@.id()==self.journal.inner.pred().names
             && self.cell.auth@.id()==self.journal.inner.pred().source
             && self.cell.history@.source()==self.journal.inner.pred().history
             && self.cell.pending@.id()==self.journal.inner.pred().pending
+            && self.cell.heads@.id()==self.journal.inner.pred().heads
     }
     /// Authenticate previously collected effect witnesses in this same write
     /// epoch. No value/slot lock or callback is entered while it is held.
@@ -770,11 +876,15 @@ impl Journal {
     /// Stable identity of this domain's authoritative execution history.
     pub closed spec fn source(&self)->Loc {self.inner.pred().history}
     pub fn new()->(out:Self) {
+        let issuer=identity::issuer();
+        let tracked (names,_)=GhostMapAuth::new(Map::empty());
         let tracked (auth,_)=GhostMapAuth::new(Map::empty());
         let tracked history=Authority::new();
         let tracked (pending,_)=GhostMapAuth::new(Map::empty());
-        let ghost pred=Predicate {source:auth.id(),history:history.source(),pending:pending.id()};
-        Self {inner:Arc::new(RwLock::new(Cell {auth:Tracked(auth),history:Tracked(history),pending:Tracked(pending),next:Ghost(0nat)},Ghost(pred)))}
+        let tracked (heads,_)=GhostMapAuth::new(Map::empty());
+        proof {ownership::empty();}
+        let ghost pred=Predicate {issuer:issuer.source(),names:names.id(),source:auth.id(),history:history.source(),pending:pending.id(),heads:heads.id()};
+        Self {inner:Arc::new(RwLock::new(Cell {issuer,names:Tracked(names),auth:Tracked(auth),history:Tracked(history),pending:Tracked(pending),heads:Tracked(heads),next:Ghost(0nat)},Ghost(pred)))}
     }
     #[verifier::rlimit(20)]
     pub(crate) fn allocate(&self,Ghost(record):Ghost<Record>)->(out:Member)
@@ -791,15 +901,39 @@ impl Journal {
         ensures out.wf(),out.journal()==*self,out.record()==record,
             out.events().len()>0,out.events().last().event.change==Change::Allocate,
             out.events().last().event.key==out.key(),out.events().last().event.after==record,
+    {self.allocate_referencing_after(Ghost(record),Tracked(target),Tracked(None))}
+    /// Allocate after a retained real checkpoint. The cause is erased; the
+    /// allocation uses the same authoritative lock and allocator as every caller.
+    pub(crate) fn allocate_following(&self,Ghost(record):Ghost<Record>,Tracked(earlier):Tracked<Option<Receipt>>)->(out:Member)
+        requires !(record is Slot),earlier.is_some() ==> earlier.unwrap().wf() && earlier.unwrap().journal()==*self,
+        ensures out.wf(),out.journal()==*self,out.record()==record,
+            out.events().len()>0,out.events().last().event.change==Change::Allocate,
+            out.events().last().event.key==out.key(),out.events().last().event.after==record,
+            earlier.is_some() ==> earlier.unwrap().events().len()<out.events().len()
+                && out.events().take(earlier.unwrap().events().len() as int)==earlier.unwrap().events(),
+    {self.allocate_referencing_after(Ghost(record),Tracked(None),Tracked(earlier))}
+    #[verifier::rlimit(20)]
+    fn allocate_referencing_after(&self,Ghost(record):Ghost<Record>,Tracked(target):Tracked<Option<Receipt>>,Tracked(earlier):Tracked<Option<Receipt>>)->(out:Member)
+        requires references::evidence(record,target),earlier.is_some() ==> earlier.unwrap().wf() && earlier.unwrap().journal()==*self,
+        ensures out.wf(),out.journal()==*self,out.record()==record,
+            out.events().len()>0,out.events().last().event.change==Change::Allocate,
+            out.events().last().event.key==out.key(),out.events().last().event.after==record,
+            earlier.is_some() ==> earlier.unwrap().events().len()<out.events().len()
+                && out.events().take(earlier.unwrap().events().len() as int)==earlier.unwrap().events(),
     {
         let (mut cell,guard)=self.inner.acquire_write();
-        let tracked point;
+        proof {if let Some(ref receipt)=earlier {cell.history.borrow().extends(&receipt.witness);}}
+        let tracked point;let tracked head;
         let ghost key=cell.next@;
         let ghost prior=cell.auth@@;
         proof {
             certify_reference(cell.history.borrow(),record,&target);
+            ownership::prepare(cell.heads@@,cell.history@.events(),Step {key,change:Change::Allocate,after:record,pending:false,settled:None});
+            reveal(ownership::frontier);
+            head=cell.heads.borrow_mut().insert(key,cell.history@.events().len());
             point=cell.auth.borrow_mut().insert(key,record);
         }
+        let identity=identity::allocate(cell.issuer,Ghost(super::service_composition::Address {journal:*self,key}),Tracked(cell.names.borrow_mut()));
         cell.next=Ghost(key+1);
         proof {
             cell.record(Step {key,change:Change::Allocate,after:record,pending:false,settled:None},prior);
@@ -808,11 +942,14 @@ impl Journal {
             assert forall|k:nat| #[trigger] cell.auth@@.contains_key(k) <==> k<cell.next@ by {
                 if k!=key {assert(cell.auth@@.contains_key(k)==prior.contains_key(k));}
             }
+            assert forall|k:nat| #[trigger] cell.names@@.contains_key(k) <==> k<cell.next@ by {
+                if k!=key {assert(k<key <==> cell.names@@.contains_key(k));}
+            }
             assert(cell.wf());
         }
         let tracked latest=cell.history.borrow().snapshot();
         guard.release_write(cell);
-        Member {journal:self.clone(),point:Tracked(point),latest:Tracked(latest)}
+        Member {identity,journal:self.clone(),point:Tracked(point),latest:Tracked(latest),head:Tracked(head)}
     }
     pub fn snapshot(&self)->(out:Snapshot)
         ensures out.certified(),out.journal_spec()==*self,out.domain()==self.source(),
@@ -860,3 +997,6 @@ pub mod classification;
 
 #[path = "payload_execution.rs"]
 pub mod payload;
+
+#[path = "joint_owner_history.rs"]
+pub mod ownership;

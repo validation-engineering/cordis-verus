@@ -18,9 +18,13 @@ verus! {
 pub struct Capture<T,M> {binding:ServiceBinding,owner:Owner,episode:Ghost<NativeEpisode<ServiceSlot<T,M>>>}
 impl<T,M> Capture<T,M> {
     pub closed spec fn binding(&self)->ServiceBinding {self.binding}
+    pub(crate) fn binding_ref(&self)->(out:&ServiceBinding) ensures *out==self.binding(), {&self.binding}
     pub closed spec fn owner(&self)->Owner {self.owner}
     pub closed spec fn episode(&self)->NativeEpisode<ServiceSlot<T,M>> {self.episode@}
     pub closed spec fn wf(&self)->bool {access::selected(self.episode(),self.binding())}
+    pub proof fn provenance(&self)
+        requires self.wf(),ensures access::selected(self.episode(),self.binding()),
+    {}
     /// Called after releasing the episode mutex; arbitrary compute never runs
     /// under the value lock either. The input is read from this retained capture.
     /// Join the prior instruction with this actual slot selection before
@@ -49,6 +53,55 @@ impl<T,M> Capture<T,M> {
         }
         Computation {capture:self,prepared}
     }
+    /// Replay checks a real captured read before invoking the original effect.
+    /// The check does not freeze the object: landing still detects interference.
+    pub(crate) fn prepare_at<E:ScalarEffect>(self,effect:E,expected:super::ValueState)
+        ->(out:Result<Computation<T,M>,super::Snapshot>)
+        requires self.wf(),
+        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.capture()==self
+                && out->Ok_0.prepared().code()==effect.model() && out->Ok_0.prepared().expected()==expected,
+            out.is_err() ==> out->Err_0.certified()
+                && out->Err_0.source()==self.binding().capture_spec().value_spec().source()
+                && out->Err_0.object()==self.binding().capture_spec().value_spec().object()
+                && out->Err_0.journal_spec()==self.binding().capture_spec().value_spec().journal_spec()
+                && out->Err_0.state()!=expected,
+    {
+        let snapshot=self.binding.capture().observe_value();
+        if snapshot.value()!=expected.value || snapshot.depth()!=expected.depth {return Err(snapshot);}
+        assert(snapshot.state()==expected);
+        let prepared=self.binding.value().prepare_observed(effect,snapshot);
+        proof {
+            prepared.read_evidence();
+            if self.binding.capture_spec().commit().journal()==prepared.cause().journal() {
+                assert(prepared.cause().covers(&self.binding.capture_spec().commit()));
+            }
+        }
+        Ok(Computation {capture:self,prepared})
+    }
+    /// Closed-instruction replay uses the same retained read and atomic input guard.
+    pub(crate) fn prepare_instruction_at(self,instruction:super::effect::Instruction,expected:super::ValueState)
+        ->(out:Result<Computation<T,M>,super::Snapshot>)
+        requires self.wf(),
+        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.capture()==self
+                && out->Ok_0.prepared().code()==instruction.model() && out->Ok_0.prepared().expected()==expected,
+            out.is_err() ==> out->Err_0.certified()
+                && out->Err_0.source()==self.binding().capture_spec().value_spec().source()
+                && out->Err_0.object()==self.binding().capture_spec().value_spec().object()
+                && out->Err_0.journal_spec()==self.binding().capture_spec().value_spec().journal_spec()
+                && out->Err_0.state()!=expected,
+    {
+        let snapshot=self.binding.capture().observe_value();
+        if !(snapshot.value()==expected.value && snapshot.depth()==expected.depth) {return Err(snapshot);}
+        assert(expected==snapshot.state());
+        let prepared=self.binding.value().prepare_instruction_observed(instruction,snapshot);
+        proof {
+            prepared.read_evidence();
+            if self.binding.capture_spec().commit().journal()==prepared.cause().journal() {
+                assert(prepared.cause().covers(&self.binding.capture_spec().commit()));
+            }
+        }
+        Ok(Computation {capture:self,prepared})
+    }
     pub fn prepare<E:ScalarEffect>(self,effect:E)->(out:Computation<T,M>)
         requires self.wf(),
         ensures out.wf(),out.capture()==self,out.prepared().code()==effect.model(),
@@ -71,10 +124,11 @@ pub struct Computation<T,M> {capture:Capture<T,M>,prepared:Prepared}
 impl<T,M> Computation<T,M> {
     pub proof fn provenance(&self)
         requires self.wf(),
-        ensures access::selected(self.capture().episode(),self.capture().binding()),
+        ensures self.prepared().wf(),self.capture().wf(),access::selected(self.capture().episode(),self.capture().binding()),
             self.prepared().target()==*self.capture().binding().capture_spec().value_spec(),
     {}
     pub closed spec fn capture(&self)->Capture<T,M> {self.capture}
+    pub(crate) fn capture_ref(&self)->(out:&Capture<T,M>) ensures *out==self.capture(), {&self.capture}
     pub closed spec fn prepared(&self)->Prepared {self.prepared}
     pub closed spec fn wf(&self)->bool {
         self.capture().wf() && self.prepared().wf()
@@ -143,6 +197,18 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
         if !self.accepts_acquisition(id) {return false;}
         owner.check(self,id)
     }
+    pub(crate) fn capture_selected_native(&self,id:usize,provider:usize,port:Port,capture:super::slot::Capture)->(out:Capture<T,M>)
+        requires self.wf(),self.value_state().is_some(),!self.value_state().unwrap().closed(),capture.wf(),
+            self.value_state().unwrap().selects_slot(provider,port,capture.slot()),
+            self.work_state().accepts(),self.cleanup_state().acquisition_open(id),
+        ensures out.wf(),out.episode()==self.value_state().unwrap(),out.binding().port_spec()==port,
+            out.binding().provider_spec()==provider,out.binding().capture_spec()==capture,out.owner().matches(self,id),
+    {
+        let binding=ServiceBinding::from_capture(provider,port,capture);
+        proof {access::selection_declared(self.value_state().unwrap(),binding);}
+        let owner=Owner::capture(self,id);
+        Capture {binding,owner,episode:Ghost(self.value_state().unwrap())}
+    }
     pub fn capture_native_effect(&self,id:usize,port:Port)->(out:Result<Capture<T,M>,StartError>)
         requires self.wf(),
         ensures out.is_err() ==> match out->Err_0 {
@@ -168,10 +234,22 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
     #[verifier::rlimit(30)]
     pub fn apply_native_effect(&mut self,id:usize,computation:Computation<T,M>,branch:Branch)->(out:Result<access::Write,EffectError>)
         requires old(self).wf(),computation.wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
             final(self).capture()==old(self).capture(),final(self).value_state()==old(self).value_state(),
             final(self).work_state()==old(self).work_state(),final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> final(self).same_runtime(old(self)),
+            effect::operation(computation.prepared().code())(computation.prepared().expected()).is_some() ==>
+                out.is_ok() || out==Err(EffectError::Closed) || out==Err(EffectError::Interference),
+            effect::operation(computation.prepared().code())(computation.prepared().expected()).is_some()
+                && out!=Err(EffectError::Closed) ==>
+                (out.is_ok()==(final(self).value_attempts().event().before()==computation.prepared().expected())),
             (out==Err(EffectError::Closed))==!(old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
                 && computation.capture().owner().matches(old(self),id)),
             out==Err(EffectError::Closed) ==> *final(self)==*old(self),
@@ -182,8 +260,11 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
                 && joint::pending_at(final(self).value_attempts().events().last().events(),final(self).value_attempts().events().last().at())==final(self).value_attempts().events().last().events().last().pending,
             out.is_ok() ==> {
                 let report=out->Ok_0;
+                &&& joint::groups::registration(report.admission.registration().insertion(),final(self).cleanup_state().link(),id)
+                &&& final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
                 &&& report.binding==computation.capture().binding() && report.computed(computation.prepared().code(),branch)
                 &&& report.admission.registration().write().follows(&computation.prepared().cause())
+                &&& final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0.state().before==computation.prepared().expected()
                 &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
                 &&& report.recorded(*final(self),id) && access::selected(computation.capture().episode(),report.binding)
                 &&& report.admission.token==old(self).cleanup_state().queues()[id].slots().len()
@@ -207,6 +288,158 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
         proof {
             if binding.capture_spec().commit().journal()==cause.journal() {
                 admission.registration().write().after_cover(&cause,&binding.capture_spec().commit());
+            }
+        }
+        let report=access::Write {binding,admission};
+        proof {report.effect_semantics(episode,code,branch);report.general_semantics();}
+        Ok(report)
+    }
+
+    /// Execute a closed kernel instruction without invoking plugin computation.
+    #[verifier::rlimit(30)]
+    pub fn apply_native_controlled(&mut self,id:usize,capture:Capture<T,M>,instruction:super::effect::Instruction,branch:Branch,Tracked(previous):Tracked<&super::registration::ReceiptMap>)->(out:Result<access::Write,EffectError>)
+        requires old(self).wf(),capture.wf(),super::registration::witnesses(*previous),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).capture()==old(self).capture(),final(self).value_state()==old(self).value_state(),
+            final(self).work_state()==old(self).work_state(),final(self).phase_spec()==old(self).phase_spec(),
+            out.is_err() ==> final(self).same_runtime(old(self)),
+            out!=Err(EffectError::Interference),
+            out!=Err(EffectError::Closed) ==> (out.is_ok()==effect::operation(instruction.model())(final(self).value_attempts().event().before()).is_some()),
+            out!=Err(EffectError::Closed) ==> forall|k:(int,bool)|previous.contains_key(k)
+                && #[trigger] previous[k].journal()==final(self).value_attempts().events().last().journal()
+                ==> final(self).value_attempts().events().last().follows(&previous[k]),
+            out.is_ok() ==> forall|k:(int,bool)|previous.contains_key(k)
+                && #[trigger] previous[k].journal()==out->Ok_0.admission.registration().write().journal()
+                ==> out->Ok_0.admission.registration().write().follows(&previous[k]),
+            (out==Err(EffectError::Closed))==!(old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
+                && capture.owner().matches(old(self),id)),
+            out==Err(EffectError::Closed) ==> *final(self)==*old(self),
+            out!=Err(EffectError::Closed) ==> final(self).value_attempts().appended(&old(self).value_attempts(),&*capture.binding().capture_spec().value_spec())
+               ,
+            out.is_err() && out!=Err(EffectError::Closed) ==> super::attempt::effect_rejection(final(self).value_attempts().event(),instruction.model(),final(self).value_attempts().event().before(),out->Err_0)
+                && joint::state_at(final(self).value_attempts().events().last().events(),final(self).value_attempts().events().last().at())==final(self).value_attempts().events().last().events().last().state
+                && joint::pending_at(final(self).value_attempts().events().last().events(),final(self).value_attempts().events().last().at())==final(self).value_attempts().events().last().events().last().pending,
+            out.is_ok() ==> {
+                let report=out->Ok_0;
+                &&& joint::groups::registration(report.admission.registration().insertion(),final(self).cleanup_state().link(),id)
+                &&& final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                &&& report.binding==capture.binding() && report.computed(instruction.model(),branch)
+                &&& final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0.state().before==final(self).value_attempts().event().before()
+                &&& final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0.state().after==final(self).value_attempts().event().after()
+                &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
+                &&& report.recorded(*final(self),id) && access::selected(capture.episode(),report.binding)
+                &&& report.admission.token==old(self).cleanup_state().queues()[id].slots().len()
+                &&& final(self).cleanup_state().queues()[id].slots().len()==old(self).cleanup_state().queues()[id].slots().len()+1
+                &&& final(self).cleanup_state().queues()[id].protocol().waiting()==old(self).cleanup_state().queues()[id].protocol().waiting().push(report.admission.token)
+                &&& final(self).cleanup_state().queues()[id].slots().take(report.admission.token as int)==old(self).cleanup_state().queues()[id].slots()
+                &&& (Applied {outcome:report.admission.outcome,next:report.admission.next,pending:Tracked(None),
+                    inverse:final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0})
+                    .effect_corresponds(&*capture.binding().capture_spec().value_spec(),instruction.model(),branch)
+            },
+            final(self).status_links()==old(self).status_links(),
+    {
+        let mut access=None;
+        self.apply_native_controlled_in(id,capture,instruction,branch,Tracked(previous),&mut access)
+    }
+
+    #[allow(clippy::too_many_arguments)] // Shared native landing with optional exclusive access.
+    #[verifier::rlimit(30)]
+    pub(crate) fn apply_native_controlled_in(&mut self,id:usize,capture:Capture<T,M>,instruction:super::effect::Instruction,branch:Branch,Tracked(previous):Tracked<&super::registration::ReceiptMap>,access:&mut Option<super::protected::Exclusive<'_>>)->(out:Result<access::Write,EffectError>)
+        requires old(access).is_some() ==> old(access)->Some_0.wf() && old(access)->Some_0.target()==*capture.binding().capture_spec().value_spec(),
+            old(self).wf(),capture.wf(),super::registration::witnesses(*previous),
+        ensures final(access).is_some()==old(access).is_some(),
+            final(access).is_some() ==> final(access)->Some_0.wf() && final(access)->Some_0.target()==old(access)->Some_0.target()
+                && (out.is_err() ==> final(access)->Some_0.state()==old(access)->Some_0.state())
+                && (out!=Err(EffectError::Closed) ==> final(self).value_attempts().event().before()==old(access)->Some_0.state()
+                    && final(self).value_attempts().event().after()==final(access)->Some_0.state()),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).capture()==old(self).capture(),final(self).value_state()==old(self).value_state(),
+            final(self).work_state()==old(self).work_state(),final(self).phase_spec()==old(self).phase_spec(),
+            out.is_err() ==> final(self).same_runtime(old(self)),
+            out!=Err(EffectError::Interference),
+            out!=Err(EffectError::Closed) ==> (out.is_ok()==effect::operation(instruction.model())(final(self).value_attempts().event().before()).is_some()),
+            out!=Err(EffectError::Closed) ==> forall|k:(int,bool)|previous.contains_key(k)
+                && #[trigger] previous[k].journal()==final(self).value_attempts().events().last().journal()
+                ==> final(self).value_attempts().events().last().follows(&previous[k]),
+            out.is_ok() ==> forall|k:(int,bool)|previous.contains_key(k)
+                && #[trigger] previous[k].journal()==out->Ok_0.admission.registration().write().journal()
+                ==> out->Ok_0.admission.registration().write().follows(&previous[k]),
+            (out==Err(EffectError::Closed))==!(old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
+                && capture.owner().matches(old(self),id)),
+            out==Err(EffectError::Closed) ==> *final(self)==*old(self),
+            out!=Err(EffectError::Closed) ==> final(self).value_attempts().appended(&old(self).value_attempts(),&*capture.binding().capture_spec().value_spec())
+               ,
+            out.is_err() && out!=Err(EffectError::Closed) ==> super::attempt::effect_rejection(final(self).value_attempts().event(),instruction.model(),final(self).value_attempts().event().before(),out->Err_0)
+                && joint::state_at(final(self).value_attempts().events().last().events(),final(self).value_attempts().events().last().at())==final(self).value_attempts().events().last().events().last().state
+                && joint::pending_at(final(self).value_attempts().events().last().events(),final(self).value_attempts().events().last().at())==final(self).value_attempts().events().last().events().last().pending,
+            out.is_ok() ==> {
+                let report=out->Ok_0;
+                &&& joint::groups::registration(report.admission.registration().insertion(),final(self).cleanup_state().link(),id)
+                &&& final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                &&& report.binding==capture.binding() && report.computed(instruction.model(),branch)
+                &&& final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0.state().before==final(self).value_attempts().event().before()
+                &&& final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0.state().after==final(self).value_attempts().event().after()
+                &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
+                &&& report.recorded(*final(self),id) && access::selected(capture.episode(),report.binding)
+                &&& report.admission.token==old(self).cleanup_state().queues()[id].slots().len()
+                &&& final(self).cleanup_state().queues()[id].slots().len()==old(self).cleanup_state().queues()[id].slots().len()+1
+                &&& final(self).cleanup_state().queues()[id].protocol().waiting()==old(self).cleanup_state().queues()[id].protocol().waiting().push(report.admission.token)
+                &&& final(self).cleanup_state().queues()[id].slots().take(report.admission.token as int)==old(self).cleanup_state().queues()[id].slots()
+                &&& (Applied {outcome:report.admission.outcome,next:report.admission.next,pending:Tracked(None),
+                    inverse:final(self).cleanup_state().queues()[id].slots()[report.admission.token as int].unwrap()->Value_0})
+                    .effect_corresponds(&*capture.binding().capture_spec().value_spec(),instruction.model(),branch)
+            },
+            final(self).status_links()==old(self).status_links(),
+    {
+        if !self.admits_native_effect(id,&capture.owner) {return Err(EffectError::Closed);}
+        let Tracked(slot_cause)=capture.binding.capture().selection_receipt();
+        let snapshot=match access {
+            Some(locked)=>locked.snapshot_following(Tracked(&slot_cause)),
+            None=>capture.binding.capture().observe_value(),
+        };
+        proof {assert(snapshot.joint_spec().events().len()>0);}
+        let Tracked(selection)=snapshot.joint_execution().checkpoint_receipt();
+        let journal=match access {
+            Some(locked)=>locked.journal(),None=>capture.binding.value().journal(),
+        };
+        let Tracked(joined)=journal.join_receipts::<(int,bool)>(Tracked(previous),Tracked(Some(selection.duplicate())));
+        let tracked cause=joined.tracked_unwrap();
+        proof {
+            if capture.binding.capture_spec().commit().journal()==journal {
+                cause.cover_through(&selection,&capture.binding.capture_spec().commit());
+            }
+        }
+        let ghost code=instruction.model();let ghost episode=capture.episode();
+        let binding=capture.binding;
+        let result=self.apply_controlled_in(id,binding.value(),instruction,branch,Tracked(cause.duplicate()),access);
+        proof {
+            assert forall|k:(int,bool)|previous.contains_key(k) && #[trigger] previous[k].journal()==self.value_attempts().events().last().journal()
+                implies self.value_attempts().events().last().follows(&previous[k]) by {
+                self.value_attempts().events().last().after_cover(&cause,&previous[k]);
+            }
+        }
+        let admission=match result {Ok(admission)=>admission,Err(error)=>{proof {self.value_attempts().rejection_step();}return Err(error);}};
+        proof {
+            if binding.capture_spec().commit().journal()==cause.journal() {
+                admission.registration().write().after_cover(&cause,&binding.capture_spec().commit());
+            }
+            assert forall|k:(int,bool)|previous.contains_key(k) && #[trigger] previous[k].journal()==admission.registration().write().journal()
+                implies admission.registration().write().follows(&previous[k]) by {
+                admission.registration().write().after_cover(&cause,&previous[k]);
             }
         }
         let report=access::Write {binding,admission};

@@ -1,0 +1,56 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-host-skips-append-history",
+      "mutation": {
+        "file": "managed_host.rs",
+        "old": "history.extend(queue);\n            assert(history.current()==queue.slots());",
+        "new": "assert(history.current()==queue.slots());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::interleaving::history::lifecycle::host",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::appended",
+          "module": "reversible_value::managed::interleaving::history::lifecycle::host",
+          "file": "managed_host.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(history.current()==queue.slots());"
+        }
+      ],
+      "selectionRationale": "Reject loss of appended inverse obligations or successful-release terminal queues in the actual host owner. Require a fresh matching positive baseline, whole-mutant compilation and the named assertion rejection; resource limits and unrelated failures do not count."
+    },
+    {
+      "name": "r3-host-drops-terminal-history",
+      "mutation": {
+        "file": "managed_lifecycle_native.rs",
+        "old": "self.terminal=Ghost(self.terminal@.union_prefer_right(out.2@.unwrap().queues()));\n                assert(self.terminal().dom()==self.histories().dom());",
+        "new": "self.terminal=Ghost(self.terminal@);\n                assert(self.terminal().dom()==self.histories().dom());"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::interleaving::history::lifecycle::native",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::release_controlled",
+          "module": "reversible_value::managed::interleaving::history::lifecycle::native",
+          "file": "managed_lifecycle_native.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.terminal().dom()==self.histories().dom());"
+        }
+      ],
+      "selectionRationale": "Reject loss of appended inverse obligations or successful-release terminal queues in the actual host owner. Require a fresh matching positive baseline, whole-mutant compilation and the named assertion rejection; resource limits and unrelated failures do not count."
+    }
+  ]
+}

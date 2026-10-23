@@ -342,6 +342,221 @@ fn shared_child_with_empty_publication_keeps_parent_values_until_its_inverse_dra
 }
 
 #[test]
+fn child_retirement_acknowledgement_does_not_release_a_consumers_provider() {
+    use cordis_kernel::lifecycle_state::registration::shared_child::{ChildCleanup, ChildDispatch};
+    type Parent = Execution<String, ChildDispatch<String, ()>, (), ChildCleanup<(), ()>>;
+    let mut world = World::new(1790);
+    let parent = register(&mut world, 1, vec![]);
+    let mut episode: Parent = world.begin_managed_execution(parent, 1791).unwrap();
+    let call = world
+        .admit_managed_root(parent, &mut episode, parent)
+        .unwrap();
+    episode
+        .complete_root(world.call(parent, call).ok().unwrap())
+        .ok()
+        .unwrap()
+        .unwrap();
+    episode.provide(port(1), Arc::new("parent".into())).unwrap();
+    world
+        .finish_managed_execution(parent, &mut episode)
+        .unwrap();
+    let (handle, _) = episode
+        .enqueue_native_child(0, "child".into())
+        .ok()
+        .unwrap();
+    let mut allocated = None;
+    let reply = episode.take_child().unwrap().run(|request| {
+        let ChildDispatch::Native(request) = request else {
+            panic!("native Child")
+        };
+        let (_, child) = request.into_parts();
+        allocated = Some(
+            world
+                .register_shared_child(
+                    &child,
+                    &BTreeMap::new(),
+                    port(202),
+                    PluginDefinition::new(vec![], vec![2], setup as Callback),
+                    "child host".into(),
+                )
+                .result
+                .ok()
+                .unwrap(),
+        );
+    });
+    episode.complete_request(reply).ok().unwrap();
+    let child = allocated.unwrap();
+    let (mut child_episode, child_value) = activate(&mut world, child, 2, 1792);
+    let consumer = register(&mut world, 3, vec![2]);
+    let (mut downstream, _) = activate(&mut world, consumer, 3, 1793);
+    downstream
+        .register(0, "retryable consumer cleanup".into())
+        .unwrap();
+    assert_eq!(world.value_count(), 3);
+    assert!(Arc::ptr_eq(
+        downstream.read(port(2)).unwrap().1,
+        &child_value
+    ));
+
+    // Ownership is not an implicit dependency. The parent's native inverse
+    // acknowledges retirement of its actual Child, not that Child's Unload.
+    world
+        .withdraw_managed_execution(parent, &mut episode, false)
+        .unwrap();
+    world.settle_managed_execution(parent, &episode).unwrap();
+    world.begin_cleanup(parent).unwrap();
+    let (ticket, action) = episode.pop(0).unwrap().unwrap();
+    let ChildCleanup::Native(inverse) = action else {
+        panic!("paired native inverse")
+    };
+    let retired = world.retire_shared_child(&inverse).result.unwrap().unwrap();
+    assert_eq!(retired.id(), child);
+    assert_eq!(handle.snapshot().identity().unwrap().id(), child);
+    assert!(world.kernel().retired(child));
+    assert_eq!(world.kernel().phase(child), Some(Phase::Active));
+    episode
+        .complete_result(
+            0,
+            ticket,
+            Ok::<_, &str>(()),
+            None,
+            CleanupPolicy::RetainFailure,
+        )
+        .ok()
+        .unwrap();
+    world
+        .release_managed_execution(parent, &mut episode)
+        .unwrap();
+    assert_eq!(world.kernel().phase(parent), Some(Phase::Inactive));
+    assert_eq!(world.value_count(), 2);
+
+    withdraw(&mut world, child, &mut child_episode);
+    assert!(world.native_value(port(2)).is_none());
+    assert!(world.begin_cleanup(child).is_err());
+    assert!(world
+        .retire_and_release_child(&handle, &mut child_episode)
+        .into_release()
+        .0
+        .is_err());
+    // The parent's already closed episode cannot be substituted for its Child.
+    assert!(world
+        .retire_and_release_child(&handle, &mut episode)
+        .into_release()
+        .0
+        .is_err());
+    assert_eq!(world.value_count(), 2);
+    assert!(Arc::ptr_eq(
+        downstream.read(port(2)).unwrap().1,
+        &child_value
+    ));
+    assert_eq!(world.kernel().committed(consumer)[0].provider, child);
+
+    // A consumer's failed cleanup keeps the actual dependency and Child value.
+    withdraw(&mut world, consumer, &mut downstream);
+    world.begin_cleanup(consumer).unwrap();
+    let (failed, action) = downstream.pop(0).unwrap().unwrap();
+    downstream
+        .complete_result(
+            0,
+            failed,
+            Err("retry"),
+            Some(action),
+            CleanupPolicy::RetainFailure,
+        )
+        .unwrap();
+    world.fail_managed_execution(consumer, &downstream).unwrap();
+    assert!(world.begin_cleanup(child).is_err());
+    assert!(world
+        .release_managed_execution(consumer, &mut downstream)
+        .is_err());
+    assert_eq!(world.value_count(), 2);
+    assert!(Arc::ptr_eq(
+        downstream.read(port(2)).unwrap().1,
+        &child_value
+    ));
+    world
+        .retry_managed_execution(consumer, &mut downstream)
+        .unwrap();
+    let (retry, _) = downstream.pop(0).unwrap().unwrap();
+    assert_ne!(failed, retry);
+    downstream
+        .complete_result(
+            0,
+            retry,
+            Ok::<_, &str>(()),
+            None,
+            CleanupPolicy::RetainFailure,
+        )
+        .unwrap();
+    world
+        .release_managed_execution(consumer, &mut downstream)
+        .unwrap();
+    world.begin_cleanup(child).unwrap();
+    world
+        .retire_and_release_child(&handle, &mut child_episode)
+        .into_release()
+        .0
+        .unwrap();
+    assert_eq!(world.kernel().phase(child), Some(Phase::Inactive));
+    assert_eq!(world.value_count(), 0);
+    assert!(world.kernel().contains(child)); // Unload is also distinct from Remove.
+    assert!(world
+        .retire_and_release_child(&handle, &mut child_episode)
+        .into_release()
+        .0
+        .is_err());
+    let reopened: Result<Episode, _> = world.begin_managed_execution(child, 1794);
+    assert!(reopened.is_err());
+    world.remove(child).unwrap();
+    assert!(!world.kernel().contains(child));
+}
+
+#[test]
+fn native_child_cancellation_has_no_unload_and_rejects_the_late_request() {
+    use cordis_kernel::lifecycle_state::registration::shared_child::{ChildCleanup, ChildDispatch};
+    type Parent = Execution<String, ChildDispatch<String, ()>, (), ChildCleanup<(), ()>>;
+    let mut world = World::new(1795);
+    let parent = register(&mut world, 1, vec![]);
+    let mut episode: Parent = world.begin_managed_execution(parent, 1796).unwrap();
+    let (handle, _) = episode
+        .enqueue_native_child(0, "late child".into())
+        .ok()
+        .unwrap();
+    assert!(handle.snapshot().pending());
+    let (decision, _) = world.retire_shared_child_observed(&handle);
+    assert_eq!(decision.result.unwrap(), None);
+    assert!(decision.before.pending());
+    assert!(decision.after.cancelled());
+    assert!(world
+        .retire_and_release_child(&handle, &mut episode)
+        .into_release()
+        .0
+        .is_err());
+    assert_eq!(world.kernel().phase(parent), Some(Phase::Loading));
+    let receipt = episode.take_child().unwrap().run(|request| {
+        let ChildDispatch::Native(request) = request else {
+            panic!("native Child")
+        };
+        let (_, child) = request.into_parts();
+        assert!(world
+            .register_shared_child(
+                &child,
+                &BTreeMap::new(),
+                port(202),
+                PluginDefinition::new(vec![], vec![2], setup as Callback),
+                "late host".into(),
+            )
+            .result
+            .is_err());
+    });
+    episode.complete_request(receipt).ok().unwrap();
+    assert!(handle.snapshot().cancelled());
+    assert!(handle.snapshot().identity().is_none());
+    assert!(world.kernel().children(parent).is_empty());
+    assert_eq!(world.value_count(), 0);
+}
+
+#[test]
 fn escaped_episode_keeps_begin_slots_across_withdrawal_failure_retry_and_replacement() {
     use std::sync::Mutex;
     let mut world = World::new(1780);
@@ -1708,4 +1923,307 @@ fn retained_status_link_does_not_retain_the_observers_error_payloads() {
     let (_, observed) = episode.retire_observed_effect(run).ok().unwrap();
     assert!(observed.finished());
     assert_eq!(dropped.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn recovery_observations_span_retry_and_republication_without_retaining_payloads() {
+    let mut world = World::new(9910);
+    let provider = register(&mut world, 1, vec![]);
+    let consumer = register(&mut world, 2, vec![1]);
+    let unrelated = register(&mut world, 3, vec![]);
+    let (_independent_owner, independent) = activate(&mut world, unrelated, 3, 9911);
+    let baseline = world.publication_snapshot();
+
+    let mut upstream: Episode = world.begin_managed_execution(provider, 9912).unwrap();
+    let first_origin = upstream.lifecycle_ticket().unwrap();
+    let mut checkpoints = vec![world.recovery_snapshot(baseline.joint())];
+    assert_eq!(world.kernel().phase(provider), Some(Phase::Loading));
+    complete(&mut world, provider, &mut upstream);
+    let value = Arc::new("same payload, different Episode".to_owned());
+    let weak = Arc::downgrade(&value);
+    upstream.provide(port(1), value.clone()).unwrap();
+    world
+        .finish_managed_execution(provider, &mut upstream)
+        .unwrap();
+    let published = world.publication_snapshot();
+    let references = Arc::strong_count(&value);
+    checkpoints.push(world.recovery_snapshot(baseline.joint()));
+    assert_eq!(Arc::strong_count(&value), references);
+
+    let (mut downstream, _) = activate(&mut world, consumer, 2, 9913);
+    downstream.register(0, "retryable cleanup".into()).unwrap();
+    withdraw(&mut world, provider, &mut upstream);
+    checkpoints.push(world.recovery_snapshot(published.joint()));
+    assert!(world.native_value(port(1)).is_none());
+    assert_eq!(world.value_count(), 3);
+    assert!(world.begin_cleanup(provider).is_err());
+    assert!(Arc::ptr_eq(downstream.read(port(1)).unwrap().1, &value));
+
+    withdraw(&mut world, consumer, &mut downstream);
+    world.begin_cleanup(consumer).unwrap();
+    let (old_ticket, action) = downstream.pop(0).unwrap().unwrap();
+    downstream
+        .complete_result(
+            0,
+            old_ticket,
+            Err("transient"),
+            Some(action),
+            CleanupPolicy::RetainFailure,
+        )
+        .unwrap();
+    world.fail_managed_execution(consumer, &downstream).unwrap();
+    assert!(world
+        .release_managed_execution(consumer, &mut downstream)
+        .is_err());
+    checkpoints.push(world.recovery_snapshot(baseline.joint()));
+    assert_eq!(world.value_count(), 3);
+    assert!(Arc::ptr_eq(downstream.read(port(1)).unwrap().1, &value));
+
+    world
+        .retry_managed_execution(consumer, &mut downstream)
+        .unwrap();
+    let (ticket, _) = downstream.pop(0).unwrap().unwrap();
+    assert_ne!(ticket, old_ticket);
+    downstream
+        .complete_result(
+            0,
+            ticket,
+            Ok::<_, &str>(()),
+            None,
+            CleanupPolicy::RetainFailure,
+        )
+        .unwrap();
+    drop(
+        world
+            .release_managed_execution(consumer, &mut downstream)
+            .unwrap(),
+    );
+    world.begin_cleanup(provider).unwrap();
+    drop(
+        world
+            .release_managed_execution(provider, &mut upstream)
+            .unwrap(),
+    );
+    checkpoints.push(world.recovery_snapshot(baseline.joint()));
+    assert_eq!(world.value_count(), 1);
+
+    // Reuse the same Arc deliberately. Source identity must still distinguish
+    // the new Begin/Finish from the first Episode's now consumed publication.
+    let mut next: Episode = world.begin_managed_execution(provider, 9914).unwrap();
+    assert!(next.lifecycle_ticket().unwrap().generation > first_origin.generation);
+    complete(&mut world, provider, &mut next);
+    next.provide(port(1), value.clone()).unwrap();
+    world.finish_managed_execution(provider, &mut next).unwrap();
+    checkpoints.push(world.recovery_snapshot(published.joint()));
+    assert!(Arc::ptr_eq(world.native_value(port(1)).unwrap(), &value));
+    assert!(world
+        .release_managed_execution(provider, &mut upstream)
+        .is_err());
+    withdraw(&mut world, provider, &mut next);
+    world.begin_cleanup(provider).unwrap();
+    drop(
+        world
+            .release_managed_execution(provider, &mut next)
+            .unwrap(),
+    );
+    checkpoints.push(world.recovery_snapshot(baseline.joint()));
+    assert_eq!(world.value_count(), 1);
+    assert!(Arc::ptr_eq(
+        world.native_value(port(3)).unwrap(),
+        &independent
+    ));
+
+    drop((upstream, downstream, next, value));
+    assert!(weak.upgrade().is_none());
+    // Captures outlive the released payload. Historical values and recovery
+    // diagnoses are proof evidence; Rust does not keep those Arc references.
+    for checkpoint in checkpoints {
+        assert_eq!(std::mem::size_of_val(&checkpoint.interval), 0);
+        assert_eq!(std::mem::size_of_val(&checkpoint.issue), 0);
+        let _ = checkpoint.cut.joint().refresh();
+    }
+    drop((baseline, published));
+}
+
+// Execute both sides of the admitted lifecycle splice with real native calls.
+// The Verus client separately constructs and proves the target history; this
+// regression checks the concrete fixture, including actual cleanup failures.
+fn run_episode_splice_fixture(include_middle: bool) -> (Vec<usize>, Vec<String>) {
+    use cordis_kernel::lifecycle_state::registration::shared_child::{ChildCleanup, ChildDispatch};
+    type Parent = Execution<String, ChildDispatch<String, ()>, (), ChildCleanup<(), ()>>;
+    let mut world = World::new(1900);
+    let owner = register(&mut world, 1, vec![]);
+    let independent = register(&mut world, 2, vec![]);
+    let consumer = register(&mut world, 3, vec![1]);
+    let (mut earlier, first_value) = activate(&mut world, owner, 1, 1901);
+    withdraw(&mut world, owner, &mut earlier);
+    world.begin_cleanup(owner).unwrap();
+    world
+        .release_managed_execution(owner, &mut earlier)
+        .unwrap();
+    let opening = world.publication_snapshot();
+
+    let stable_value = if include_middle {
+        let mut parent: Parent = world.begin_managed_execution(owner, 1902).unwrap();
+        let call = world.admit_managed_root(owner, &mut parent, owner).unwrap();
+        parent
+            .complete_root(world.call(owner, call).ok().unwrap())
+            .ok()
+            .unwrap()
+            .unwrap();
+        parent
+            .provide(port(1), Arc::new("middle owner".into()))
+            .unwrap();
+        world.finish_managed_execution(owner, &mut parent).unwrap();
+        let (handle, _) = parent
+            .enqueue_native_child(0, "owned child".into())
+            .ok()
+            .unwrap();
+        let mut born = None;
+        let reply = parent.take_child().unwrap().run(|request| {
+            let ChildDispatch::Native(request) = request else {
+                panic!("native Child")
+            };
+            let (_, child) = request.into_parts();
+            born = Some(
+                world
+                    .register_shared_child(
+                        &child,
+                        &BTreeMap::new(),
+                        port(104),
+                        PluginDefinition::new(vec![1], vec![4], setup as Callback),
+                        "owned child".into(),
+                    )
+                    .result
+                    .ok()
+                    .unwrap(),
+            );
+        });
+        parent.complete_request(reply).ok().unwrap();
+        let child = born.unwrap();
+        let (mut child_episode, _) = activate(&mut world, child, 4, 1903);
+        let (mut downstream, _) = activate(&mut world, consumer, 3, 1904);
+        downstream
+            .register(0, "retry this consumer cleanup".into())
+            .unwrap();
+        let (_, stable) = activate(&mut world, independent, 2, 1905);
+        world
+            .withdraw_managed_execution(owner, &mut parent, false)
+            .unwrap();
+        world.settle_managed_execution(owner, &parent).unwrap();
+        assert!(world.begin_cleanup(owner).is_err());
+        assert!(world.release_managed_execution(owner, &mut parent).is_err());
+
+        withdraw(&mut world, consumer, &mut downstream);
+        world.begin_cleanup(consumer).unwrap();
+        let (old_ticket, inverse) = downstream.pop(0).unwrap().unwrap();
+        downstream
+            .complete_result(
+                0,
+                old_ticket,
+                Err("transient"),
+                Some(inverse),
+                CleanupPolicy::RetainFailure,
+            )
+            .unwrap();
+        world.fail_managed_execution(consumer, &downstream).unwrap();
+        assert!(world.begin_cleanup(owner).is_err());
+        assert!(world
+            .release_managed_execution(consumer, &mut downstream)
+            .is_err());
+        assert_eq!(world.kernel().committed(consumer)[0].provider, owner);
+        assert!(Arc::ptr_eq(world.native_value(port(2)).unwrap(), &stable));
+        let _failed_cut = world.publication_snapshot();
+
+        world
+            .retry_managed_execution(consumer, &mut downstream)
+            .unwrap();
+        let (current, _) = downstream.pop(0).unwrap().unwrap();
+        assert_ne!(old_ticket, current);
+        assert!(downstream
+            .complete_result(
+                0,
+                old_ticket,
+                Ok::<_, &str>(()),
+                None,
+                CleanupPolicy::RetainFailure
+            )
+            .is_err());
+        downstream
+            .complete_result(
+                0,
+                current,
+                Ok::<_, &str>(()),
+                None,
+                CleanupPolicy::RetainFailure,
+            )
+            .unwrap();
+        world
+            .release_managed_execution(consumer, &mut downstream)
+            .unwrap();
+        // The Child still imports the parent's publication after its sibling
+        // consumer finishes, so the parent is not yet eligible for cleanup.
+        assert!(world.begin_cleanup(owner).is_err());
+        withdraw(&mut world, child, &mut child_episode);
+        world.begin_cleanup(child).unwrap();
+        world
+            .release_managed_execution(child, &mut child_episode)
+            .unwrap();
+        assert_eq!(world.kernel().phase(child), Some(Phase::Inactive));
+        assert!(world.kernel().contains(child));
+        assert!(world.remove(child).is_err()); // Unload is not retirement/removal.
+        assert_eq!(handle.snapshot().identity().unwrap().id(), child);
+        world.begin_cleanup(owner).unwrap();
+        let (ticket, inverse) = parent.pop(0).unwrap().unwrap();
+        let ChildCleanup::Native(inverse) = inverse else {
+            panic!("native inverse")
+        };
+        world.retire_shared_child(&inverse).result.unwrap();
+        assert!(world.kernel().retired(child));
+        assert!(world.kernel().contains(child));
+        world.remove(child).unwrap();
+        assert!(!world.kernel().contains(child));
+        parent
+            .complete_result(
+                0,
+                ticket,
+                Ok::<_, &str>(()),
+                None,
+                CleanupPolicy::RetainFailure,
+            )
+            .ok()
+            .unwrap();
+        world.release_managed_execution(owner, &mut parent).unwrap();
+        assert!(world.kernel().children(owner).is_empty());
+        stable
+    } else {
+        let (_, stable) = activate(&mut world, independent, 2, 1905);
+        stable
+    };
+    // The later Episode remains in both executions. It is not erased together
+    // with all activity by this owner, nor confused with its first generation.
+    let (_, later_value) = activate(&mut world, owner, 1, 1906);
+    assert!(!Arc::ptr_eq(&first_value, &later_value));
+    assert!(Arc::ptr_eq(
+        world.native_value(port(2)).unwrap(),
+        &stable_value
+    ));
+    assert!(world.native_value(port(3)).is_none());
+    assert!(world.native_value(port(4)).is_none());
+    let _closing = world.recovery_snapshot(opening.joint());
+    (
+        world.ids(),
+        vec![
+            world.native_value(port(1)).unwrap().as_ref().clone(),
+            world.native_value(port(2)).unwrap().as_ref().clone(),
+        ],
+    )
+}
+
+#[test]
+fn interior_episode_deletion_keeps_other_generations_and_independent_publication() {
+    assert_eq!(
+        run_episode_splice_fixture(true),
+        run_episode_splice_fixture(false)
+    );
 }

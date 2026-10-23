@@ -110,3 +110,24 @@ pub proof fn complete_projection(frames:Seq<Frame>,positions:Seq<nat>,key:nat,so
 }
 
 }
+
+verus! {
+pub(crate) proof fn same_source_receipts(tracked a:&super::Receipt,tracked b:&super::Receipt)
+    requires a.wf(),b.wf(),a.journal()==b.journal(),a.event().key==b.event().key,
+        a.event().after is Payload,b.event().after is Payload,
+    ensures a.event().after->Payload_source==b.event().after->Payload_source,
+{
+    a.compare(b);
+    if a.covers(b) {
+        a.included(b);let f=a.events();let k=a.event().key;
+        assert(super::step(super::state_at(f,b.at()),f[b.at() as int].state,f[b.at() as int].event));
+        assert(super::step(super::state_at(f,a.at()),f[a.at() as int].state,f[a.at() as int].event));
+        super::payload::retained(f,b.at()+1,a.at()+1,k);
+    } else {
+        b.included(a);let f=b.events();let k=b.event().key;
+        assert(super::step(super::state_at(f,a.at()),f[a.at() as int].state,f[a.at() as int].event));
+        assert(super::step(super::state_at(f,b.at()),f[b.at() as int].state,f[b.at() as int].event));
+        super::payload::retained(f,a.at()+1,b.at()+1,k);
+    }
+}
+}

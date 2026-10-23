@@ -15,7 +15,7 @@ pub open spec fn attempted(receipt:&joint::Receipt,inverse:Inverse,success:bool)
     &&& receipt.wf() && receipt.journal()==inverse.target().journal_spec()
     &&& receipt.event().key==inverse.target().object().key && receipt.event().change is Value
     &&& receipt.event().change->Value_event.valid()
-    &&& if success {receipt.event().change==(joint::Change::Value {event:Event::Restore {inverse:inverse.state(),before:inverse.state().after,after:inverse.state().before}})}
+    &&& if success {receipt.event().change==(joint::Change::Value {event:Event::Restore {inverse:inverse.state(),before:inverse.state().after,after:inverse.state().before,origin:inverse.origin().at()}})}
         else {receipt.event().change==(joint::Change::Value {event:Event::Blocked {inverse:inverse.state(),before:receipt.event().change->Value_event.before()}})}
 }
 pub open spec fn issued(receipt:Option<joint::Receipt>,queue:Option<(joint::Journal,nat)>,ticket:RestoreTicket)->bool {
@@ -68,6 +68,7 @@ impl Evidence {
     }
     /// Called by the real typed dispatcher before returning its completion.
     /// The interval endpoints are its own authoritative queue receipts.
+    #[verifier::spinoff_prover]
     pub(crate) proof fn establish_interval(&self)
         requires self.protocol(),ensures self.certified(),
     {

@@ -65,7 +65,7 @@ python3 scripts/check-r2-acceptance.py --check
 刷新过期证据。仓库内的[开发记录](development-report.json)提供对应的源码绑定结果。
 新 checkout 需运行命令产生本地 R2 报告；里程碑标签本身不是通过证据。
 
-这不是完整 318 项反例回归或其校准。报告明确保留 `fullNegativeControls: not_run`、
+这不是完整反例回归或其校准。报告明确保留 `fullNegativeControls: not_run`、
 `scopedCalibration: not_run`、`releaseAcceptance: false`、`paperCompletion: false`。
 
 ## 明确范围与后续工作

@@ -39,7 +39,22 @@ pub struct CleanupQueue<T> {
 impl<T> CleanupQueue<T> {
     pub closed spec fn protocol(&self)->CleanupJournal {self.journal}
     pub closed spec fn slots(&self)->Seq<Option<T>> {self.payloads@}
+    pub(crate) fn retained_len(&self)->(out:usize) ensures out==self.slots().len(), {self.payloads.len()}
+    /// Internal immutable inspection; never duplicates or dispatches an inverse.
+    pub(crate) fn retained(&self,token:usize)->(out:Option<&T>)
+        ensures out.is_some()==(token<self.slots().len() && self.slots()[token as int].is_some()),
+            out.is_some() ==> *out.unwrap()==self.slots()[token as int].unwrap(),
+    {
+        if token>=self.payloads.len() {return None;}
+        self.payloads[token].as_ref()
+    }
     pub closed spec fn trace(&self)->Seq<joint::Frame> {match self.joint {Some(member)=>member.events(),None=>Seq::empty()}}
+    pub proof fn trace_record(&self)
+        requires self.wf(),self.link().is_some(),
+        ensures self.trace().len()>0,joint::valid(self.trace()),
+            self.trace().last().event.key==self.link().unwrap().1,
+            self.trace().last().event.after==(joint::Record::Cleanup {state:self.observation()}),
+    {match &self.joint {Some(member)=>member.trace_record(),None=>{}}}
     pub(crate) proof fn latest_receipt(tracked &self)->(tracked out:Option<joint::Receipt>)
         requires self.wf(),
         ensures out.is_some()==self.link().is_some(),out.is_some() ==> out.unwrap().wf()
@@ -90,6 +105,12 @@ impl<T> CleanupQueue<T> {
         match self.joint {None=>true,Some(member)=>member.wf() && member.record()==(joint::Record::Cleanup {state})}
     }
     pub closed spec fn wf(&self)->bool {self.local_wf() && self.traces(self.observation())}
+    pub proof fn issued_slot_empty(&self)
+        requires self.wf(),
+        ensures self.issued() ==> self.protocol().selected().is_some()
+            && self.protocol().selected().unwrap().token<self.slots().len()
+            && self.slots()[self.protocol().selected().unwrap().token as int].is_none(),
+    {}
     fn commit(&mut self,Ghost(before):Ghost<CleanupState>,Ghost(event):Ghost<CleanupChange>)
         requires old(self).local_wf(),old(self).traces(before),cleanup_step(before,old(self).observation(),event),
         ensures final(self).wf(),final(self).protocol()==old(self).protocol(),final(self).slots()==old(self).slots(),
@@ -147,6 +168,10 @@ impl<T> CleanupQueue<T> {
     pub closed spec fn same(&self,prior:&Self)->bool {
         self.journal.same(&prior.journal) && self.slots()==prior.slots() && self.in_flight==prior.in_flight
     }
+    pub proof fn unchanged_slots(&self,prior:&Self)
+        requires self.same(prior),
+        ensures self.slots()==prior.slots(),self.protocol().domain_id()==prior.protocol().domain_id(),self.issued()==prior.issued(),self.protocol().selected()==prior.protocol().selected(),
+    {}
     pub closed spec fn retry_enabled(&self)->bool {
         self.journal.failed_spec() && self.journal.next_attempt()<u64::MAX
             && self.slots()[self.journal.selected().unwrap().token as int].is_some()
@@ -180,12 +205,16 @@ impl<T> CleanupQueue<T> {
             final(self).protocol().selected()==old(self).protocol().selected(),
             final(self).protocol().failed_spec()==old(self).protocol().failed_spec(),
             final(self).issued()==old(self).issued(),
-    {self.register_following(payload,Tracked(None),Tracked(None)).token}
+    {self.register_following(payload,Tracked(None),Tracked(None),Tracked(None)).token}
     /// Allocate the token and store its real payload in one exclusive operation.
-    pub(crate) fn register_following(&mut self,payload:T,Tracked(cause):Tracked<Option<joint::Receipt>>,Tracked(pending):Tracked<Option<joint::Pending>>)->(out:Insertion)
-        requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
+    pub(crate) fn register_following(&mut self,payload:T,Tracked(cause):Tracked<Option<joint::Receipt>>,Tracked(pending):Tracked<Option<joint::Pending>>,Tracked(observed):Tracked<Option<&Member>>)->(out:Insertion)
+        requires observed.is_some() ==> observed.unwrap().wf() && old(self).link().is_some()
+                && observed.unwrap().journal()==old(self).link().unwrap().0 && observed.unwrap().record() is Groups,
+            old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
             joint::registration_pending(pending,cause,old(self).link()),
-        ensures final(self).protocol().stage().cancellation()==old(self).protocol().stage().cancellation(),
+        ensures observed.is_some() ==> out.trace@.is_some()
+                && joint::state_at(out.trace@.unwrap().events(),out.trace@.unwrap().events().len()).contains_pair(observed.unwrap().key(),observed.unwrap().record()),
+            final(self).protocol().stage().cancellation()==old(self).protocol().stage().cancellation(),
             final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.token==old(self).slots().len(),
             final(self).slots()==old(self).slots().push(Some(payload)),
             final(self).protocol().waiting()==old(self).protocol().waiting().push(out.token),
@@ -223,7 +252,7 @@ impl<T> CleanupQueue<T> {
                 proof {reveal(joint::changes);}
                 let ghost change=if cause.is_some() && cause.unwrap().journal()==member.journal() && cause.unwrap().forward()
                     {joint::Change::RegisterInverse {write:cause.unwrap().at()}} else {joint::Change::Cleanup {event:CleanupChange::Register}};
-                let _pending=member.update_following(Ghost(joint::Record::Cleanup {state:after}),Ghost(change),Tracked(cause),Ghost(false),Tracked(pending));
+                let _pending=member.update_observing(Ghost(joint::Record::Cleanup {state:after}),Ghost(change),Tracked(cause),Ghost(false),Tracked(pending),Tracked(observed));
                 proof {
                     trace=Some(member.receipt());
                     let r=trace.unwrap();
@@ -297,6 +326,30 @@ impl<T> CleanupQueue<T> {
                         && final(self).protocol().waiting()==old(self).protocol().waiting().drop_last()
                 }
             },
+    {self.pop_following(Tracked(None))}
+    pub(crate) fn pop_following(&mut self,Tracked(cause):Tracked<Option<joint::Receipt>>)->(out:Result<Option<(RestoreTicket,T)>,RestoreError>)
+        requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
+        ensures out.is_ok() && out->Ok_0.is_some() && cause.is_some() && old(self).link().is_some() && cause.unwrap().journal()==old(self).link().unwrap().0 ==>
+                cause.unwrap().events().len()<final(self).trace().len() && final(self).trace().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+            out.is_err() || out.unwrap().is_none() ==> final(self).same(old(self)) && final(self).trace()==old(self).trace(),
+            out.is_ok() && out.unwrap().is_some() ==> {
+                let (ticket,payload)=out.unwrap().unwrap();
+                &&& final(self).link().is_some() ==> final(self).trace().last().event.change==(joint::Change::Cleanup {event:CleanupChange::Pop {ticket}})
+                    && old(self).trace().len()<final(self).trace().len() && final(self).trace().take(old(self).trace().len() as int)==old(self).trace()
+                &&& !old(self).issued() && !old(self).protocol().failed_spec()
+                &&& ticket.token<old(self).slots().len()
+                &&& old(self).slots()[ticket.token as int]==Some(payload)
+                &&& final(self).slots()==old(self).slots().update(ticket.token as int,None)
+                &&& final(self).issued() && final(self).protocol().selected()==Some(ticket)
+                &&& if old(self).protocol().selected().is_some() {
+                    ticket==old(self).protocol().selected().unwrap()
+                        && final(self).protocol().waiting()==old(self).protocol().waiting()
+                } else {
+                    old(self).protocol().waiting().len()>0 && ticket.token==old(self).protocol().waiting().last()
+                        && final(self).protocol().waiting()==old(self).protocol().waiting().drop_last()
+                }
+            },
     {
         let ghost prior=*self;
         if self.in_flight || self.journal.has_failed() {return Ok(None);}
@@ -328,7 +381,7 @@ impl<T> CleanupQueue<T> {
             }
         }
         proof {assert(self.observation().occupied =~= prior.observation().occupied.update(ticket.token as int,false));}
-        self.commit(Ghost(prior.observation()),Ghost(CleanupChange::Pop {ticket}));
+        self.commit_following(Ghost(prior.observation()),Ghost(CleanupChange::Pop {ticket}),Tracked(cause));
         Ok(Some((ticket,payload)))
     }
 
@@ -382,11 +435,12 @@ impl<T> CleanupQueue<T> {
     /// A consumed nonretryable failure cannot be converted into an empty retry.
     pub fn retry(&mut self)->(out:Result<RestoreTicket,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).retry_enabled(),
+        ensures out.is_ok() ==> !final(self).issued(),out.is_err() ==> final(self).protocol().selected()==old(self).protocol().selected(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),out.is_ok()==old(self).retry_enabled(),
             final(self).slots()==old(self).slots(),final(self).issued()==old(self).issued(),
             final(self).protocol().waiting()==old(self).protocol().waiting(),
             out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> final(self).protocol().selected()==Some(out.unwrap()) && !final(self).protocol().failed_spec()
+            out.is_ok() ==> old(self).protocol().selected().is_some() && final(self).protocol().selected()==Some(out.unwrap()) && !final(self).protocol().failed_spec()
                 && out.unwrap().token==old(self).protocol().selected().unwrap().token
                 && out.unwrap().attempt>old(self).protocol().selected().unwrap().attempt,
     {
@@ -405,7 +459,8 @@ impl<T> CleanupQueue<T> {
         out
     }
     pub fn admit(&mut self,target:Option<&[Binding]>)->(out:bool)
-        requires old(self).wf(),ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
+        requires old(self).wf(),ensures final(self).protocol().selected()==old(self).protocol().selected(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),
             out==final(self).protocol().stage().pending(),
             out==(old(self).protocol().stage().pending() || (!old(self).protocol().stage().settled() && !old(self).protocol().stage().cancellation() && target.is_some() && crate::episode::binding_set(target.unwrap()@)==crate::episode::binding_set(old(self).protocol().stage().committed_view()))),
@@ -416,14 +471,16 @@ impl<T> CleanupQueue<T> {
         self.commit(Ghost(before),Ghost(CleanupChange::Admit {matches}));out
     }
     pub fn end(&mut self)->(out:bool)
-        requires old(self).wf(),ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
+        requires old(self).wf(),ensures final(self).protocol().selected()==old(self).protocol().selected(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),out==old(self).protocol().stage().pending(),
             out ==> !final(self).protocol().stage().pending() && final(self).protocol().stage().settled()
                 && accumulator_step(old(self).protocol().stage().abstract_view(),final(self).protocol().stage().abstract_view(),
                     if old(self).protocol().stage().cancellation() {AccumulatorRule::Divert(None)} else {AccumulatorRule::Finish}),
     {let ghost before=self.observation();let out=self.journal.end();self.commit(Ghost(before),Ghost(CleanupChange::End));out}
     pub fn cancel(&mut self)
-        requires old(self).wf(),ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
+        requires old(self).wf(),ensures final(self).protocol().selected()==old(self).protocol().selected(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(self).slots()==old(self).slots(),
             final(self).issued()==old(self).issued(),
             final(self).protocol().stage().cancellation(),final(self).protocol().stage().pending()==old(self).protocol().stage().pending(),
     {let ghost before=self.observation();self.journal.cancel();self.commit(Ghost(before),Ghost(CleanupChange::Cancel));}

@@ -102,7 +102,7 @@ impl<R> History<R> {
     }
 }
 #[allow(dead_code)]
-pub(crate) struct Ledger<R> {history:Ghost<History<R>>,positions:Ghost<Seq<nat>>,native:Ghost<nat>,member:joint::Member}
+pub(crate) struct Ledger<R> {revision:Option<u64>,history:Ghost<History<R>>,positions:Ghost<Seq<nat>>,native:Ghost<nat>,member:joint::Member}
 impl<R> Ledger<R> {
     pub closed spec fn history(&self)->History<R> {self.history@}
     pub closed spec fn positions(&self)->Seq<nat> {self.positions@}
@@ -113,9 +113,19 @@ impl<R> Ledger<R> {
     pub open spec fn current(&self)->Map<usize,RegisteredPlugin<R>> {self.history().states.last()}
     pub open spec fn record(&self)->r::State {r::State {native:self.native(),revision:self.history().events.len(),entries:project(self.current())}}
     pub closed spec fn wf(&self)->bool {
-        self.history().valid() && self.member.wf() && self.member.record()==(joint::Record::Recipes {state:self.record()})
+        (match self.revision {Some(n)=>n as nat==self.history().events.len(),None=>self.history().events.len()>u64::MAX})
+            && self.history().valid() && self.member.wf() && self.member.record()==(joint::Record::Recipes {state:self.record()})
             && self.history().indexed(self.positions(),self.member.events(),self.key(),self.native())
     }
+    /// Executable position in this actual recipe stream. Exhaustion disables
+    /// ordering capture without wrapping or changing ordinary host execution.
+    pub(crate) fn identity(&self)->(out:std::sync::Arc<joint::identity::AllocationIdentity>)
+        requires self.wf(),ensures out.wf(),out.address()==(crate::reversible_value::service_composition::Address {journal:self.journal(),key:self.key()}),
+    {self.member.identity()}
+    pub(crate) fn revision(&self)->(out:Option<u64>)
+        requires self.wf(),
+        ensures match out {Some(n)=>n as nat==self.history().events.len(),None=>self.history().events.len()>u64::MAX},
+    {self.revision}
     pub(crate) fn receipt(&self)->(out:Tracked<joint::Receipt>)
         requires self.wf(),
         ensures out@.wf(),out@.journal()==self.journal(),out@.events()==self.frames(),
@@ -127,7 +137,7 @@ impl<R> Ledger<R> {
         let member=journal.allocate(Ghost(joint::Record::Recipes {state:r::State {native,revision:0,entries:Map::empty()}}));
         let ghost positions=seq![(member.events().len()-1) as nat];
         proof {assert(project::<R>(Map::empty()) =~= Map::empty());}
-        Self {history:Ghost(History {states:seq![Map::empty()],events:Seq::empty()}),positions:Ghost(positions),native:Ghost(native),member}
+        Self {revision:Some(0),history:Ghost(History {states:seq![Map::empty()],events:Seq::empty()}),positions:Ghost(positions),native:Ghost(native),member}
     }
     pub(crate) fn advance<'a>(&mut self,view:joint::WriteView<'a>,Ghost(next):Ghost<Map<usize,RegisteredPlugin<R>>>,Ghost(event):Ghost<r::Event>)->(out:joint::WriteView<'a>)
         requires old(self).wf(),view.wf(),view.journal_spec()==old(self).journal(),step(old(self).current(),next,event),
@@ -146,6 +156,7 @@ impl<R> Ledger<R> {
             prior.history().append_indexed(prior.positions(),prior.member.events(),self.member.events(),self.key(),self.native(),next,event);
             self.history=Ghost(prior.history().append(next,event));self.positions=Ghost(prior.positions().push((self.member.events().len()-1) as nat));
         }
+        self.revision=match self.revision {Some(n)=>if n<u64::MAX {Some(n+1)} else {None},None=>None};
         view
     }
     pub(crate) fn snapshot(&self,native:&joint::Member)->(out:Snapshot<R>)

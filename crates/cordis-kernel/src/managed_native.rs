@@ -22,7 +22,9 @@ impl<R,H> NativeHost<R,H> {
     pub fn begin_managed_execution<V,C,G,I>(&mut self,id:usize,store:&NativeServices<V>,domain:u64)
         ->(out:Result<Execution<V,C,G,I>,Error>)
         requires old(self).wf(),store.wf(),
-        ensures out.is_ok() ==> out->Ok_0.work_state().link().is_none() && out->Ok_0.cleanup_state().execution_journal().is_none() && out->Ok_0.cleanup_state().queues().dom()==set![0usize],final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), (forall|n:usize| n!=id ==> final(self).state().control().generation_of(n)==old(self).state().control().generation_of(n)), final(self).wf(),final(self).entries()==old(self).entries(),
+        ensures out.is_ok() ==> out->Ok_0.work_state().domain_id()==domain,
+            out.is_ok() ==> final(self).root_ready(id,&out->Ok_0.work_state()),
+            final(self).state().control().next_id()==old(self).state().control().next_id(),out.is_ok() ==> out->Ok_0.work_state().link().is_none() && out->Ok_0.cleanup_state().execution_journal().is_none() && out->Ok_0.cleanup_state().queues().dom()==set![0usize],final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), (forall|n:usize| n!=id ==> final(self).state().control().generation_of(n)==old(self).state().control().generation_of(n)), final(self).wf(),final(self).entries()==old(self).entries(),
             out.is_err() ==> final(self).state().same(&old(self).state()),
             out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.value_attempts().events().len()==0 && out->Ok_0.phase_spec()==ExecutionPhase::Loading
                 && final(self).state().execution_matches(id,&out->Ok_0.work_state(),&out->Ok_0.cleanup_state())
@@ -51,7 +53,8 @@ impl<R,H> NativeHost<R,H> {
     pub fn finish_managed_execution<V,C,G,I>(&mut self,id:usize,store:&mut NativeServices<V>,execution:&mut Execution<V,C,G,I>)
         ->(out:Result<(),Error>)
         requires old(self).wf(),old(store).wf(),old(execution).wf(),
-        ensures final(store).domain_id()==old(store).domain_id(), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
+        ensures old(store).entries().submap_of(final(store).entries()),
+            final(store).domain_id()==old(store).domain_id(), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
             final(execution).work_state()==old(execution).work_state(),final(execution).cleanup_state()==old(execution).cleanup_state(),
             final(execution).value_state()==old(execution).value_state(),
             out.is_err() ==> *final(execution)==*old(execution) && *final(store)==*old(store)
@@ -80,7 +83,8 @@ impl<R,H> NativeHost<R,H> {
     pub fn release_managed_execution<V,C,G,I>(&mut self,id:usize,store:&mut NativeServices<V>,execution:&mut Execution<V,C,G,I>)
         ->(out:Result<(CleanupOutcome,ReleasedNativeValues<V>),Error>)
         requires old(self).wf(),old(store).wf(),old(execution).wf(),
-        ensures final(store).domain_id()==old(store).domain_id(), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
+        ensures final(execution).cleanup_state().next_id()==old(execution).cleanup_state().next_id(),
+            final(execution).cleanup_state().link()==old(execution).cleanup_state().link(),final(store).domain_id()==old(store).domain_id(), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
             final(execution).origin()==old(execution).origin(),
             final(execution).value_state().is_some() ==> final(execution).value_state().unwrap().capture()==old(execution).value_state().unwrap().capture(),
             out.is_err() ==> final(self).state().same(&old(self).state()) && *final(store)==*old(store) && *final(execution)==*old(execution),
@@ -133,7 +137,8 @@ impl<R,H> NativeHost<R,H> {
     pub fn admit_managed_root<V,C,G,I,A>(&self,id:usize,execution:&mut Execution<V,C,G,I>,argument:A)
         ->(out:Result<RegisteredInvocation<A>,A>)
         requires self.wf(),old(execution).wf(),
-        ensures final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),final(execution).value_state()==old(execution).value_state(),
+        ensures out.is_ok()==self.root_ready(id,&old(execution).work_state()),
+            final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),final(execution).value_state()==old(execution).value_state(),
             final(execution).cleanup_state()==old(execution).cleanup_state(),final(execution).origin()==old(execution).origin(),
             final(execution).work_state().domain_id()==old(execution).work_state().domain_id(),
             final(execution).value_state().is_some() ==> final(execution).value_state().unwrap().capture()==old(execution).value_state().unwrap().capture(),
@@ -160,14 +165,19 @@ impl<R,H> NativeHost<R,H> {
         requires old(self).wf(),execution.wf(),
         ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(self).state().control().unchanged(&old(self).state().control()),
             out.is_ok() ==> execution.cleanup_state().any_failed() && execution.work_state().idle()
-                && !execution.cleanup_state().any_pending() && !execution.cleanup_state().any_issued(),
+                && !execution.cleanup_state().any_pending() && !execution.cleanup_state().any_issued()
+                && final(self).state().protocol().failed(id,execution.origin().unwrap().generation),
     {
         proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
 
         proof {execution.representation();}self.fail_execution(id,&execution.work,&execution.groups)}
     pub fn retry_managed_execution<V,C,G,I>(&mut self,id:usize,execution:&mut Execution<V,C,G,I>)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),old(execution).wf(),
-        ensures out.is_ok() ==> out->Ok_0.id==id && out->Ok_0.generation==old(execution).origin().unwrap().generation
+        ensures out.is_ok() ==> !final(execution).cleanup_state().any_issued(),
+            final(execution).cleanup_state().next_id()==old(execution).cleanup_state().next_id(),
+            final(execution).cleanup_state().link()==old(execution).cleanup_state().link(),
+            final(execution).cleanup_state().same_slots(&old(execution).cleanup_state()),out.is_ok() ==> final(execution).cleanup_state().retried_failed(&old(execution).cleanup_state()),
+            out.is_ok() ==> out->Ok_0.id==id && out->Ok_0.generation==old(execution).origin().unwrap().generation
                 && out->Ok_0.action==old(self).state().protocol().next_id(),
             final(self).state().control().unchanged(&old(self).state().control()), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(execution).wf(),final(execution).execution_journal()==old(execution).execution_journal(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
             final(execution).work_state()==old(execution).work_state(),final(execution).value_state()==old(execution).value_state(),

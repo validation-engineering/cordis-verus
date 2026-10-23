@@ -85,7 +85,7 @@ The tracked [development record](development-report.json) is the complementary
 source-bound evidence. A clean checkout must run the command to create its local
 R2 report; the milestone label alone is not a passing report.
 
-These are selected checks, **not** the complete 318-case negative regression or
+These are selected checks, **not** the complete negative regression or
 its calibration. Reports explicitly retain `fullNegativeControls: not_run`,
 `scopedCalibration: not_run`, `releaseAcceptance: false` and `paperCompletion: false`.
 

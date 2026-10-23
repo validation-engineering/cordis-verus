@@ -179,7 +179,7 @@ impl Cursor {
         let ghost before=cell.history@;
         let result=cell.forward(instruction.operation,instruction.branch,Ghost(managed));
         let tracked origin=cell.joint.receipt();
-        let snapshot=cell.snapshot_after(&self.checkpoint);guard.release_write(cell);
+        let identity=cell.joint.identity();let snapshot=cell.snapshot_after(&self.checkpoint);guard.release_write(cell);
         let next=match &result {Ok(forward)=>forward.next,Err(_)=>Some(pc)};
         proof {
             assert(snapshot.history().take(self.checkpoint.history().len() as int) =~= self.checkpoint.history());
@@ -194,7 +194,7 @@ impl Cursor {
         self.checkpoint=snapshot;self.next=next;
         match result {
             Ok(forward)=>Ok(Some(Applied {outcome:forward.outcome,next:forward.next,pending:forward.pending,
-                inverse:Inverse {target:self.target.clone(),state:forward.inverse,origin:Tracked(origin)}})),
+                inverse:Inverse {target:self.target.clone(),state:forward.inverse,identity,origin:Tracked(origin),lease:forward.lease}})),
             Err(error)=>Err(error),
         }
     }
@@ -331,7 +331,16 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
     /// value can change. Failures never discard already registered inverses.
     pub fn advance_value_program(&mut self,id:usize,cursor:&mut Cursor)->(out:Result<Option<Outcome>,ValueError>)
         requires old(self).wf(),old(cursor).wf(),
-        ensures final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(cursor).wf(),final(cursor).same_program(old(cursor)),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(cursor).wf(),final(cursor).same_program(old(cursor)),
             final(cursor).checkpoint().extends(&old(cursor).checkpoint()),
             final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),

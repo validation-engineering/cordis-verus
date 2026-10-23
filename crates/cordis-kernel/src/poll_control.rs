@@ -159,6 +159,11 @@ impl<R,H,V> NativeRuntime<R,H,V> {
         ensures final(self).wf(),final(execution).wf(),final(control).wf(),final(control).bound(final(self)),final(control).key()==old(control).key(),
             final(control).setup_error()==old(control).setup_error(),
             out.is_err() ==> *final(control)==*old(control),
+            final(execution).execution_journal()==old(execution).execution_journal(),
+            final(execution).cleanup_state().same_slots(&old(execution).cleanup_state()),
+            final(execution).cleanup_state().next_id()==old(execution).cleanup_state().next_id(),
+            final(execution).cleanup_state().link()==old(execution).cleanup_state().link(),
+            out.is_ok() ==> !final(execution).cleanup_state().any_issued(),
             out.is_ok() ==> final(control).matches(final(execution)) && final(control).cleanup_error().is_none()
                 && final(control).state()==(State {cleanup_failure:false,..old(control).state()}) && out->Ok_0.1==old(control).cleanup_error()
                 && out->Ok_0.0.id==id && out->Ok_0.0.generation==old(execution).origin().unwrap().generation
@@ -185,13 +190,30 @@ impl<R,H,V> NativeRuntime<R,H,V> {
             out.is_ok() ==> !final(self).episode_owners().contains_key(id)
                 && final(control).state()==(State {episode:None,groups:None,restart:false,..old(control).state()}),
             final(execution).status_links()==old(execution).status_links(),
+    {self.release_controlled_execution_observed(id,execution,control).0}
+    pub fn release_controlled_execution_observed<C,G,I,E>(&mut self,id:usize,execution:&mut Execution<V,C,G,I>,control:&mut PollControl<E>)
+        ->(out:crate::lifecycle_state::native::runtime::ReleaseObservation<V,I>)
+        requires old(self).wf(),old(execution).wf(),old(control).wf(),old(control).bound(old(self)),
+        ensures final(execution).origin()==old(execution).origin(),final(execution).cleanup_state().next_id()==old(execution).cleanup_state().next_id(),
+            final(execution).cleanup_state().link()==old(execution).cleanup_state().link(),
+            final(execution).execution_journal()==old(execution).execution_journal(),
+            out.0.is_err() ==> *final(execution)==*old(execution) && out.1@.is_none() && out.2@.is_none(),
+            out.0.is_ok() ==> crate::lifecycle_state::native::runtime::released(out)
+                && out.2@==Some(old(execution).cleanup_state()) && final(execution).cleanup_state().queues()==Map::empty(),
+            final(self).wf(),final(execution).wf(),final(control).wf(),final(control).bound(final(self)),final(control).key()==old(control).key(),
+            final(control).setup_error()==old(control).setup_error(),final(control).cleanup_error()==old(control).cleanup_error(),
+            out.0.is_err() ==> *final(control)==*old(control),
+            out.0.is_ok() ==> !final(self).episode_owners().contains_key(id)
+                && final(control).state()==(State {episode:None,groups:None,restart:false,..old(control).state()}),
+            final(execution).status_links()==old(execution).status_links(),
     {
-        if id!=control.owner || !control.matches_execution(execution) {return Err(Error::InvalidState);}
-        let released=self.release_managed_execution(id,execution)?;
+        if id!=control.owner || !control.matches_execution(execution) {return (Err(Error::InvalidState),Tracked(None),Ghost(None));}
+        let released=self.release_managed_execution_observed(id,execution);
+        if released.0.is_err() {return released;}
         let ghost before=control.state();control.episode=None;control.groups=Ghost(None);control.restart=false;
         let journal=control.member.domain();let view=journal.write();self.certify_poll_control(&view);
         proof {reveal(joint::control::step);reveal(joint::control::guard);}
-        control.commit(view,Ghost(before),Ghost(Event::Release));Ok(released)
+        control.commit(view,Ghost(before),Ghost(Event::Release));released
     }
 }
 }

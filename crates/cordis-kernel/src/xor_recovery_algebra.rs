@@ -52,4 +52,62 @@ pub proof fn scalar_interface()
     }
 }
 
+/// Exact partial generators preserve definedness as well as values. Both
+/// forward and captured inverse are the real Xor map on every input.
+pub proof fn partial_generator(mask:u64,f:crate::mediated::PartialMap<u64>)
+    requires crate::partial_independence::value_generators(md::xor_operation(mask)).contains(f),
+    ensures f==(|value:u64|Some(value^mask)),
+{
+    let op=md::xor_operation(mask);
+    if f==crate::partial_independence::value_forward(op) {assert(f =~= (|value:u64|Some(value^mask)));}
+    else {
+        let input=choose|input:u64| #[trigger] op(input).is_some() && op(input).unwrap().undo==f;
+        assert(f =~= (|value:u64|Some(value^mask)));
+    }
+}
+proof fn stable_partial(mask:u64,f:crate::mediated::PartialMap<u64>)
+    ensures crate::partial_independence::value_stable(|a:u64,b:u64|a==b,md::xor_operation(mask),f),
+{
+    assert forall|value:u64| #[trigger] f(value).is_some() implies {
+        let a=md::xor_operation(mask)(value);let b=md::xor_operation(mask)(f(value).unwrap());
+        &&& a.is_some()==b.is_some()
+        &&& a.is_some() ==> a.unwrap().outcome==b.unwrap().outcome
+            && crate::mediated::partial_related(|a:u64,b:u64|a==b,a.unwrap().undo,b.unwrap().undo)
+    } by {}
+}
+pub proof fn strict_pair(left:u64,right:u64)
+    ensures crate::partial_independence::value_independent(|a:u64,b:u64|a==b,md::xor_operation(left),md::xor_operation(right)),
+{
+    let eq=|a:u64,b:u64|a==b;
+    assert forall|f:crate::mediated::PartialMap<u64>,g:crate::mediated::PartialMap<u64>|
+        crate::partial_independence::value_generators(md::xor_operation(left)).contains(f)
+        && crate::partial_independence::value_generators(md::xor_operation(right)).contains(g)
+        implies #[trigger] crate::partial_independence::commutes(eq,f,g) by {
+        partial_generator(left,f);partial_generator(right,g);
+        assert forall|v:u64| #[trigger] crate::partial_independence::optional_equal(eq,
+            crate::partial_independence::compose(f,g)(v),crate::partial_independence::compose(g,f)(v)) by {
+            assert((v^right)^left==(v^left)^right) by(bit_vector);
+        }
+    }
+    assert forall|g:crate::mediated::PartialMap<u64>|crate::partial_independence::value_generators(md::xor_operation(right)).contains(g)
+        implies #[trigger] crate::partial_independence::value_stable(eq,md::xor_operation(left),g) by {stable_partial(left,g);}
+    assert forall|f:crate::mediated::PartialMap<u64>|crate::partial_independence::value_generators(md::xor_operation(left)).contains(f)
+        implies #[trigger] crate::partial_independence::value_stable(eq,md::xor_operation(right),f) by {stable_partial(right,f);}
+}
+/// The actual executable library supplies raw outcome stability and strict
+/// inverse commutation needed by constructive lifecycle deletion.
+pub proof fn strict_interface()
+    ensures crate::observational_grammar::primitive_theory(|_:Port,a:u64,b:u64|a==b,md::library()),
+        crate::shared_replay::interface(|_:Port,a:u64,b:u64|a==b,md::library()),
+{
+    md::library_theory();crate::observational_grammar::exact_theory(|_:Port,a:u64,b:u64|a==b,md::library());
+    assert forall|a:Port,b:Port,x:u64,y:u64|#![trigger (md::library().apply)(a,x),(md::library().apply)(b,y)]
+        md::library().allowed.contains(a) && md::library().allowed.contains(b)
+        && (md::library().arguments)(a,x) && (md::library().arguments)(b,y) && (md::library().key)(a)==(md::library().key)(b)
+        implies crate::partial_independence::value_independent(|u:u64,v:u64|(|_:Port,c:u64,d:u64|c==d)((md::library().key)(a),u,v),(md::library().apply)(a,x),(md::library().apply)(b,y)) by {
+            strict_pair(x,y);
+            assert((|u:u64,v:u64|(|_:Port,c:u64,d:u64|c==d)((md::library().key)(a),u,v)) =~= (|u:u64,v:u64|u==v));
+        }
+}
+
 }

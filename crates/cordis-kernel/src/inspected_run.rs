@@ -36,7 +36,8 @@ impl InspectedReport {
 /// Includes failure reports: the successfully executed prefix has the same
 /// value and function interpretation, and the first failed command stays Err.
 pub fn run_inspected(blueprints:Vec<Blueprint>,commands:&[Command],actor:usize,key:Port,index:usize)->(out:InspectedReport)
-    ensures out.run.machine.wf(),
+    ensures out.run.machine.wf(),out.run.machine.journal_recovery(),
+        out.run.recovery_history(blueprints@.map(|_:int,bp:Blueprint|bp.compiled())),
         out.certified(blueprints@.map(|_:int,bp:Blueprint|bp.compiled()),actor,key,index),
         out.run.error.is_none() ==> out.run.transitions.len()==commands.len(),
         out.run.error.is_some() ==> out.run.transitions.len()<commands.len(),

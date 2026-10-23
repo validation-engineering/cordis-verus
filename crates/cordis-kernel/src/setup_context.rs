@@ -93,7 +93,17 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     /// may still cancel/settle its queue through the ordinary checked protocol.
     pub fn admit_scoped_effect(&mut self,run:&mut EffectRun<G>,target:Option<&[Binding]>)->(out:Option<SetupScope>)
         requires old(self).wf(),old(run).wf(),
-        ensures final(self).wf(),final(run).wf(),final(self).execution_journal()==old(self).execution_journal(),
+        ensures old(self).cleanup_state().live(old(run).identity().group_id()) ==> final(self).cleanup_state().queues()[old(run).identity().group_id()].slots()==old(self).cleanup_state().queues()[old(run).identity().group_id()].slots(),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),old(run).identity().group_id()),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(old(run).identity().group_id()) ==> {
+                let id=old(run).identity().group_id();
+                &&& final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                &&& final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                &&& final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected()
+            },
+            final(self).wf(),final(run).wf(),final(self).execution_journal()==old(self).execution_journal(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),final(run).identity()==old(run).identity(),
@@ -140,7 +150,10 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     /// bindings. Rejection returns the untouched payload and execution.
     pub fn enqueue_native_effect(&mut self,source:usize,domain:u64,payload:G)->(out:Result<usize,G>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+        ensures final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            out.is_ok() ==> final(self).cleanup_state().next_id()==old(self).cleanup_state().next_id()+1
+                && final(self).cleanup_state().queues()[out->Ok_0].slots().len()==0,
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),
             final(self).origin()==old(self).origin(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),

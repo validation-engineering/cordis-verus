@@ -305,6 +305,57 @@ not claim the complete negative regression has run. See the
 
 Package 4 adds four controls for native and Node control/full-state stutter
 confusion, premature callback-claim completion and substituted Insert provenance.
-The canonical inventory is now 318 controls. Selected checks retain exact
+This brought the canonical inventory to 318 controls. Selected checks retain exact
 positive, compilation and named-failure requirements; this addition does not
 claim a fresh run of the full negative regression.
+
+## R3 episode-recovery controls
+
+The next batch adds two semantic mapping mutations: discarding the actual foreign
+history and replacing the retained receipt sequence with an empty journal in the
+recovery observation. This brought the canonical inventory to 320 controls.
+`python3 scripts/check-r3-episode-controls.py` runs only these two fresh selected
+positives, whole-mutant compilations and precise contract rejections, preserving
+source/tool bindings and the existing strict diagnostics. Full negative regression
+and calibration remain separate and are labelled `not_run` in that report. See
+the [R3 review](r3-episode-recovery.md).
+
+## R3 production-recovery controls
+
+Two further controls reject treating actual allocation changes as quiet gaps and
+weakening the executable typed head guard to accept an already consumed inverse.
+The canonical inventory is now 322 controls. Run
+`python3 scripts/check-r3-production-controls.py` for the fixed selected profile;
+it shares the strict matching-positive, whole-mutant compilation and exact
+diagnostic runner above. Full regression and calibration remain separate. See
+[production recovery](r3-production-recovery.md).
+
+## R3 native episode-deletion controls
+
+Package 4 adds two canonical controls for retaining erased lifecycle actions and
+skipping Child-birth closure in the source-bound native deletion query. The
+canonical inventory is now 330 controls. Run the two selected controls with
+`python3 scripts/check-r3-deletion-controls.py`; fresh positives, whole-mutant
+compilation and exact assertion diagnostics are required. This scoped run is
+separate from full negative regression and is not R3 or release acceptance.
+
+## R3 full-Journal deletion controls
+
+Package 5 adds `r3-effect-deletion-skips-read` and
+`r3-effect-deletion-keeps-source-index`. The canonical inventory is 332 controls.
+Run `python3 scripts/check-r3-effect-deletion-controls.py` for this fixed profile;
+fresh matching positives, whole-mutant compilation and designated assertions are
+required. This is separate from full regression and R3/release acceptance.
+
+## R3 production Kernel replay controls
+
+The control-replay batch brought the canonical inventory to 334 controls. `r3-control-replay-keeps-source-allocation` and `r3-control-replay-skips-executable-begin` target actual allocation preparation and the real Kernel call. Run `python3 scripts/check-r3-control-replay-controls.py`. A matching positive, a compiling mutant and rejection at the designated semantic assertion are required; this profile is separate from full negative regression and R3/release acceptance.
+
+
+## R3 automatic source-chain controls
+
+The source-chain batch brings the canonical inventory to 336 controls. `python3 scripts/check-r3-source-chain-controls.py` checks omission of actual command recording and omission of authentic Unload-source collection. Each requires a matching positive, whole-mutant compilation and the designated correspondence assertion or completeness precondition failure. The report is written to `target/r3-source-chain-controls/report.json`. These selected checks do not replace full negative regression, R3 acceptance or release checks.
+
+## R3 real target-execution controls
+
+The target-execution batch brings the canonical inventory to 338 controls. `python3 scripts/check-r3-target-execution-controls.py` checks skipping the actual interpreter and changing a retained source operation key. Each requires matching positive evidence, complete mutant compilation and its designated semantic rejection. The report is `target/r3-target-execution-controls/report.json`; full negative regression remains separate and is not implied by this profile.

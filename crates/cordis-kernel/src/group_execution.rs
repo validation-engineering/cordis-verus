@@ -55,6 +55,17 @@ pub open spec fn recorded(frames:Seq<super::Frame>,n:nat,key:nat)->bool {
     super::state_at(frames,n).contains_key(key) && super::state_at(frames,n)[key] is Groups
 }
 pub open spec fn at(frames:Seq<super::Frame>,n:nat,key:nat)->State {super::state_at(frames,n)[key]->Groups_state}
+/// Membership is checked at the actual inverse insertion, not inferred from
+/// a queue number or from a later owner snapshot.
+#[verifier::opaque]
+pub open spec fn registration(receipt:Option<super::Receipt>,link:Option<(super::Journal,nat)>,id:usize)->bool {
+    receipt.is_some()==link.is_some() && (receipt.is_some() ==> {
+        let r=receipt.unwrap();
+        &&& r.wf() && r.journal()==link.unwrap().0 && r.event().after is Cleanup
+        &&& recorded(r.events(),r.events().len(),link.unwrap().1)
+        &&& at(r.events(),r.events().len(),link.unwrap().1).queues.contains_pair(id,(r.event().key,r.event().after->Cleanup_state.domain))
+    })
+}
 proof fn edge(frames:Seq<super::Frame>,n:nat,key:nat,id:usize)
     requires super::valid(frames),n<frames.len(),recorded(frames,n,key),
         id<at(frames,n,key).next,!at(frames,n,key).queues.contains_key(id),
@@ -106,7 +117,7 @@ pub proof fn checked_removal(snapshot:&super::Snapshot,index:nat,key:nat,id:usiz
         absent_later(frames,index+1,n,key,id);
     }
 }
-proof fn sealed_later(frames:Seq<super::Frame>,start:nat,end:nat,key:nat)
+pub proof fn sealed_later(frames:Seq<super::Frame>,start:nat,end:nat,key:nat)
     requires super::valid(frames),start<=end<=frames.len(),recorded(frames,start,key),
         at(frames,start,key).sealed,at(frames,start,key).queues.is_empty(),
     ensures recorded(frames,end,key),at(frames,end,key).sealed,at(frames,end,key).queues.is_empty(),
@@ -151,3 +162,6 @@ pub proof fn checked_seal(snapshot:&super::Snapshot,index:nat,key:nat)
     }
 }
 }
+
+#[path = "group_release_history.rs"]
+pub mod release;

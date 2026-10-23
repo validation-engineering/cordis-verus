@@ -1,0 +1,58 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-effect-deletion-skips-read",
+      "mutation": {
+        "file": "native_joint_deletion.rs",
+        "old": "if exists|i:nat|i<self.frames().len() && !self.read(i) {",
+        "new": "if false {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::deletion::joint",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::joint::Selection::check"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::joint::Selection::check",
+          "module": "lifecycle_state::native::runtime::history::deletion::joint",
+          "file": "native_joint_deletion.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.admissible());"
+        }
+      ],
+      "selectionRationale": "Reject omitted cross-record reads and stale inverse-registration indices in the source-bound full Journal construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; resource limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-effect-deletion-keeps-source-index",
+      "mutation": {
+        "file": "joint_erasure.rs",
+        "old": "Change::RegisterInverse {write:self.rank(write)}",
+        "new": "Change::RegisterInverse {write}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::joint::erasure",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::joint::erasure::Plan::registration_position"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::joint::erasure::Plan::registration_position",
+          "module": "reversible_value::joint::erasure",
+          "file": "joint_erasure.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.event(source,i).change->RegisterInverse_write<self.rank(i)\n            && self.positions(i)[self.event(source,i).change->RegisterInverse_write as int]==source[i as int].event.change->RegisterInverse_write);"
+        }
+      ],
+      "selectionRationale": "Reject omitted cross-record reads and stale inverse-registration indices in the source-bound full Journal construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; resource limits, frontend errors and unrelated failures are not evidence."
+    }
+  ]
+}

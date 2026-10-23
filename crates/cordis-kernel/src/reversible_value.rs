@@ -82,7 +82,7 @@ pub proof fn primitive_theory()
 pub enum Event {
     Forward {operation:Operation,branch:Branch,before:ValueState,after:ValueState,outcome:Outcome,next:Option<usize>},
     Rejected {operation:Operation,before:ValueState},
-    Restore {inverse:InverseState,before:ValueState,after:ValueState},
+    Restore {inverse:InverseState,before:ValueState,after:ValueState,origin:nat},
     Blocked {inverse:InverseState,before:ValueState},
     Computed {code:effect::Code,branch:Branch,before:ValueState,after:ValueState,outcome:Outcome,next:Option<usize>},
     ComputationRejected {code:effect::Code,before:ValueState},
@@ -96,7 +96,7 @@ impl Event {
             Self::Forward {operation:op,branch,before,after,outcome,next}=>operation(*op)(*before).is_some()
                 && operation(*op)(*before).unwrap().value==*after && operation(*op)(*before).unwrap().outcome==*outcome && *next==branch.selected(*outcome),
             Self::Rejected {operation:op,before}=>operation(*op)(*before).is_none(),
-            Self::Restore {inverse,before,after}=>inverse.undo(*before)==Some(*after),
+            Self::Restore {inverse,before,after,..}=>inverse.undo(*before)==Some(*after),
             Self::Blocked {inverse,before}=>inverse.undo(*before).is_none(),
             Self::Computed {code,branch,before,after,outcome,next}=>effect::operation(*code)(*before).is_some()
                 && effect::operation(*code)(*before).unwrap().value==*after && effect::operation(*code)(*before).unwrap().outcome==*outcome && *next==branch.selected(*outcome),
@@ -125,7 +125,7 @@ pub proof fn extend(initial:ValueState,events:Seq<Event>,last:ValueState,event:E
 #[allow(dead_code)]
 pub struct Snapshot {
     state:ValueState,initial:Ghost<ValueState>,history:Ghost<Seq<Event>>,
-    witness:Tracked<history::Witness<Event>>,joint:joint::Snapshot,key:Ghost<nat>,positions:Ghost<Seq<nat>>,
+    witness:Tracked<history::Witness<Event>>,joint:joint::Snapshot,key:Ghost<nat>,positions:Ghost<Seq<nat>>,birth:Ghost<nat>,custody:Ghost<Seq<ownership::Frame>>,
 }
 impl Snapshot {
     pub closed spec fn state(&self)->ValueState {self.state}
@@ -133,6 +133,8 @@ impl Snapshot {
     pub closed spec fn history(&self)->Seq<Event> {self.history@}
     pub closed spec fn source(&self)->Loc {self.witness@.source()}
     pub closed spec fn positions(&self)->Seq<nat> {self.positions@}
+    pub closed spec fn birth(&self)->nat {self.birth@}
+    pub closed spec fn custody(&self)->Seq<ownership::Frame> {self.custody@}
     pub closed spec fn object(&self)->joint::Object {joint::Object {domain:self.joint.domain(),key:self.key@}}
     pub closed spec fn journal_spec(&self)->joint::Journal {self.joint.journal_spec()}
     pub fn joint_execution(&self)->(out:&joint::Snapshot) ensures *out==self.joint_spec(), {&self.joint}
@@ -142,6 +144,9 @@ impl Snapshot {
             && self.joint.certified() && self.joint.last().contains_key(self.key@)
             && self.joint.last()[self.key@]==(joint::Record::Object {source:self.source(),state:self.state()})
             && joint::indexed(self.history(),self.positions(),self.joint.events(),self.key@)
+            && joint::ownership::complete(seq![self.birth()]+self.positions(),self.joint.events(),self.key@)
+            && self.birth()<self.joint.events().len() && self.joint.events()[self.birth() as int].event.change==joint::Change::Allocate
+            && ownership::valid(self.custody()) && ownership::matches(self.custody(),self.history(),self.positions())
     }
     pub open spec fn extends(&self,earlier:&Self)->bool {
         self.source()==earlier.source() && self.initial()==earlier.initial() && self.object()==earlier.object() && self.joint_spec().extends(&earlier.joint_spec())
@@ -170,13 +175,16 @@ impl Snapshot {
 #[allow(dead_code)]
 struct Cell {
     state:ValueState,initial:Ghost<ValueState>,history:Ghost<Seq<Event>>,
-    authority:Tracked<history::Authority<Event>>,joint:joint::Member,positions:Ghost<Seq<nat>>,
+    authority:Tracked<history::Authority<Event>>,joint:joint::Member,positions:Ghost<Seq<nat>>,birth:Ghost<nat>,custody:Tracked<ownership::Protocol>,
 }
 impl Cell {
     spec fn wf(&self)->bool {
         execution(self.initial@,self.history@,self.state) && self.authority@.wf() && self.authority@.events()==self.history@ && self.joint.wf()
             && self.joint.record()==(joint::Record::Object {source:self.authority@.source(),state:self.state})
             && joint::indexed(self.history@,self.positions@,self.joint.events(),self.joint.key())
+            && joint::ownership::complete(seq![self.birth@]+self.positions@,self.joint.events(),self.joint.key())
+            && self.birth@<self.joint.events().len() && self.joint.events()[self.birth@ as int].event.change==joint::Change::Allocate
+            && self.custody@.wf() && ownership::matches(self.custody@.frames(),self.history@,self.positions@)
     }
     fn snapshot(&self)->(out:Snapshot)
         requires self.wf(),ensures out.certified(),out.state()==self.state,out.history()==self.history@,out.initial()==self.initial@,
@@ -184,8 +192,10 @@ impl Cell {
     {
         let tracked witness=self.authority.borrow().snapshot();
         let joint=self.joint.observe();
-        proof {joint::extend_indexed(self.history@,self.positions@,self.joint.events(),joint.events(),self.joint.key());}
-        Snapshot {state:self.state,initial:self.initial,history:self.history,witness:Tracked(witness),joint,key:Ghost(self.joint.key()),positions:self.positions}
+        proof {joint::extend_indexed(self.history@,self.positions@,self.joint.events(),joint.events(),self.joint.key());
+            joint::ownership::extend(seq![self.birth@]+self.positions@,self.joint.events(),joint.events(),self.joint.key());self.custody@.facts();
+            assert(joint.events()[self.birth@ as int]==self.joint.events()[self.birth@ as int]);}
+        Snapshot {state:self.state,initial:self.initial,history:self.history,witness:Tracked(witness),joint,key:Ghost(self.joint.key()),positions:self.positions,birth:self.birth,custody:Ghost(self.custody@.frames())}
     }
     fn snapshot_following(&self,Tracked(earlier):Tracked<&joint::Receipt>)->(out:Snapshot)
         requires self.wf(),earlier.wf(),
@@ -193,11 +203,20 @@ impl Cell {
                 && out.joint_spec().events().take(earlier.events().len() as int)==earlier.events(),
             out.certified(),out.state()==self.state,out.history()==self.history@,out.initial()==self.initial@,
             out.source()==self.authority@.source(),out.object()==self.joint.object(),out.journal_spec()==self.joint.journal(),out.positions()==self.positions@,
+    {self.snapshot_caused(Tracked(Some(earlier)))}
+    fn snapshot_caused(&self,Tracked(earlier):Tracked<Option<&joint::Receipt>>)->(out:Snapshot)
+        requires self.wf(),earlier.is_some() ==> earlier.unwrap().wf(),
+        ensures earlier.is_some() && earlier.unwrap().journal()==self.joint.journal() ==> earlier.unwrap().events().len()<=out.joint_spec().events().len()
+                && out.joint_spec().events().take(earlier.unwrap().events().len() as int)==earlier.unwrap().events(),
+            out.certified(),out.state()==self.state,out.history()==self.history@,out.initial()==self.initial@,
+            out.source()==self.authority@.source(),out.object()==self.joint.object(),out.journal_spec()==self.joint.journal(),out.positions()==self.positions@,
     {
         let tracked witness=self.authority.borrow().snapshot();
-        let joint=self.joint.observe_following(Tracked(earlier));
-        proof {joint::extend_indexed(self.history@,self.positions@,self.joint.events(),joint.events(),self.joint.key());}
-        Snapshot {state:self.state,initial:self.initial,history:self.history,witness:Tracked(witness),joint,key:Ghost(self.joint.key()),positions:self.positions}
+        let joint=self.joint.observe_caused(Tracked(earlier));
+        proof {joint::extend_indexed(self.history@,self.positions@,self.joint.events(),joint.events(),self.joint.key());
+            joint::ownership::extend(seq![self.birth@]+self.positions@,self.joint.events(),joint.events(),self.joint.key());self.custody@.facts();
+            assert(joint.events()[self.birth@ as int]==self.joint.events()[self.birth@ as int]);}
+        Snapshot {state:self.state,initial:self.initial,history:self.history,witness:Tracked(witness),joint,key:Ghost(self.joint.key()),positions:self.positions,birth:self.birth,custody:Ghost(self.custody@.frames())}
     }
     fn snapshot_after(&self,earlier:&Snapshot)->(out:Snapshot)
         requires self.wf(),earlier.certified(),earlier.source()==self.authority@.source(),earlier.initial()==self.initial@,
@@ -208,22 +227,31 @@ impl Cell {
         proof {self.extends(earlier);}
         let tracked witness=self.authority.borrow().snapshot();
         let joint=self.joint.observe_after(&earlier.joint);
-        proof {joint::extend_indexed(self.history@,self.positions@,self.joint.events(),joint.events(),self.joint.key());}
-        Snapshot {state:self.state,initial:self.initial,history:self.history,witness:Tracked(witness),joint,key:Ghost(self.joint.key()),positions:self.positions}
+        proof {joint::extend_indexed(self.history@,self.positions@,self.joint.events(),joint.events(),self.joint.key());
+            joint::ownership::extend(seq![self.birth@]+self.positions@,self.joint.events(),joint.events(),self.joint.key());self.custody@.facts();
+            assert(joint.events()[self.birth@ as int]==self.joint.events()[self.birth@ as int]);}
+        Snapshot {state:self.state,initial:self.initial,history:self.history,witness:Tracked(witness),joint,key:Ghost(self.joint.key()),positions:self.positions,birth:self.birth,custody:Ghost(self.custody@.frames())}
     }
     proof fn extends(tracked &self,tracked earlier:&Snapshot)
         requires self.wf(),earlier.certified(),earlier.source()==self.authority@.source(),
         ensures earlier.history().len()<=self.history@.len(),self.history@.take(earlier.history().len() as int)==earlier.history(),
     {self.authority.borrow().extends(earlier.witness.borrow());}
-    fn record_following(&mut self,Ghost(before):Ghost<ValueState>,Ghost(event):Ghost<Event>,Ghost(managed):Ghost<bool>,Tracked(cause):Tracked<Option<joint::Receipt>>)->(out:Tracked<Option<joint::Pending>>)
+    fn record_following(&mut self,Ghost(before):Ghost<ValueState>,Ghost(event):Ghost<Event>,Ghost(managed):Ghost<bool>,Tracked(cause):Tracked<Option<joint::Receipt>>,Tracked(restore):Tracked<Option<ownership::Lease>>)->(out:(Tracked<Option<joint::Pending>>,Tracked<Option<ownership::Lease>>))
         requires cause.is_some() ==> cause.unwrap().wf(),
+            old(self).custody@.wf(),ownership::matches(old(self).custody@.frames(),old(self).history@,old(self).positions@),
+            joint::ownership::complete(seq![old(self).birth@]+old(self).positions@,old(self).joint.events(),old(self).joint.key()),
+            old(self).birth@<old(self).joint.events().len(),old(self).joint.events()[old(self).birth@ as int].event.change==joint::Change::Allocate,
+            restore.is_some()==(event is Restore),restore.is_some() ==> restore.unwrap().source()==old(self).custody@.source()
+                && restore.unwrap().origin()==event->Restore_origin && restore.unwrap().inverse()==event->Restore_inverse,
             managed ==> event is Forward || event is Computed,
             execution(old(self).initial@,old(self).history@,before),old(self).authority@.wf(),old(self).authority@.events()==old(self).history@,old(self).joint.wf(),
             joint::indexed(old(self).history@,old(self).positions@,old(self).joint.events(),old(self).joint.key()),
             old(self).joint.record()==(joint::Record::Object {source:old(self).authority@.source(),state:before}),event.valid(),event.before()==before,event.after()==old(self).state,
         ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>
                 cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
-            joint::pending_matches(out@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),
+            joint::pending_matches(out.0@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),
+            ownership::issued(out.1@,final(self).custody@.source(),event,(final(self).joint.events().len()-1) as nat),
+            final(self).custody@.source()==old(self).custody@.source(),final(self).birth==old(self).birth,
             final(self).wf(),final(self).state==old(self).state,final(self).initial==old(self).initial,final(self).history@==old(self).history@.push(event),
             final(self).history@.take(old(self).history@.len() as int)==old(self).history@,final(self).authority@.source()==old(self).authority@.source(),
             final(self).joint.journal()==old(self).joint.journal(),final(self).joint.key()==old(self).joint.key(),
@@ -231,7 +259,7 @@ impl Cell {
             final(self).positions@==old(self).positions@.push((final(self).joint.events().len()-1) as nat),
             final(self).positions@.take(old(self).positions@.len() as int)==old(self).positions@,
     {
-        let ghost events=self.history@;let ghost frames=self.joint.events();
+        let ghost events=self.history@;let ghost frames=self.joint.events();let ghost old_positions=self.positions@;let ghost old_custody=self.custody@.frames();let tracked lease;
         proof {
         extend(self.initial@,self.history@,before,event);
         assert(self.history@.push(event).take(self.history@.len() as int) =~= self.history@);
@@ -242,15 +270,25 @@ impl Cell {
         let pending=self.joint.update_following(Ghost(joint::Record::Object {source:self.authority@.source(),state:self.state}),Ghost(joint::Change::Value {event}),Tracked(cause),Ghost(managed),Tracked(None));
         proof {
             joint::append_indexed(events,self.positions@,frames,self.joint.events(),self.joint.key(),event);
+            joint::ownership::commit(seq![self.birth@]+self.positions@,frames,self.joint.events(),self.joint.key());
+            if self.custody@.frames().len()>0 {assert(self.custody@.frames().last().at==self.positions@.last());}
+            lease=self.custody.borrow_mut().record(event,(self.joint.events().len()-1) as nat,restore);
             let prior=self.positions@;
             self.positions=Ghost(self.positions@.push((self.joint.events().len()-1) as nat));
             assert(self.positions@.take(prior.len() as int) =~= prior);
         }
-        pending
+        proof {
+            assert(seq![self.birth@]+self.positions@ =~= (seq![self.birth@]+old_positions).push((self.joint.events().len()-1) as nat));
+            assert(self.joint.events()[self.birth@ as int]==frames[self.birth@ as int]);
+            assert forall|i:int|0<=i<self.custody@.frames().len() implies (#[trigger] self.custody@.frames()[i]).event==self.history@[i] && self.custody@.frames()[i].at==self.positions@[i] by {
+                if i<old_custody.len() {assert(self.custody@.frames()[i]==old_custody[i]);}
+            }
+        }
+        (pending,Tracked(lease))
     }
 }
 #[allow(dead_code)] // Read only by the erased lock predicate.
-struct Forward {outcome:Outcome,next:Option<usize>,inverse:InverseState,pending:Tracked<Option<joint::Pending>>}
+struct Forward {outcome:Outcome,next:Option<usize>,inverse:InverseState,pending:Tracked<Option<joint::Pending>>,lease:Tracked<Option<ownership::Lease>>}
 impl Forward {
     spec fn corresponds(&self,op:Operation,branch:Branch)->bool {
         &&& operation(op)(self.inverse.before).is_some()
@@ -263,7 +301,7 @@ impl Forward {
 impl Cell {
     fn forward(&mut self,op:Operation,branch:Branch,Ghost(managed):Ghost<bool>)->(out:Result<Forward,ValueError>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).initial==old(self).initial,final(self).authority@.source()==old(self).authority@.source(),
+        ensures final(self).custody@.source()==old(self).custody@.source(),final(self).wf(),final(self).initial==old(self).initial,final(self).authority@.source()==old(self).authority@.source(),
             final(self).joint.journal()==old(self).joint.journal(),final(self).joint.key()==old(self).joint.key(),
             final(self).joint.events().last().event.change==(joint::Change::Value {event:final(self).history@.last()}),
             final(self).positions@.last()==final(self).joint.events().len()-1,
@@ -274,6 +312,7 @@ impl Cell {
             out.is_err() ==> final(self).history@.last()==(Event::Rejected {operation:op,before:old(self).state}),
             out.is_ok()==operation(op)(old(self).state).is_some(),
             out.is_ok() ==> joint::pending_matches (out->Ok_0.pending@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),
+            out.is_ok() ==> ownership::issued(out->Ok_0.lease@,final(self).custody@.source(),final(self).history@.last(),(final(self).joint.events().len()-1) as nat),
             out.is_ok() ==> out->Ok_0.corresponds(op,branch) && out->Ok_0.inverse.before==old(self).state && out->Ok_0.inverse.after==final(self).state,
             out.is_err() ==> final(self).state==old(self).state && (out==Err(ValueError::Capacity) || out==Err(ValueError::Overflow)),
             out.is_err() ==> attempt::value_rejection (final(self).history@.last(),op,out->Err_0),
@@ -282,7 +321,7 @@ impl Cell {
         requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
         ensures cause.is_some() && cause.unwrap().journal()==old(self).joint.journal() ==>
                 cause.unwrap().events().len()<final(self).joint.events().len() && final(self).joint.events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
-            final(self).wf(),final(self).initial==old(self).initial,final(self).authority@.source()==old(self).authority@.source(),
+            final(self).custody@.source()==old(self).custody@.source(),final(self).wf(),final(self).initial==old(self).initial,final(self).authority@.source()==old(self).authority@.source(),
             final(self).joint.journal()==old(self).joint.journal(),final(self).joint.key()==old(self).joint.key(),
             final(self).joint.events().last().event.change==(joint::Change::Value {event:final(self).history@.last()}),
             final(self).positions@.last()==final(self).joint.events().len()-1,
@@ -293,33 +332,34 @@ impl Cell {
             out.is_err() ==> final(self).history@.last()==(Event::Rejected {operation:op,before:old(self).state}),
             out.is_ok()==operation(op)(old(self).state).is_some(),
             out.is_ok() ==> joint::pending_matches(out->Ok_0.pending@,final(self).joint.journal(),final(self).joint.key(),(final(self).joint.events().len()-1) as nat,managed),
+            out.is_ok() ==> ownership::issued(out->Ok_0.lease@,final(self).custody@.source(),final(self).history@.last(),(final(self).joint.events().len()-1) as nat),
             out.is_ok() ==> out->Ok_0.corresponds(op,branch) && out->Ok_0.inverse.before==old(self).state && out->Ok_0.inverse.after==final(self).state,
             out.is_err() ==> final(self).state==old(self).state && (out==Err(ValueError::Capacity) || out==Err(ValueError::Overflow)),
             out.is_err() ==> attempt::value_rejection(final(self).history@.last(),op,out->Err_0),
     {
         let before=self.state;
         if before.depth==u64::MAX {
-            let _pending=self.record_following(Ghost(before),Ghost(Event::Rejected {operation:op,before}),Ghost(false),Tracked(cause));
+            let _pending=self.record_following(Ghost(before),Ghost(Event::Rejected {operation:op,before}),Ghost(false),Tracked(cause),Tracked(None));
             return Err(ValueError::Capacity);
         }
         let outcome=match op.evaluate(before.value) {
             Ok(outcome)=>outcome,
             Err(error)=>{
-                let _pending=self.record_following(Ghost(before),Ghost(Event::Rejected {operation:op,before}),Ghost(false),Tracked(cause));
+                let _pending=self.record_following(Ghost(before),Ghost(Event::Rejected {operation:op,before}),Ghost(false),Tracked(cause),Tracked(None));
                 return Err(error);
             },
         };
         let after=ValueState {value:outcome.after,depth:before.depth+1};let next=branch.select(outcome);
         self.state=after;
-        let pending=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(managed),Tracked(cause));
-        Ok(Forward {outcome,next,inverse:InverseState {before,after},pending})
+        let (pending,lease)=self.record_following(Ghost(before),Ghost(Event::Forward {operation:op,branch,before,after,outcome,next}),Ghost(managed),Tracked(cause),Tracked(None));
+        Ok(Forward {outcome,next,inverse:InverseState {before,after},pending,lease})
     }
 }
 
 #[allow(dead_code)] // Read only by the erased lock predicate.
-struct Predicate {initial:ValueState,source:Loc,journal:joint::Journal,key:nat}
+struct Predicate {initial:ValueState,source:Loc,journal:joint::Journal,key:nat,custody:Loc}
 impl RwLockPredicate<Cell> for Predicate {
-    closed spec fn inv(self,cell:Cell)->bool {cell.wf() && cell.initial@==self.initial && cell.authority@.source()==self.source && cell.joint.journal()==self.journal && cell.joint.key()==self.key}
+    closed spec fn inv(self,cell:Cell)->bool {cell.wf() && cell.initial@==self.initial && cell.authority@.source()==self.source && cell.joint.journal()==self.journal && cell.joint.key()==self.key && cell.custody@.source()==self.custody}
 }
 
 /// A shareable service with no unguarded setter and no mutable inner reference.
@@ -331,10 +371,26 @@ impl Clone for ReversibleValue {
 }
 /// Linear and tied to its original shared value. No constructor, Clone, target
 /// parameter or mutable payload lets a plugin substitute another restoration.
-pub struct Inverse {target:ReversibleValue,state:InverseState,#[allow(dead_code)] origin:Tracked<joint::Receipt>}
+pub struct Inverse {target:ReversibleValue,state:InverseState,identity:Arc<joint::identity::AllocationIdentity>,#[allow(dead_code)] origin:Tracked<joint::Receipt>,#[allow(dead_code)] lease:Tracked<Option<ownership::Lease>>}
 impl Inverse {
+    #[verifier::type_invariant]
+    closed spec fn invariant(&self)->bool {self.recorded() && self.identity.wf()
+        && self.identity.address()==(service_composition::Address {journal:self.target().journal_spec(),key:self.target().object().key}) && self.lease@.is_some()
+        && self.lease@.unwrap().source()==self.target.inner.pred().custody
+        && self.lease@.unwrap().origin()==self.origin().at() && self.lease@.unwrap().inverse()==self.state()}
+
     pub closed spec fn target(&self)->ReversibleValue {self.target}
     pub closed spec fn state(&self)->InverseState {self.state}
+    /// Copy the actual pre-write operand, without copying the linear inverse.
+    pub(crate) fn replay_input(&self)->(out:ValueState)
+        ensures out==self.state().before,
+    {self.state.before}
+    pub(crate) fn replay_output(&self)->(out:ValueState)
+        ensures out==self.state().after,
+    {self.state.after}
+    pub(crate) fn replay_identity(&self)->(out:Arc<joint::identity::AllocationIdentity>)
+        ensures out.wf(),out.address()==(service_composition::Address {journal:self.target().journal_spec(),key:self.target().object().key}),
+    {proof {use_type_invariant(self);}self.identity.clone()}
     pub closed spec fn origin(&self)->joint::Receipt {self.origin@}
     pub open spec fn recorded(&self)->bool {
         self.origin().wf() && self.origin().journal()==self.target().journal_spec()
@@ -347,7 +403,18 @@ impl Inverse {
     pub fn restore(self)->(out:Result<Snapshot,Self>)
         ensures out.is_ok() ==> out->Ok_0.certified() && out->Ok_0.state()==self.state().before && out->Ok_0.source()==self.target().source(),
             out.is_err() ==> out->Err_0==self,
-    {self.restore_following(Tracked(None)).0}
+    {self.restore_observed().0}
+    /// Return the actual guarded restore/block receipt as erased evidence.
+    /// The ordinary restore entry delegates here and keeps the same behavior.
+    pub fn restore_observed(self)->(out:(Result<Snapshot,Self>,Tracked<joint::Receipt>))
+        ensures restoration::attempted(&out.1@,self,out.0.is_ok()),
+            out.0.is_ok() ==> out.0->Ok_0.certified() && out.0->Ok_0.state()==self.state().before
+                && out.0->Ok_0.source()==self.target().source() && out.0->Ok_0.object()==self.target().object()
+                && out.0->Ok_0.journal_spec()==self.target().journal_spec()
+                && out.0->Ok_0.history().last()==out.1@.event().change->Value_event
+                && out.0->Ok_0.positions().last()==out.1@.at(),
+            out.0.is_err() ==> out.0->Err_0==self,
+    {self.restore_following(Tracked(None))}
     /// The returned receipt comes from the actual guarded restore attempt,
     /// including a blocked attempt. Same-domain dispatch precedes this commit.
     pub(crate) fn restore_following(self,Tracked(cause):Tracked<Option<joint::Receipt>>)
@@ -362,15 +429,16 @@ impl Inverse {
                 && out.0->Ok_0.positions().last()==out.1@.at(),
             out.0.is_err() ==> out.0->Err_0==self,
     {
+        proof {use_type_invariant(&self);}
         let (mut cell,guard)=self.target.inner.acquire_write();
         let before=cell.state;
         if before!=self.state.after {
-            let _pending=cell.record_following(Ghost(before),Ghost(Event::Blocked {inverse:self.state,before}),Ghost(false),Tracked(cause));
+            let _pending=cell.record_following(Ghost(before),Ghost(Event::Blocked {inverse:self.state,before}),Ghost(false),Tracked(cause),Tracked(None));
             let tracked receipt=cell.joint.receipt();
             guard.release_write(cell);return (Err(self),Tracked(receipt));
         }
         cell.state=self.state.before;
-        let _pending=cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state}),Ghost(false),Tracked(cause));
+        let _pending=cell.record_following(Ghost(before),Ghost(Event::Restore {inverse:self.state,before,after:cell.state,origin:self.origin().at()}),Ghost(false),Tracked(cause),self.lease);
         let tracked receipt=cell.joint.receipt();
         let snapshot=cell.snapshot();guard.release_write(cell);(Ok(snapshot),Tracked(receipt))
     }
@@ -403,6 +471,12 @@ impl ReversibleValue {
     }
     pub closed spec fn journal_spec(&self)->joint::Journal {self.inner.pred().journal}
     pub closed spec fn object(&self)->joint::Object {joint::Object {domain:self.journal_spec().source(),key:self.inner.pred().key}}
+    pub fn identity(&self)->(out:Arc<joint::identity::AllocationIdentity>)
+        ensures out.wf(),out.address()==(service_composition::Address {journal:self.journal_spec(),key:self.object().key}),
+    {
+        let guard=self.inner.acquire_read();let cell=guard.borrow();
+        let identity=cell.joint.identity();guard.release_read();identity
+    }
     pub fn journal(&self)->(out:joint::Journal) ensures out==self.journal_spec(), {
         let (journal,_receipt)=self.reference();journal
     }
@@ -419,16 +493,29 @@ impl ReversibleValue {
     }
     /// Allocate directly in the lifecycle's execution domain. Registration and
     /// every later mutation use the same real journal lock.
+    #[verifier::spinoff_prover]
     pub fn new_in(journal:&joint::Journal,value:u64)->(out:Self)
         ensures out.initial()==(ValueState {value,depth:0}),out.journal_spec()==*journal,
+    {let (value,_birth)=Self::new_in_following(journal,value,Tracked(None));value}
+    pub(crate) fn new_in_following(journal:&joint::Journal,value:u64,Tracked(earlier):Tracked<Option<joint::Receipt>>)->(out:(Self,Tracked<joint::Receipt>))
+        requires earlier.is_some() ==> earlier.unwrap().wf() && earlier.unwrap().journal()==*journal,
+        ensures out.0.initial()==(ValueState {value,depth:0}),out.0.journal_spec()==*journal,
+            out.1@.wf(),out.1@.journal()==*journal,out.1@.event().key==out.0.object().key,
+            out.1@.event().change==joint::Change::Allocate,
+            earlier.is_some() ==> out.1@.follows(&earlier.unwrap()),
     {
         let state=ValueState {value,depth:0};
         let tracked authority=history::Authority::new();
         let ghost source=authority.source();
-        let joint=journal.allocate(Ghost(joint::Record::Object {source,state}));
-        let ghost key=joint.key();
-        Self {inner:Arc::new(RwLock::new(Cell {state,initial:Ghost(state),history:Ghost(Seq::empty()),authority:Tracked(authority),joint,positions:Ghost(Seq::empty())},
-            Ghost(Predicate {initial:state,source,journal:*journal,key})))}
+        let joint=journal.allocate_following(Ghost(joint::Record::Object {source,state}),Tracked(earlier));
+        let tracked receipt=joint.receipt();
+        proof {joint.trace_record();}
+        let ghost key=joint.key();let ghost birth=(joint.events().len()-1) as nat;
+        let tracked custody=ownership::Protocol::new();let ghost custody_source=custody.source();
+        proof {joint::ownership::allocation(joint.events(),key);}
+        let value=Self {inner:Arc::new(RwLock::new(Cell {state,initial:Ghost(state),history:Ghost(Seq::empty()),authority:Tracked(authority),joint,positions:Ghost(Seq::empty()),birth:Ghost(birth),custody:Tracked(custody)},
+            Ghost(Predicate {initial:state,source,journal:*journal,key,custody:custody_source})))};
+        (value,Tracked(receipt))
     }
     /// Observe the actual value and its domain trace while holding the value
     /// read lock. The trace's heap entry is proved equal to this snapshot.
@@ -446,6 +533,12 @@ impl ReversibleValue {
             earlier.journal()==self.journal_spec() ==> earlier.events().len()<=out.joint_spec().events().len()
                 && out.joint_spec().events().take(earlier.events().len() as int)==earlier.events(),
     {let guard=self.inner.acquire_read();let out=guard.borrow().snapshot_following(Tracked(earlier));guard.release_read();out}
+    pub(crate) fn snapshot_caused(&self,Tracked(earlier):Tracked<Option<&joint::Receipt>>)->(out:Snapshot)
+        requires earlier.is_some() ==> earlier.unwrap().wf(),
+        ensures out.certified(),out.initial()==self.initial(),out.source()==self.source(),out.object()==self.object(),out.journal_spec()==self.journal_spec(),
+            earlier.is_some() && earlier.unwrap().journal()==self.journal_spec() ==> earlier.unwrap().events().len()<=out.joint_spec().events().len()
+                && out.joint_spec().events().take(earlier.unwrap().events().len() as int)==earlier.unwrap().events(),
+    {let guard=self.inner.acquire_read();let out=guard.borrow().snapshot_caused(Tracked(earlier));guard.release_read();out}
     pub fn snapshot(&self)->(out:Snapshot) ensures out.certified(),out.initial()==self.initial(),out.source()==self.source(),out.object()==self.object(),out.journal_spec()==self.journal_spec(), {
         let guard=self.inner.acquire_read();let out=guard.borrow().snapshot();guard.release_read();out
     }
@@ -484,9 +577,10 @@ impl ReversibleValue {
         let result=cell.forward_following(op,branch,Ghost(managed),Tracked(cause));
         let tracked origin=cell.joint.receipt();
         proof {attempts.record(&origin);}
+        let identity=cell.joint.identity();
         guard.release_write(cell);
         match result {
-            Ok(forward)=>Ok(Applied {outcome:forward.outcome,next:forward.next,pending:forward.pending,inverse:Inverse {target:self.clone(),state:forward.inverse,origin:Tracked(origin)}}),
+            Ok(forward)=>Ok(Applied {outcome:forward.outcome,next:forward.next,pending:forward.pending,inverse:Inverse {target:self.clone(),state:forward.inverse,identity,origin:Tracked(origin),lease:forward.lease}}),
             Err(error)=>Err(error),
         }
     }
@@ -590,6 +684,8 @@ pub mod access;
 pub mod alias;
 #[path = "native_effect.rs"]
 pub mod native_effect;
+#[path = "native_payload.rs"]
+pub mod native_payload;
 
 #[path = "value_function.rs"]
 pub mod function;
@@ -620,3 +716,15 @@ pub mod payload;
 
 #[path = "managed_function.rs"]
 pub mod managed;
+
+#[path = "scalar_ownership.rs"]
+pub mod ownership;
+
+#[path = "controlled_effect.rs"]
+pub mod controlled;
+
+#[path = "protected_value.rs"]
+pub(crate) mod protected;
+
+#[path = "closed_value.rs"]
+pub mod closed;

@@ -114,7 +114,16 @@ impl Function {
     pub fn run<T,M,C,G,Cb,X>(&self,execution:&mut Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>>,port:Port)
         ->(out:Result<Report,Error>)
         requires self.valid(),old(execution).wf(),
-        ensures final(execution).wf(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
+        ensures final(execution).cleanup_state().frame(&old(execution).cleanup_state(),0),
+            final(execution).cleanup_state().queues().dom()==old(execution).cleanup_state().queues().dom(),
+            final(execution).cleanup_state().domain_ids()==old(execution).cleanup_state().domain_ids(),
+            old(execution).cleanup_state().live(0) ==> {
+                let before=old(execution).cleanup_state().queues()[0];let after=final(execution).cleanup_state().queues()[0];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(execution).wf(),final(execution).value_attempts()==old(execution).value_attempts(),final(execution).capture()==old(execution).capture(),
             final(execution).work_state()==old(execution).work_state(),final(execution).value_state()==old(execution).value_state(),
             final(execution).phase_spec()==old(execution).phase_spec(),
             out.is_err() ==> *final(execution)==*old(execution),
@@ -154,10 +163,20 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
     /// Run a finite calculation from an ordinary root, Child or effect group.
     /// The actual Begin declarations and provider select the target; the same
     /// method is also the registered finite-function dispatch path.
+    #[verifier::spinoff_prover]
     pub fn run_native_value_program(&mut self,id:usize,port:Port,program:&Program)
         ->(out:Result<Report,Error>)
         requires program.valid(),old(self).wf(),
-        ensures final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> *final(self)==*old(self),
@@ -286,10 +305,20 @@ impl<R,H,T,M,F> NativeRuntime<Body<R,F>,H,ServiceSlot<T,M>> {
     /// Run the stored finite root/Child against the execution actually issued
     /// by this runtime. Resolve the port from the registered declarations and
     /// settle the real root from the computed result, including failed prefixes.
+    #[verifier::spinoff_prover]
     pub fn run_value_root<C,G,Cb,X>(&mut self,id:usize,execution:&mut Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>>)
         ->(out:Result<RegisteredReport,AdmissionError>)
         requires old(self).wf(),old(execution).wf(),
-        ensures final(self).wf(),final(self).registry()==old(self).registry(),final(self).state()==old(self).state(),
+        ensures final(execution).cleanup_state().frame(&old(execution).cleanup_state(),0),
+            final(execution).cleanup_state().queues().dom()==old(execution).cleanup_state().queues().dom(),
+            final(execution).cleanup_state().domain_ids()==old(execution).cleanup_state().domain_ids(),
+            old(execution).cleanup_state().live(0) ==> {
+                let before=old(execution).cleanup_state().queues()[0];let after=final(execution).cleanup_state().queues()[0];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).registry()==old(self).registry(),final(self).state()==old(self).state(),
             final(self).publications()==old(self).publications(),final(self).episode_owners()==old(self).episode_owners(),
             final(self).journal_spec()==old(self).journal_spec(),final(self).joint_key()==old(self).joint_key(),
             out.is_err() ==> final(self).recipe_history()==old(self).recipe_history(),

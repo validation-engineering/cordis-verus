@@ -111,6 +111,7 @@ Choose a starting point for review:
 
 - [Paper-to-code guide](docs/paper-review-guide.md): trace a claim to its contract, executable call and regression.
 - [Comparison with Cordis](docs/comparison.md): see supported functionality and known differences.
+- [Provider update with a failed Child](docs/cases/update-recovery.md): real inverse failure, explicit retry, safe release and fresh activation.
 - [Lifecycle cleanup case](docs/cases/lifecycle-cleanup.md): reproduce a consumer's final write while its provider remains available.
 
 The [evidence guide](docs/evidence-guide.md) links source-bound proof, test and application records, with instructions for independent reproduction.

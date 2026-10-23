@@ -1,0 +1,56 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-observation-skips-publication",
+      "mutation": {
+        "file": "native_observation_recovery.rs",
+        "old": "if let Some(issue)=self.history().publication_registry().check(self.first,self.last(),scope.providers) {",
+        "new": "if let Some(issue)=Option::<registry::Issue>::None {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::recovery",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::recovery::Interval::check",
+          "module": "lifecycle_state::native::runtime::history::recovery",
+          "file": "native_observation_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.balanced(scope));"
+        }
+      ],
+      "selectionRationale": "Reject a recovery query that omits actual publication or pending obligations. Require a fresh matching positive, whole-mutant compilation and the named source-balance contract failure; resource limits and unrelated diagnostics are not evidence."
+    },
+    {
+      "name": "r3-observation-skips-pending",
+      "mutation": {
+        "file": "native_observation_recovery.rs",
+        "old": "if let Some(issue)=pending::check(self.frames(),self.start,self.end(),scope.objects) {",
+        "new": "if let Some(issue)=Option::<pending::Issue>::None {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::recovery",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::recovery::Interval::check",
+          "module": "lifecycle_state::native::runtime::history::recovery",
+          "file": "native_observation_recovery.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.balanced(scope));"
+        }
+      ],
+      "selectionRationale": "Reject a recovery query that omits actual publication or pending obligations. Require a fresh matching positive, whole-mutant compilation and the named source-balance contract failure; resource limits and unrelated diagnostics are not evidence."
+    }
+  ]
+}

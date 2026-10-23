@@ -50,7 +50,7 @@ impl<T:?Sized> Evidence<T> {
     }
     #[verifier::opaque]
     pub open spec fn certified(&self)->bool {
-        self.protocol() && (self.queue().is_some() ==> interval::holds(self.acknowledgement().unwrap().events(),
+        self.protocol() && self.attempt().recovered() && (self.queue().is_some() ==> interval::holds(self.acknowledgement().unwrap().events(),
             self.issue().unwrap().at()+1,self.acknowledgement().unwrap().at(),self.queue().unwrap().1,self.ticket()))
     }
     pub open spec fn records(&self,inverse:Inverse<T>,ticket:RestoreTicket,queue:Option<(joint::Journal,nat)>)->bool {
@@ -59,7 +59,7 @@ impl<T:?Sized> Evidence<T> {
     pub(crate) proof fn establish_interval(&self)
         requires self.protocol(),ensures self.certified(),
     {
-        reveal(Evidence::certified);
+        reveal(Evidence::certified);self.attempt().establish_recovery();
         if self.queue().is_some() {
             interval::issued_interval(&self.issue().unwrap(),&self.acknowledgement().unwrap(),self.queue().unwrap().1,self.ticket());
         }

@@ -109,7 +109,8 @@ pub proof fn forward_projection<A,X,U,B,I>(lib:mx::Library<A,X,U,B>,node:mx::Nod
 
 pub proof fn restore_projection<U,I>(history:Seq<mx::Entry<U,I>>,tokens:Seq<nat>,a:s::State<U>,actor:usize)
     requires inv::well_formed(a),mx::restore(history,tokens,a,actor).is_some(),
-    ensures p::project(mx::restore(history,tokens,a,actor).unwrap(),ISet::full())==e::restore(word(history,tokens),p::project(a,ISet::full())),
+    ensures inv::well_formed(mx::restore(history,tokens,a,actor).unwrap()),
+        p::project(mx::restore(history,tokens,a,actor).unwrap(),ISet::full())==e::restore(word(history,tokens),p::project(a,ISet::full())),
     decreases tokens.len(),
 {
     if tokens.len()>0 {

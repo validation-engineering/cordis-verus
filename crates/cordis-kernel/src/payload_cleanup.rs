@@ -30,15 +30,20 @@ pub type Report<C,R,H,T,X> = CleanupReport<RestoreError,Action<C,R,H,T,X>>;
 pub type DispatchResult<C,R,H,T,X> = Result<Option<Dispatch<C,R,H,T,X>>,QueueError>;
 
 #[allow(dead_code)]
-pub struct Admission<T:?Sized> {pub token:usize,inverse:Ghost<Inverse<T>>,insertion:Ghost<Insertion>,witnesses:Tracked<crate::reversible_value::registration::ReceiptMap>}
+pub struct Admission<T:?Sized> {pub token:usize,inverse:Ghost<Inverse<T>>,insertion:Ghost<Insertion>,witnesses:Tracked<crate::reversible_value::registration::ReceiptMap>,history:Tracked<crate::reversible_value::history::Witness<crate::reversible_value::payload::State<T>>>}
 impl<T:?Sized> Admission<T> {
     pub closed spec fn witnesses(&self)->crate::reversible_value::registration::ReceiptMap {self.witnesses@}
+    pub closed spec fn history(&self)->crate::reversible_value::history::Witness<crate::reversible_value::payload::State<T>> {self.history@}
     pub open spec fn witnessed(&self)->bool {
-        crate::reversible_value::registration::witnesses(self.witnesses())
+        self.history().wf() && self.history().source()==self.inverse().owner().source() && self.history().events()==self.inverse().after().states
+            && crate::reversible_value::registration::witnesses(self.witnesses())
             && self.witnesses().contains_key((0,false)) && self.witnesses()[(0,false)].same(&self.inverse().after().commit)
             && (self.registration_receipt().is_some() ==> self.witnesses().contains_key((0,true))
                 && self.witnesses()[(0,true)].same(&self.registration_receipt().unwrap()))
     }
+    pub(crate) proof fn history_witness(tracked &self)->(tracked out:crate::reversible_value::history::Witness<crate::reversible_value::payload::State<T>>)
+        requires self.witnessed(),ensures out.wf(),out.source()==self.inverse().owner().source(),out.events()==self.inverse().after().states,
+    {self.history.borrow().duplicate()}
     pub(crate) proof fn retain(tracked &self,tracked receipts:&mut crate::reversible_value::registration::ReceiptMap,index:int)
         requires self.witnessed(),crate::reversible_value::registration::witnesses(*old(receipts)),
         ensures crate::reversible_value::registration::witnesses(*final(receipts)),
@@ -56,10 +61,24 @@ impl<T:?Sized> Admission<T> {
     pub closed spec fn inverse(&self)->Inverse<T> {self.inverse@}
     pub(crate) closed spec fn insertion(&self)->Insertion {self.insertion@}
     pub closed spec fn token_spec(&self)->usize {self.token}
+    pub fn token(&self)->(out:usize) ensures out==self.token_spec(), {self.token}
     pub closed spec fn registered(&self,link:Option<(joint::Journal,nat)>,state:joint::episode::CleanupState)->bool {
-        self.insertion().recorded(link,state,Some(self.inverse().after().commit),
+        self.token_spec()==self.insertion().token && self.insertion().recorded(link,state,Some(self.inverse().after().commit),
             if joint::local(link,self.inverse().owner().journal_spec()) {Some(self.inverse().after().commit.at())} else {None})
     }
+    pub proof fn registration_facts(&self,link:Option<(joint::Journal,nat)>,state:joint::episode::CleanupState)
+        requires self.inverse().wf(),self.registered(link,state),
+        ensures self.registration_receipt().is_some()==link.is_some(),self.registration_receipt().is_some() ==> {
+            let receipt=self.registration_receipt().unwrap();
+            &&& receipt.wf() && receipt.journal()==link.unwrap().0 && receipt.event().key==link.unwrap().1
+            &&& receipt.event().after is Cleanup && receipt.event().after->Cleanup_state.occupied.len()==self.token_spec()+1
+            &&& receipt.event().after->Cleanup_state.occupied[self.token_spec() as int]
+            &&& receipt.journal()==self.inverse().after().commit.journal() ==> receipt.follows(&self.inverse().after().commit)
+                && receipt.event().settled==Some(self.inverse().after().commit.at())
+            &&& receipt.event().change==if receipt.journal()==self.inverse().after().commit.journal() {joint::Change::RegisterInverse {write:self.inverse().after().commit.at()}}
+                else {joint::Change::Cleanup {event:joint::episode::CleanupChange::Register}}
+        },
+    {self.inverse().provenance();}
     pub open spec fn queued<C,R,H,X>(&self,queue:CleanupQueue<Action<C,R,H,T,X>>,retained:H)->bool {
         self.token_spec()<queue.slots().len() && queue.slots()[self.token_spec() as int]==Some(ChildCleanup::Callback(Cleanup::Payload {inverse:self.inverse(),retained}))
             && self.registered(queue.link(),queue.observation())
@@ -88,7 +107,14 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
     pub fn apply_payload(&mut self,id:usize,owner:&SharedPayload<T>,value:Arc<T>,retained:H)
         ->(out:Result<Admission<T>,(ReplaceError,Arc<T>,H)>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
@@ -97,6 +123,8 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
                 let a=out->Ok_0;let inv=a.inverse();let queue=final(self).cleanup_state().queues()[id];
                 &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
                 &&& final(self).cleanup_state().live(id)
+                &&& joint::groups::registration(a.registration_receipt(),final(self).cleanup_state().link(),id)
+                &&& queue.link()==old(self).cleanup_state().queues()[id].link()
                 &&& a.witnessed() && inv.wf() && inv.owner()==*owner && inv.after().value==value
                 &&& old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
                 &&& a.token_spec()==old(self).cleanup_state().queues()[id].slots().len()
@@ -109,11 +137,18 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
     pub(crate) fn apply_payload_following(&mut self,id:usize,owner:&SharedPayload<T>,value:Arc<T>,retained:H,Tracked(cause):Tracked<&crate::reversible_value::registration::ReceiptMap>)
         ->(out:Result<Admission<T>,(ReplaceError,Arc<T>,H,Ghost<Option<crate::reversible_value::payload::restoration::ForwardRejection<T>>>)>)
         requires old(self).wf(),crate::reversible_value::registration::witnesses(*cause),
-        ensures out.is_err() ==> if old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id) {
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            out.is_err() ==> if old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id) {
                 out->Err_0.3@.is_some() && out->Err_0.3@.unwrap().owner()==*owner && out->Err_0.3@.unwrap().explains(out->Err_0.0)
             } else {out->Err_0.0==ReplaceError::Closed && out->Err_0.3@.is_none()},
             out.is_ok() ==> forall|k:(int,bool)|cause.contains_key(k) && #[trigger] cause[k].journal()==out->Ok_0.inverse().owner().journal_spec() ==> out->Ok_0.inverse().after().commit.follows(&cause[k]),
             final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
@@ -122,6 +157,8 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
                 let a=out->Ok_0;let inv=a.inverse();let queue=final(self).cleanup_state().queues()[id];
                 &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
                 &&& final(self).cleanup_state().live(id)
+                &&& joint::groups::registration(a.registration_receipt(),final(self).cleanup_state().link(),id)
+                &&& queue.link()==old(self).cleanup_state().queues()[id].link()
                 &&& a.witnessed() && inv.wf() && inv.owner()==*owner && inv.after().value==value
                 &&& old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
                 &&& a.token_spec()==old(self).cleanup_state().queues()[id].slots().len()
@@ -130,14 +167,116 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
                 &&& a.registered(queue.link(),queue.observation()) && a.queued(queue,retained)
             },
     {
+        match self.apply_payload_captured_following(id,owner,None,value,retained,Tracked(cause)) {
+            Ok((admission,_capture))=>Ok(admission),Err(error)=>Err(error),
+        }
+    }
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn apply_payload_captured_following(&mut self,id:usize,owner:&SharedPayload<T>,expected:Option<&crate::reversible_value::payload::Capture<T>>,value:Arc<T>,retained:H,Tracked(cause):Tracked<&crate::reversible_value::registration::ReceiptMap>)
+        ->(out:Result<(Admission<T>,crate::reversible_value::payload::Capture<T>),(ReplaceError,Arc<T>,H,Ghost<Option<crate::reversible_value::payload::restoration::ForwardRejection<T>>>)>)
+        requires old(self).wf(),expected.is_some() ==> expected.unwrap().wf() && expected.unwrap().owner()==*owner,crate::reversible_value::registration::witnesses(*cause),
+        ensures expected.is_some() && expected.unwrap().revision_spec() as int+expected.unwrap().observation().state().depth as int+2<=u64::MAX
+                ==> !(out.is_err() && out->Err_0.0==ReplaceError::Capacity),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            out.is_err() ==> if old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id) {
+                out->Err_0.3@.is_some() && out->Err_0.3@.unwrap().owner()==*owner && out->Err_0.3@.unwrap().explains(out->Err_0.0)
+            } else {out->Err_0.0==ReplaceError::Closed && out->Err_0.3@.is_none()},
+            out.is_ok() ==> forall|k:(int,bool)|cause.contains_key(k) && #[trigger] cause[k].journal()==out->Ok_0.0.inverse().owner().journal_spec() ==> out->Ok_0.0.inverse().after().commit.follows(&cause[k]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
+            final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
+            final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
+            out.is_err() ==> *final(self)==*old(self) && out->Err_0.1==value && out->Err_0.2==retained,
+            out.is_ok() ==> {
+                let a=out->Ok_0.0;let inv=a.inverse();let queue=final(self).cleanup_state().queues()[id];
+                &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
+                &&& final(self).cleanup_state().live(id)
+                &&& joint::groups::registration(a.registration_receipt(),final(self).cleanup_state().link(),id)
+                &&& queue.link()==old(self).cleanup_state().queues()[id].link()
+                &&& a.witnessed() && inv.wf() && inv.owner()==*owner && inv.after().value==value
+                &&& old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
+                &&& a.token_spec()==old(self).cleanup_state().queues()[id].slots().len()
+                &&& queue.slots()==old(self).cleanup_state().queues()[id].slots().push(Some(ChildCleanup::Callback(Cleanup::Payload {inverse:inv,retained})))
+                &&& queue.protocol().waiting()==old(self).cleanup_state().queues()[id].protocol().waiting().push(a.token_spec())
+                &&& a.registered(queue.link(),queue.observation()) && a.queued(queue,retained)
+            },
+            out.is_ok() ==> out->Ok_0.1.wf() && out->Ok_0.1.observes(out->Ok_0.0.inverse().after()),
+            out.is_ok() && expected.is_some() ==> out->Ok_0.0.inverse().before().state()==expected.unwrap().observation().state()
+                && out->Ok_0.0.inverse().before().revision==expected.unwrap().revision_spec(),
+    {
+        let mut mode=None;
+        self.apply_payload_captured_in(id,owner,expected,value,retained,Tracked(cause),&mut mode)
+    }
+    #[allow(clippy::type_complexity)]
+    #[allow(clippy::too_many_arguments)] // Includes the erased receipt and borrowed execution guards.
+    pub(crate) fn apply_payload_captured_in(&mut self,id:usize,owner:&SharedPayload<T>,expected:Option<&crate::reversible_value::payload::Capture<T>>,value:Arc<T>,retained:H,Tracked(cause):Tracked<&crate::reversible_value::registration::ReceiptMap>,mode:&mut Option<crate::reversible_value::payload::protected::Exclusive<'_,T>>)
+        ->(out:Result<(Admission<T>,crate::reversible_value::payload::Capture<T>),(ReplaceError,Arc<T>,H,Ghost<Option<crate::reversible_value::payload::restoration::ForwardRejection<T>>>)>)
+        requires old(mode).is_some() ==> old(mode)->Some_0.wf() && old(mode)->Some_0.target()==*owner,
+            old(self).wf(),expected.is_some() ==> expected.unwrap().wf() && expected.unwrap().owner()==*owner,crate::reversible_value::registration::witnesses(*cause),
+        ensures final(mode).is_some()==old(mode).is_some(),
+            final(mode).is_some() ==> final(mode)->Some_0.wf() && final(mode)->Some_0.target()==old(mode)->Some_0.target()
+                && (out.is_err() ==> final(mode)->Some_0.state()==old(mode)->Some_0.state() && final(mode)->Some_0.revision()==old(mode)->Some_0.revision())
+                && (out.is_ok() ==> old(mode)->Some_0.state()==Some(out->Ok_0.0.inverse().before().state())
+                    && old(mode)->Some_0.revision()==Some(out->Ok_0.0.inverse().before().revision)
+                    && final(mode)->Some_0.state()==Some(out->Ok_0.0.inverse().after().state())
+                    && final(mode)->Some_0.revision()==Some(out->Ok_0.0.inverse().after().revision)),
+            old(mode).is_some() && old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
+                && old(mode)->Some_0.state().is_some()
+                && (expected.is_none() || expected.unwrap().revision_spec()==old(mode)->Some_0.revision().unwrap())
+                && old(mode)->Some_0.revision().unwrap() as int+old(mode)->Some_0.state().unwrap().depth as int+2<=u64::MAX ==> out.is_ok(),
+            expected.is_some() && expected.unwrap().revision_spec() as int+expected.unwrap().observation().state().depth as int+2<=u64::MAX
+                ==> !(out.is_err() && out->Err_0.0==ReplaceError::Capacity),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            out.is_err() ==> if old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id) {
+                out->Err_0.3@.is_some() && out->Err_0.3@.unwrap().owner()==*owner && out->Err_0.3@.unwrap().explains(out->Err_0.0)
+            } else {out->Err_0.0==ReplaceError::Closed && out->Err_0.3@.is_none()},
+            out.is_ok() ==> forall|k:(int,bool)|cause.contains_key(k) && #[trigger] cause[k].journal()==out->Ok_0.0.inverse().owner().journal_spec() ==> out->Ok_0.0.inverse().after().commit.follows(&cause[k]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
+            final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
+            final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
+            out.is_err() ==> *final(self)==*old(self) && out->Err_0.1==value && out->Err_0.2==retained,
+            out.is_ok() ==> {
+                let a=out->Ok_0.0;let inv=a.inverse();let queue=final(self).cleanup_state().queues()[id];
+                &&& final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id)
+                &&& final(self).cleanup_state().live(id)
+                &&& joint::groups::registration(a.registration_receipt(),final(self).cleanup_state().link(),id)
+                &&& queue.link()==old(self).cleanup_state().queues()[id].link()
+                &&& a.witnessed() && inv.wf() && inv.owner()==*owner && inv.after().value==value
+                &&& old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
+                &&& a.token_spec()==old(self).cleanup_state().queues()[id].slots().len()
+                &&& queue.slots()==old(self).cleanup_state().queues()[id].slots().push(Some(ChildCleanup::Callback(Cleanup::Payload {inverse:inv,retained})))
+                &&& queue.protocol().waiting()==old(self).cleanup_state().queues()[id].protocol().waiting().push(a.token_spec())
+                &&& a.registered(queue.link(),queue.observation()) && a.queued(queue,retained)
+            },
+            out.is_ok() ==> out->Ok_0.1.wf() && out->Ok_0.1.observes(out->Ok_0.0.inverse().after()),
+            out.is_ok() && expected.is_some() ==> out->Ok_0.0.inverse().before().state()==expected.unwrap().observation().state()
+                && out->Ok_0.0.inverse().before().revision==expected.unwrap().revision_spec(),
+    {
         proof {self.representation();}
         if !self.accepts_acquisition(id) {return Err((ReplaceError::Closed,value,retained,Ghost(None)));}
-        let (applied,rejection)=owner.apply_managed_following(value,Ghost(joint::local(self.cleanup_state().queues()[id].link(),owner.journal_spec())),Tracked(cause));
-        let applied=match applied {
+        let (applied,rejection)=match mode {
+            Some(held)=>held.apply(value,expected,Ghost(joint::local(self.cleanup_state().queues()[id].link(),owner.journal_spec())),Tracked(cause)),
+            None=>owner.apply_captured_following(value,expected,Ghost(joint::local(self.cleanup_state().queues()[id].link(),owner.journal_spec())),Tracked(cause)),
+        };
+        let (applied,capture)=match applied {
             Ok(applied)=>applied,Err(error)=>return Err((error.error,error.value,retained,rejection)),
         };
         let ghost inverse=applied.inverse;
         let tracked write=applied.inverse.receipt();
+        let tracked history=applied.inverse.history_witness();
         let tracked write_cause=write.duplicate();
         let payload=ChildCleanup::Callback(Cleanup::Payload {inverse:applied.inverse,retained});
         let insertion=match self.groups.register_following(id,payload,Tracked(Some(write_cause)),applied.pending) {
@@ -146,7 +285,7 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
         proof {self.representation();}
         let tracked mut witnesses=Map::tracked_empty();
         proof {witnesses.tracked_insert((0int,false),write);match insertion.trace.borrow() {Some(receipt)=>witnesses.tracked_insert((0int,true),receipt.duplicate()),None=>{}}}
-        Ok(Admission {token:insertion.token,inverse:Ghost(inverse),insertion:Ghost(insertion),witnesses:Tracked(witnesses)})
+        Ok((Admission {token:insertion.token,inverse:Ghost(inverse),insertion:Ghost(insertion),witnesses:Tracked(witnesses),history:Tracked(history)},capture))
     }
 }
 
@@ -171,11 +310,21 @@ pub open spec fn access_failed<T:?Sized,M>(episode:Option<crate::lifecycle_state
 impl<C,G,A,R,T:?Sized,M,X> Execution<ServiceSlot<SharedPayload<T>,M>,C,G,ChildCleanup<Cleanup<A,R,Arc<ServiceSlot<SharedPayload<T>,M>>,T>,X>> {
     pub fn apply_native_payload(&mut self,id:usize,port:crate::Port,value:Arc<T>)->(out:Result<Admission<T>,(AccessError,Arc<T>)>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0.1==value,
+            out.is_ok() ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
+            out.is_ok() ==> out->Ok_0.registered(final(self).cleanup_state().queues()[id].link(),final(self).cleanup_state().queues()[id].observation()),
+            out.is_ok() ==> joint::groups::registration(out->Ok_0.registration_receipt(),final(self).cleanup_state().link(),id),
             out.is_ok() ==> out->Ok_0.witnessed() && out->Ok_0.inverse().wf() && out->Ok_0.inverse().after().value==value
                 && old(self).value_state().is_some()
                 && selected(old(self).value_state().unwrap(),port,out->Ok_0.inverse().owner())
@@ -190,13 +339,23 @@ impl<C,G,A,R,T:?Sized,M,X> Execution<ServiceSlot<SharedPayload<T>,M>,C,G,ChildCl
     #[allow(clippy::type_complexity)]
     pub(crate) fn apply_native_payload_following(&mut self,id:usize,port:crate::Port,value:Arc<T>,Tracked(cause):Tracked<&crate::reversible_value::registration::ReceiptMap>)->(out:Result<Admission<T>,(AccessError,Arc<T>,Ghost<Option<crate::reversible_value::payload::restoration::ForwardRejection<T>>>)>)
         requires old(self).wf(),crate::reversible_value::registration::witnesses(*cause),
-        ensures out.is_err() ==> access_failed(old(self).value_state(),old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id),port,out->Err_0.0,out->Err_0.2@),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            out.is_err() ==> access_failed(old(self).value_state(),old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id),port,out->Err_0.0,out->Err_0.2@),
             out.is_ok() ==> forall|k:(int,bool)|cause.contains_key(k) && #[trigger] cause[k].journal()==out->Ok_0.inverse().owner().journal_spec() ==> out->Ok_0.inverse().after().commit.follows(&cause[k]),
             final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0.1==value,
+            out.is_ok() ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
+            out.is_ok() ==> out->Ok_0.registered(final(self).cleanup_state().queues()[id].link(),final(self).cleanup_state().queues()[id].observation()),
+            out.is_ok() ==> joint::groups::registration(out->Ok_0.registration_receipt(),final(self).cleanup_state().link(),id),
             out.is_ok() ==> out->Ok_0.witnessed() && out->Ok_0.inverse().wf() && out->Ok_0.inverse().after().value==value
                 && old(self).value_state().is_some()
                 && selected(old(self).value_state().unwrap(),port,out->Ok_0.inverse().owner())
@@ -224,16 +383,20 @@ impl<C,G,A,R,T:?Sized,M,X> Execution<ServiceSlot<SharedPayload<T>,M>,C,G,ChildCl
     }
 }
 
+pub type DispatchBoundaries<C,R,H,T,X> = Ghost<crate::cleanup_queue::completion::Boundaries<Action<C,R,H,T,X>>>;
+
 pub struct Completion<C,R,H,T:?Sized,X> {
     pub ticket:RestoreTicket,
     pub report:Report<C,R,H,T,X>,
     pub restored:Option<Restored<T>>,
     pub attempt:Ghost<Result<Restored<T>,Failure<T>>>,
     pub trace:Tracked<Evidence<T>>,
+    #[doc(hidden)] pub boundaries:DispatchBoundaries<C,R,H,T,X>,
 }
 pub enum Dispatch<C,R,H,T:?Sized,X> {Other(CleanupDispatch<Cleanup<C,R,H,T>,X>),Payload(Completion<C,R,H,T,X>)}
 impl<C,R,H,T:?Sized,X> Completion<C,R,H,T,X> {
     pub closed spec fn evidence(&self)->Evidence<T> {self.trace@}
+    pub closed spec fn boundaries(&self)->crate::cleanup_queue::completion::Boundaries<Action<C,R,H,T,X>> {self.boundaries@}
     pub open spec fn corresponds(&self,inverse:Inverse<T>,retained:H)->bool {
         &&& self.evidence().certified() && self.evidence().inverse()==inverse && self.evidence().ticket()==self.ticket
         &&& self.evidence().attempt().result()==self.attempt@
@@ -269,13 +432,15 @@ impl<C,R,H,T:?Sized,X> CleanupQueue<Action<C,R,H,T,X>> {
             issued(issue,old(self).link(),ticket),issue.is_some() ==> issue.unwrap().events()==old(self).trace(),
         ensures final(self).wf(),final(self).link()==old(self).link(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.ticket==ticket,out.corresponds(inverse,retained),out.report.result.is_ok()==out.restored.is_some(),
-            out.evidence().records(inverse,ticket,old(self).link()),
+            out.evidence().records(inverse,ticket,old(self).link()),out.evidence().issue()==issue,
             final(self).link().is_some() ==> out.evidence().acknowledgement().unwrap().events()==final(self).trace(),
             out.restored.is_some() ==> out.restored.unwrap().wf() && out.restored.unwrap().after().state()==inverse.before().state(),
             out.report.outcome==if out.restored.is_some() {RestoreOutcome::Succeeded} else {RestoreOutcome::Failed},
             out.report.discarded==if out.restored.is_some() {Some(ChildCleanup::Callback(Cleanup::Payload {inverse,retained}))} else {None},
             final(self).slots()==old(self).slots().update(ticket.token as int,if out.restored.is_some() {None} else {Some(ChildCleanup::Callback(Cleanup::Payload {inverse,retained}))}),
             !final(self).issued(),final(self).protocol().failed_spec()==out.restored.is_none(),
+            final(self).protocol().waiting()==old(self).protocol().waiting(),
+            final(self).protocol().selected()==if out.restored.is_some() {None} else {Some(ticket)},
     {
         let tracked cause=match &issue {Some(receipt)=>Some(receipt.duplicate()),None=>None};
         let (attempt,trace)=inverse.restore_following(Tracked(cause));
@@ -292,13 +457,15 @@ impl<C,R,H,T:?Sized,X> CleanupQueue<Action<C,R,H,T,X>> {
             attempt.is_err() ==> attempt->Err_0.wf(&inverse),
         ensures final(self).wf(),final(self).link()==old(self).link(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.ticket==ticket,out.corresponds(inverse,retained),out.report.result.is_ok()==out.restored.is_some(),
-            out.evidence().records(inverse,ticket,old(self).link()),
+            out.evidence().records(inverse,ticket,old(self).link()),out.evidence().issue()==issue,
             final(self).link().is_some() ==> out.evidence().acknowledgement().unwrap().events()==final(self).trace(),
             out.restored.is_some() ==> out.restored.unwrap().wf() && out.restored.unwrap().after().state()==inverse.before().state(),
             out.report.outcome==if out.restored.is_some() {RestoreOutcome::Succeeded} else {RestoreOutcome::Failed},
             out.report.discarded==if out.restored.is_some() {Some(ChildCleanup::Callback(Cleanup::Payload {inverse,retained}))} else {None},
             final(self).slots()==old(self).slots().update(ticket.token as int,if out.restored.is_some() {None} else {Some(ChildCleanup::Callback(Cleanup::Payload {inverse,retained}))}),
             !final(self).issued(),final(self).protocol().failed_spec()==out.restored.is_none(),
+            final(self).protocol().waiting()==old(self).protocol().waiting(),
+            final(self).protocol().selected()==if out.restored.is_some() {None} else {Some(ticket)},
     {
         let ghost queue=self.link();let ghost observed=attempt;
         proof {self.issued_slot(ticket);attempt_trace.domain();}
@@ -329,11 +496,14 @@ impl<C,R,H,T:?Sized,X> CleanupQueue<Action<C,R,H,T,X>> {
             assert(trace.same_domain() ==> trace.acknowledgement().unwrap().follows(&trace.attempt().endpoint()));
             trace.establish_interval();
         }
-        Completion {ticket,report:CleanupReport {result,outcome,discarded},restored,attempt:Ghost(observed),trace:Tracked(trace)}
+        Completion {ticket,report:CleanupReport {result,outcome,discarded},restored,attempt:Ghost(observed),trace:Tracked(trace),boundaries:Ghost(None)}
     }
-    fn dispatch_payload(&mut self)->(out:DispatchResult<C,R,H,T,X>)
-        requires old(self).wf(),
-        ensures final(self).wf(),final(self).link()==old(self).link(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+    pub(crate) fn dispatch_payload_following(&mut self,Tracked(cause):Tracked<Option<joint::Receipt>>)->(out:DispatchResult<C,R,H,T,X>)
+        requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
+        ensures out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap().managed() ==> out->Ok_0.unwrap().follows_boundary(cause),
+            (out.is_err() || out==Ok(None)) ==> final(self).same(old(self)),
+            final(self).wf(),final(self).link()==old(self).link(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().finished(*old(self),*final(self)) && out->Ok_0.unwrap().authentic(),
             out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().from_slot(old(self).slots())
                 && out->Ok_0.unwrap().selected_from(old(self).protocol().selected(),old(self).protocol().waiting()),
             out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Payload ==> {
@@ -349,22 +519,69 @@ impl<C,R,H,T:?Sized,X> CleanupQueue<Action<C,R,H,T,X>> {
                 &&& final(self).protocol().failed_spec()==c.restored.is_none()
             },
     {
-        let dispatch=match self.dispatch()? {None=>return Ok(None),Some(dispatch)=>dispatch};
-        match dispatch {
+        let ghost before=*self;let ghost preceding=cause;
+        let dispatch=match self.dispatch_following(Tracked(cause))? {None=>return Ok(None),Some(dispatch)=>dispatch};
+        let out=match dispatch {
             CleanupDispatch::Host {ticket,action:ChildCleanup::Callback(Cleanup::Payload {inverse,retained})}=>{
                 let tracked issue=self.issue_receipt(ticket);
-                Ok(Some(Dispatch::Payload(self.restore_payload(ticket,inverse,retained,Tracked(issue)))))
+                let mut completion=self.restore_payload(ticket,inverse,retained,Tracked(issue));
+                completion.boundaries=Ghost(Some((before,*self)));
+                Dispatch::Payload(completion)
             },
-            other=>Ok(Some(Dispatch::Other(other))),
+            other=>Dispatch::Other(other),
+        };
+        proof {
+            out.establish_recovery(before.slots());
+            assert(out.from_slot(before.slots()));
+            assert(out.selected_from(before.protocol().selected(),before.protocol().waiting()));
+            if out.managed() {
+                assert(out.boundaries()==Some((before,*self)));
+                assert(out.queue_link()==before.link());
+                if before.link().is_some() {
+                    reveal(crate::reversible_value::payload::restoration::attempt::protocol::Evidence::certified);
+                    assert(out.acknowledgement().is_some());
+                    assert(out.acknowledgement().unwrap().events()==self.trace());
+                }
+                assert(self.slots()==before.slots().update(out.ticket().token as int,if out.succeeded() {None} else {before.slots()[out.ticket().token as int]}));
+                assert(!self.issued());
+                assert(self.protocol().failed_spec()==!out.succeeded());
+                assert(self.protocol().selected()==if out.succeeded() {None} else {Some(out.ticket())});
+                assert(self.protocol().waiting()==if before.protocol().selected().is_some() {before.protocol().waiting()} else {before.protocol().waiting().drop_last()});
+            }
         }
+        proof {if out.managed() {out.establish_boundary(preceding);}}
+        Ok(Some(out))
     }
 }
 impl<C,R,H,T:?Sized,X> CleanupGroups<Action<C,R,H,T,X>> {
     pub fn dispatch_payload(&mut self,id:usize)->(out:DispatchResult<C,R,H,T,X>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),
+        ensures old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link(),
+            (out.is_err() || out==Ok(None)) && old(self).live(id) ==> final(self).queues()[id].same(&old(self).queues()[id]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),
             final(self).origin()==old(self).origin(),final(self).domain_ids()==old(self).domain_ids(),final(self).queues().dom()==old(self).queues().dom(),
             final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().finished(old(self).queues()[id],final(self).queues()[id]) && out->Ok_0.unwrap().authentic(),
+            out.is_ok() && out->Ok_0.is_some() ==> old(self).live(id)
+                && out->Ok_0.unwrap().from_slot(old(self).queues()[id].slots())
+                && out->Ok_0.unwrap().selected_from(old(self).queues()[id].protocol().selected(),old(self).queues()[id].protocol().waiting()),
+            out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Payload ==> {
+                let c=out->Ok_0.unwrap()->Payload_0;
+                &&& c.evidence().queue()==old(self).queues()[id].link()
+                &&& final(self).queues()[id].link().is_some() ==> c.evidence().acknowledgement().unwrap().events()==final(self).queues()[id].trace()
+                &&& final(self).queues()[id].slots()==old(self).queues()[id].slots().update(c.ticket.token as int,if c.restored.is_some() {None} else {old(self).queues()[id].slots()[c.ticket.token as int]})
+                &&& final(self).queues()[id].protocol().failed_spec()==c.restored.is_none()
+            },
+    {self.dispatch_payload_following(Tracked(None),id)}
+    pub(crate) fn dispatch_payload_following(&mut self,Tracked(cause):Tracked<Option<joint::Receipt>>,id:usize)->(out:DispatchResult<C,R,H,T,X>)
+        requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
+        ensures out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap().managed() ==> out->Ok_0.unwrap().follows_boundary(cause),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link(),
+            (out.is_err() || out==Ok(None)) && old(self).live(id) ==> final(self).queues()[id].same(&old(self).queues()[id]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),
+            final(self).origin()==old(self).origin(),final(self).domain_ids()==old(self).domain_ids(),final(self).queues().dom()==old(self).queues().dom(),
+            final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().finished(old(self).queues()[id],final(self).queues()[id]) && out->Ok_0.unwrap().authentic(),
             out.is_ok() && out->Ok_0.is_some() ==> old(self).live(id)
                 && out->Ok_0.unwrap().from_slot(old(self).queues()[id].slots())
                 && out->Ok_0.unwrap().selected_from(old(self).queues()[id].protocol().selected(),old(self).queues()[id].protocol().waiting()),
@@ -377,16 +594,22 @@ impl<C,R,H,T:?Sized,X> CleanupGroups<Action<C,R,H,T,X>> {
             },
     {
         if !self.contains(id) {return Err(QueueError::InvalidState);}
-        let mut queue=self.take(id);let out=queue.dispatch_payload();self.put(id,queue);out
+        let mut queue=self.take(id);let out=queue.dispatch_payload_following(Tracked(cause));self.put(id,queue);out
     }
 }
 impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
     pub fn dispatch_payload_cleanup(&mut self,id:usize)->(out:DispatchResult<A,R,H,T,X>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+        ensures old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            (out.is_err() || out==Ok(None)) && old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].same(&old(self).cleanup_state().queues()[id]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().finished(old(self).cleanup_state().queues()[id],final(self).cleanup_state().queues()[id]) && out->Ok_0.unwrap().authentic(),
             out.is_ok() && out->Ok_0.is_some() ==> old(self).cleanup_state().live(id)
                 && out->Ok_0.unwrap().from_slot(old(self).cleanup_state().queues()[id].slots())
                 && out->Ok_0.unwrap().selected_from(old(self).cleanup_state().queues()[id].protocol().selected(),old(self).cleanup_state().queues()[id].protocol().waiting()),
@@ -397,6 +620,33 @@ impl<V,C,G,A,R,H,T:?Sized,X> Execution<V,C,G,Action<A,R,H,T,X>> {
                 &&& final(self).cleanup_state().queues()[id].slots()==old(self).cleanup_state().queues()[id].slots().update(c.ticket.token as int,if c.restored.is_some() {None} else {old(self).cleanup_state().queues()[id].slots()[c.ticket.token as int]})
                 &&& final(self).cleanup_state().queues()[id].protocol().failed_spec()==c.restored.is_none()
             },
-    {proof {self.representation();}let out=self.groups.dispatch_payload(id);proof {self.representation();}out}
+    {self.dispatch_payload_cleanup_following(Tracked(None),id)}
+    pub(crate) fn dispatch_payload_cleanup_following(&mut self,Tracked(cause):Tracked<Option<joint::Receipt>>,id:usize)->(out:DispatchResult<A,R,H,T,X>)
+        requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
+        ensures out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap().managed() ==> out->Ok_0.unwrap().follows_boundary(cause),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            (out.is_err() || out==Ok(None)) && old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].same(&old(self).cleanup_state().queues()[id]),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),
+            final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
+            final(self).capture()==old(self).capture(),final(self).phase_spec()==old(self).phase_spec(),
+            final(self).value_attempts()==old(self).value_attempts(),final(self).status_links()==old(self).status_links(),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().finished(old(self).cleanup_state().queues()[id],final(self).cleanup_state().queues()[id]) && out->Ok_0.unwrap().authentic(),
+            out.is_ok() && out->Ok_0.is_some() ==> old(self).cleanup_state().live(id)
+                && out->Ok_0.unwrap().from_slot(old(self).cleanup_state().queues()[id].slots())
+                && out->Ok_0.unwrap().selected_from(old(self).cleanup_state().queues()[id].protocol().selected(),old(self).cleanup_state().queues()[id].protocol().waiting()),
+            out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Payload ==> {
+                let c=out->Ok_0.unwrap()->Payload_0;
+                &&& c.evidence().queue()==old(self).cleanup_state().queues()[id].link()
+                &&& final(self).cleanup_state().queues()[id].link().is_some() ==> c.evidence().acknowledgement().unwrap().events()==final(self).cleanup_state().queues()[id].trace()
+                &&& final(self).cleanup_state().queues()[id].slots()==old(self).cleanup_state().queues()[id].slots().update(c.ticket.token as int,if c.restored.is_some() {None} else {old(self).cleanup_state().queues()[id].slots()[c.ticket.token as int]})
+                &&& final(self).cleanup_state().queues()[id].protocol().failed_spec()==c.restored.is_none()
+            },
+    {proof {self.representation();}let out=self.groups.dispatch_payload_following(Tracked(cause),id);proof {self.representation();}out}
 }
 }
+
+#[path = "cleanup_recovery.rs"]
+pub mod recovery;

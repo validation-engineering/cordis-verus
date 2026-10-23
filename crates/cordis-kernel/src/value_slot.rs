@@ -65,7 +65,7 @@ impl Slot {
         guard.release_read();Tracked(receipt)
     }
     pub fn new(value:Arc<ReversibleValue>)->(out:Self)
-        ensures out.initial()==value,
+        ensures out.initial()==value,out.journal_spec()==value.journal_spec(),
     {
         let tracked mut authority=Authority::new();
         proof {authority.append(value);}
@@ -79,6 +79,11 @@ impl Slot {
     fn domain(&self)->(out:joint::Journal)
         ensures out==self.journal_spec(),
     {let guard=self.inner.acquire_read();let out=guard.borrow().joint.domain();guard.release_read();out}
+    pub fn identity(&self)->(out:Arc<joint::identity::AllocationIdentity>)
+        ensures out.wf(),out.address()==(crate::reversible_value::service_composition::Address {journal:self.journal_spec(),key:self.key()}),
+    {
+        let guard=self.inner.acquire_read();let identity=guard.borrow().joint.identity();guard.release_read();identity
+    }
     pub fn capture(&self)->(out:Capture)
         ensures out.wf(),out.slot()==*self,
     {
@@ -126,6 +131,24 @@ impl Capture {
             && self.slot().receipt_matches(self.commit())
             && self.commit().event().after==(joint::Record::Slot {source:self.slot().source(),revision:self.revision_spec(),object:self.value_spec().object()})
     }
+    pub fn duplicate(&self)->(out:Self)
+        requires self.wf(),ensures out.wf(),out.slot()==self.slot(),out.value_spec()==self.value_spec(),out.revision_spec()==self.revision_spec(),
+    {Self {slot:self.slot.clone(),revision:self.revision,value:self.value.clone(),witness:Tracked(self.witness.borrow().duplicate()),commit:Tracked(self.commit.borrow().duplicate())}}
+    /// Compare retained versions of the same actual slot. A later live read is
+    /// unnecessary; a successful comparison identifies the captured allocation.
+    pub fn same_revision(&self,other:&Self)->(out:bool)
+        requires self.wf(),other.wf(),self.slot()==other.slot(),
+        ensures out==(self.revision_spec()==other.revision_spec()),out ==> self.value_spec()==other.value_spec(),
+    {
+        if self.revision!=other.revision {return false;}
+        proof {self.witness.borrow().prefix(other.witness.borrow());assert(self.history() =~= other.history());}
+        true
+    }
+    /// Revision zero selects the allocation installed by the real constructor.
+    pub proof fn initial_selection(&self)
+        requires self.wf(),self.revision_spec()==0,
+        ensures self.value_spec()==self.slot().initial(),
+    {}
     pub open spec fn extends(&self,earlier:&Self)->bool {
         self.slot()==earlier.slot() && earlier.revision_spec()<=self.revision_spec()
             && self.history().take(earlier.history().len() as int)==earlier.history()
@@ -134,6 +157,7 @@ impl Capture {
     pub fn selection_receipt(&self)->(out:Tracked<joint::Receipt>)
         requires self.wf(),ensures out@.wf(),out@.same(&self.commit()),
     {let tracked receipt=self.commit.borrow().duplicate();Tracked(receipt)}
+    pub fn slot_ref(&self)->(out:&Slot) ensures *out==self.slot(), {&self.slot}
     pub fn value(&self)->(out:&Arc<ReversibleValue>) ensures *out==self.value_spec(), {&self.value}
     pub fn revision(&self)->(out:u64) ensures out==self.revision_spec(), {self.revision}
     pub fn observe_value(&self)->(out:Snapshot)
@@ -292,7 +316,7 @@ impl<T,M> ServiceSlot<T,M> {
     {}
     pub fn new_opaque(value:T,metadata:M)->(out:Self) ensures out.managed().is_none(),out.opaque_spec()==Some(value), {Self {payload:Payload::Opaque(value),metadata}}
     pub fn new_reversible(value:Arc<ReversibleValue>,metadata:M)->(out:Self)
-        ensures out.managed().is_some(),out.managed().unwrap().initial()==value,
+        ensures out.managed().is_some(),out.managed().unwrap().initial()==value,out.managed().unwrap().journal_spec()==value.journal_spec(),
     {
         Self {payload:Payload::Reversible(Slot::new(value)),metadata}
     }
@@ -319,6 +343,10 @@ impl ServiceBinding {
     pub closed spec fn port_spec(&self)->Port {self.port}
     pub closed spec fn capture_spec(&self)->Capture {self.capture}
     pub open spec fn wf(&self)->bool {self.capture_spec().wf()}
+    pub(crate) fn from_capture(provider:usize,port:Port,capture:Capture)->(out:Self)
+        requires capture.wf(),
+        ensures out.wf(),out.provider_spec()==provider,out.port_spec()==port,out.capture_spec()==capture,
+    {Self {provider,port,capture}}
     pub fn provider(&self)->(out:usize) ensures out==self.provider_spec(), {self.provider}
     pub fn port(&self)->(out:Port) ensures out==self.port_spec(), {self.port}
     pub fn capture(&self)->(out:&Capture) ensures *out==self.capture_spec(), {&self.capture}
@@ -365,6 +393,82 @@ impl<T,M> NativeEpisode<ServiceSlot<T,M>> {
             assert(self.reversible_read_failed(port,error));
             Err(error)
         }}
+    }
+}
+}
+
+#[path = "protected_slot.rs"]
+pub(crate) mod protected;
+
+verus! {
+#[derive(Debug)]
+pub enum SelectionError {Changed,Capacity}
+impl Slot {
+    /// Compare under the same write lock as the replacement. A stale retained
+    /// selection cannot overwrite an intervening host update.
+    pub fn replace_captured(&self,expected:&Capture,value:Arc<ReversibleValue>)->(out:Result<Replacement,SelectionError>)
+        requires expected.wf(),expected.slot()==*self,
+        ensures out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.previous().slot()==*self
+            && out->Ok_0.previous().revision_spec()==expected.revision_spec()
+            && out->Ok_0.previous().value_spec()==expected.value_spec() && out->Ok_0.current().value_spec()==value,
+    {
+        let (_domain,Tracked(target))=value.reference();
+        let (mut cell,guard)=self.inner.acquire_write();let previous=cell.capture(self);
+        if !previous.same_revision(expected) {guard.release_write(cell);return Err(SelectionError::Changed);}
+        match cell.value.replace(value) {
+            Ok(_old)=>{
+                proof {cell.authority.borrow_mut().append(value);reveal(joint::changes);}
+                let _pending=cell.joint.update_following(Ghost(joint::Record::Slot {source:self.source(),revision:cell.value.revision_spec(),object:value.object()}),
+                    Ghost(joint::Change::Replace),Tracked(Some(target)),Ghost(false),Tracked(None));
+                let current=cell.capture(self);
+                proof {assert(current.history().take(previous.history().len() as int) =~= previous.history());}
+                guard.release_write(cell);Ok(Replacement {previous,current})
+            },
+            Err(_)=>{guard.release_write(cell);Err(SelectionError::Capacity)},
+        }
+    }
+}
+proof fn slot_source_retained(frames:Seq<joint::Frame>,from:nat,to:nat,key:nat)
+    requires joint::valid(frames),from<=to<=frames.len(),joint::state_at(frames,from).contains_key(key),joint::state_at(frames,from)[key] is Slot,
+    ensures joint::state_at(frames,to).contains_key(key),joint::state_at(frames,to)[key] is Slot,
+        joint::state_at(frames,to)[key]->Slot_source==joint::state_at(frames,from)[key]->Slot_source,
+    decreases to-from,
+{
+    if from<to {
+        assert(joint::step(joint::state_at(frames,from),frames[from as int].state,frames[from as int].event));
+        reveal(joint::changes);
+        slot_source_retained(frames,from+1,to,key);
+    }
+}
+proof fn same_slot_source(tracked a:&joint::Receipt,tracked b:&joint::Receipt)
+    requires a.wf(),b.wf(),a.journal()==b.journal(),a.event().key==b.event().key,a.event().after is Slot,b.event().after is Slot,
+    ensures a.event().after->Slot_source==b.event().after->Slot_source,
+{
+    a.compare(b);
+    if a.covers(b) {
+        a.included(b);let f=a.events();
+        assert(joint::step(joint::state_at(f,b.at()),f[b.at() as int].state,f[b.at() as int].event));
+        assert(joint::step(joint::state_at(f,a.at()),f[a.at() as int].state,f[a.at() as int].event));
+        slot_source_retained(f,b.at()+1,a.at()+1,a.event().key);
+    } else {
+        b.included(a);let f=b.events();
+        assert(joint::step(joint::state_at(f,a.at()),f[a.at() as int].state,f[a.at() as int].event));
+        assert(joint::step(joint::state_at(f,b.at()),f[b.at() as int].state,f[b.at() as int].event));
+        slot_source_retained(f,a.at()+1,b.at()+1,a.event().key);
+    }
+}
+impl Capture {
+    /// Retained captures from the same allocated slot have one authoritative
+    /// history, even when the caller carries different handle representations.
+    pub fn same_revision_at(&self,other:&Self)->(out:bool)
+        requires self.wf(),other.wf(),self.slot().journal_spec()==other.slot().journal_spec(),self.slot().key()==other.slot().key(),
+        ensures out==(self.revision_spec()==other.revision_spec()),out ==> self.value_spec()==other.value_spec(),
+    {
+        if self.revision!=other.revision {return false;}
+        proof {
+            same_slot_source(self.commit.borrow(),other.commit.borrow());
+            self.witness.borrow().prefix(other.witness.borrow());assert(self.history() =~= other.history());
+        }true
     }
 }
 }

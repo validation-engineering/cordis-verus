@@ -2,6 +2,14 @@
 //! This observation preserves retained publications while a provider unloads.
 //! It does not interpret slot interiors, outstanding episode programs or opaque
 //! callbacks as paper effect functions.
+#[path = "native_episode_deletion.rs"]
+pub mod deletion;
+#[path = "native_lifetime.rs"]
+pub mod lifetime;
+#[path = "native_observation_recovery.rs"]
+pub mod recovery;
+#[path = "native_registry_recovery.rs"]
+pub mod registry_recovery;
 use super::owner::EpisodeOwner;
 use crate::lifecycle_state::services::NativePublication;
 use crate::refinement as r;
@@ -245,19 +253,19 @@ impl<V> Snapshot<V> {
     pub closed spec fn key(&self)->nat {self.key@}
     pub closed spec fn joint_spec(&self)->joint::Snapshot {self.joint}
     pub closed spec fn certified(&self)->bool {
-        self.joint_spec().certified() && self.history().valid()
+        self.joint_spec().certified() && self.history().valid() && self.history().fresh_insertions()
             && self.history().indexed(self.positions(),self.joint_spec().events(),self.key())
             && self.joint_spec().last().contains_pair(self.key(),joint::Record::Native {
                 state:self.history().states.last().project(self.history().labels.len())})
     }
     pub(crate) fn new(joint:joint::Snapshot,Ghost(history):Ghost<History<V>>,Ghost(positions):Ghost<Seq<nat>>,Ghost(key):Ghost<nat>)->(out:Self)
-        requires joint.certified(),history.valid(),history.indexed(positions,joint.events(),key),
+        requires joint.certified(),history.valid(),history.fresh_insertions(),history.indexed(positions,joint.events(),key),
             joint.last().contains_pair(key,joint::Record::Native {state:history.states.last().project(history.labels.len())}),
         ensures out.certified(),out.joint_spec()==joint,out.history()==history,out.positions()==positions,out.key()==key,
             super::production::interpreted(out.joint_spec().events(),out.key()),
     {let out=Self {joint,history:Ghost(history),positions:Ghost(positions),key:Ghost(key)};proof {out.production_trace();}out}
     pub proof fn valid_history(&self)
-        requires self.certified(),ensures self.joint_spec().certified(),self.history().valid(),
+        requires self.certified(),ensures self.joint_spec().certified(),self.history().valid(),self.history().fresh_insertions(),
             self.positions().len()==self.history().states.len(),
             self.history().indexed(self.positions(),self.joint_spec().events(),self.key()),
             self.joint_spec().last().contains_pair(self.key(),joint::Record::Native {state:self.history().states.last().project(self.history().labels.len())}),

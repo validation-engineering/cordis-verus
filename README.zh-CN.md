@@ -111,6 +111,7 @@ Verus 在开发阶段检查内核，已编译应用无需运行验证器。完�
 
 - [论文到代码指南](docs/paper-review-guide.zh-CN.md)：从一项主张追踪到合同、实际调用和回归测试。
 - [Cordis 功能对照](docs/comparison.zh-CN.md)：了解支持的功能与已知差异。
+- [Child 失败时更新 provider](docs/cases/update-recovery.zh-CN.md)：真实逆操作失败、显式重试、安全释放与重新激活。
 - [生命周期清理案例](docs/cases/lifecycle-cleanup.md)：复现消费者在 provider 仍可用时写入最后一条记录。
 
 [证据指南](docs/evidence-guide.md) 汇集绑定源码的证明、测试和应用验收记录，以及独立复现方式。

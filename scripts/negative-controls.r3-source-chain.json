@@ -1,0 +1,58 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-source-chain-skips-command",
+      "mutation": {
+        "file": "native_control_source.rs",
+        "old": "let ghost before=self.commands@;self.commands.push(c);",
+        "new": "let ghost before=self.commands@;let _=c;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::control_source",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::control_source::Recorder::append"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::control_source::Recorder::append",
+          "module": "lifecycle_state::native::runtime::control_source",
+          "file": "native_control_source.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.commands.len()==next.labels.len());"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated source-correspondence or Unload-completeness failure. Omitting runtime command recording or the authentic release source must not certify a complete source chain. Timeouts, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-source-chain-skips-unload-source",
+      "mutation": {
+        "file": "native_runtime.rs",
+        "old": "self.children.borrow_mut().unload(end.duplicate(),before_collection.joint_events());",
+        "new": "// Mutation: omit the actual Unload source collection."
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following",
+          "module": "lifecycle_state::native::runtime",
+          "file": "native_runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "control_source::cleanup::unload_collected(prior.child_records(),self.child_records(),prior.execution_history(),prior.history_positions(),self.execution_history(),self.history_positions(),end,id);"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated source-correspondence or Unload-completeness failure. Omitting runtime command recording or the authentic release source must not certify a complete source chain. Timeouts, frontend errors and unrelated failures are not evidence."
+    }
+  ]
+}

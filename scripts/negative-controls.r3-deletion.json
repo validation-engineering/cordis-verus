@@ -1,0 +1,56 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-deletion-retains-selected-actions",
+      "mutation": {
+        "file": "native_deletion_trace.rs",
+        "old": "i<self.start || self.end<=i || self.region.keep(label.0,label.1)",
+        "new": "i<self.start || self.end<=i || true"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::deletion::trace",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::trace::Window::edge",
+          "module": "lifecycle_state::native::runtime::history::deletion::trace",
+          "file": "native_deletion_trace.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.keep(i,h.labels[i]) ==> super::super::step(self.at(h,i),self.at(h,i+1),h.labels[i].0,h.labels[i].1));"
+        }
+      ],
+      "selectionRationale": "Reject retaining erased lifecycle actions or dropping source Child-birth closure in the actual-snapshot deletion construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; timeouts, resource limits and unrelated diagnostics are not evidence."
+    },
+    {
+      "name": "r3-deletion-skips-child-birth",
+      "mutation": {
+        "file": "native_deletion_trace.rs",
+        "old": "if !self.births_closed(h) {",
+        "new": "if false {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime::history::deletion::trace",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::trace::Window::check",
+          "module": "lifecycle_state::native::runtime::history::deletion::trace",
+          "file": "native_deletion_trace.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(self.admissible(h));"
+        }
+      ],
+      "selectionRationale": "Reject retaining erased lifecycle actions or dropping source Child-birth closure in the actual-snapshot deletion construction. Require fresh matching positives, whole-mutant compilation and the designated assertion; timeouts, resource limits and unrelated diagnostics are not evidence."
+    }
+  ]
+}

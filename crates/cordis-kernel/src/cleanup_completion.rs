@@ -57,7 +57,10 @@ impl<T> CleanupQueue<T> {
     pub fn complete_result<E>(&mut self,ticket:RestoreTicket,result:Result<(),E>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(RestoreTicket,Result<(),E>,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+        ensures final(self).slots()==if out.is_ok() {old(self).slots().update(ticket.token as int,retained(result,retry))} else {old(self).slots()},
+            out.is_err() ==> final(self).issued()==old(self).issued() && final(self).protocol().selected()==old(self).protocol().selected(),
+            out.is_ok() ==> ticket.token<old(self).slots().len(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(ticket) && !old(self).protocol().failed_spec()),
             out.is_err() ==> final(self).same(old(self)) && out->Err_0==(ticket,result,retry),
             out.is_ok() ==> out->Ok_0.result==result && out->Ok_0.outcome==outcome(result,retry,policy)
@@ -73,7 +76,10 @@ impl<T> CleanupQueue<T> {
     pub fn complete_future<E>(&mut self,completion:Completion<RestoreTicket,Result<(),E>>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(Completion<RestoreTicket,Result<(),E>>,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+        ensures final(self).slots()==if out.is_ok() {old(self).slots().update(completion.argument().token as int,retained(completion.result(),retry))} else {old(self).slots()},
+            out.is_err() ==> final(self).issued()==old(self).issued() && final(self).protocol().selected()==old(self).protocol().selected(),
+            out.is_ok() ==> completion.argument().token<old(self).slots().len(),
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(completion.argument()) && !old(self).protocol().failed_spec()),
             out.is_err() ==> final(self).same(old(self)) && out->Err_0==(completion,retry),
             out.is_ok() ==> out->Ok_0.result==completion.result()
@@ -112,13 +118,17 @@ impl<T> CleanupQueue<T> {
     }
 }
 
+pub type Boundaries<I> = Option<(CleanupQueue<I>,CleanupQueue<I>)>;
+
 pub struct ValueCleanupReport<C,X> {
     pub report:CleanupReport<crate::reversible_value::ValueError,crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>>,
     pub restored:Option<crate::reversible_value::Snapshot>,
     #[allow(dead_code)] pub trace:Tracked<restoration::Evidence>,
+    #[doc(hidden)] pub boundaries:Ghost<Boundaries<crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>>>,
 }
 impl<C,X> ValueCleanupReport<C,X> {
     pub open spec fn evidence(&self)->restoration::Evidence {self.trace@}
+    pub closed spec fn boundaries(&self)->Boundaries<crate::lifecycle_state::registration::shared_child::ChildCleanup<C,X>> {self.boundaries@}
     pub open spec fn corresponds(&self,inverse:crate::reversible_value::Inverse)->bool {
         &&& self.evidence().certified() && self.evidence().inverse()==inverse
         &&& self.evidence().succeeded()==self.restored.is_some()
@@ -144,7 +154,9 @@ impl<C,X> CleanupQueue<crate::lifecycle_state::registration::shared_child::Child
             out.is_ok()==(old(self).issued() && old(self).protocol().selected()==Some(ticket) && !old(self).protocol().failed_spec()),
             out.is_err() ==> final(self).same(old(self)) && out->Err_0==(ticket,inverse),
             out.is_ok() ==> out->Ok_0.corresponds(inverse) && !final(self).issued()
-                && out->Ok_0.evidence().records(inverse,ticket,old(self).link())
+                && final(self).protocol().waiting()==old(self).protocol().waiting()
+                && final(self).protocol().selected()==if out->Ok_0.restored.is_some() {None} else {Some(ticket)}
+                && out->Ok_0.evidence().records(inverse,ticket,old(self).link()) && out->Ok_0.evidence().issue()==issue
                 && (final(self).link().is_some() ==> out->Ok_0.evidence().acknowledgement().unwrap().events()==final(self).trace())
                 && final(self).slots()==old(self).slots().update(ticket.token as int,if out->Ok_0.restored.is_some() {None}
                     else {Some(crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse))})
@@ -171,7 +183,7 @@ impl<C,X> CleanupQueue<crate::lifecycle_state::registration::shared_child::Child
         let tracked acknowledgement=self.latest_receipt();
         let tracked trace=restoration::Evidence {issue,attempt,acknowledgement,queue,ticket,inverse:original,success:restored.is_some()};
         proof {trace.representation();trace.establish_interval();}
-        Ok(ValueCleanupReport {report,restored,trace:Tracked(trace)})
+        Ok(ValueCleanupReport {report,restored,trace:Tracked(trace),boundaries:Ghost(None)})
     }
 
 }
@@ -191,7 +203,8 @@ impl<C,X> CleanupDispatch<C,X> {
             Self::Host {ticket,action}=>ticket.token<slots.len() && slots[ticket.token as int]==Some(*action)
                 && !(*action is Value),
             Self::Value {ticket,completion}=>ticket.token<slots.len() && slots[ticket.token as int].is_some()
-                && slots[ticket.token as int].unwrap() is Value && completion.corresponds(slots[ticket.token as int].unwrap()->Value_0),
+                && slots[ticket.token as int].unwrap() is Value && completion.corresponds(slots[ticket.token as int].unwrap()->Value_0)
+                && completion.evidence().ticket()==*ticket,
         }
     }
 }
@@ -207,24 +220,54 @@ impl<C,X> CleanupQueue<crate::lifecycle_state::registration::shared_child::Child
                 && final(self).slots()==old(self).slots().update(out->Ok_0.unwrap().ticket().token as int,None)
                 && (final(self).link().is_some() ==> final(self).trace().last().event.change==(joint::Change::Cleanup {event:joint::episode::CleanupChange::Pop {ticket:out->Ok_0.unwrap().ticket()}})),
             out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().from_slot(old(self).slots()),
+            out.is_ok() && out->Ok_0.is_some() ==> final(self).protocol().waiting()==if old(self).protocol().selected().is_some() {old(self).protocol().waiting()} else {old(self).protocol().waiting().drop_last()},
             out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().selected_from(old(self).protocol().selected(),old(self).protocol().waiting()),
             out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Value ==> {
                 let report=out->Ok_0.unwrap();let ticket=report->Value_ticket;let completion=report->Value_completion;
                 &&& completion.evidence().records(old(self).slots()[ticket.token as int].unwrap()->Value_0,ticket,old(self).link())
+                &&& completion.boundaries()==Some((*old(self),*final(self)))
                 &&& final(self).link().is_some() ==> completion.evidence().acknowledgement().unwrap().events()==final(self).trace()
                 &&& final(self).slots()==old(self).slots().update(ticket.token as int,
                     if completion.restored.is_some() {None} else {old(self).slots()[ticket.token as int]})
                 &&& final(self).protocol().failed_spec()==completion.restored.is_none()
+                &&& !final(self).issued() && final(self).protocol().selected()==if completion.restored.is_some() {None} else {Some(ticket)}
+            },
+    {self.dispatch_following(Tracked(None))}
+    pub(crate) fn dispatch_following(&mut self,Tracked(cause):Tracked<Option<joint::Receipt>>)->(out:Result<Option<CleanupDispatch<C,X>>,crate::cleanup_journal::RestoreError>)
+        requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
+        ensures out.is_ok() && out->Ok_0.is_some() && cause.is_some() && old(self).link().is_some() && cause.unwrap().journal()==old(self).link().unwrap().0 ==> match out->Ok_0.unwrap() {
+                CleanupDispatch::Host {..}=>cause.unwrap().events().len()<final(self).trace().len() && final(self).trace().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
+                CleanupDispatch::Value {completion,..}=>completion.evidence().issue().is_some() && completion.evidence().issue().unwrap().follows(&cause.unwrap()),
+            },
+            final(self).link()==old(self).link(),final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+            out.is_err() || out==Ok(None) ==> final(self).same(old(self)) && final(self).trace()==old(self).trace(),
+            out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Host ==> final(self).issued()
+                && final(self).protocol().selected()==Some(out->Ok_0.unwrap().ticket()) && !final(self).protocol().failed_spec()
+                && final(self).slots()==old(self).slots().update(out->Ok_0.unwrap().ticket().token as int,None)
+                && (final(self).link().is_some() ==> final(self).trace().last().event.change==(joint::Change::Cleanup {event:joint::episode::CleanupChange::Pop {ticket:out->Ok_0.unwrap().ticket()}})),
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().from_slot(old(self).slots()),
+            out.is_ok() && out->Ok_0.is_some() ==> final(self).protocol().waiting()==if old(self).protocol().selected().is_some() {old(self).protocol().waiting()} else {old(self).protocol().waiting().drop_last()},
+            out.is_ok() && out->Ok_0.is_some() ==> out->Ok_0.unwrap().selected_from(old(self).protocol().selected(),old(self).protocol().waiting()),
+            out.is_ok() && out->Ok_0.is_some() && out->Ok_0.unwrap() is Value ==> {
+                let report=out->Ok_0.unwrap();let ticket=report->Value_ticket;let completion=report->Value_completion;
+                &&& completion.evidence().records(old(self).slots()[ticket.token as int].unwrap()->Value_0,ticket,old(self).link())
+                &&& completion.boundaries()==Some((*old(self),*final(self)))
+                &&& final(self).link().is_some() ==> completion.evidence().acknowledgement().unwrap().events()==final(self).trace()
+                &&& final(self).slots()==old(self).slots().update(ticket.token as int,
+                    if completion.restored.is_some() {None} else {old(self).slots()[ticket.token as int]})
+                &&& final(self).protocol().failed_spec()==completion.restored.is_none()
+                &&& !final(self).issued() && final(self).protocol().selected()==if completion.restored.is_some() {None} else {Some(ticket)}
             },
     {
         let ghost before=*self;
-        let (ticket,action)=match self.pop()? {None=>return Ok(None),Some(pair)=>pair};
+        let (ticket,action)=match self.pop_following(Tracked(cause))? {None=>return Ok(None),Some(pair)=>pair};
         let tracked issue=self.latest_receipt();
         match action {
             crate::lifecycle_state::registration::shared_child::ChildCleanup::Value(inverse)=>{
-                let completion=match self.restore_value(ticket,inverse,Tracked(issue)) {Ok(report)=>report,Err(_)=>{assert(false);return Err(crate::cleanup_journal::RestoreError::InvalidState);}};
+                let mut completion=match self.restore_value(ticket,inverse,Tracked(issue)) {Ok(report)=>report,Err(_)=>{assert(false);return Err(crate::cleanup_journal::RestoreError::InvalidState);}};
                 assert(self.slots()==before.slots().update(ticket.token as int,
                     if completion.restored.is_some() {None} else {before.slots()[ticket.token as int]}));
+                completion.boundaries=Ghost(Some((before,*self)));
                 Ok(Some(CleanupDispatch::Value {ticket,completion}))
             },
             action=>Ok(Some(CleanupDispatch::Host {ticket,action})),

@@ -49,7 +49,7 @@ pub proof fn primitive_theory<K,T:?Sized>()
         implies d::operation_typed(library::<K,T>(),a,x) && m::operation_admissible(|u:Value<T>,v:Value<T>|u==v,(library::<K,T>().apply)(a,x)) by {}
 }
 pub open spec fn code<E:effect::ScalarEffect,T:?Sized>(effect:Effect<E,T>,head:u64)->Code<T> {
-    match effect {Effect::Scalar(e)=>Code::Scalar(e.model()),Effect::Replace(value)=>Code::Payload {value,head}}
+    match effect {Effect::Kernel(i)=>Code::Scalar(i.model()),Effect::Scalar(e)=>Code::Scalar(e.model()),Effect::Replace(value)=>Code::Payload {value,head}}
 }
 pub open spec fn node<K,E:effect::ScalarEffect,T:?Sized>(calls:Seq<Call<E,T>>,resolve:spec_fn(usize)->K,heads:spec_fn(usize)->u64,pc:usize)->d::Node<K,(K,Code<T>),(),Value<T>,Outcome,usize> {
     if pc<calls.len() {d::Node::Operation {operation:(resolve(pc),code(calls[pc as int].effect,heads(pc))),argument:(),select:|out:Outcome|selected(calls[pc as int].branch,out)}} else {d::Node::Unit}

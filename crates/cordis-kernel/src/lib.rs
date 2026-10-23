@@ -161,6 +161,19 @@ impl Kernel {
             committed: ISet::new(|b: Binding| self.binding_recorded(id, b)),
         }
     }
+    /// One synchronous command advances a stored generation by at most one;
+    /// new allocations start at zero and no command leaks a cleanup lock.
+    pub closed spec fn synchronous_metadata(&self,prior:&Self,advance:bool)->bool {
+        &&& self.nodes.len()>=prior.nodes.len()
+        &&& forall|i:int|0<=i<self.nodes.len() ==> if i<prior.nodes.len() {
+            self.nodes[i].generation as nat<=prior.nodes[i].generation as nat+(if advance {1nat}else{0nat})
+        } else {self.nodes[i].generation==0}
+        &&& forall|n:usize|!prior.is_restoring(n) ==> !self.is_restoring(n)
+    }
+    pub closed spec fn metadata_bound(&self,steps:nat)->bool {
+        (forall|i:int|0<=i<self.nodes.len() ==> self.nodes[i].generation<=steps)
+            && forall|n:usize|!self.is_restoring(n)
+    }
     /// Episode generation is implementation metadata, absent from the paper
     /// projection. It changes only when a new Loading episode begins.
     pub closed spec fn generation_of(&self,id:usize) -> Option<u64> {
@@ -1117,6 +1130,10 @@ impl Kernel {
                 && node.parent == old(self).nodes[id as int].parent
                 && (forall|j: int| 0 <= j < old(self).links.len()
                     ==> !(old(self).links[j].live && old(self).links[j].binding.provider == id)) ==> r.is_ok(),
+            old(self).registered(id) && !node.present && node.phase==Phase::Inactive && !node.restoring
+                && (forall|m:int| 0<=m<old(self).nodes.len() ==> !(old(self).nodes[m].present && old(self).nodes[m].parent==Some(id)))
+                && (forall|j:int| 0<=j<old(self).links.len() && old(self).links[j].live
+                    ==> old(self).links[j].consumer!=id && old(self).links[j].binding.provider!=id) ==> r.is_ok(),
             r.is_ok() && !node.present ==> forall|m: int| 0 <= m < old(self).nodes.len()
                 ==> !(old(self).nodes[m].present && old(self).nodes[m].parent == Some(id)),
     {
@@ -1646,7 +1663,7 @@ impl Kernel {
     #[verifier::rlimit(30)]
     pub fn insert(&mut self, parent: Option<usize>, dependencies: Vec<Port>, provisions: Vec<Port>) -> (r: Result<usize, Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(),
+        ensures final(self).synchronous_metadata(old(self),false), final(self).generations_preserved(old(self)), final(self).wf(),
             r.is_ok() == old(self).insert_enabled(parent, dependencies@, provisions@),
             r.is_ok() ==> r.unwrap() == old(self).next_id()
                 && final(self).next_id() == old(self).next_id() + 1
@@ -1948,9 +1965,10 @@ impl Kernel {
         out
     }
 
+    #[verifier::spinoff_prover]
     pub fn begin(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),
+        ensures final(self).synchronous_metadata(old(self),true), final(self).wf(),
             r.is_ok() == old(self).begin_enabled(id),
             r.is_ok() ==> final(self).iteration_enabled(id),
             r.is_ok() ==> old(self).generation_of(id).is_some() && final(self).generation_of(id).is_some()
@@ -1961,6 +1979,8 @@ impl Kernel {
                 && refinement::step(old(self).paper(), final(self).paper(), id, refinement::Rule::Begin),
             r.is_err() ==> final(self).unchanged(old(self)),
     {
+        hide(Kernel::synchronous_metadata);
+        proof {assert(self.synchronous_metadata(self,true)) by {reveal(Kernel::synchronous_metadata);}}
         if !self.contains(id) { return Err(Error::Unknown); }
         let mut node = self.nodes[id];
         if node.phase != Phase::Inactive { return Err(Error::InvalidState); }
@@ -2031,6 +2051,7 @@ impl Kernel {
         proof {
             // The binding loop only appends links. Discharge the episode
             // metadata frame separately from the quantified service proof.
+            self.metadata_after_begin(old(self),id);
             assert(self.generation_of(id) == Some(node.generation));
             assert(node.generation as nat == old(self).generation_of(id).unwrap() as nat + 1);
             assert forall|n: usize| n != id implies self.generation_of(n) == old(self).generation_of(n) by {
@@ -2102,7 +2123,7 @@ impl Kernel {
 
     pub fn finish(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+        ensures final(self).synchronous_metadata(old(self),false), final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
  final(self).same_bindings(old(self)),
             r.is_ok() == old(self).iteration_enabled(id),
             r.is_ok() ==> old(self).coherent(id),
@@ -2125,7 +2146,7 @@ impl Kernel {
 
     pub fn leave(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), r != Err(Error::Changed), final(self).wf(), final(self).next_id() == old(self).next_id(), final(self).same_bindings(old(self)),
+        ensures final(self).synchronous_metadata(old(self),false), final(self).generations_preserved(old(self)), r != Err(Error::Changed), final(self).wf(), final(self).next_id() == old(self).next_id(), final(self).same_bindings(old(self)),
             r.is_ok() ==> final(self).phase_of(id) == Some(Phase::Unloading)
                 && refinement::step(old(self).paper(), final(self).paper(), id, refinement::Rule::Restart)
                 && (!refinement::coherent(old(self).paper(), id) ==> refinement::step(old(self).paper(), final(self).paper(), id,
@@ -2148,7 +2169,7 @@ impl Kernel {
     /// Explicit cancellation/restart uses `leave` instead.
     pub fn leave_if_changed(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+        ensures final(self).synchronous_metadata(old(self),false), final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
             old(self).phase_of(id) == Some(Phase::Loading) || old(self).phase_of(id) == Some(Phase::Active) ==> r.is_ok() || r == Err(Error::Changed),
 
             r.is_ok() ==> refinement::step(old(self).paper(), final(self).paper(), id,
@@ -2195,7 +2216,7 @@ impl Kernel {
     }
     pub fn retire(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+        ensures final(self).synchronous_metadata(old(self),false), final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
             forall|n:usize| final(self).is_restoring(n) == old(self).is_restoring(n),
  final(self).same_bindings(old(self)),
             r.is_ok() == old(self).registered(id),
@@ -2231,7 +2252,7 @@ impl Kernel {
     }
     pub fn begin_cleanup(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+        ensures forall|n:usize|n!=id ==> final(self).is_restoring(n)==old(self).is_restoring(n), final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
             r.is_ok() == old(self).cleanup_enabled(id),
             r.is_ok() ==> final(self).is_restoring(id),
  final(self).same_bindings(old(self)),
@@ -2277,7 +2298,7 @@ impl Kernel {
     }
     pub fn finish_cleanup(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+        ensures forall|n:usize|n!=id ==> final(self).is_restoring(n)==old(self).is_restoring(n), final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
             r.is_ok() == old(self).is_restoring(id),
 
             r.is_ok() ==> final(self).phase_of(id) == Some(Phase::Inactive) && final(self).no_committed(id)
@@ -2357,9 +2378,13 @@ impl Kernel {
         proof { assert(refinement::step(prior.paper(), self.paper(), id, refinement::Rule::Unload)); }
         Ok(())
     }
+    /// Exact registry-removal guard, including live ownership references.
+    pub open spec fn removal_enabled(&self,id:usize)->bool {
+        refinement::removal_domain(self.paper(),id)
+    }
     pub fn remove(&mut self, id: usize) -> (r: Result<(), Error>)
         requires old(self).wf(),
-        ensures final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
+        ensures final(self).synchronous_metadata(old(self),false), r.is_ok()==old(self).removal_enabled(id), final(self).generations_preserved(old(self)), final(self).wf(), final(self).next_id() == old(self).next_id(),
  final(self).same_bindings(old(self)),
             r.is_ok() ==> !final(self).registered(id)
                 && refinement::step(old(self).paper(), final(self).paper(), id, refinement::Rule::Remove),
@@ -2370,9 +2395,27 @@ impl Kernel {
         if !node.retired { return Err(Error::InvalidState); }
         if node.phase != Phase::Inactive { return Err(Error::InvalidState); }
         let ghost prior = *self;
+        proof {
+            self.paper_observations(id);assert(Self::node_ok(self.nodes@,id as int));
+            if self.removal_enabled(id) {
+                assert forall|n:int|0<=n<self.nodes.len() implies !(self.nodes[n].present && self.nodes[n].parent==Some(id)) by {
+                    if self.nodes[n].present {assert(refinement::registered(self.paper(),n as usize));assert(self.paper().fibers[n as usize].parent!=Some(id));}
+                }
+            }
+            assert forall|j:int| 0<=j<self.links.len() && self.links[j].live implies
+                self.links[j].consumer!=id && self.links[j].binding.provider!=id by {
+                assert(Self::link_ok(self.nodes@,self.links[j]));
+            }
+            assert forall|n:int| 0<=n<self.nodes.len() && self.nodes[n].present implies
+                refinement::registered(self.paper(),n as usize) by { }
+        }
         node.present = false;
         let result = self.update_node(id, node);
         proof { if result.is_ok() {
+            assert forall|n:usize| refinement::registered(prior.paper(),n) implies prior.paper().fibers[n].parent!=Some(id) by {
+                assert(n<prior.nodes.len());
+                assert(!(prior.nodes[n as int].present && prior.nodes[n as int].parent==Some(id)));
+            }
             self.paper_frame(&prior, id);
             assert(prior.paper_fiber(id).committed.is_empty()) by {
                 assert forall|b: Binding| !prior.paper_fiber(id).committed.contains(b) by {
@@ -2561,3 +2604,9 @@ pub mod configuration_binding;
 pub mod configuration_schema;
 
 pub mod configuration_module;
+
+#[path = "closed_region_deletion.rs"]
+pub mod closed_region_deletion;
+
+#[path = "kernel_replay.rs"]
+pub mod kernel_replay;

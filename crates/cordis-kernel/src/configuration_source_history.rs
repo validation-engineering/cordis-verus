@@ -205,6 +205,7 @@ impl<S,R,K,U,P,V> Snapshot<S,R,K,U,P,V> {
     }
     /// Resolve the guard to an exact typed configuration state produced earlier
     /// in this same history, including same-version recovery/refresh steps.
+    #[verifier::spinoff_prover]
     pub proof fn accepted_configuration(&self,index:int)->(at:int)
         requires self.certified(),0<=index<self.history().events.len(),
         ensures 0<=at<self.configuration().history().states.len(),
@@ -213,12 +214,16 @@ impl<S,R,K,U,P,V> Snapshot<S,R,K,U,P,V> {
             self.configuration().history().states[at].staged().is_none(),
             self.history().events[index] is Save ==> self.history().events[index]->Save_revision==self.configuration().history().states[at].version(),
     {
+        hide(joint::valid);hide(joint::step);
         let frames=self.joint_spec().events();let pos=self.positions()[index+1];let key=self.configuration().key();
         self.facts();self.position(index+1);self.joint_spec().valid_history();
-        assert(joint::step(joint::state_at(frames,pos),frames[pos as int].state,frames[pos as int].event));
+        assert(joint::step(joint::state_at(frames,pos),frames[pos as int].state,frames[pos as int].event)) by {reveal(joint::valid);}
         assert(frames[pos as int].event.change==(joint::Change::Sources {event:r::Event {kind:kind(self.history().events[index]),accepted:self.reviews()[index]}}));
-        reveal(joint::changes);reveal(r::step);
-        assert(joint::state_at(frames,pos).contains_pair(key,joint::Record::Configuration {state:self.reviews()[index]}));
+        // Extract only this Sources commit's accepted configuration; keep
+        // unrelated Journal transitions opaque in the origin/position proof.
+        assert(joint::state_at(frames,pos).contains_pair(key,joint::Record::Configuration {state:self.reviews()[index]})) by {
+            reveal(joint::step);reveal(joint::changes);reveal(r::step);
+        }
         let n=joint::record_origin(frames,pos,key);let at=self.configuration.complete_at(n);self.configuration.position(at);
         at
     }

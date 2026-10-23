@@ -1,0 +1,56 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-managed-gap-ignores-writes",
+      "mutation": {
+        "file": "managed_recovery.rs",
+        "old": "e.key!=key || joint::state_at(frames,i as nat).contains_pair(key,e.after)",
+        "new": "true || joint::state_at(frames,i as nat).contains_pair(key,e.after)"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::recovery",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::recovery::quiet_record",
+          "module": "reversible_value::managed::recovery",
+          "file": "managed_recovery.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures joint::state_at(frames,end).contains_pair(key,joint::state_at(frames,start)[key]),"
+        }
+      ],
+      "selectionRationale": "Reject a real foreign mutation being treated as a quiet recovery gap, or executable restoration accepting an already consumed semantic head. Require a fresh matching positive, whole-mutant compilation and the exact named contract diagnostic; resource failures and unrelated errors do not count."
+    },
+    {
+      "name": "r3-typed-restores-consumed-head",
+      "mutation": {
+        "file": "payload_inverse.rs",
+        "old": "if cell.head!=self.expected {",
+        "new": "if cell.head>self.expected {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::payload::restoration",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::payload::restoration::Inverse::restore_live",
+          "module": "reversible_value::payload::restoration",
+          "file": "payload_inverse.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(cell.state()==self.after().state());"
+        }
+      ],
+      "selectionRationale": "Reject a real foreign mutation being treated as a quiet recovery gap, or executable restoration accepting an already consumed semantic head. Require a fresh matching positive, whole-mutant compilation and the exact named contract diagnostic; resource failures and unrelated errors do not count."
+    }
+  ]
+}

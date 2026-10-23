@@ -404,10 +404,16 @@ impl LifecycleState {
         Ok(RegisteredPlugin {domain,id,parent,anchor,realms:RealmContext::from_map(realms.clone()),dependencies,provisions,revision:0,payload:definition.payload})
     }
 
+    pub open spec fn registered_root_ready<T,C,G>(&self,plugin:&RegisteredPlugin<T>,work:&SetupWork<C,G>)->bool {
+        plugin.domain_id()==self.protocol().domain_id() && work.origin().is_some()
+            && work.origin().unwrap().id==plugin.owner() && self.root_invocation_enabled(work.origin().unwrap())
+            && work.accepts() && !work.is_closed() && work.root_status()==crate::setup_work::RootStatus::Unissued
+    }
     pub fn admit_registered_root<T,C,G,A>(&self,plugin:&RegisteredPlugin<T>,work:&mut SetupWork<C,G>,argument:A)
         ->(out:Result<RegisteredInvocation<A>,A>)
         requires self.wf(),old(work).wf(),
-        ensures final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
+        ensures out.is_ok()==self.registered_root_ready(plugin,old(work)),
+            final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
             out.is_ok() ==> out->Ok_0.domain_id()==plugin.domain_id() && out->Ok_0.owner()==plugin.owner()
                 && out->Ok_0.version()==plugin.version() && out->Ok_0.work().value()==argument
                 && out->Ok_0.lifecycle()==old(work).origin().unwrap()

@@ -92,9 +92,28 @@ impl<V,C,G,I> Execution<V,C,G,I> {
         requires self.wf(),
         ensures out.is_some()==self.execution_journal().is_some(),out.is_some() ==> self.observed(&out.unwrap()),
     {
+        let tracked receipts=Map::<usize,crate::reversible_value::joint::Receipt>::tracked_empty();
+        self.observe_execution_following::<usize>(Tracked(&receipts))
+    }
+    /// Observe the actual owner after collecting these authentic receipts.
+    /// Inclusion is established at the held Journal read lock, not inferred
+    /// from comparable ghost descriptions or from a caller-supplied timestamp.
+    pub fn observe_execution_following<K>(&self,Tracked(receipts):Tracked<&Map<K,crate::reversible_value::joint::Receipt>>)
+        ->(out:Option<crate::reversible_value::joint::Snapshot>)
+        requires self.wf(),forall|k:K|receipts.contains_key(k) ==> #[trigger] receipts[k].wf(),
+        ensures out.is_some()==self.execution_journal().is_some(),
+            out.is_some() ==> self.observed(&out.unwrap()) && out.unwrap().events().len()>0,
+            forall|k:K|receipts.contains_key(k) && self.execution_journal()==Some(#[trigger] receipts[k].journal()) ==>
+                out.is_some() && out.unwrap().covers(&receipts[k]),
+    {
         let journal=self.groups.execution_domain()?;
-        let view=journal.read();self.work.certify(&view);self.groups.certify(&view);
-        Some(view.finish())
+        let view=journal.read();view.certify_receipts::<K>(Tracked(receipts));
+        self.work.certify(&view);self.groups.certify(&view);
+        let snapshot=view.finish();
+        proof {assert(snapshot.events().len()>0) by {
+            if snapshot.events().len()==0 {assert(snapshot.last()==Map::empty());}
+        }}
+        Some(snapshot)
     }
     pub fn observe_execution_after(&self,earlier:&crate::reversible_value::joint::Snapshot)
         ->(out:crate::reversible_value::joint::Snapshot)
@@ -247,7 +266,10 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     /// Its real payload is returned for destruction outside the host mutex.
     pub fn retire_effect(&mut self,run:EffectRun<G>)->(out:Result<G,EffectRun<G>>)
         requires old(self).wf(),run.wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
+        ensures out.is_ok() ==> old(self).cleanup_state().live(run.identity().group_id())
+                && crate::cleanup_groups::drained(old(self).cleanup_state().queues()[run.identity().group_id()])
+                && final(self).cleanup_state().queues()==old(self).cleanup_state().queues().remove(run.identity().group_id()),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).effect_state()==old(self).effect_state(),
             final(self).cleanup_state().frame(&old(self).cleanup_state(),run.identity().group_id()),
@@ -292,17 +314,25 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     /// release must also release its value owner and real lifecycle atomically.
     pub fn seal_external(&mut self)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
+        ensures final(self).cleanup_state().link()==old(self).cleanup_state().link(),final(self).cleanup_state().next_id()==old(self).cleanup_state().next_id(),
+            out ==> final(self).cleanup_state().queues()==Map::empty(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
             out ==> final(self).phase_spec()==ExecutionPhase::Closed && old(self).work_state().idle()
                 && old(self).cleanup_state().all_drained(),!out ==> *final(self)==*old(self),
             final(self).status_links()==old(self).status_links(),
     {if self.values.is_some() || !self.effects.is_empty() || !self.checked_out.is_empty() || !self.statuses.is_empty() {return false;} self.work.seal(&mut self.groups)}
     pub fn provide(&mut self,port:Port,value:Arc<V>)->(out:Result<(),(NativeValueError,Arc<V>)>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).cleanup_state()==old(self).cleanup_state(),
+        ensures final(self).value_state().is_some()==old(self).value_state().is_some(),
+            final(self).value_state().is_some() ==> final(self).value_state().unwrap().same_identity(&old(self).value_state().unwrap())
+                && final(self).value_state().unwrap().imports()==old(self).value_state().unwrap().imports()
+                && final(self).value_state().unwrap().closed()==old(self).value_state().unwrap().closed()
+                && old(self).value_state().unwrap().owned().submap_of(final(self).value_state().unwrap().owned()),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).cleanup_state()==old(self).cleanup_state(),
             final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> out->Err_0.1==value && final(self).value_state()==old(self).value_state(),
-            out.is_ok() ==> old(self).value_state().is_some()
+            out.is_ok() ==> old(self).value_state().is_some() && final(self).value_state().is_some()
+                && final(self).value_state().unwrap().owned().contains_pair((port.key,port.realm),value)
                 && final(self).value_state().unwrap().owned_table()==crate::coeffects::put(old(self).value_state().unwrap().owned_table(),port,Some(value)),
             final(self).status_links()==old(self).status_links(),
     {match self.values.as_mut() {Some(values)=>values.provide(port,value),None=>Err((NativeValueError::Undeclared,value))}}
@@ -405,7 +435,10 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     #[allow(clippy::type_complexity)]
     pub fn register(&mut self,id:usize,payload:I)->(out:Result<usize,I>)
         requires old(self).wf(), old(self).cleanup_state().wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==old(self).cleanup_state().drained_failure(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),out.is_ok()==old(self).cleanup_state().live(id),
+        ensures old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued() && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==old(self).cleanup_state().drained_failure(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),out.is_ok()==old(self).cleanup_state().live(id),
             final(self).effect_state()==old(self).effect_state(),final(self).checked_out()==old(self).checked_out(),
             final(self).initialized()==old(self).initialized(),
             out.is_err() ==> final(self).cleanup_state()==old(self).cleanup_state() && out->Err_0==payload,
@@ -416,7 +449,12 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     {self.groups.register(id,payload)}
     #[allow(clippy::type_complexity)]
     pub fn cancel(&mut self,id:usize)
-        requires old(self).wf(), old(self).cleanup_state().wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==old(self).cleanup_state().drained_failure(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+        requires old(self).wf(), old(self).cleanup_state().wf(),ensures final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].slots()==old(self).cleanup_state().queues()[id].slots()
+                && final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==old(self).cleanup_state().drained_failure(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
             final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
             old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].protocol().stage().cancellation()
                 && final(self).cleanup_state().queues()[id].protocol().stage().pending()==old(self).cleanup_state().queues()[id].protocol().stage().pending(),
@@ -436,7 +474,12 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     pub fn complete_future<E>(&mut self,id:usize,completion:Completion<RestoreTicket,Result<(),E>>,retry:Option<I>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,I>,(Completion<RestoreTicket,Result<(),E>>,Option<I>)>)
         requires old(self).wf(), old(self).cleanup_state().wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==(old(self).cleanup_state().drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
+        ensures final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].slots()==if out.is_ok() {old(self).cleanup_state().queues()[id].slots().update(completion.argument().token as int,crate::cleanup_queue::completion::retained(completion.result(),retry))} else {old(self).cleanup_state().queues()[id].slots()},
+            out.is_ok() ==> completion.argument().token<old(self).cleanup_state().queues()[id].slots().len(),
+            out.is_err() && old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued() && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==(old(self).cleanup_state().drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
             out.is_err() ==> out->Err_0==(completion,retry),
             out.is_ok() ==> old(self).cleanup_state().live(id) && out->Ok_0.result==completion.result()
                 && old(self).cleanup_state().queues()[id].issued()
@@ -457,7 +500,13 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     pub fn complete_result<E>(&mut self,id:usize,ticket:RestoreTicket,result:Result<(),E>,retry:Option<I>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,I>,(RestoreTicket,Result<(),E>,Option<I>)>)
         requires old(self).wf(), old(self).cleanup_state().wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
+        ensures final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].slots()==if out.is_ok() {old(self).cleanup_state().queues()[id].slots().update(ticket.token as int,crate::cleanup_queue::completion::retained(result,retry))} else {old(self).cleanup_state().queues()[id].slots()},
+            out.is_ok() ==> old(self).cleanup_state().live(id) && old(self).cleanup_state().queues()[id].issued() && old(self).cleanup_state().queues()[id].protocol().selected()==Some(ticket)
+                && ticket.token<old(self).cleanup_state().queues()[id].slots().len() && !final(self).cleanup_state().queues()[id].issued(),
+            out.is_err() && old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued() && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
             final(self).cleanup_state().drained_failure()==(old(self).cleanup_state().drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),
             out.is_err() ==> out->Err_0==(ticket,result,retry),
             out.is_ok() ==> out->Ok_0.result==result && out->Ok_0.outcome==crate::cleanup_queue::completion::outcome(result,retry,policy),
@@ -466,9 +515,16 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     #[allow(clippy::type_complexity)]
     pub fn retry(&mut self,id:usize)->(out:Result<RestoreTicket,RestoreError>)
         requires old(self).wf(), old(self).cleanup_state().wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==old(self).cleanup_state().drained_failure(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
+        ensures old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued(),out.is_ok() ==> !final(self).cleanup_state().queues()[id].issued(),out.is_err() && old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(), final(self).cleanup_state().wf(),final(self).cleanup_state().origin()==old(self).cleanup_state().origin(),final(self).cleanup_state().drained_failure()==old(self).cleanup_state().drained_failure(),final(self).cleanup_state().frame(&old(self).cleanup_state(),id),final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),final(self).cleanup_state().live(id)==old(self).cleanup_state().live(id),
             out.is_ok()==(old(self).cleanup_state().live(id) && old(self).cleanup_state().queues()[id].retry_enabled()),
             out.is_ok() ==> !final(self).cleanup_state().queues()[id].protocol().failed_spec(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].slots()==old(self).cleanup_state().queues()[id].slots()
+                && final(self).cleanup_state().queues()[id].protocol().waiting()==old(self).cleanup_state().queues()[id].protocol().waiting(),
+            out.is_ok() ==> final(self).cleanup_state().queues()[id].protocol().selected()==Some(out->Ok_0)
+                && out->Ok_0.token==old(self).cleanup_state().queues()[id].protocol().selected().unwrap().token
+                && out->Ok_0.attempt>old(self).cleanup_state().queues()[id].protocol().selected().unwrap().attempt,
             final(self).status_links()==old(self).status_links(),
     {self.groups.retry(id)}
     pub fn contains(&self,id:usize)->(out:bool) ensures out==self.cleanup_state().live(id), {self.groups.contains(id)}
@@ -489,9 +545,31 @@ impl<V,C,G,I> Execution<V,C,G,I> {
             out ==> id!=0 && !final(self).cleanup_state().live(id),
             !out ==> *final(self)==*old(self),
             final(self).status_links()==old(self).status_links(),
-    {if id==0 || self.effects.contains_key(&id) || self.checked_out.contains_key(&id) || self.statuses.contains_key(&id) {false} else {self.groups.remove(id)}}
+    {self.remove_observed(id).0}
+    /// Export the actual early-removal boundary for a continuing recovery log.
+    pub fn remove_observed(&mut self,id:usize)->(out:(bool,Ghost<Option<CleanupQueue<I>>>))
+        requires old(self).wf(),ensures final(self).cleanup_state().next_id()==old(self).cleanup_state().next_id(),
+            final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
+            final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
+            out.0 ==> id!=0 && !final(self).cleanup_state().live(id),
+            !out.0 ==> *final(self)==*old(self),
+            final(self).status_links()==old(self).status_links(),
+            out.1@==if out.0 {Some(old(self).cleanup_state().queues()[id])} else {None},
+            out.0 ==> old(self).cleanup_state().live(id),
+            final(self).cleanup_state().queues()==if out.0 {old(self).cleanup_state().queues().remove(id)} else {old(self).cleanup_state().queues()},
+            out.1@.is_some() ==> out.1@.unwrap().wf() && crate::cleanup_groups::drained(out.1@.unwrap()),
+    {if id==0 || self.effects.contains_key(&id) || self.checked_out.contains_key(&id) || self.statuses.contains_key(&id) {(false,Ghost(None))} else {self.groups.remove_observed(id)}}
     pub fn enqueue_owned_child(&mut self,group:usize,payload:C,inverse:I)->(out:Result<usize,(C,I)>)
-        requires old(self).wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
+        requires old(self).wf(),ensures out.is_ok() ==> old(self).cleanup_state().live(group)
+                && out->Ok_0==old(self).cleanup_state().queues()[group].slots().len(),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),group),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            old(self).cleanup_state().live(group) ==> final(self).cleanup_state().queues()[group].link()==old(self).cleanup_state().queues()[group].link()
+                && final(self).cleanup_state().queues()[group].issued()==old(self).cleanup_state().queues()[group].issued()
+                && final(self).cleanup_state().queues()[group].protocol().selected()==old(self).cleanup_state().queues()[group].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==(payload,inverse),
             out.is_ok() ==> old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(group)
@@ -502,7 +580,10 @@ impl<V,C,G,I> Execution<V,C,G,I> {
 }
 impl<V,C,P,I> Execution<V,C,P,I> {
     pub fn enqueue_effect(&mut self,source:usize,domain:u64,committed:Vec<Binding>,payload:P)->(out:Result<usize,(Vec<Binding>,P)>)
-        requires old(self).wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
+        requires old(self).wf(),ensures final(self).cleanup_state().link()==old(self).cleanup_state().link(),
+            out.is_ok() ==> final(self).cleanup_state().next_id()==old(self).cleanup_state().next_id()+1
+                && final(self).cleanup_state().queues()[out->Ok_0].slots().len()==0,
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==(committed,payload),
             out.is_ok() ==> final(self).work_state().group_requests().last().value().payload()==payload
@@ -514,7 +595,17 @@ impl<V,C,P,I> Execution<V,C,P,I> {
             final(self).status_links()==old(self).status_links(),
     {self.work.enqueue_effect(&mut self.groups,source,domain,committed,payload)}
     pub fn admit_effect(&mut self,run:&mut EffectRun<P>,target:Option<&[Binding]>)->(out:bool)
-        requires old(self).wf(),old(run).wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(run).wf(),
+        requires old(self).wf(),old(run).wf(),ensures old(self).cleanup_state().live(old(run).identity().group_id()) ==> final(self).cleanup_state().queues()[old(run).identity().group_id()].slots()==old(self).cleanup_state().queues()[old(run).identity().group_id()].slots(),
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),old(run).identity().group_id()),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(old(run).identity().group_id()) ==> {
+                let id=old(run).identity().group_id();
+                &&& final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                &&& final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                &&& final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected()
+            },
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(run).wf(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),
             final(run).identity()==old(run).identity(),
@@ -528,7 +619,29 @@ impl<V,C,P,I> Execution<V,C,P,I> {
             final(self).status_links()==old(self).status_links(),
     {run.admit(&mut self.groups,target)}
     pub fn land_effect<E>(&mut self,run:&mut EffectRun<P>,reply:EffectReply<I,E>)->(out:Result<Option<StageReport<E>>,EffectReply<I,E>>)
-        requires old(self).wf(),old(run).wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(run).wf(),
+        requires old(self).wf(),old(run).wf(),ensures final(run).identity()==old(run).identity(),
+            old(self).cleanup_state().live(old(run).identity().group_id()) ==> final(self).cleanup_state().queues()[old(run).identity().group_id()].slots()==
+                if out.is_ok() && reply.result() is Ready && reply.result()->Ready_0.is_ok() && reply.result()->Ready_0->Ok_0.is_some()
+                {old(self).cleanup_state().queues()[old(run).identity().group_id()].slots().push(reply.result()->Ready_0->Ok_0)}
+                else {old(self).cleanup_state().queues()[old(run).identity().group_id()].slots()},
+            out.is_ok() ==> old(run).called() && old(run).current()==Some(reply.serial()) && reply.identity()==old(run).identity()
+                && old(run).identity().matches(&old(self).cleanup_state()) && old(self).cleanup_state().queues()[old(run).identity().group_id()].protocol().stage().pending(),
+            out.is_ok() ==> final(run).current().is_none() && !final(run).called() && match reply.result() {
+                crate::effect_work::EffectOutput::Pending=>out->Ok_0.is_none(),
+                crate::effect_work::EffectOutput::Ready(result)=>out->Ok_0.is_some()
+                    && !final(self).cleanup_state().queues()[old(run).identity().group_id()].protocol().stage().pending()
+                    && out->Ok_0.unwrap().token==if result.is_ok() && result->Ok_0.is_some() {Some(old(self).cleanup_state().queues()[old(run).identity().group_id()].slots().len() as usize)} else {None},
+            },
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),old(run).identity().group_id()),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(old(run).identity().group_id()) ==> {
+                let id=old(run).identity().group_id();
+                &&& final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                &&& final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                &&& final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected()
+            },
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(run).wf(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> out->Err_0==reply && *final(self)==*old(self) && *final(run)==*old(run),
@@ -537,7 +650,24 @@ impl<V,C,P,I> Execution<V,C,P,I> {
 }
 impl<V,N,X,G,C,E> Execution<V,ChildDispatch<N,X>,G,ChildCleanup<C,E>> {
     pub fn enqueue_native_child(&mut self,group:usize,payload:N)->(out:Result<(SharedChild,usize),N>)
-        requires old(self).wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
+        requires old(self).wf(),ensures out.is_ok() ==> {
+                let child=out->Ok_0.0;let token=out->Ok_0.1;
+                &&& old(self).cleanup_state().live(group) && child.wf() && old(self).origin().is_some()
+                &&& child.domain_id()==old(self).origin().unwrap().domain && child.owner()==old(self).origin().unwrap().id
+                &&& child.episode()==Some(old(self).origin().unwrap().generation)
+                &&& final(self).work_state().child_requests().last().value() is Native
+                &&& final(self).work_state().child_requests().last().value()->Native_0.payload()==payload
+                &&& final(self).work_state().child_requests().last().value()->Native_0.child()==child
+                &&& token==old(self).cleanup_state().queues()[group].slots().len()
+                &&& final(self).cleanup_state().queues()[group].slots()==old(self).cleanup_state().queues()[group].slots().push(Some(ChildCleanup::<C,E>::Native(child)))
+            },
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),group),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            old(self).cleanup_state().live(group) ==> final(self).cleanup_state().queues()[group].link()==old(self).cleanup_state().queues()[group].link()
+                && final(self).cleanup_state().queues()[group].issued()==old(self).cleanup_state().queues()[group].issued()
+                && final(self).cleanup_state().queues()[group].protocol().selected()==old(self).cleanup_state().queues()[group].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).origin()==old(self).origin(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> out->Err_0==payload && *final(self)==*old(self),
             final(self).status_links()==old(self).status_links(),
@@ -560,7 +690,16 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
         operation:crate::reversible_value::Operation,branch:crate::reversible_value::Branch)
         ->(out:Result<ValueAdmission,crate::reversible_value::ValueError>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> final(self).same_runtime(old(self)),
             (out==Err(crate::reversible_value::ValueError::Closed))==!(old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)),
@@ -581,11 +720,21 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
                     inverse:final(self).cleanup_state().queues()[id].slots()[out->Ok_0.token as int].unwrap()->Value_0}).corresponds(value,operation,branch),
             final(self).status_links()==old(self).status_links(),
     {self.apply_value_following(id,value,operation,branch,Tracked(None))}
+    #[verifier::spinoff_prover]
     pub(crate) fn apply_value_following(&mut self,id:usize,value:&crate::reversible_value::ReversibleValue,
         operation:crate::reversible_value::Operation,branch:crate::reversible_value::Branch,Tracked(cause):Tracked<Option<crate::reversible_value::joint::Receipt>>)
         ->(out:Result<ValueAdmission,crate::reversible_value::ValueError>)
         requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
-        ensures out!=Err(crate::reversible_value::ValueError::Closed) && cause.is_some() && cause.unwrap().journal()==value.journal_spec() ==>
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            out!=Err(crate::reversible_value::ValueError::Closed) && cause.is_some() && cause.unwrap().journal()==value.journal_spec() ==>
                 final(self).value_attempts().events().last().follows(&cause.unwrap()),
             final(self).execution_journal()==old(self).execution_journal(),final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),

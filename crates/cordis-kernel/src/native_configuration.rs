@@ -25,7 +25,7 @@ impl<S,C,K,U,P,T,V> Snapshot<S,C,K,U,P,T,V> {
             self.sources().joint_spec()==self.joint_spec(),
     {self.native.valid_history();}
     fn new(sources:source_history::Snapshot<S,C,K,U,P,T>,Ghost(history):Ghost<history::History<V>>,Ghost(positions):Ghost<Seq<nat>>,Ghost(key):Ghost<nat>)->(out:Self)
-        requires sources.certified(),sources.joint_spec().certified(),history.valid(),history.indexed(positions,sources.joint_spec().events(),key),
+        requires sources.certified(),sources.joint_spec().certified(),history.valid(),history.fresh_insertions(),history.indexed(positions,sources.joint_spec().events(),key),
             sources.joint_spec().last().contains_pair(key,joint::Record::Native {state:history.states.last().project(history.labels.len())}),
         ensures out.certified(),out.sources()==sources,out.native().history()==history,out.native().positions()==positions,out.native().key()==key,
             out.joint_spec()==sources.joint_spec(),out.interpreted(),

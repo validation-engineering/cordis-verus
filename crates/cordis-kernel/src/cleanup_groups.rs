@@ -48,8 +48,17 @@ impl<T> CleanupGroups<T> {
     pub closed spec fn origin(&self)->Option<ActionTicket> {self.lifecycle}
     pub fn lifecycle_ticket(&self)->(out:Option<ActionTicket>) ensures out==self.origin(), {self.lifecycle}
     pub closed spec fn queues(&self)->Map<usize,CleanupQueue<T>> {self.entries@}
+    /// Replay input capture borrows retained data; the queue keeps ownership.
+    pub(crate) fn retained(&self,id:usize,token:usize)->(out:Option<&T>)
+        ensures out.is_some()==(self.live(id) && token<self.queues()[id].slots().len()
+                && self.queues()[id].slots()[token as int].is_some()),
+            out.is_some() ==> *out.unwrap()==self.queues()[id].slots()[token as int].unwrap(),
+    {
+        match self.entries.get(&id) {Some(queue)=>queue.retained(token),None=>None}
+    }
     pub closed spec fn domain_ids(&self)->Map<usize,u64> {self.domains@}
     pub closed spec fn next_id(&self)->usize {self.next}
+    pub(crate) fn allocated_groups(&self)->(out:usize) ensures out==self.next_id(), {self.next}
     pub closed spec fn last_domain(&self)->u64 {self.last_domain}
     pub closed spec fn closed(&self)->bool {self.sealed}
     /// Sticky evidence that an accepted cleanup was consumed after failure.
@@ -90,6 +99,15 @@ impl<T> CleanupGroups<T> {
     pub closed spec fn membership_trace(&self)->Seq<joint::Frame> {
         match self.membership {Some(member)=>member.events(),None=>Seq::empty()}
     }
+    /// Persistent evidence from the actual membership owner. Values and live
+    /// queues remain in their owners; no runtime snapshot allocation is needed.
+    pub proof fn membership_receipt(tracked &self)->(tracked out:Option<joint::Receipt>)
+        requires self.wf(),
+        ensures out.is_some()==self.link().is_some(),out.is_some() ==> out.unwrap().wf()
+            && out.unwrap().journal()==self.link().unwrap().0 && out.unwrap().event().key==self.link().unwrap().1
+            && out.unwrap().events()==self.membership_trace()
+            && out.unwrap().event().after==(joint::Record::Groups {state:self.observation()}),
+    {match &self.membership {Some(member)=>Some(member.receipt()),None=>None}}
     pub closed spec fn traces(&self,state:GroupState)->bool {
         self.membership.is_some()==self.execution.is_some() && (self.membership.is_some() ==> {
             let member=self.membership.unwrap();member.wf() && member.journal()==self.execution.unwrap()
@@ -104,6 +122,21 @@ impl<T> CleanupGroups<T> {
                 && (self.queues().contains_key(other) ==> self.queues()[other]==prior.queues()[other])
                 && self.domain_ids().contains_key(other)==prior.domain_ids().contains_key(other)
                 && (self.domain_ids().contains_key(other) ==> self.domain_ids()[other]==prior.domain_ids()[other])
+    }
+    /// Retry changes attempt state, never the retained inverse or queue identity.
+    pub open spec fn same_slots(&self,prior:&Self)->bool {
+        self.queues().dom()==prior.queues().dom()
+            && forall|id:usize|#[trigger] prior.queues().contains_key(id) ==>
+                self.queues()[id].slots()==prior.queues()[id].slots()
+                && self.queues()[id].issued()==prior.queues()[id].issued()
+                && self.queues()[id].link()==prior.queues()[id].link()
+                && self.queues()[id].protocol().domain_id()==prior.queues()[id].protocol().domain_id()
+    }
+    pub open spec fn retried_failed(&self,prior:&Self)->bool {
+        forall|id:usize|#[trigger] prior.queues().contains_key(id) && prior.queues()[id].protocol().failed_spec() ==>
+            prior.queues()[id].protocol().selected().is_some() && self.queues()[id].protocol().selected().is_some()
+            && self.queues()[id].protocol().selected().unwrap().token==prior.queues()[id].protocol().selected().unwrap().token
+            && self.queues()[id].protocol().selected().unwrap().attempt>prior.queues()[id].protocol().selected().unwrap().attempt
     }
     pub open spec fn all_drained(&self)->bool {
         forall|id:usize| #[trigger] self.queues().contains_key(id) ==> drained(self.queues()[id])
@@ -363,7 +396,8 @@ impl<T> CleanupGroups<T> {
     {!self.sealed && domain>self.last_domain && self.next<usize::MAX}
     pub fn register(&mut self,id:usize,payload:T)->(out:Result<usize,T>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).queues().dom()==old(self).queues().dom(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
+        ensures old(self).live(id) ==> final(self).queues()[id].issued()==old(self).queues()[id].issued() && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).queues().dom()==old(self).queues().dom(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==payload,
             out.is_ok() ==> final(self).live(id)
                 && out->Ok_0==old(self).queues()[id].slots().len()
@@ -375,17 +409,24 @@ impl<T> CleanupGroups<T> {
     pub(crate) fn register_following(&mut self,id:usize,payload:T,Tracked(cause):Tracked<Option<joint::Receipt>>,Tracked(pending):Tracked<Option<joint::Pending>>)->(out:Result<crate::cleanup_queue::Insertion,T>)
         requires old(self).wf(),cause.is_some() ==> cause.unwrap().wf(),
             pending.is_some() ==> old(self).live(id) && joint::registration_pending(pending,cause,old(self).queues()[id].link()),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).queues().dom()==old(self).queues().dom(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
+        ensures old(self).live(id) ==> final(self).queues()[id].issued()==old(self).queues()[id].issued() && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).queues().dom()==old(self).queues().dom(), final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out.is_ok()==old(self).live(id),
             out.is_err() ==> *final(self)==*old(self) && out->Err_0==payload,
             out.is_ok() ==> final(self).live(id) && final(self).acquisition_open(id)==old(self).acquisition_open(id)
                 && out->Ok_0.token==old(self).queues()[id].slots().len()
                 && final(self).queues()[id].link()==old(self).queues()[id].link()
                 && final(self).queues()[id].slots()==old(self).queues()[id].slots().push(Some(payload))
                 && final(self).queues()[id].protocol().waiting()==old(self).queues()[id].protocol().waiting().push(out->Ok_0.token)
+                && joint::groups::registration(out->Ok_0.trace@,final(self).link(),id)
                 && out->Ok_0.recorded(final(self).queues()[id].link(),final(self).queues()[id].observation(),cause,joint::pending_index(pending)),
     {
         if !self.contains(id) {return Err(payload);}
-        let mut queue=self.take(id);let token=queue.register_following(payload,Tracked(cause),Tracked(pending));self.put(id,queue);Ok(token)
+        let mut queue=self.take(id);
+        let tracked observed=match &self.membership {Some(member)=>Some(member),None=>None};
+        let token=queue.register_following(payload,Tracked(cause),Tracked(pending),Tracked(observed));
+        self.put(id,queue);
+        proof {reveal(joint::groups::registration);}
+        Ok(token)
     }
     pub open spec fn poll_enabled(&self,id:usize,target:Option<&[Binding]>)->bool {
         self.live(id) && (self.queues()[id].protocol().stage().pending()
@@ -395,7 +436,12 @@ impl<T> CleanupGroups<T> {
     }
     pub fn admit(&mut self,id:usize,target:Option<&[Binding]>)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out ==> old(self).live(id),
+        ensures old(self).live(id) ==> final(self).queues()[id].slots()==old(self).queues()[id].slots(),
+            final(self).queues().dom()==old(self).queues().dom(),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link()
+                && final(self).queues()[id].issued()==old(self).queues()[id].issued()
+                && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),out ==> old(self).live(id),
             final(self).live(id)==old(self).live(id),
             out ==> final(self).queues()[id].protocol().stage().pending(),
             out==old(self).poll_enabled(id,target),
@@ -404,7 +450,12 @@ impl<T> CleanupGroups<T> {
         let mut queue=self.take(id);let out=queue.admit(target);self.put(id,queue);out
     }
     pub fn cancel(&mut self,id:usize)
-        requires old(self).wf(),ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
+        requires old(self).wf(),ensures old(self).live(id) ==> final(self).queues()[id].slots()==old(self).queues()[id].slots(),
+            final(self).queues().dom()==old(self).queues().dom(),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link()
+                && final(self).queues()[id].issued()==old(self).queues()[id].issued()
+                && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),
             final(self).live(id)==old(self).live(id),
             old(self).live(id) ==> final(self).queues()[id].protocol().stage().cancellation()
                 && final(self).queues()[id].protocol().stage().pending()==old(self).queues()[id].protocol().stage().pending(),
@@ -415,7 +466,14 @@ impl<T> CleanupGroups<T> {
     pub fn land_result<E>(&mut self,id:usize,result:Result<Option<T>,E>)
         ->(out:Result<StageReport<E>,Result<Option<T>,E>>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures old(self).live(id) ==> final(self).queues()[id].slots()==if out.is_ok() && result.is_ok() && result->Ok_0.is_some()
+                {old(self).queues()[id].slots().push(result->Ok_0)} else {old(self).queues()[id].slots()},
+            out.is_ok() ==> (if result.is_ok() && result->Ok_0.is_some() {out->Ok_0.token.is_some() && out->Ok_0.token.unwrap()==old(self).queues()[id].slots().len()} else {out->Ok_0.token.is_none()}),
+            final(self).queues().dom()==old(self).queues().dom(),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link()
+                && final(self).queues()[id].issued()==old(self).queues()[id].issued()
+                && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_ok()==(old(self).live(id) && old(self).queues()[id].protocol().stage().pending()),
             out.is_err() ==> out->Err_0==result,
             out.is_ok() && result.is_ok() && result->Ok_0.is_some() ==>
@@ -454,7 +512,12 @@ impl<T> CleanupGroups<T> {
     pub fn complete_future<E>(&mut self,id:usize,completion:Completion<RestoreTicket,Result<(),E>>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(Completion<RestoreTicket,Result<(),E>>,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).queues().dom()==old(self).queues().dom(),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link()
+                && final(self).queues()[id].slots()==if out.is_ok() {old(self).queues()[id].slots().update(completion.argument().token as int,crate::cleanup_queue::completion::retained(completion.result(),retry))} else {old(self).queues()[id].slots()},
+            out.is_ok() ==> completion.argument().token<old(self).queues()[id].slots().len(),
+            out.is_err() && old(self).live(id) ==> final(self).queues()[id].issued()==old(self).queues()[id].issued() && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_err() ==> out->Err_0==(completion,retry),
             out.is_ok() ==> old(self).live(id) && out->Ok_0.result==completion.result()
                 && old(self).queues()[id].issued()
@@ -483,7 +546,13 @@ impl<T> CleanupGroups<T> {
     pub fn complete_result<E>(&mut self,id:usize,ticket:RestoreTicket,result:Result<(),E>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:Result<CleanupReport<E,T>,(RestoreTicket,Result<(),E>,Option<T>)>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures final(self).queues().dom()==old(self).queues().dom(),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link()
+                && final(self).queues()[id].slots()==if out.is_ok() {old(self).queues()[id].slots().update(ticket.token as int,crate::cleanup_queue::completion::retained(result,retry))} else {old(self).queues()[id].slots()},
+            out.is_ok() ==> old(self).live(id) && old(self).queues()[id].issued() && old(self).queues()[id].protocol().selected()==Some(ticket)
+                && ticket.token<old(self).queues()[id].slots().len() && !final(self).queues()[id].issued(),
+            out.is_err() && old(self).live(id) ==> final(self).queues()[id].issued()==old(self).queues()[id].issued() && final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             final(self).drained_failure()==(old(self).drained_failure() || (out.is_ok() && out->Ok_0.outcome==RestoreOutcome::Drained)),
             out.is_err() ==> out->Err_0==(ticket,result,retry),
             out.is_ok() ==> out->Ok_0.result==result && out->Ok_0.outcome==crate::cleanup_queue::completion::outcome(result,retry,policy),
@@ -495,9 +564,16 @@ impl<T> CleanupGroups<T> {
     }
     pub fn retry(&mut self,id:usize)->(out:Result<RestoreTicket,RestoreError>)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
+        ensures old(self).live(id) ==> final(self).queues()[id].issued()==old(self).queues()[id].issued(),out.is_ok() ==> !final(self).queues()[id].issued(),out.is_err() && old(self).live(id) ==> final(self).queues()[id].protocol().selected()==old(self).queues()[id].protocol().selected(),
+            old(self).live(id) ==> final(self).queues()[id].link()==old(self).queues()[id].link(),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),final(self).domain_ids()==old(self).domain_ids(),final(self).live(id)==old(self).live(id),
             out.is_ok()==(old(self).live(id) && old(self).queues()[id].retry_enabled()),
             out.is_ok() ==> !final(self).queues()[id].protocol().failed_spec(),
+            old(self).live(id) ==> final(self).queues()[id].slots()==old(self).queues()[id].slots()
+                && final(self).queues()[id].protocol().waiting()==old(self).queues()[id].protocol().waiting(),
+            out.is_ok() ==> old(self).queues()[id].protocol().selected().is_some() && final(self).queues()[id].protocol().selected()==Some(out->Ok_0)
+                && out->Ok_0.token==old(self).queues()[id].protocol().selected().unwrap().token
+                && out->Ok_0.attempt>old(self).queues()[id].protocol().selected().unwrap().attempt,
     {
         if !self.contains(id) {return Err(RestoreError::InvalidState);}
         let mut queue=self.take(id);let out=queue.retry();self.put(id,queue);out
@@ -566,7 +642,8 @@ impl<T> CleanupGroups<T> {
     }
     pub fn retry_all(&mut self)->(out:bool)
         requires old(self).wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),out==old(self).retries_ready(),
+        ensures final(self).same_slots(old(self)),out ==> final(self).retried_failed(old(self)),
+            final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),out==old(self).retries_ready(),
             final(self).domain_ids()==old(self).domain_ids(),final(self).closed()==old(self).closed(),
             final(self).queues().dom()==old(self).queues().dom(),
             final(self).next_id()==old(self).next_id(),final(self).last_domain()==old(self).last_domain(),
@@ -576,20 +653,44 @@ impl<T> CleanupGroups<T> {
         let ghost prior=*self;
         let ids=self.active_ids();let mut i=0;
         while i<ids.len()
-            invariant self.wf(),self.link()==prior.link(),self.execution_journal()==prior.execution_journal(),prior.retries_ready(),ids@.no_duplicates(),ids@.to_set()==self.queues().dom(),
+            invariant self.wf(),prior.wf(),self.same_slots(&prior),self.link()==prior.link(),self.execution_journal()==prior.execution_journal(),prior.retries_ready(),ids@.no_duplicates(),ids@.to_set()==self.queues().dom(),
                 self.domain_ids()==prior.domain_ids(),self.closed()==prior.closed(),
                 self.next_id()==prior.next_id(),self.last_domain()==prior.last_domain(),
                 self.drained_failure()==prior.drained_failure(),self.origin()==prior.origin(),
                 self.queues().dom()==prior.queues().dom(),i<=ids.len(),
                 forall|j:int| i<=j<ids.len() ==> self.queues()[#[trigger] ids@[j]]==prior.queues()[ids@[j]],
-                forall|j:int| 0<=j<i ==> !self.queues()[#[trigger] ids@[j]].protocol().failed_spec(),
+                forall|j:int| 0<=j<i ==> !self.queues()[#[trigger] ids@[j]].protocol().failed_spec()
+                    && (prior.queues()[ids@[j]].protocol().failed_spec() ==>
+                        prior.queues()[ids@[j]].protocol().selected().is_some() && self.queues()[ids@[j]].protocol().selected().is_some()
+                        && self.queues()[ids@[j]].protocol().selected().unwrap().token==prior.queues()[ids@[j]].protocol().selected().unwrap().token
+                        && self.queues()[ids@[j]].protocol().selected().unwrap().attempt>prior.queues()[ids@[j]].protocol().selected().unwrap().attempt),
             decreases ids.len()-i,
         {
             assert(ids@.to_set().contains(ids@[i as int]));assert(self.live(ids@[i as int]));
-            let id=ids[i];
+            let id=ids[i];let ghost before=*self;
             if self.entries.get(&id).unwrap().has_failed() {
                 assert(prior.live(id));assert(self.queues()[id].retry_enabled());
                 let _result=self.retry(id);assert(_result.is_ok());
+            }
+            proof {
+                assert forall|other:usize|#[trigger] prior.queues().contains_key(other) implies
+                    self.queues()[other].slots()==prior.queues()[other].slots()
+                    && self.queues()[other].issued()==prior.queues()[other].issued()
+                    && self.queues()[other].link()==prior.queues()[other].link()
+                    && self.queues()[other].protocol().domain_id()==prior.queues()[other].protocol().domain_id() by {
+                    assert(before.queues().contains_key(other));
+                    if other!=id {assert(self.queues()[other]==before.queues()[other]);}
+                }
+                assert(self.queues().dom() =~= prior.queues().dom());
+                assert(self.same_slots(&prior));
+                assert forall|j:int| 0<=j<=i implies !self.queues()[#[trigger] ids@[j]].protocol().failed_spec()
+                    && (prior.queues()[ids@[j]].protocol().failed_spec() ==>
+                        prior.queues()[ids@[j]].protocol().selected().is_some() && self.queues()[ids@[j]].protocol().selected().is_some()
+                        && self.queues()[ids@[j]].protocol().selected().unwrap().token==prior.queues()[ids@[j]].protocol().selected().unwrap().token
+                        && self.queues()[ids@[j]].protocol().selected().unwrap().attempt>prior.queues()[ids@[j]].protocol().selected().unwrap().attempt) by {
+                    if j<i {assert(ids@[j]!=id);assert(self.queues()[ids@[j]]==before.queues()[ids@[j]]);}
+                    else {assert(before.queues()[id]==prior.queues()[id]);}
+                }
             }
             i+=1;
         }
@@ -641,14 +742,29 @@ impl<T> CleanupGroups<T> {
                 && forall|j:int| 0<=j<old(self).queues()[id].slots().len() ==> #[trigger] old(self).queues()[id].slots()[j].is_none(),
             !out ==> *final(self)==*old(self),
             out && final(self).link().is_some() ==> final(self).membership_trace().last().event.change==(joint::Change::Groups {event:GroupEvent::Remove {id}}),
+    {self.remove_observed(id).0}
+    /// The same removal returns its actual drained queue as erased evidence.
+    /// An unsuccessful removal never produces a terminal queue.
+    pub fn remove_observed(&mut self,id:usize)->(out:(bool,Ghost<Option<CleanupQueue<T>>>))
+        requires old(self).wf(),
+        ensures final(self).execution_journal()==old(self).execution_journal(),final(self).link()==old(self).link(),final(self).wf(),final(self).origin()==old(self).origin(),final(self).drained_failure()==old(self).drained_failure(),final(self).frame(old(self),id),
+            out.0==(old(self).live(id) && drained(old(self).queues()[id])),
+            out.0 ==> final(self).queues()==old(self).queues().remove(id)
+                && final(self).domain_ids()==old(self).domain_ids().remove(id)
+                && !old(self).queues()[id].issued()
+                && forall|j:int| 0<=j<old(self).queues()[id].slots().len() ==> #[trigger] old(self).queues()[id].slots()[j].is_none(),
+            !out.0 ==> *final(self)==*old(self),
+            out.0 && final(self).link().is_some() ==> final(self).membership_trace().last().event.change==(joint::Change::Groups {event:GroupEvent::Remove {id}}),
+            out.1@==if out.0 {Some(old(self).queues()[id])} else {None},
+            out.1@.is_some() ==> out.1@.unwrap().wf() && drained(out.1@.unwrap()),
     {
-        if !self.contains(id) {return false;}
+        if !self.contains(id) {return (false,Ghost(None));}
         let queue=self.entries.get(&id).unwrap();
-        if !queue.is_empty() || queue.is_pending() || !queue.is_settled() {return false;}
+        if !queue.is_empty() || queue.is_pending() || !queue.is_settled() {return (false,Ghost(None));}
         let ghost before=self.observation();let ghost before_queues=self.queues();
         let queue=self.take(id);self.domains.remove(&id);
         proof {Self::members_remove(before_queues,id);}
-        self.commit_membership(Ghost(before),Ghost(GroupEvent::Remove {id}),MembershipAction::Remove,id,Some(&queue));true
+        self.commit_membership(Ghost(before),Ghost(GroupEvent::Remove {id}),MembershipAction::Remove,id,Some(&queue));(true,Ghost(Some(queue)))
     }
     /// Inspect every owned queue and close admission in one exclusive operation.
     /// There is no host-supplied manifest from which a group could be omitted.

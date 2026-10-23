@@ -92,9 +92,10 @@ impl<T> NativeServices<T> {
 /// Immutable metadata issued by the real native Begin capture. Sharing this
 /// owner cannot retain a service payload or alter a committed provider.
 pub struct NativeContext {
-    origin:ActionTicket,work_domain:u64,realms:RealmContext,anchor:Port,provisions:Vec<Port>,bindings:Vec<Binding>,
+    origin:ActionTicket,work_domain:u64,realms:RealmContext,anchor:Port,provisions:Vec<Port>,bindings:Vec<Binding>,publications:BTreeMap<usize,ActionTicket>,
 }
 impl NativeContext {
+    pub closed spec fn publication_origins(&self)->Map<usize,ActionTicket> {self.publications@}
     pub closed spec fn origin(&self)->ActionTicket {self.origin}
     pub closed spec fn domain_id(&self)->u64 {self.work_domain}
     pub closed spec fn realms(&self)->Map<u64,u64> {self.realms.mapping()}
@@ -107,6 +108,8 @@ impl NativeContext {
         self.origin()==capture.origin && self.domain_id()==capture.work_domain
             && self.realms()==capture.realms && self.anchor_port()==capture.anchor
             && self.provisions()==capture.provisions && self.bindings()==capture.bindings
+            && (forall|id:usize|#[trigger] self.publication_origins().contains_key(id) ==> capture.sources.contains_key(id) && self.publication_origins()[id]==capture.sources[id].origin)
+            && (forall|key:(usize,u64,u64)|#[trigger] capture.imports.contains_key(key) ==> self.publication_origins().contains_key(key.0))
     }
     pub fn ticket(&self)->(out:ActionTicket) ensures out==self.origin(), {self.origin}
     pub fn owner(&self)->(out:usize) ensures out==self.origin().id, {self.origin.id}
@@ -180,7 +183,7 @@ impl<T> NativeEpisode<T> {
     }
     pub fn ticket(&self)->(out:ActionTicket) ensures out==self.origin(), {self.context.origin}
     pub fn is_closed(&self)->(out:bool) ensures out==self.closed(), {self.closed}
-    fn declares(&self,port:Port)->(out:bool) ensures out==self.provisions().contains(port), {
+    pub(crate) fn declares(&self,port:Port)->(out:bool) ensures out==self.provisions().contains(port), {
         let mut i=0;
         while i<self.context.provisions.len()
             invariant i<=self.context.provisions.len(),forall|j:int| 0<=j<i ==> self.context.provisions@[j]!=port,
@@ -267,6 +270,18 @@ impl<T> NativeEpisode<T> {
             NativeValueError::Duplicate=>false,
         }
     }
+    /// The provider's actual Begin-captured generation, not today's target.
+    // Explicit branches preserve the erased receipt and owner relations.
+    #[allow(clippy::manual_map)]
+    pub fn provider_origin(&self,provider:usize,port:Port)->(out:Option<ActionTicket>)
+        requires self.wf(),
+        ensures out.is_some() ==> if self.provisions().contains(port) {out==Some(self.origin()) && provider==self.origin().id}
+            else {self.capture().sources.contains_key(provider) && out==Some(self.capture().sources[provider].origin)},
+            (exists|value:Arc<T>|self.selects_value(provider,port,value)) ==> out.is_some(),
+    {
+        if self.declares(port) {if provider==self.context.origin.id {Some(self.context.origin)} else {None}}
+        else {match self.context.publications.get(&provider) {Some(origin)=>Some(*origin),None=>None}}
+    }
     pub fn read(&self,port:Port)->(out:Result<(usize,&Arc<T>),NativeReadError>)
         requires self.wf(),
         ensures out.is_err() ==> self.read_failed(port,out->Err_0),
@@ -344,7 +359,9 @@ impl LifecycleState {
     pub fn begin_native_execution<T,C,G,I,R>(&mut self,store:&NativeServices<T>,registration:&RegisteredPlugin<R>,cleanup_domain:u64)
         ->(out:Result<(SetupWork<C,G>,CleanupGroups<I>,NativeEpisode<T>),Error>)
         requires old(self).wf(),store.wf(),
-        ensures out.is_ok() ==> out->Ok_0.0.link().is_none() && out->Ok_0.1.execution_journal().is_none() && out->Ok_0.1.queues().dom()==set![0usize],(forall|n:usize| n!=registration.owner() ==> final(self).control().generation_of(n)==old(self).control().generation_of(n)), out.is_ok() ==> out->Ok_0.0.accepts(), out.is_ok() ==> !out->Ok_0.0.is_closed() && !out->Ok_0.1.closed(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
+        ensures out.is_ok() ==> out->Ok_0.0.root_status()==crate::setup_work::RootStatus::Unissued
+                && final(self).registered_root_ready(registration,&out->Ok_0.0),
+            final(self).control().next_id()==old(self).control().next_id(),out.is_ok() ==> out->Ok_0.0.link().is_none() && out->Ok_0.1.execution_journal().is_none() && out->Ok_0.1.queues().dom()==set![0usize],(forall|n:usize| n!=registration.owner() ==> final(self).control().generation_of(n)==old(self).control().generation_of(n)), out.is_ok() ==> out->Ok_0.0.accepts(), out.is_ok() ==> !out->Ok_0.0.is_closed() && !out->Ok_0.1.closed(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),
             out.is_ok()==(store.domain_id()==old(self).protocol().domain_id() && registration.domain_id()==old(self).protocol().domain_id()
                 && !store.entries().contains_key(registration.owner())
                 && old(self).protocol().admission_enabled(registration.owner()) && old(self).control().begin_enabled(registration.owner())),
@@ -393,9 +410,11 @@ impl LifecycleState {
     {
         let ticket=work.lifecycle_ticket().unwrap();
         let bindings=self.kernel.committed(ticket.id);
-        let mut imports=BTreeMap::new();let mut i=0;
+        let mut imports=BTreeMap::new();let mut publications:BTreeMap<usize,ActionTicket>=BTreeMap::new();let mut i=0;
         while i<bindings.len()
             invariant i<=bindings.len(),self.wf(),store.wf(),
+                forall|id:usize|#[trigger] publications@.contains_key(id) ==> store.entries().contains_key(id) && publications@[id]==store.entries()[id].origin(),
+                forall|key:(usize,u64,u64)|#[trigger] imports@.contains_key(key) ==> publications@.contains_key(key.0),
                 forall|j:int| 0<=j<i && store.available(self,bindings@[j].provider,Port {key:bindings@[j].key,realm:bindings@[j].realm}) ==>
                     imports@.contains_key((bindings@[j].provider,bindings@[j].key,bindings@[j].realm)),
                 forall|key:(usize,u64,u64)| #[trigger] imports@.contains_key(key) ==> bindings@.contains(Binding {provider:key.0,key:key.1,realm:key.2})
@@ -405,6 +424,7 @@ impl LifecycleState {
             let b=bindings[i];
             if let Some(value)=store.retained(self,b.provider,Port {key:b.key,realm:b.realm}) {
                 assert(bindings@.contains(b));imports.insert((b.provider,b.key,b.realm),value.clone());
+                publications.insert(b.provider,store.entries.get(&b.provider).unwrap().origin);
             }
             i+=1;
         }
@@ -425,7 +445,7 @@ impl LifecycleState {
             }
             assert(capture.wf());
         }
-        NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings}),owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}
+        NativeEpisode {context:Arc::new(NativeContext {origin:ticket,work_domain:work.domain(),realms,anchor,provisions,bindings,publications}),owned:BTreeMap::new(),imports,closed:false,capture:Ghost(capture)}
     }
     fn native_values_match<T,C,G>(&self,id:usize,store:&NativeServices<T>,values:&NativeEpisode<T>,work:&SetupWork<C,G>)->(out:bool)
         ensures out==(store.domain_id()==self.protocol().domain_id() && Some(values.origin())==work.origin()
@@ -437,6 +457,7 @@ impl LifecycleState {
         ->(out:Result<(),Error>)
         requires old(self).wf(),old(store).wf(),values.wf(),work.wf(),groups.wf(),
         ensures final(self).control().generations_preserved(&old(self).control()), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(store).wf(),final(store).domain_id()==old(store).domain_id(),
+            old(store).entries().submap_of(final(store).entries()),
             out.is_err() ==> *final(store)==*old(store) && final(self).control().unchanged(&old(self).control()),
             out.is_ok() ==> values.domain_id()==work.domain_id() && old(self).execution_matches(id,work,groups) && values.complete() && !values.closed() && Some(values.origin())==work.origin()
                 && values.origin().id==id && values.origin().domain==old(self).protocol().domain_id()
@@ -458,7 +479,8 @@ impl LifecycleState {
     pub fn release_native_execution<T,C,G,I>(&mut self,id:usize,store:&mut NativeServices<T>,values:&mut NativeEpisode<T>,work:&mut SetupWork<C,G>,groups:&mut CleanupGroups<I>)
         ->(out:Result<(CleanupOutcome,ReleasedNativeValues<T>),Error>)
         requires old(self).wf(),old(store).wf(),old(values).wf(),old(work).wf(),old(groups).wf(),
-        ensures final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).control().generations_preserved(&old(self).control()), out.is_ok() ==> old(work).idle() && old(groups).all_drained(), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(store).wf(),final(values).wf(),final(work).wf(),final(groups).wf(),
+        ensures final(groups).next_id()==old(groups).next_id(),
+            final(groups).link()==old(groups).link(),final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).control().generations_preserved(&old(self).control()), out.is_ok() ==> old(work).idle() && old(groups).all_drained(), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).protocol().domain_id()==old(self).protocol().domain_id(),final(store).wf(),final(values).wf(),final(work).wf(),final(groups).wf(),
             final(store).domain_id()==old(store).domain_id(),final(values).same_identity(old(values)),
             out.is_err() ==> final(self).same(old(self)) && *final(store)==*old(store) && *final(values)==*old(values)
                 && *final(work)==*old(work) && *final(groups)==*old(groups),

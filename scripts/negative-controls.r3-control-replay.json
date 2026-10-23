@@ -1,0 +1,57 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-control-replay-keeps-source-allocation",
+      "mutation": {
+        "file": "kernel_replay_names.rs",
+        "old": "names.pair(*actor,next);",
+        "new": "names.pair(*actor,*actor);"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "kernel_replay::names",
+          "descendants": false,
+          "function": "cordis_negative::kernel_replay::names::prepare"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::kernel_replay::names::prepare",
+          "module": "kernel_replay::names",
+          "file": "kernel_replay_names.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(names.name_spec(*actor)==prior_next);"
+        }
+      ],
+      "selectionRationale": "Reject unchanged source allocation IDs and omission of the real Kernel Begin call. Require fresh matching positives, whole-mutant compilation and the designated semantic assertion. Timeouts, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "r3-control-replay-skips-executable-begin",
+      "mutation": {
+        "file": "kernel_replay.rs",
+        "old": "r::Rule::Begin=>{self.begin(*actor)?;}",
+        "new": "r::Rule::Begin=>{}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "kernel_replay",
+          "descendants": true
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::Kernel::replay_one",
+          "module": "kernel_replay",
+          "file": "kernel_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(r::step(prior.paper(),self.paper(),c.actor(),c.rule()));"
+        }
+      ],
+      "selectionRationale": "Verify the kernel_replay module and its name-preparation child module with the pinned verifier module filter. The full Rust method name is rooted at Kernel, while its defining timing module is kernel_replay. Require the exact replay_one control-step assertion to fail; retain strict scope, positive-baseline, compiling-mutant and diagnostic checks."
+    }
+  ]
+}

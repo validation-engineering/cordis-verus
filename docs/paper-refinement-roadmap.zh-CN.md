@@ -1,5 +1,9 @@
 # 整篇论文精化里程碑
 
+**当前剩余工作以[论文到代码义务盘点](paper-mapping-inventory.zh-CN.md)为索引。** R1–R4 是技术层次；盘点用 31 个固定关闭单元记录全部 81 项和四项整体义务的已有成果、前提来源及依赖。这些单元不是轮数估计或完成百分比。
+
+R3 当前剩余验收项及依赖统一见 [R3 剩余工作](r3-remaining-work.zh-CN.md)。下方历史工作包是局部成果，不表示仅剩最后测试。
+
 R2 已在明确的 [managed-production/v1 范围](r2-acceptance.zh-CN.md)内完成。R3／R4 仍在推进，R5 尚未完成，原论文审计结论未改变。
 
 [English](paper-refinement-roadmap.md)
@@ -24,6 +28,42 @@ R0 已完成计划基线；R3–R4 已有部分成果，R5 尚待验收。这些
 
 R0 先于 R1。表示确定后，R2 与 R3 可以同时推进；R4 组合两者的结果，R5 审查整条链。
 代码与证明工作可以跨里程碑推进，运行案例和完整验收检查在相关工作组合后集中完成。
+
+[来源连续性路径](r3-source-continuity.zh-CN.md)从真实 scalar／typed 存储历史推导完整生产者区间、区间前义务与恢复。[R3 剩余第 1 包](r3-final-recovery.zh-CN.md)现已将区间、实际 native Unload、外部恢复和全部原始 Child 义务组合到同一个真实快照。可执行捕获返回证明层阻断或完整终点保证；非空终态 owner／Child 客户端推导外部和 Child 闭合。验证与源码绑定在[开发记录](development-report.json)中，另有两个独立定向负向控制。[第 2 包](r3-observation-recovery.zh-CN.md)现已完成 native 中间截面的完整 publication／owner／pending 来源重建与恢复查询，并接入同一实际快照。[第 3 包](r3-host-recovery.zh-CN.md)现已将普通 Rust 宿主修改入口接到记录型所有者。Node 独立协议恢复和合法剩余生产执行仍待完成，R3 尚未完成。
+
+[闭合区域删除](r3-closed-region-deletion.zh-CN.md)现为 Mixed／Fresh 实际脚本报告补入一类 owner 创建 Child、publication 存在实际 consumer 的合法剩余执行构造，并有非空证明客户端。Fresh 还提供经过验证的可执行名称压缩、绑定来源的 Insert 参数及实际命令计划的合法轨迹，并有 39→25 个转换的重放回归。跨区域共享写入、按特定 Episode 选择、Mixed 固定名称迁移及生产接入仍待完成。
+
+Fresh 现已从实际执行保留 Active 完整发布、精确且合法的蓝图声明及声明去重事实，并证明压缩保持它们。全部七类分派命令已具备成功充要条件。精确后继、同步 Divert 迁移和真实 generation／清理元数据已组合为该 Fresh profile 的整段有限脚本完备性：原执行器完整运行满足条件的压缩计划，返回相同记录和最终状态；26→21 回归还覆盖保留 Loading 离开与 consumer 重复激活。
+
+## 当前 R3 批次
+
+[全 Episode 恢复](r3-episode-recovery.zh-CN.md)已将实际 Mixed／Fresh 的任意检查点与历史中间
+Unload 接到式 (55)／(56)，包括返回机器的真实逆操作收据。[生产恢复](r3-production-recovery.zh-CN.md)
+进一步从真实 scalar／typed 历史及 quiet 间隔推出混合逆序列有定义，并解释实际 typed 清理
+失败。[交错恢复](r3-interleaved-recovery.zh-CN.md)现已从记录的派发／重试构造本地受管确认
+覆盖，并利用实际移除／释放边界，在明确来源与外部恢复闭合条件下恢复 Begin 值。
+受管所有者现已沿真实 root 返回、派发、native 重试和释放路径维护历史，并支持后续注册、
+新组来源及有守卫的同步／等待结果确认。work／effect／Child 准入及后续受管调用的
+正向观察也已持续维护这些历史。真实返回、Pop 派发及确认现已连接同 Journal 的受管
+调用与清理，包含失败前缀、空调用和重试。[原生 Child 桥](r3-child-recovery.zh-CN.md)
+现已将持久共享槽决策接到准确 Child Episode 自己的 Unload；普通 Rust 入口组合真实
+退休与带守卫释放，让 Unload 同时晚于退休和清理封闭。创建者 Episode 查询将该证据
+关联到保留的 Child 逆操作。实际登记、退休及 managed 释放现自动保留出生／父 Episode
+与终态来源，并按全部原始 native 逆操作检查完整性，不从父插件排空推断 Child 完成。
+[共同切点组合](r3-common-recovery-cut.zh-CN.md)现利用实际分配新鲜性保持 Child 终态，
+与调用值恢复组合，并推出本次调用的正向注册在同一实际快照不再 pending。
+[被观察所有者路径](r3-observed-recovery.zh-CN.md)进一步从真实注册步骤和终态组推出
+外部恢复；可执行调用／派发入口沿失败和重试保持已有观察覆盖。
+native 中间切点的 publication／owner／pending 恢复现见[第 2 包](r3-observation-recovery.zh-CN.md)。普通 Rust 宿主迁移现见[第 3 包](r3-host-recovery.zh-CN.md)。
+一般合法删除及整体审查仍待完成，
+R3 保持进行中。
+
+以下检查点描述较早实施阶段；R2 当前完成范围以上方验收页为准。
+
+[第 4 包](r3-native-deletion.zh-CN.md)现从真实快照构造中间区间的 native 生命周期／publication／owner 删除，保留其他 Episode、出生与提交来源，并共享受管恢复切点。完整效果轨迹转换、可执行 generation／分配重放、Node 恢复及 R3 联合验收仍待完成。
+
+
+[Native 控制重放](r3-control-replay.zh-CN.md)现已将来源区间删除接到原生产 Kernel 的实际调用：压缩注册表 ID 与父／provider 引用，从保留 Begin 重新生成 generation，并证明每一步实际控制状态。真实 native 案例覆盖 24→13 步、后续分配移位和 generation 3→2。[自动来源链](r3-source-chain.zh-CN.md)已从真实转换导出控制命令／快照关联，并将每个 Unload 的清理来源及 managed 恢复切面接到同一 Journal；完整 Journal／typed payload／action 与 work 票据转换、Node 恢复和 R3 联合验收仍未完成。
 
 ## 历史实施检查点与下一步
 
@@ -118,3 +158,7 @@ Begin 来源现已贯穿生产 episode、发布和释放合同：捕获的 impor
 连续历史归纳证明了记录的 Begin 来源与保留。共享 adapter 锁、任意函数含义和完整
 Node／native 到 R1 的联合解释仍开放，详见
 [R2 归属合同](r2-execution.zh-CN.md#begin-分配的-episode-归属与延迟根调用)。
+
+[第 5 包](r3-effect-deletion.zh-CN.md)现从来源准入的 native 区间和效果掩码构造完整 Journal 关系中的合法剩余轨迹，保留真实守卫读取、槽位引用、scalar 逆操作来源及 pending 登记下标，并共享恢复切点。可执行分配／generation 重放、完整 typed 生产者转换、更一般共享写入、Node 恢复及 R3 联合验收仍待完成。
+
+[真实 managed 目标执行](r3-target-execution.zh-CN.md)现已保存一次实际调用，并经新目标 Begin、原解释器和记录清理历史的所有者运行函数。源／目标票据分离，局部步骤在输入对应条件下获得结果对应证明。完整选择后的 Journal 调度及跨调用输入／引用／票据迁移仍未完成。

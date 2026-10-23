@@ -508,6 +508,7 @@ pub struct MixedDriver {
 }
 
 impl MixedDriver {
+    pub closed spec fn allocation_bound(&self)->nat {self.rows.len() as nat}
     pub closed spec fn control(&self)->r::State {self.kernel.paper()}
     pub closed spec fn table(&self,id:usize)->IMap<Port,u64> {self.tables[id as int].map()}
     pub closed spec fn journal(&self,id:usize)->Seq<Receipt> {self.rows[id as int].journal@}
@@ -836,7 +837,7 @@ impl MixedDriver {
     }
 
     pub fn new(blueprints:Vec<Blueprint>)->(out:Self)
-        ensures out.wf(),out.control().fibers.dom().is_empty(),out.represents(blueprints@,mx::empty()),
+        ensures out.wf(),out.allocation_bound()==0,out.control().fibers.dom().is_empty(),out.represents(blueprints@,mx::empty()),
     {
         let out=Self {kernel:Kernel::new(),blueprints,rows:Vec::new(),tables:Vec::new()};
         assert(out.control().fibers =~= IMap::empty());assert(out.tables() =~= IMap::empty());out
@@ -918,7 +919,7 @@ impl MixedDriver {
 
     fn insert_inner(&mut self,parent:Option<usize>,blueprint:usize)->(out:Result<usize,DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).blueprints@==old(self).blueprints@,
+        ensures final(self).kernel.synchronous_metadata(&old(self).kernel,false), final(self).wf(),final(self).blueprints@==old(self).blueprints@,
             out.is_ok()==old(self).insertion_enabled(parent,blueprint),
             final(self).rows.len()>=old(self).rows.len(),
             forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i] && final(self).tables[i]==old(self).tables[i],
@@ -1252,7 +1253,7 @@ impl MixedDriver {
     fn execute(&mut self,actor:usize,_blueprint:usize,instruction:Instruction)->(out:Result<Receipt,DriverError>)
         requires old(self).wf(),actor<old(self).rows.len(),r::registered(old(self).control(),actor),
             old(self).control().fibers[actor].phase==Phase::Loading,
-        ensures final(self).wf(),final(self).blueprints@==old(self).blueprints@,
+        ensures final(self).kernel.synchronous_metadata(&old(self).kernel,false), final(self).wf(),final(self).blueprints@==old(self).blueprints@,
             out.is_ok()==old(self).primitive_enabled(actor,instruction),
             final(self).rows.len()>=old(self).rows.len(),
             forall|i:int| 0<=i<old(self).rows.len() ==> final(self).rows[i]==old(self).rows[i],
@@ -1356,7 +1357,7 @@ impl MixedDriver {
         requires old(self).wf(),actor<old(self).rows.len(),r::registered(old(self).control(),actor),
             old(self).control().fibers[actor].phase==Phase::Loading,receipt.actor==actor,
             next.is_some() ==> next.unwrap()<=old(self).blueprints[old(self).rows[actor as int].blueprint as int].code.len(),
-        ensures final(self).wf(),final(self).rows.len()==old(self).rows.len(),
+        ensures final(self).kernel.synchronous_metadata(&old(self).kernel,false), final(self).wf(),final(self).rows.len()==old(self).rows.len(),
             out.is_ok()==(next.is_some() || (old(self).fully_provided(actor) && r::coherent(old(self).control(),actor))),
             final(self).tables@==old(self).tables@,final(self).blueprints@==old(self).blueprints@,
             out.is_ok() ==> {
@@ -1512,7 +1513,7 @@ impl MixedDriver {
     fn undo_one(&mut self,receipt:Receipt)->(out:Result<(),DriverError>)
         requires old(self).wf(),r::registered(old(self).control(),receipt.actor),
             old(self).control().fibers[receipt.actor].phase==Phase::Unloading,
-        ensures final(self).wf(),final(self).rows@==old(self).rows@,final(self).blueprints@==old(self).blueprints@,
+        ensures final(self).kernel.generations_preserved(&old(self).kernel), final(self).kernel.synchronous_metadata(&old(self).kernel,false), final(self).wf(),final(self).rows@==old(self).rows@,final(self).blueprints@==old(self).blueprints@,
             out.is_ok()==mx::undo(receipt.model(),old(self).primitive_state()).is_some(),
             out.is_err() ==> final(self).same(old(self)),
             forall|n:usize| final(self).kernel.is_restoring(n)==old(self).kernel.is_restoring(n),
@@ -1654,7 +1655,7 @@ impl MixedDriver {
     #[verifier::spinoff_prover]
     fn unload_inner(&mut self,actor:usize)->(out:Result<(),DriverError>)
         requires old(self).wf(),
-        ensures final(self).wf(),out.is_ok()==old(self).unload_enabled(actor),
+        ensures out.is_ok() ==> final(self).kernel.synchronous_metadata(&old(self).kernel,false), final(self).wf(),out.is_ok()==old(self).unload_enabled(actor),
             old(self).owner_table_recovery() && out.is_ok() ==> final(self).table(actor).is_empty(),
             out.is_ok() ==> {
             &&& final(self).journal(actor).len()==0 && final(self).rows[actor as int].current.is_none()
@@ -1689,7 +1690,9 @@ impl MixedDriver {
         while !self.rows[actor].journal.is_empty()
             invariant initial==*old(self),self.wf(),actor<self.rows.len(),r::registered(self.control(),actor),
                 self.control().fibers[actor].phase==Phase::Unloading,self.kernel.is_restoring(actor),
-                initial.kernel.cleanup_enabled(actor),
+                initial.kernel.cleanup_enabled(actor),self.kernel.generations_preserved(&initial.kernel),
+                self.kernel.next_id()==initial.kernel.next_id(),
+                forall|n:usize|n!=actor ==> self.kernel.is_restoring(n)==initial.kernel.is_restoring(n),
                 r::registered(initial.control(),actor),initial.control().fibers[actor].phase==Phase::Unloading,!r::relied(initial.control(),actor),
                 self.rows.len()==initial.rows.len(),self.blueprints@==initial.blueprints@,
                 self.rows[actor as int].blueprint==initial.rows[actor as int].blueprint,
@@ -1742,6 +1745,18 @@ impl MixedDriver {
             assert(self.primitive_state().effects =~= expected.effects);
             assert(self.primitive_state().iterators =~= expected.iterators);
             assert(self.primitive_state().accumulators =~= expected.accumulators);
+        }
+        proof {
+            assert(self.kernel.nodes.len()==initial.kernel.nodes.len());
+            assert forall|i:int|0<=i<self.kernel.nodes.len() implies self.kernel.nodes[i].generation==initial.kernel.nodes[i].generation by {
+                assert(self.kernel.nodes[i].generation==restored.kernel.nodes[i].generation);
+                assert(restored.kernel.nodes[i].generation==initial.kernel.nodes[i].generation);
+            }
+            assert(Kernel::node_ok(self.kernel.nodes@,actor as int));
+            assert(!self.kernel.is_restoring(actor));
+            assert forall|n:usize|!initial.kernel.is_restoring(n) implies !self.kernel.is_restoring(n) by {
+                if n!=actor {assert(self.kernel.is_restoring(n)==restored.kernel.is_restoring(n));}
+            }
         }
         Ok(())
     }
@@ -1976,7 +1991,7 @@ impl ScriptReport {
         requires self.machine.wf(),mx::execution(library(),programs(bank),states,labels(self.transitions@)),states.first()==mx::empty::<u64,Index>(),
             self.machine.represents(bank,states.last()),
         ensures self.refines(bank),self.machine.unit_child_recovery(),self.machine.provision_recovery(),self.machine.journal_recovery(),
-            self.machine.owner_table_recovery(),self.terminal_recovery(bank),
+            self.machine.owner_table_recovery(),self.terminal_recovery(bank),self.recovery_history(bank),
     {
         library_theory();mx::from_empty_safe(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));
         self.machine.unit_child_recovery_from_source(bank,states.last());
@@ -1987,6 +2002,7 @@ impl ScriptReport {
         crate::provision_coverage::mixed_from_empty(|_:Port,x:u64,y:u64|x==y,library(),programs(bank),states,labels(self.transitions@));
         self.machine.owner_table_recovery_from_source(bank,states.last());
         self.establish_terminal_recovery(bank,states);
+        self.establish_recovery_history(bank,states);
     }
 }
 
@@ -1996,7 +2012,7 @@ impl ScriptReport {
 pub fn run_script(blueprints:Vec<Blueprint>,commands:&[Command])->(out:ScriptReport)
     ensures out.machine.wf(),out.refines(blueprints@),out.transitions.len()<=commands.len(),
         out.machine.unit_child_recovery(),out.machine.provision_recovery(),out.machine.journal_recovery(),
-        out.machine.owner_table_recovery(),out.terminal_recovery(blueprints@),
+        out.machine.owner_table_recovery(),out.terminal_recovery(blueprints@),out.recovery_history(blueprints@),
         out.error.is_none() ==> out.transitions.len()==commands.len(),
         out.error.is_some() ==> out.transitions.len()<commands.len(),
         out.error.is_some() ==> match commands[out.transitions.len() as int] {
@@ -2091,3 +2107,9 @@ mod unload_tests;
 
 #[path = "reified_context.rs"]
 pub mod context;
+
+#[path = "episode_replay.rs"]
+pub mod episode_replay;
+
+#[path = "script_deletion.rs"]
+pub mod deletion;

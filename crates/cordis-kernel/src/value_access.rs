@@ -239,9 +239,19 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
     /// Ordinary root/Child callbacks reach the same checked resolution path.
     /// No provider, raw value pointer or expected output is supplied by the host.
     #[verifier::rlimit(20)]
+    #[verifier::spinoff_prover]
     pub fn apply_native_value(&mut self,id:usize,port:Port,operation:Operation,branch:Branch)->(out:Result<Write,Error>)
         requires old(self).wf(),
-        ensures final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).execution_journal()==old(self).execution_journal(),
             out.is_err() ==> final(self).same_runtime(old(self)),
@@ -286,9 +296,19 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
     }
     /// Ordered multi-service calls keep an actual prior write as a cause.
     #[verifier::rlimit(20)]
+    #[verifier::spinoff_prover]
     pub fn apply_native_value_chained(&mut self,id:usize,port:Port,operation:Operation,branch:Branch,Tracked(previous):Tracked<Option<joint::Receipt>>)->(out:Result<Write,Error>)
         requires old(self).wf(),previous.is_some() ==> previous.unwrap().wf(),
-        ensures final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).execution_journal()==old(self).execution_journal(),
             out.is_err() ==> final(self).same_runtime(old(self)),

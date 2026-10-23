@@ -325,7 +325,11 @@ impl<C,G> SetupWork<C,G> {
     pub fn enqueue_owned_child<T>(&mut self,cleanups:&mut CleanupGroups<T>,group:usize,payload:C,inverse:T)
         ->(out:Result<usize,(C,T)>)
         requires old(self).wf(),old(cleanups).wf(),
-        ensures final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
+        ensures final(cleanups).frame(old(cleanups),group),
+            old(cleanups).live(group) ==> final(cleanups).queues()[group].link()==old(cleanups).queues()[group].link()
+                && final(cleanups).queues()[group].issued()==old(cleanups).queues()[group].issued()
+                && final(cleanups).queues()[group].protocol().selected()==old(cleanups).queues()[group].protocol().selected(),
+            final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(cleanups).queues().dom()==old(cleanups).queues().dom(), final(self).domain_id()==old(self).domain_id(), final(self).accepts()==old(self).accepts(), final(self).is_closed()==old(self).is_closed(), final(cleanups).origin()==old(cleanups).origin(), final(cleanups).domain_ids()==old(cleanups).domain_ids(), final(cleanups).closed()==old(cleanups).closed(), final(cleanups).live(0)==old(cleanups).live(0), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
             out.is_ok()==(old(self).owns(old(cleanups)) && old(self).accepts() && old(self).next_id()<u64::MAX && old(cleanups).acquisition_open(group)),
             out.is_err() ==> out->Err_0==(payload,inverse) && *final(self)==*old(self) && *final(cleanups)==*old(cleanups),
             out.is_ok() ==> old(self).owns(old(cleanups)) && old(self).accepts()
@@ -481,7 +485,9 @@ impl<C,G> SetupWork<C,G> {
     /// dispatch queue cannot hide work already handed to a host or a Future.
     pub fn seal<T>(&mut self,cleanups:&mut CleanupGroups<T>)->(out:bool)
         requires old(self).wf(),old(cleanups).wf(),
-        ensures final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(cleanups).origin()==old(cleanups).origin(), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
+        ensures out ==> final(cleanups).queues()==Map::empty(),
+            final(cleanups).next_id()==old(cleanups).next_id(),
+            final(cleanups).link()==old(cleanups).link(),final(cleanups).execution_journal()==old(cleanups).execution_journal(),final(self).link()==old(self).link(),final(self).domain_id()==old(self).domain_id(), final(cleanups).origin()==old(cleanups).origin(), final(self).wf(),final(self).origin()==old(self).origin(),final(cleanups).wf(),
             out==(old(self).owns(old(cleanups)) && old(self).idle() && old(cleanups).all_drained()),
             final(cleanups).drained_failure()==old(cleanups).drained_failure(),
             out ==> final(self).is_closed() && final(cleanups).closed() && old(self).outstanding().len()==0,

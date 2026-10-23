@@ -163,7 +163,7 @@ impl<R,H> NativeHost<R,H> {
     pub fn register(&mut self,parent:Option<usize>,realms:&BTreeMap<u64,u64>,anchor:Port,definition:PluginDefinition<R>,host:H)
         ->(out:Result<usize,(Error,PluginDefinition<R>,H)>)
         requires old(self).wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(),
+        ensures out.is_ok() ==> out->Ok_0==old(self).state().control().next_id(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(),
             out.is_ok()==old(self).state().registration_enabled(parent,realms@,anchor,&definition),
             out.is_err() ==> final(self).state().same(&old(self).state()) && final(self).entries()==old(self).entries()
                 && out->Err_0.1==definition && out->Err_0.2==host,
@@ -171,6 +171,7 @@ impl<R,H> NativeHost<R,H> {
                 && !old(self).entries().contains_key(out->Ok_0)
                 && final(self).entries()[out->Ok_0].recipe().version()==0
                 && final(self).entries()[out->Ok_0].recipe().payload()==definition.payload()
+                && final(self).entries()[out->Ok_0].recipe().parent_id()==parent
                 && final(self).entries()[out->Ok_0].recipe().realms()==realms@
                 && final(self).entries()[out->Ok_0].recipe().anchor_port()==anchor
                 && final(self).entries()[out->Ok_0].bookkeeping()==host
@@ -195,7 +196,7 @@ impl<R,H> NativeHost<R,H> {
     pub fn register_child<E>(&mut self,slot:&mut ChildSlot<E>,realms:&BTreeMap<u64,u64>,anchor:Port,definition:PluginDefinition<R>,host:H)
         ->(out:Result<usize,(Error,PluginDefinition<R>,H)>)
         requires old(self).wf(),old(slot).wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(slot).wf(),final(slot).same_origin(old(slot)),
+        ensures out.is_ok() ==> out->Ok_0==old(self).state().control().next_id(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(slot).wf(),final(slot).same_origin(old(slot)),
             out.is_ok()==(old(slot).state() is Pending && old(slot).domain_id()==old(self).state().protocol().domain_id()
                 && old(slot).episode()==old(self).state().control().generation_of(old(slot).owner())
                 && (old(self).state().control().phase_of(old(slot).owner())==Some(crate::Phase::Loading)
@@ -294,9 +295,13 @@ impl<R,H> NativeHost<R,H> {
         }
         out
     }
+    pub open spec fn root_ready<C,G>(&self,id:usize,work:&SetupWork<C,G>)->bool {
+        self.entries().contains_key(id) && self.state().registered_root_ready(&self.entries()[id].recipe(),work)
+    }
     pub fn admit_root<C,G,A>(&self,id:usize,work:&mut SetupWork<C,G>,argument:A)->(out:Result<RegisteredInvocation<A>,A>)
         requires self.wf(),old(work).wf(),
-        ensures final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> out->Err_0==argument && *final(work)==*old(work),
+        ensures out.is_ok()==self.root_ready(id,old(work)),
+            final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> out->Err_0==argument && *final(work)==*old(work),
             out.is_ok() ==> self.entries().contains_key(id) && out->Ok_0.owner()==id
                 && out->Ok_0.domain_id()==self.state().protocol().domain_id()
                 && out->Ok_0.version()==self.entries()[id].recipe().version() && out->Ok_0.work().value()==argument
@@ -372,7 +377,8 @@ impl<R,H> NativeHost<R,H> {
     pub fn begin_native_execution<V,C,G,I>(&mut self,id:usize,store:&NativeServices<V>,cleanup_domain:u64)
         ->(out:Result<(SetupWork<C,G>,CleanupGroups<I>,NativeEpisode<V>),Error>)
         requires old(self).wf(),store.wf(),
-        ensures out.is_ok() ==> out->Ok_0.0.link().is_none() && out->Ok_0.1.execution_journal().is_none() && out->Ok_0.1.queues().dom()==set![0usize],final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), (forall|n:usize| n!=id ==> final(self).state().control().generation_of(n)==old(self).state().control().generation_of(n)), out.is_ok() ==> out->Ok_0.0.accepts(), out.is_ok() ==> !out->Ok_0.0.is_closed() && !out->Ok_0.1.closed(), final(self).wf(),final(self).entries()==old(self).entries(),
+        ensures out.is_ok() ==> final(self).root_ready(id,&out->Ok_0.0),
+            final(self).state().control().next_id()==old(self).state().control().next_id(),out.is_ok() ==> out->Ok_0.0.link().is_none() && out->Ok_0.1.execution_journal().is_none() && out->Ok_0.1.queues().dom()==set![0usize],final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), (forall|n:usize| n!=id ==> final(self).state().control().generation_of(n)==old(self).state().control().generation_of(n)), out.is_ok() ==> out->Ok_0.0.accepts(), out.is_ok() ==> !out->Ok_0.0.is_closed() && !out->Ok_0.1.closed(), final(self).wf(),final(self).entries()==old(self).entries(),
             out.is_ok()==(old(self).entries().contains_key(id) && store.domain_id()==old(self).state().protocol().domain_id()
                 && !store.entries().contains_key(id) && old(self).state().protocol().admission_enabled(id) && old(self).state().control().begin_enabled(id)),
             out.is_err() ==> final(self).state().same(&old(self).state()),
@@ -417,7 +423,8 @@ impl<R,H> NativeHost<R,H> {
     pub fn finish_native_execution<V,C,G,I>(&mut self,id:usize,store:&mut NativeServices<V>,values:&NativeEpisode<V>,work:&SetupWork<C,G>,groups:&CleanupGroups<I>)
         ->(out:Result<(),Error>)
         requires old(self).wf(),old(store).wf(),values.wf(),work.wf(),groups.wf(),
-        ensures final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(store).domain_id()==old(store).domain_id(),
+        ensures old(store).entries().submap_of(final(store).entries()),
+            final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(store).domain_id()==old(store).domain_id(),
             out.is_err() ==> *final(store)==*old(store) && final(self).state().control().unchanged(&old(self).state().control()),
             out.is_ok() ==> old(self).state().execution_matches(id,work,groups) && values.complete() && !values.closed() && Some(values.origin())==work.origin()
                 && values.origin().id==id && values.origin().domain==old(self).state().protocol().domain_id()
@@ -441,7 +448,8 @@ impl<R,H> NativeHost<R,H> {
     pub fn release_native_execution<V,C,G,I>(&mut self,id:usize,store:&mut NativeServices<V>,values:&mut NativeEpisode<V>,work:&mut SetupWork<C,G>,groups:&mut CleanupGroups<I>)
         ->(out:Result<(CleanupOutcome,ReleasedNativeValues<V>),Error>)
         requires old(self).wf(),old(store).wf(),old(values).wf(),old(work).wf(),old(groups).wf(),
-        ensures final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), out.is_ok() ==> old(work).idle() && old(groups).all_drained(), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(values).wf(),final(work).wf(),final(groups).wf(),
+        ensures final(groups).next_id()==old(groups).next_id(),
+            final(groups).link()==old(groups).link(),final(work).link()==old(work).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), out.is_ok() ==> old(work).idle() && old(groups).all_drained(), final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(groups).origin()==old(groups).origin(), final(self).wf(),final(self).entries()==old(self).entries(),final(store).wf(),final(values).wf(),final(work).wf(),final(groups).wf(),
             final(store).domain_id()==old(store).domain_id(),final(values).same_identity(old(values)),
             out.is_err() ==> final(self).state().same(&old(self).state()) && *final(store)==*old(store) && *final(values)==*old(values)
                 && *final(work)==*old(work) && *final(groups)==*old(groups),
@@ -472,11 +480,14 @@ impl<R,H> NativeHost<R,H> {
         ensures out.is_ok() && out->Ok_0.is_none() ==> final(self).state().same(&old(self).state()), final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(self).wf(),final(self).entries()==old(self).entries(),final(slot).wf(),final(slot).same_origin(old(slot)),
             !(old(slot).state() is Pending) ==> *final(slot)==*old(slot),
             out.is_err() ==> final(self).state().same(&old(self).state()) && *final(slot)==*old(slot),
-            out.is_ok() ==> !(final(slot).state() is Pending)
+            out.is_ok() ==> old(slot).domain_id()==old(self).state().protocol().domain_id()
+                && out->Ok_0.is_some()==(final(slot).state() is Assigned)
+                && !(final(slot).state() is Pending)
                 && (old(slot).state() is Pending ==> final(slot).state() is Cancelled && out->Ok_0.is_none())
                 && (out->Ok_0.is_some() ==> old(slot).state() is Assigned && out->Ok_0==Some(old(slot).state()->Assigned_0)
                     && (if old(self).state().control().registered(out->Ok_0.unwrap().child()) {
-                        refinement::step(old(self).state().control().paper(),final(self).state().control().paper(),out->Ok_0.unwrap().child(),Rule::Retire)
+                        old(self).state().control().paper().fibers[out->Ok_0.unwrap().child()].parent==Some(old(slot).owner())
+                            && refinement::step(old(self).state().control().paper(),final(self).state().control().paper(),out->Ok_0.unwrap().child(),Rule::Retire)
                     } else {final(self).state().same(&old(self).state())})),
     {
         proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
@@ -550,7 +561,8 @@ impl<R,H> NativeHost<R,H> {
             out.is_err() ==> final(self).state().same(&old(self).state()),
             out.is_ok() ==> old(self).state().execution_matches(id,work,groups) && groups.any_failed()
                 && work.idle() && !groups.any_pending() && !groups.any_issued()
-                && !final(self).state().protocol().eligible(id,work.origin().unwrap().generation),
+                && !final(self).state().protocol().eligible(id,work.origin().unwrap().generation)
+                && final(self).state().protocol().failed(id,work.origin().unwrap().generation),
     {
         proof {reveal(crate::Kernel::generations_preserved);reveal(crate::Kernel::unchanged);}
 
@@ -561,7 +573,10 @@ impl<R,H> NativeHost<R,H> {
 
     pub fn retry_execution<C,G,I>(&mut self,id:usize,work:&SetupWork<C,G>,groups:&mut CleanupGroups<I>)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),work.wf(),old(groups).wf(),
-        ensures final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).entries()==old(self).entries(),final(self).state().control().unchanged(&old(self).state().control()),
+        ensures out.is_ok() ==> !final(groups).any_issued(),
+            final(groups).next_id()==old(groups).next_id(),
+            final(groups).same_slots(old(groups)),out.is_ok() ==> final(groups).retried_failed(old(groups)),
+            final(groups).link()==old(groups).link(),final(groups).execution_journal()==old(groups).execution_journal(),final(self).state().protocol().domain_id()==old(self).state().protocol().domain_id(), final(self).state().control().generations_preserved(&old(self).state().control()), final(groups).origin()==old(groups).origin(), final(groups).domain_ids()==old(groups).domain_ids(), final(groups).queues().dom()==old(groups).queues().dom(), final(groups).closed()==old(groups).closed(), final(self).wf(),final(self).entries()==old(self).entries(),final(self).state().control().unchanged(&old(self).state().control()),
             out.is_err() ==> final(self).state().same(&old(self).state()) && *final(groups)==*old(groups),
             final(groups).wf(),final(groups).drained_failure()==old(groups).drained_failure(),
             out.is_ok() ==> old(self).state().execution_matches(id,work,old(groups)) && old(groups).retries_ready()

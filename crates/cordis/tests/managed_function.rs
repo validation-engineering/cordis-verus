@@ -303,3 +303,74 @@ fn malformed_branches_and_static_dispatch_are_rejected() {
     start.episode.cancel();
     ready(start.episode.cleanup().unwrap()).unwrap();
 }
+
+#[test]
+fn recorded_host_keeps_root_prefix_through_late_writes_child_and_callback_retry() {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    let mut f = fixture();
+    let id = f
+        .runtime
+        .mount(
+            &f.context,
+            None,
+            Plugin::native_function(
+                "recorded root",
+                vec![
+                    I::scalar(f.key, Op::Add(5), next(1)),
+                    I::replace(f.text, "root".to_owned(), end()),
+                ],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    ready(f.runtime.settle()).unwrap();
+    let setup = f.runtime.owner_context(id).unwrap();
+    setup.update_reversible(f.key, Op::Add(2)).unwrap();
+    setup.replace_service(f.text, "later".to_owned()).unwrap();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let count = attempts.clone();
+    setup
+        .on_cleanup_retryable(move || {
+            if count.fetch_add(1, Ordering::SeqCst) == 0 {
+                Err("retry retained callback".into())
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap();
+    let child = setup
+        .mount(Plugin::native_function("recorded Child", vec![]).unwrap())
+        .unwrap();
+    ready(f.runtime.settle()).unwrap();
+    let stale_generation = f.runtime.episode_generation(id).unwrap();
+    f.runtime.dispose(id).unwrap();
+    assert!(matches!(
+        ready(f.runtime.settle()),
+        Err(RuntimeError::Cleanup { .. })
+    ));
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    assert_eq!(f.local.snapshot().value(), 17);
+    assert_eq!(f.runtime.get(&f.context, f.text).unwrap().as_str(), "later");
+    assert!(f.runtime.cleanup_failure(id).is_some());
+    assert!(setup.update_reversible(f.key, Op::Add(1)).is_err());
+    f.runtime.retry_cleanup(id).unwrap();
+    ready(f.runtime.settle()).unwrap();
+    assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        (f.local.snapshot().value(), f.local.snapshot().depth()),
+        (10, 0)
+    );
+    assert_eq!(f.runtime.get(&f.context, f.text).unwrap().as_str(), "old");
+    assert!(!f.runtime.contains(id));
+    assert!(!f.runtime.contains(child.id().unwrap()));
+    assert_ne!(f.runtime.episode_generation(id), Some(stale_generation));
+    assert!(setup.replace_service(f.text, "stale".to_owned()).is_err());
+    // The recorded owner is proof-erased; retained setup references cannot
+    // preserve released imports or reactivate a closed episode.
+    f.runtime.dispose(f.provider).unwrap();
+    ready(f.runtime.settle()).unwrap();
+    assert!(!f.runtime.contains(f.provider));
+}

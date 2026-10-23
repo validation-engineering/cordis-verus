@@ -158,7 +158,13 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
     pub(crate) fn register_inverse(&mut self,id:usize,applied:Applied)->(out:Registered)
         requires old(self).wf(),old(self).cleanup_state().live(id),applied.inverse.recorded(),
             applied.pending_for(joint::local(old(self).cleanup_state().queues()[id].link(),applied.inverse.target().journal_spec())),
-        ensures final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).value_attempts()==old(self).value_attempts(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).wf(),final(self).execution_journal()==old(self).execution_journal(),final(self).value_attempts()==old(self).value_attempts(),
             final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),
             final(self).effect_state()==old(self).effect_state(),final(self).checked_out()==old(self).checked_out(),final(self).initialized()==old(self).initialized(),
@@ -169,6 +175,7 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
             final(self).cleanup_state().live(id),final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),out.token==old(self).cleanup_state().queues()[id].slots().len(),
             final(self).cleanup_state().queues()[id].slots()==old(self).cleanup_state().queues()[id].slots().push(Some(ChildCleanup::<Cb,X>::Value(applied.inverse))),
             final(self).cleanup_state().queues()[id].protocol().waiting()==old(self).cleanup_state().queues()[id].protocol().waiting().push(out.token),
+            joint::groups::registration(out.evidence@.insertion(),final(self).cleanup_state().link(),id),
             out.evidence@.records(applied.inverse,final(self).cleanup_state().queues()[id].link(),final(self).cleanup_state().queues()[id].protocol().domain_id(),out.token),
             final(self).status_links()==old(self).status_links(),
     {

@@ -72,7 +72,7 @@ pub open spec fn value_law(before:Map<nat,Record>,after:Map<nat,Record>,step:Ste
             &&& forall|input:Map<nat,ValueState>| #[trigger] (run.unwrap().undo)(input)==
                 if input.contains_key(step.key) && input[step.key]==event.after() {Some(input.insert(step.key,event.before()))} else {None}
         },
-        Event::Restore {inverse,before:input,after:output}=>inverse.undo(input)==Some(output),
+        Event::Restore {inverse,before:input,after:output,..}=>inverse.undo(input)==Some(output),
         Event::Rejected {operation,before:input}=>crate::reversible_value::operation(operation)(input).is_none(),
         Event::Blocked {inverse,before:input}=>inverse.undo(input).is_none(),
         Event::ComputationRejected {code,before:input}=>effect::operation(code)(input).is_none(),

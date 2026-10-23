@@ -282,7 +282,7 @@ impl ReversibleValue {
                 cause.is_some() && cause.unwrap().journal()==self.journal_spec() ==>
                     forall|i:int| 0<=i<items@.len() ==> (#[trigger] items@[i]).inverse.origin().follows(&cause.unwrap()),
                 cell.wf(),cell.initial@==self.initial(),cell.authority@.source()==self.source(),
-                cell.joint.journal()==self.journal_spec(),cell.joint.key()==self.inner.pred().key,
+                cell.joint.journal()==self.journal_spec(),cell.joint.key()==self.inner.pred().key,cell.custody@.source()==self.inner.pred().custody,
                 error.is_some() ==> current.is_some() && operation(program.code()[current.unwrap() as int].operation)(cell.state).is_none(),
                 prefix(program.code(),points,outcomes@),points.last().state==cell.state,points.last().next==current,
                 cell.history@.len()==offset+outcomes.len()+if error.is_some() {1nat} else {0nat},
@@ -326,7 +326,7 @@ impl ReversibleValue {
                         }
                     }
                     let tracked origin=cell.joint.receipt();
-                    items.push_back(Applied {outcome:forward.outcome,next:forward.next,pending:forward.pending,inverse:Inverse {target:self.clone(),state:forward.inverse,origin:Tracked(origin)}});
+                    items.push_back(Applied {outcome:forward.outcome,next:forward.next,pending:forward.pending,inverse:Inverse {target:self.clone(),state:forward.inverse,identity:cell.joint.identity(),origin:Tracked(origin),lease:forward.lease}});
                 },
             }
         }
@@ -342,9 +342,19 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
     /// the value lock for the complete finite program, then this exclusive
     /// owner registers every actual inverse in order before returning.
     #[allow(clippy::len_zero)] // The pinned vstd specifies VecDeque::len, but not is_empty.
+    #[verifier::spinoff_prover]
     pub fn run_value_program(&mut self,id:usize,value:&ReversibleValue,program:&Program)->(out:Result<ProgramReport,ValueError>)
         requires old(self).wf(),program.valid(),
-        ensures final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),
             out.is_err() ==> out==Err(ValueError::Closed) && *final(self)==*old(self),
             out.is_err()==!(old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)),
@@ -365,9 +375,19 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
             final(self).status_links()==old(self).status_links(),
     {self.run_value_program_following(id,value,program,Tracked(None))}
     #[allow(clippy::len_zero)] // The checked VecDeque contract uses len.
+    #[verifier::spinoff_prover]
     pub(crate) fn run_value_program_following(&mut self,id:usize,value:&ReversibleValue,program:&Program,Tracked(cause):Tracked<Option<joint::Receipt>>)->(out:Result<ProgramReport,ValueError>)
         requires old(self).wf(),program.valid(),cause.is_some() ==> cause.unwrap().wf(),
-        ensures out.is_ok() && cause.is_some() && cause.unwrap().journal()==value.journal_spec() ==>
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            out.is_ok() && cause.is_some() && cause.unwrap().journal()==value.journal_spec() ==>
                 forall|i:int| 0<=i<out->Ok_0.results().len() ==> (#[trigger] out->Ok_0.registrations()[i]).write().follows(&cause.unwrap()),
             final(self).wf(),final(self).value_attempts()==old(self).value_attempts(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
             final(self).phase_spec()==old(self).phase_spec(),
@@ -399,7 +419,16 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
         let Tracked(mut receipts)=report.receipts;report.receipts=Tracked(Map::tracked_empty());
         let ghost slots=self.cleanup_state().queues()[id].slots();
         while items.len()>0
-            invariant earlier.is_some() && earlier.unwrap().journal()==value.journal_spec() ==>
+            invariant self.cleanup_state().frame(&prior.cleanup_state(),id),
+            self.cleanup_state().queues().dom()==prior.cleanup_state().queues().dom(),
+            self.cleanup_state().domain_ids()==prior.cleanup_state().domain_ids(),
+            prior.cleanup_state().live(id) ==> {
+                let before=prior.cleanup_state().queues()[id];let after=self.cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+                earlier.is_some() && earlier.unwrap().journal()==value.journal_spec() ==>
                     forall|j:int| 0<=j<all.len() ==> (#[trigger] all[j]).inverse.origin().follows(&earlier.unwrap()),
                 self.status_links()==prior.status_links(),self.wf(),self.value_attempts()==prior.value_attempts(),self.cleanup_state().live(id),report.certified(program.code()),
                 self.work_state()==prior.work_state(),self.value_state()==prior.value_state(),self.phase_spec()==prior.phase_spec(),

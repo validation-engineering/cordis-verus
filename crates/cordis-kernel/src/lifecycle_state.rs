@@ -181,7 +181,7 @@ impl LifecycleState {
 
     pub fn begin(&mut self,id:usize)->(out:Result<ActionTicket,Error>)
         requires old(self).wf(),
-        ensures (forall|n:usize| n!=id ==> final(self).control().generation_of(n)==old(self).control().generation_of(n)), final(self).wf(),final(self).control_history().extends(old(self).control_history()),
+        ensures final(self).control().next_id()==old(self).control().next_id(),(forall|n:usize| n!=id ==> final(self).control().generation_of(n)==old(self).control().generation_of(n)), final(self).wf(),final(self).control_history().extends(old(self).control_history()),
             out.is_ok()==(old(self).protocol().admission_enabled(id) && old(self).control().begin_enabled(id)),
             out.is_err() ==> final(self).same(old(self)),
             final(self).protocol().history_preserved(&old(self).protocol()),
@@ -232,6 +232,7 @@ impl LifecycleState {
         ensures final(self).wf(),final(self).control_history().extends(old(self).control_history()),
             out.is_ok()==old(self).protocol().cleanup_reply_enabled(ticket),
             out.is_err() ==> final(self).same(old(self)),
+            out.is_ok() && outcome==CleanupOutcome::Failed ==> final(self).protocol().failed(ticket.id,ticket.generation),
             final(self).control().unchanged(&old(self).control()),
             final(self).protocol().history_preserved(&old(self).protocol()),
             out.is_ok() ==> ticket.kind==crate::action_ledger::ActionKind::Cleanup && old(self).protocol().recorded(ticket)

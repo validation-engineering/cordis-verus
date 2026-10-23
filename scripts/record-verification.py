@@ -176,7 +176,11 @@ def test_counts(log):
             current = (doctests, line.split("Doc-tests ", 1)[1].strip())
         match = re.search(r"test result: ok\. (\d+) passed; 0 failed;", line)
         if match and current:
-            current[0][current[1]] = int(match[1])
+            # Integration test filenames can be shared by workspace crates.
+            # These labels group results by name; retain every successful run
+            # instead of letting a later crate overwrite an earlier count.
+            counts, label = current
+            counts[label] = counts.get(label, 0) + int(match[1])
             current = None
     if not suites or not sum(suites.values()):
         raise RuntimeError("No successful workspace test suites found")

@@ -24,6 +24,22 @@ pub open spec fn project<V>(s: full::State<V>, keys: ISet<Port>) -> IMap<Port, V
         |key: Port| s.tables[owner(s, key)][key])
 }
 
+/// Execution metadata does not affect the unique table-value observation.
+pub proof fn equal_payload<V>(a: full::State<V>, b: full::State<V>, keys: ISet<Port>)
+    requires unambiguous(a), a.control == b.control, a.tables == b.tables,
+    ensures project(a, keys) == project(b, keys),
+{
+    assert(bindings_equal(a, b)) by {
+        assert forall|key: Port, n: usize| owns(a, key, n) == owns(b, key, n)
+            && (owns(a, key, n) ==> a.tables[n][key] == b.tables[n][key]) by {}
+    }
+    assert(unambiguous(b)) by {
+        assert forall|key: Port, x: usize, y: usize| owns(b, key, x) && owns(b, key, y)
+            implies x == y by { assert(owns(a, key, x)); assert(owns(a, key, y)); }
+    }
+    projection_equal(a, b, keys);
+}
+
 pub proof fn unique_owner<V>(s: full::State<V>)
     requires inv::well_formed(s),
     ensures unambiguous(s),

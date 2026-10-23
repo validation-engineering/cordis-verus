@@ -1,0 +1,58 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "r3-target-execution-skips-interpreter",
+      "mutation": {
+        "file": "managed_replay.rs",
+        "old": "let (owner,report)=runtime.run_recorded_root(id,execution);",
+        "new": "let (owner,report)=(RecordedExecution::new(execution),Err::<RegisteredReport<E,T>,AdmissionError>(AdmissionError::NotAdmitted));"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
+          "module": "reversible_value::managed::replay",
+          "file": "managed_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(report.is_ok());"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated successful-admission assertion. Skipping the actual interpreter and inventing an admission error must not certify the real target invocation."
+    },
+    {
+      "name": "r3-target-execution-drops-source-body",
+      "mutation": {
+        "file": "managed_replay.rs",
+        "old": "Body::Managed(self.function.duplicate())",
+        "new": "Body::Managed(Function::<E,T> {code:Vec::new()})"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "reversible_value::managed::replay",
+          "descendants": false,
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
+          "module": "reversible_value::managed::replay",
+          "file": "managed_replay.rs",
+          "diagnosticKind": "assertion failed",
+          "uniqueSourceAnchor": "assert(recipe.payload()->Managed_0.code()==self.program().code());"
+        }
+      ],
+      "selectionRationale": "Require a matching positive, a compiling mutant and the designated exact-source-program assertion in the real target registration path. Replacing the retained program with an empty executable body must not certify source correspondence. Frontend errors, timeouts and unrelated proof failures are not evidence."
+    }
+  ]
+}

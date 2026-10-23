@@ -385,6 +385,22 @@ class Gates(unittest.TestCase):
                             expected_failures=self.case["expectedFailures"])
         self.validate(self.rejection())
 
+    def test_extension_impl_keeps_full_type_path_and_exact_owning_module(self):
+        function = "cordis_negative::definition::Value::write"
+        target = {"kind": "module", "path": "consumer", "descendants": False, "function": function}
+        self.case["targets"] = [target]
+        self.case["expectedFailures"][0]["function"] = function
+        S.validate_manifest(self.manifest)
+        self.assertEqual(S.selectors([target]), ["--verify-only-module", "consumer", "--verify-function", function])
+        value = payload()
+        value["times-ms"]["smt"]["smt-run-module-times"][0]["function-breakdown"][0]["function"] = function
+        S.validate_positive(self.record(value), self.reports, entire=False, targets=[target],
+                            expected_failures=self.case["expectedFailures"])
+        value["times-ms"]["smt"]["smt-run-module-times"][0]["module"] = "definition"
+        with self.assertRaisesRegex(RuntimeError, "no timed proof"):
+            S.validate_positive(self.record(value), self.reports, entire=False, targets=[target],
+                                expected_failures=self.case["expectedFailures"])
+
     def test_function_selector_rejects_wildcards_none_empty_or_multiple_modules(self):
         for function in (None, "", "*reject", "reject", "other::reject", 42):
             target = self.function_target(); target["function"] = function

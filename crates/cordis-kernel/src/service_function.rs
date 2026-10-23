@@ -146,10 +146,20 @@ impl<R,H,T,M,F> NativeRuntime<Body<R,F>,H,ServiceSlot<T,M>> {
     /// The stored body, recipe revision and complete declaration binding are
     /// obtained here. The caller supplies only the actual owner/execution.
     #[verifier::rlimit(30)]
+    #[verifier::spinoff_prover]
     pub fn run_service_root<C,G,Cb,X>(&mut self,id:usize,execution:&mut Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>>)
         ->(out:Result<RegisteredReport,AdmissionError>)
         requires old(self).wf(),old(execution).wf(),
-        ensures final(self).wf(),final(self).registry()==old(self).registry(),final(self).state()==old(self).state(),
+        ensures final(execution).cleanup_state().frame(&old(execution).cleanup_state(),0),
+            final(execution).cleanup_state().queues().dom()==old(execution).cleanup_state().queues().dom(),
+            final(execution).cleanup_state().domain_ids()==old(execution).cleanup_state().domain_ids(),
+            old(execution).cleanup_state().live(0) ==> {
+                let before=old(execution).cleanup_state().queues()[0];let after=final(execution).cleanup_state().queues()[0];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).registry()==old(self).registry(),final(self).state()==old(self).state(),
             final(self).publications()==old(self).publications(),final(self).episode_owners()==old(self).episode_owners(),
             final(self).journal_spec()==old(self).journal_spec(),final(self).joint_key()==old(self).joint_key(),
             out.is_err() ==> final(self).recipe_history()==old(self).recipe_history(),

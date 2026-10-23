@@ -25,6 +25,9 @@ pub type Code = spec_fn(u64)->Option<Decision>;
 /// The managed owner constructs the inverse, so implementations cannot substitute
 /// its target or captured before/after state. External effects are not covered by
 /// this scalar contract; unchecked Rust implementations do not inherit the law.
+/// The return-value law does not imply absence of shared-state effects during
+/// compute. Replay must preserve the actual input and account for interference
+/// between observation and landing, even for a verified implementation.
 pub trait ScalarEffect: Sized {
     spec fn model(&self)->Code;
     fn compute(self,input:u64)->(out:Option<Decision>)
@@ -55,6 +58,33 @@ impl ScalarEffect for ScaleAdd {
             Some(scaled)=>scaled.checked_add(self.offset).map(|value:u64| -> (decision:Decision)
                 ensures decision==(Decision {value,matched:true}),
             {Decision {value,matched:true}}),
+        }
+    }
+}
+
+/// Data-only calculations executed by the kernel under the value lock. No
+/// function pointer, trait object, closure, service handle or plugin callback
+/// can be stored here. New primitives require verifying this executor.
+#[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]
+pub enum Instruction {Operation(Operation),ScaleAdd {scale:u64,offset:u64}}
+impl Instruction {
+    pub open spec fn model(&self)->Code {
+        match self {
+            Self::Operation(op)=>op.model(),
+            Self::ScaleAdd {scale,offset}=>(ScaleAdd {scale:*scale,offset:*offset}).model(),
+        }
+    }
+    pub fn evaluate(&self,input:u64)->(out:Option<Decision>)
+        ensures out==(self.model())(input),
+    {
+        match self {
+            Self::Operation(op)=>match op.evaluate(input) {Ok(value)=>Some(Decision {value:value.after,matched:value.matched}),Err(_)=>None},
+            Self::ScaleAdd {scale,offset}=>match input.checked_mul(*scale) {
+                None=>None,
+                Some(value)=>value.checked_add(*offset).map(|value:u64| -> (decision:Decision)
+                    ensures decision==(Decision {value,matched:true}),
+                {Decision {value,matched:true}}),
+            },
         }
     }
 }
@@ -157,6 +187,7 @@ impl Prepared {
         ensures self.cause().wf(),self.cause().journal()==self.target().journal_spec(),
             self.cause().events()==self.observation().joint_spec().events(),self.observation().certified(),
             self.observation().state()==self.expected(),self.observation().journal_spec()==self.target().journal_spec(),
+            self.observation().source()==self.target().source(),self.observation().object()==self.target().object(),
     { }
 
     /// Only the checked execution owner can land this prepared computation.
@@ -169,47 +200,89 @@ impl Prepared {
             out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),self.code(),self.expected(),out->Err_0), out.is_ok() ==> out->Ok_0.effect_corresponds(&self.target(),self.code(),branch)
             && out->Ok_0.inverse.state().before==self.expected() && out->Ok_0.pending_for(managed),
             out.is_err() ==> out!=Err(EffectError::Closed),
-    { commit_calculated(&self.target,self.expected,self.decision,self.code,branch,Ghost(managed),Tracked(self.cause.borrow().duplicate()),Tracked(attempts)) }
+    { commit_calculation(&self.target,Calculation::Observed {expected:self.expected,decision:self.decision},self.code,branch,Ghost(managed),Tracked(self.cause.borrow().duplicate()),Tracked(attempts)) }
 
 }
-#[allow(clippy::too_many_arguments)] // Four inputs carry erased proof data; four are runtime values.
-fn commit_calculated(target:&ReversibleValue,expected:ValueState,decision:Option<Decision>,Ghost(code):Ghost<Code>,branch:Branch,
+pub(crate) enum Calculation {Observed {expected:ValueState,decision:Option<Decision>},Kernel(Instruction)}
+impl Calculation {
+    pub(crate) open spec fn wf(&self,code:Code)->bool {
+        match self {Self::Observed {expected,decision}=>*decision==code(expected.value),Self::Kernel(i)=>i.model()==code}
+    }
+    pub(crate) open spec fn input(&self,actual:ValueState)->ValueState {
+        match self {Self::Observed {expected,..}=>*expected,Self::Kernel(_)=>actual}
+    }
+}
+#[allow(clippy::too_many_arguments)] // Four arguments carry erased proof data.
+pub(crate) fn commit_calculation(target:&ReversibleValue,calculation:Calculation,Ghost(code):Ghost<Code>,branch:Branch,
     Ghost(managed):Ghost<bool>,Tracked(cause):Tracked<super::joint::Receipt>,Tracked(attempts):Tracked<&mut super::attempt::Ledger>)->(out:Result<Applied,EffectError>)
-    requires decision==code(expected.value),cause.wf(),cause.journal()==target.journal_spec(),old(attempts).wf(),
-    ensures final(attempts).appended(old(attempts),target),final(attempts).events().last().follows(&cause),
+    requires calculation.wf(code),cause.wf(),cause.journal()==target.journal_spec(),old(attempts).wf(),
+    ensures final(attempts).appended(old(attempts),target),final(attempts).events().last().follows(
+            &cause),
         out.is_ok() ==> final(attempts).records(out->Ok_0.inverse),
-        out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),code,expected,out->Err_0),
-        out.is_ok() ==> out->Ok_0.effect_corresponds(target,code,branch) && out->Ok_0.inverse.state().before==expected && out->Ok_0.pending_for(managed),
+        out.is_err() ==>
+            super::attempt::effect_rejection(final(attempts).event(),code,calculation.input(final(attempts).event().before()),out->Err_0),
+        out.is_ok() ==> out->Ok_0.effect_corresponds(target,code,branch)
+            && out->Ok_0.inverse.state().before==calculation.input(final(attempts).event().before()) && out->Ok_0.pending_for(managed),
         out.is_err() ==> out!=Err(EffectError::Closed),
+        calculation is Kernel ==> out!=Err(EffectError::Interference)
+            && (out.is_ok()==operation(code)(final(attempts).event().before()).is_some()),
     {
         let (mut cell,guard)=target.inner.acquire_write();
+        let result=commit_calculation_in(target,&mut cell,calculation,Ghost(code),branch,Ghost(managed),Tracked(cause),Tracked(attempts));
+        guard.release_write(cell);
+        result
+    }
+
+#[allow(clippy::too_many_arguments)] // Shared locked implementation; evidence erases.
+pub(super) fn commit_calculation_in(target:&ReversibleValue,cell:&mut super::Cell,calculation:Calculation,Ghost(code):Ghost<Code>,branch:Branch,
+    Ghost(managed):Ghost<bool>,Tracked(cause):Tracked<super::joint::Receipt>,Tracked(attempts):Tracked<&mut super::attempt::Ledger>)->(out:Result<Applied,EffectError>)
+    requires target.inner.inv(*old(cell)),calculation.wf(code),cause.wf(),cause.journal()==target.journal_spec(),old(attempts).wf(),
+    ensures target.inner.inv(*final(cell)),
+        out.is_ok() ==> out->Ok_0.inverse.state().before==old(cell).state && out->Ok_0.inverse.state().after==final(cell).state,
+        out.is_err() ==> final(cell).state==old(cell).state,
+        final(attempts).event().before()==old(cell).state,
+        final(attempts).event().after()==final(cell).state,
+        final(attempts).appended(old(attempts),target),final(attempts).events().last().follows(&cause),
+        out.is_ok() ==> final(attempts).records(out->Ok_0.inverse),
+        out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),code,calculation.input(final(attempts).event().before()),out->Err_0),
+        out.is_ok() ==> out->Ok_0.effect_corresponds(target,code,branch)
+            && out->Ok_0.inverse.state().before==calculation.input(final(attempts).event().before()) && out->Ok_0.pending_for(managed),
+        out.is_err() ==> out!=Err(EffectError::Closed),
+        calculation is Kernel ==> out!=Err(EffectError::Interference)
+            && (out.is_ok()==operation(code)(final(attempts).event().before()).is_some()),
+    {
         let before=cell.state;
+        let (expected,decision)=match calculation {
+            Calculation::Observed {expected,decision}=>(expected,decision),
+            Calculation::Kernel(instruction)=>(before,instruction.evaluate(before.value)),
+        };
+        assert(decision==code(expected.value));
         if before!=expected {
-            let _pending=cell.record_following(Ghost(before),Ghost(Event::StaleComputation {expected,before}),Ghost(false),Tracked(Some(cause.duplicate())));
+            let _pending=cell.record_following(Ghost(before),Ghost(Event::StaleComputation {expected,before}),Ghost(false),Tracked(Some(cause.duplicate())),Tracked(None));
             proof {let tracked receipt=cell.joint.receipt();attempts.record(&receipt);}
-            guard.release_write(cell);return Err(EffectError::Interference);
+            return Err(EffectError::Interference);
         }
         if before.depth==u64::MAX {
-            let _pending=cell.record_following(Ghost(before),Ghost(Event::ComputationRejected {code,before}),Ghost(false),Tracked(Some(cause.duplicate())));
+            let _pending=cell.record_following(Ghost(before),Ghost(Event::ComputationRejected {code,before}),Ghost(false),Tracked(Some(cause.duplicate())),Tracked(None));
             proof {let tracked receipt=cell.joint.receipt();attempts.record(&receipt);}
-            guard.release_write(cell);return Err(EffectError::Capacity);
+            return Err(EffectError::Capacity);
         }
         let decision=match decision {
             Some(value)=>value,
             None=>{
-                let _pending=cell.record_following(Ghost(before),Ghost(Event::ComputationRejected {code,before}),Ghost(false),Tracked(Some(cause.duplicate())));
+                let _pending=cell.record_following(Ghost(before),Ghost(Event::ComputationRejected {code,before}),Ghost(false),Tracked(Some(cause.duplicate())),Tracked(None));
                 proof {let tracked receipt=cell.joint.receipt();attempts.record(&receipt);}
-            guard.release_write(cell);return Err(EffectError::Rejected);
+            return Err(EffectError::Rejected);
             },
         };
         let after=ValueState {value:decision.value,depth:before.depth+1};
         let outcome=Outcome {before:before.value,after:after.value,matched:decision.matched};
         let next=branch.select(outcome);cell.state=after;
-        let pending=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(Some(cause.duplicate())));
+        let (pending,lease)=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(Some(cause.duplicate())),Tracked(None));
         let tracked origin=cell.joint.receipt();
         proof {attempts.record(&origin);}
-        guard.release_write(cell);
-        Ok(Applied {outcome,next,pending,inverse:Inverse {target:target.clone(),state:InverseState {before,after},origin:Tracked(origin)}})
+        let identity=cell.joint.identity();
+        Ok(Applied {outcome,next,pending,inverse:Inverse {target:target.clone(),state:InverseState {before,after},identity,origin:Tracked(origin),lease}})
     }
 
 impl ReversibleValue {
@@ -219,6 +292,18 @@ impl ReversibleValue {
         ensures out.wf(),out.target()==*self,out.code()==effect.model(),
     {
         self.prepare_observed(effect,self.snapshot())
+    }
+    /// Prepare a closed instruction from a retained real read. The same
+    /// atomic commit used by ordinary effects rejects a changed input before
+    /// writing. This path never invokes a plugin callback.
+    pub(crate) fn prepare_instruction_observed(&self,instruction:Instruction,snapshot:super::Snapshot)->(out:Prepared)
+        requires snapshot.certified(),snapshot.source()==self.source(),snapshot.object()==self.object(),snapshot.journal_spec()==self.journal_spec(),
+        ensures out.wf(),out.target()==*self,out.code()==instruction.model(),out.observation()==snapshot,
+    {
+        proof {assert(snapshot.joint_spec().events().len()>0);}
+        let cause=snapshot.joint_execution().checkpoint_receipt();
+        let decision=instruction.evaluate(snapshot.value());
+        Prepared {target:self.clone(),expected:snapshot.state,decision,code:Ghost(instruction.model()),observed:Ghost(snapshot),cause}
     }
     /// Native captures supply a real read that includes their slot selection.
     /// This entry cannot turn caller-supplied numbers into a certified input.
@@ -251,7 +336,22 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
     /// actual inverse before returning the outcome to the ordinary adapter.
     pub fn apply_prepared_effect(&mut self,id:usize,prepared:Prepared,branch:Branch)->(out:Result<ValueAdmission,EffectError>)
         requires old(self).wf(),prepared.wf(),
-        ensures final(self).execution_journal()==old(self).execution_journal(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link()
+                && final(self).cleanup_state().queues()[id].issued()==old(self).cleanup_state().queues()[id].issued()
+                && final(self).cleanup_state().queues()[id].protocol().selected()==old(self).cleanup_state().queues()[id].protocol().selected(),
+            final(self).execution_journal()==old(self).execution_journal(),
             out!=Err(EffectError::Closed) ==> final(self).value_attempts().events().last().follows(&prepared.cause()),
             final(self).wf(),final(self).capture()==old(self).capture(),
             final(self).work_state()==old(self).work_state(),final(self).value_state()==old(self).value_state(),
@@ -268,6 +368,7 @@ impl<V,C,G,Cb,X> Execution<V,C,G,ChildCleanup<Cb,X>> {
             out.is_err() && out!=Err(EffectError::Closed) ==>
                 super::attempt::effect_rejection(final(self).value_attempts().event(),prepared.code(),prepared.expected(),out->Err_0),
             out.is_ok() ==> final(self).value_attempts().events().last().same(&out->Ok_0.registration().write()),
+            out.is_ok() ==> super::joint::groups::registration(out->Ok_0.registration().insertion(),final(self).cleanup_state().link(),id),
             out.is_ok() ==> final(self).cleanup_state().queues()[id].link()==old(self).cleanup_state().queues()[id].link(),
             out.is_ok() ==> final(self).cleanup_state().acquisition_open(id)==old(self).cleanup_state().acquisition_open(id) && final(self).cleanup_state().live(id) && old(self).work_state().accepts() && old(self).cleanup_state().acquisition_open(id)
                 && out->Ok_0.next==branch.selected(out->Ok_0.outcome)

@@ -407,9 +407,19 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
     /// Called by ordinary native root, Child and effect-group callbacks. Check
     /// the entire stored body's declarations before applying any instruction.
     #[verifier::rlimit(30)]
+    #[verifier::spinoff_prover]
     pub fn run_service_program(&mut self,id:usize,program:&Program)->(out:Result<Report,AdmissionError>)
         requires old(self).wf(),program.valid(),
-        ensures final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
+        ensures final(self).cleanup_state().frame(&old(self).cleanup_state(),id),
+            final(self).cleanup_state().queues().dom()==old(self).cleanup_state().queues().dom(),
+            final(self).cleanup_state().domain_ids()==old(self).cleanup_state().domain_ids(),
+            old(self).cleanup_state().live(id) ==> {
+                let before=old(self).cleanup_state().queues()[id];let after=final(self).cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+            final(self).wf(),final(self).capture()==old(self).capture(),final(self).work_state()==old(self).work_state(),
             final(self).value_state()==old(self).value_state(),final(self).phase_spec()==old(self).phase_spec(),final(self).execution_journal()==old(self).execution_journal(),
             out.is_err() ==> *final(self)==*old(self),
             out.is_ok() ==> old(self).cleanup_state().live(id) && old(self).value_state().is_some() && program.declared(old(self).value_state().unwrap())
@@ -430,7 +440,16 @@ impl<T,M,C,G,Cb,X> Execution<ServiceSlot<T,M>,C,G,ChildCleanup<Cb,X>> {
         let mut steps:Vec<Step>=Vec::new();let tracked mut previous:Option<joint::Receipt>=None;let mut pc=if program.code.is_empty() {None} else {Some(0usize)};
         proof {empty_prefix(program.code(),values);}
         while pc.is_some()
-            invariant initial==*old(self),offset==initial.cleanup_state().queues()[id].slots().len(),initial.cleanup_state().live(id),self.wf(),program.valid(),program.declared(values),self.value_state()==Some(values),initial.value_state()==Some(values),
+            invariant self.cleanup_state().frame(&initial.cleanup_state(),id),
+            self.cleanup_state().queues().dom()==initial.cleanup_state().queues().dom(),
+            self.cleanup_state().domain_ids()==initial.cleanup_state().domain_ids(),
+            initial.cleanup_state().live(id) ==> {
+                let before=initial.cleanup_state().queues()[id];let after=self.cleanup_state().queues()[id];
+                &&& after.link()==before.link() && after.protocol().domain_id()==before.protocol().domain_id()
+                &&& after.slots().len()>=before.slots().len() && after.slots().take(before.slots().len() as int)==before.slots()
+                &&& after.issued()==before.issued() && after.protocol().selected()==before.protocol().selected()
+            },
+                initial==*old(self),offset==initial.cleanup_state().queues()[id].slots().len(),initial.cleanup_state().live(id),self.wf(),program.valid(),program.declared(values),self.value_state()==Some(values),initial.value_state()==Some(values),
                 self.status_links()==initial.status_links(),self.capture()==initial.capture(),self.work_state()==initial.work_state(),self.phase_spec()==initial.phase_spec(),self.execution_journal()==initial.execution_journal(),
                 previous.is_some()==(steps.len()>0),previous.is_some() ==> previous.unwrap().wf() && previous.unwrap().same(&steps@.last().write.admission.registration().completion()) && previous.unwrap().covers(&steps@.last().write.admission.registration().write()),
                 (Report {steps,failure:None,receipts:Tracked(receipts)}).ordered(),
