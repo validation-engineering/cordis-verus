@@ -55,13 +55,13 @@ static host 共享所有权协议，但不因此获得 native publication 语义
 
 | 来源 | 审查内容 |
 | --- | --- |
-| [managed_host.rs](../crates/cordis-kernel/src/managed_host.rs) | 只读内核访问、宿主追加合同及终态消费定理。 |
-| [managed_lifecycle_callbacks.rs](../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs) | 受守卫的回调／Future 确认与拒绝结果保留。 |
-| [managed_lifecycle_native.rs](../crates/cordis-kernel/src/managed_lifecycle_native.rs) | recorded root 返回、受控重试与终态释放。 |
+| [reversible_value/managed/interleaving/history/lifecycle/host.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs) | 只读内核访问、宿主追加合同及终态消费定理。 |
+| [reversible_value/managed/interleaving/history/lifecycle/callbacks.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/callbacks.rs) | 受守卫的回调／Future 确认与拒绝结果保留。 |
+| [reversible_value/managed/interleaving/history/lifecycle/native.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs) | recorded root 返回、受控重试与终态释放。 |
 | [poll_control.rs](../crates/cordis-kernel/src/poll_control.rs) | 实际 control 身份检查及带来源的 Unload。 |
 | [native.rs](../crates/cordis-driver/src/shared/native.rs) | 普通 driver 对同一所有者的调用。 |
 | [runtime.rs](../crates/cordis/src/runtime.rs) | root／Child 接入、实际清理派发和调度调用。 |
-| [managed_function.rs](../crates/cordis/tests/managed_function.rs) | 后续 scalar／typed 写入、Child、回调失败、前缀保留、重试成功及旧 context 拒绝。 |
+| [reversible_value/managed.rs](../crates/cordis/tests/managed_function.rs) | 后续 scalar／typed 写入、Child、回调失败、前缀保留、重试成功及旧 context 拒绝。 |
 
 既有 scalar／service program、异步回调、effect／句柄、static host 和插件测试覆盖
 迁移后的路径。新增运行案例检查可见值和清理行为，不能读取擦除的证明数据。

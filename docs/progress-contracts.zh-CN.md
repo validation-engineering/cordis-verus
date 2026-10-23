@@ -41,16 +41,16 @@
 | [`Kernel::check_insert` / `insert`](../crates/cordis-kernel/src/lib.rs) | 在且仅在 `insert_enabled(parent, dependencies, provisions)` 时成功：身份容量足够、指定的 parent 已登记、声明无重复、provision 端口未被预留。 | O-Insert 的真实注册定义域，将实现表示边界与论文谓词分开列出。 |
 | [`Kernel::begin`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.begin_enabled(id)`：Inactive、目标可用、generation 存在且小于 `u64::MAX`。成功后递增 generation，并提交实际目标。 | L-Begin 的可执行接纳条件。保留实现中有限计数器的边界；论文投影擦除了该计数器。 |
 | [`Kernel::begin_cleanup`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.cleanup_enabled(id)`：已登记、Unloading、尚未开始恢复、没有存活的 committed dependent。 | 受保护 L-Unload 的实际起点。该调用在论文投影中保持状态，开放恢复过程；`finish_cleanup` 才完成投影中的 Unload。 |
-| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs)、[`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | 在且仅在 `unload_enabled` 时成功：Kernel 允许清理，**且** `restore_receipts(journal(actor), primitive_state).is_some()`。对完整的具体 Unit/Child/Provision/Xor 日志，从真实历史导出的 `journal_recovery` 可消解 inverse 条件。 | 执行 L-Unload 的真实有限 LIFO 恢复；恢复事实来自已表示的历史，不来自任意 `wf()`。公共错误保持完整机器，内部草稿错误不具备同样保证。 |
+| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs)、[`FreshDriver::unload`](../crates/cordis-kernel/src/mixed_driver/fresh.rs) | 在且仅在 `unload_enabled` 时成功：Kernel 允许清理，**且** `restore_receipts(journal(actor), primitive_state).is_some()`。对完整的具体 Unit/Child/Provision/Xor 日志，从真实历史导出的 `journal_recovery` 可消解 inverse 条件。 | 执行 L-Unload 的真实有限 LIFO 恢复；恢复事实来自已表示的历史，不来自任意 `wf()`。公共错误保持完整机器，内部草稿错误不具备同样保证。 |
 | [`Kernel::check_iteration` / `finish`](../crates/cordis-kernel/src/lib.rs) | 在且仅在 Loading 且 `coherent(id)` 时成功。`paper_coherence`、`paper_iteration_guard` 证明此条件恰好对应投影中的论文守卫。 | L-Iter 接纳和 L-Finish 控制转换。利用已有的 provider 唯一性、绑定类型与覆盖不变式检查身份，不依赖缓冲区的顺序或重复次数。 |
 | [`StageProtocol::admit`](../crates/cordis-kernel/src/episode.rs) | `accepted == (old.pending || (!old.settled && !old.cancelled && matching_target))`。`matching_target` 指 target 存在且完整绑定身份集合相等。已接纳的阶段在取消或目标丢失后仍保持接纳；结束与取消标记的更新也有精确合同。 | 迭代阶段的接纳与保留。`land`、`end` 提供 Iter/Finish 或延迟 Divert 在 token 层的累积器转换。显式宿主取消是扩展行为，不能据此认定论文目标已变化。 |
 | [`ChildEpisode::check_child` / `land_child`](../crates/cordis-kernel/src/ownership.rs)、[`ChildDriver` 包装层](../crates/cordis-kernel/src/child_driver.rs) | 在且仅在 `land_enabled` 时成功：已有 pending、捕获身份和 generation 仍匹配、满足当前插入定义域。 | 定义 52 中有条件的真实 child 注册及逆操作捕获；接纳本身不保证插入成功。 |
 | [`MixedDriver::insert`](../crates/cordis-kernel/src/mixed_driver.rs) | 在且仅在 `insertion_enabled` 时成功：蓝图索引及所需蓝图库前缀合法，且满足真实 Kernel 插入域。 | 闭合解释器的注册边界；`wf()` 不会使未使用的非法蓝图条目变得合法。 |
-| [`FreshDriver::insert` / `begin` / `apply`](../crates/cordis-kernel/src/fresh_driver.rs)、[`preparation_command`](../crates/cordis-kernel/src/fresh_preparation.rs) | 对 `Insert`、`Begin`、`Step`，在且仅在当前 `preparation_enabled(command)` 时成功。Insert 复用完整 Mixed 插入域；Begin 还要求保留 journal 为空及 Kernel Begin 域。 | 将真实准备 dispatcher 接到精确的局部实现定义域；其他命令仍受支持，但不在该等价合同范围内。 |
-| [`MixedDriver::step`](../crates/cordis-kernel/src/mixed_driver.rs)、[`FreshDriver::step`](../crates/cordis-kernel/src/fresh_driver.rs) | 在且仅在 `step_enabled` 时成功：actor 已登记、Loading 且 coherent，存在当前指令，满足其 primitive 定义域；终态指令执行后还须完整发布。 | 同步 L-Iter/L-Finish 解释器的精确局部接纳，与引理 57 和定理 73(1) 相关，不是整段执行终止。 |
-| [`FreshDriver::admit` / `Admission::land`](../crates/cordis-kernel/src/admitted_fresh_driver.rs) | 接纳在且仅在 `admission_enabled`（即 `ready`）时成功；落地在且仅在 `land_enabled` 时成功：票据未消费且当前绑定有效、满足所选 primitive 的实时定义域，仅 coherent 终态还要求 `complete_after`。 | 跨已检查调用的精确接纳，包括目标丢失后的 L-Divert；接纳不预留值或 child provision。 |
-| [`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/fresh_run.rs) | 在 `wf()` 下反复调用真实 `step`，直到终态发布或首个错误；已提交步数由输入程序位置的秩约束，无需 fuel 或未来成功前提。 | 单个已安装 actor 的有限真实执行；源 refinement 延伸输入机器已表示的良构源状态，不建立全局静止。 |
-| [`run_from_empty`](../crates/cordis-kernel/src/fresh_bootstrap.rs) | 构造新机器，执行真实准备脚本；仅全部准备调用成功后运行一个 actor，返回 `SetupFailed`、`Blocked` 或 `Finished`。 | 无需输入源状态前提，建立一条从 empty 出发、同时表示准备后与最终机器的源执行；失败处的 Insert/Begin/Step 命令不满足其定义域；其他命令定义域与全局进展仍有独立义务。 |
+| [`FreshDriver::insert` / `begin` / `apply`](../crates/cordis-kernel/src/mixed_driver/fresh.rs)、[`preparation_command`](../crates/cordis-kernel/src/mixed_driver/fresh/preparation.rs) | 对 `Insert`、`Begin`、`Step`，在且仅在当前 `preparation_enabled(command)` 时成功。Insert 复用完整 Mixed 插入域；Begin 还要求保留 journal 为空及 Kernel Begin 域。 | 将真实准备 dispatcher 接到精确的局部实现定义域；其他命令仍受支持，但不在该等价合同范围内。 |
+| [`MixedDriver::step`](../crates/cordis-kernel/src/mixed_driver.rs)、[`FreshDriver::step`](../crates/cordis-kernel/src/mixed_driver/fresh.rs) | 在且仅在 `step_enabled` 时成功：actor 已登记、Loading 且 coherent，存在当前指令，满足其 primitive 定义域；终态指令执行后还须完整发布。 | 同步 L-Iter/L-Finish 解释器的精确局部接纳，与引理 57 和定理 73(1) 相关，不是整段执行终止。 |
+| [`FreshDriver::admit` / `Admission::land`](../crates/cordis-kernel/src/mixed_driver/fresh/admitted.rs) | 接纳在且仅在 `admission_enabled`（即 `ready`）时成功；落地在且仅在 `land_enabled` 时成功：票据未消费且当前绑定有效、满足所选 primitive 的实时定义域，仅 coherent 终态还要求 `complete_after`。 | 跨已检查调用的精确接纳，包括目标丢失后的 L-Divert；接纳不预留值或 child provision。 |
+| [`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/mixed_driver/fresh/runner.rs) | 在 `wf()` 下反复调用真实 `step`，直到终态发布或首个错误；已提交步数由输入程序位置的秩约束，无需 fuel 或未来成功前提。 | 单个已安装 actor 的有限真实执行；源 refinement 延伸输入机器已表示的良构源状态，不建立全局静止。 |
+| [`run_from_empty`](../crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs) | 构造新机器，执行真实准备脚本；仅全部准备调用成功后运行一个 actor，返回 `SetupFailed`、`Blocked` 或 `Finished`。 | 无需输入源状态前提，建立一条从 empty 出发、同时表示准备后与最终机器的源执行；失败处的 Insert/Begin/Step 命令不满足其定义域；其他命令定义域与全局进展仍有独立义务。 |
 
 论文中已使能的 Begin，在实现的 generation 计数器耗尽时仍会被拒绝；这一容量限制
 并非第 73 条原文的前提。
@@ -194,7 +194,7 @@ Kernel 和混合逆操作日志上执行闭合指令库。同一份可执行方�
 `step_enabled` 再结合 `ready`。公共 `MixedDriver::step` **在且仅在**该谓词成立时
 成功，合同不再仅仅表达成功后的安全性。
 
-[`FreshDriver::selected_instruction`](../crates/cordis-kernel/src/fresh_driver.rs)
+[`FreshDriver::selected_instruction`](../crates/cordis-kernel/src/mixed_driver/fresh.rs)
 在本次调用中，以分配器当前 `next_id` 实例化 Child 模板。其 `step_enabled` 对实例化
 后的指令使用相同的效果与终态检查；实际 `FreshDriver::step` 公开相同的成功等价合同。
 自动 fresh 身份免去调用者固定 expected ID 的要求，但不会免除 provision 预留、
@@ -213,7 +213,7 @@ Kernel 和混合逆操作日志上执行闭合指令库。同一份可执行方�
 
 ## 已接纳阶段在落地时重新检查当前定义域
 
-拥有机器的 [`fresh::admitted::Admission`](../crates/cordis-kernel/src/admitted_fresh_driver.rs)
+拥有机器的 [`fresh::admitted::Admission`](../crates/cordis-kernel/src/mixed_driver/fresh/admitted.rs)
 会话捕获 actor、generation、蓝图、程序位置和指令模板。`FreshDriver::admit` 在且仅在
 `admission_enabled(actor)` 时成功，该条件就是内层 driver 的 `ready(actor)`。
 它检查 coherent Loading 控制状态与已安装位置，不检查所有效果前提，也不预留服务值
@@ -305,7 +305,7 @@ episode，执行它，再调用
 
 ## 将单个 Fresh actor 运行到终态或首个错误
 
-[`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/fresh_run.rs) 位于
+[`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/mixed_driver/fresh/runner.rs) 位于
 `mixed_driver::fresh::runner`，循环调用真实的事务 `step`。它只要求已有 `wf()`，
 不需要调用者传入 fuel、未来成功前提或源轨迹。重新导出的 `RunReport` 提供运行时
 字段 `steps: u128` 与 `error: Option<DriverError>`。
@@ -394,7 +394,7 @@ Unload 分支另外给出成功 iff 输入满足 `unload_enabled`，并未扩大
 
 ## 真实 Unit/Child 日志的恢复有定义性
 
-[`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs) 中
+[`mixed_driver/recovery.rs`](../crates/cordis-kernel/src/mixed_driver/recovery.rs) 中
 proof-only 的 `unit_child_journal(actor)` 按**实际保留的 receipts** 分类：每条均为
 `Inverse::Unit` 或 `Inverse::Child`。`unit_child_recovery()` 表示，对每个已登记且
 日志符合此分类的 actor，`restore_receipts` 解释其当前完整日志均有定义。这是当前
@@ -440,7 +440,7 @@ accumulator 增加当前状态不变式 `live_provisions`：每条保留的 Prov
 同一槽，较后的 inverse 删除值后，较早的 inverse 就可能失去定义。外部 Xor
 可以修改值，但保持槽占用；不变式不要求当前 payload 等于当初提供的 payload。
 
-[`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs) 把该源
+[`mixed_driver/provision_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/provision_recovery.rs) 把该源
 不变式和 child retention 接到**真实 receipts**。`unit_child_provision_journal(actor)`
 允许 owner 的当前日志包含 Unit、Child、Provision。`provision_recovery()` 说明每个
 已登记且日志符合该范围的 actor，其整个 `restore_receipts` 序列有定义。在 LIFO
@@ -477,7 +477,7 @@ provider 在 consumer 仍保留 commitment 时清理，将定义 53/54 的 provi
 规则连接到 inverse 所需的值。它与定义 52 的 child 名称保留互补，不把所有权视为
 服务依赖。
 
-[`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs) 作为
+[`mixed_driver/recovery_all.rs`](../crates/cordis-kernel/src/mixed_driver/recovery_all.rs) 作为
 `mixed_driver::recovery_all` 导出，通过 `operations_from_source` 将源不变式
 接到**真实 receipts**。`restore_all` 结合 `live_xors`、Provision 的唯一性与值存在性、
 child 身份保留，证明实际 receipt 的全部四种 variant——Unit、Child、Provision、
@@ -512,7 +512,7 @@ consumer 的交错效果、publication 不完整后的启动前缀恢复。这�
 有定义，也可能留下未被记录的 owner 值。归纳跟随实际成功的源转换，包括动态 child、
 外部操作与清理，并不假设未来的 Unload 会成功。
 
-[`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+[`mixed_driver/owner_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/owner_recovery.rs)
 作为 `mixed_driver::owner_recovery` 导出，将源覆盖定理接到实际 Unload 使用的同一份
 表和 receipts。`owner_table_recovery_from_source` 建立 `owner_table_recovery()`：
 对每个已登记 actor，**若**完整 `restore_receipts` 有定义，则恢复后的 owner 表为空。
@@ -536,7 +536,7 @@ Loading 执行的恢复和同一注册上的第二轮 episode：旧端口可重�
 
 ## Mixed 脚本终态等于其 foreign-only 值重放
 
-[`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) 作为
+[`mixed_driver/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/terminal_replay.rs) 作为
 `mixed_driver::terminal_replay` 导出，强化实际 **Mixed** `ScriptReport`。
 `terminal_episode(transitions, owner, begin)` 从成功转换日志中选取 Begin，要求
 最后一条成功转换是该 owner 的 Unload，并排除中途同一 owner 的 Unload。真实源
@@ -580,7 +580,7 @@ consumer，在反事实值计算中仍可有定义，但若没有该 owner，其
 `actual_terminal_recovery` 将它与实际最终 Unload、owner 槽覆盖定理组合。
 foreign Unload 保留实际捕获的 inverse journal，包括所选 episode 开始前产生的记录。
 
-[`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+[`mixed_driver/fresh/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs)
 作为 `mixed_driver::fresh::terminal_replay` 导出，将定理接到真实 Fresh
 `ScriptReport`。`terminal_recovery(bank)` 是 `run_script` 的实际后置条件。
 匹配的 Begin 和末条成功 owner Unload 标识 episode，`fresh_installed_interval`
@@ -603,7 +603,7 @@ foreign Unload 保留实际捕获的 inverse journal，包括所选 episode 开�
 
 ## 从新机器经过真实准备与执行
 
-[`run_from_empty(blueprints, setup_commands, actor)`](../crates/cordis-kernel/src/fresh_bootstrap.rs)
+[`run_from_empty(blueprints, setup_commands, actor)`](../crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs)
 是可执行入口，由 `mixed_driver::fresh` 与 `FromEmptyReport`、`FromEmptyStatus`
 一起重新导出。它构造新机器，调用真实 `run_script`，仅当所有准备命令成功后才调用
 `run_until_blocked(actor)`。调用者不传机器、源执行见证、fuel，也不假设未来调用成功。
@@ -629,7 +629,7 @@ prepared 快照、自主 outcomes 和源状态都是运行时擦除的 ghost 数
 `Vec<Transition>` 仍是运行时分配。
 
 准备命令已有一个精确定义域范围：
-[`preparation_command`](../crates/cordis-kernel/src/fresh_preparation.rs) 只选取
+[`preparation_command`](../crates/cordis-kernel/src/mixed_driver/fresh/preparation.rs) 只选取
 `Insert`、`Begin`、`Step`。这些谓词只用于证明，真实执行分支与错误顺序保持不变。
 
 | 命令 | `preparation_enabled` 使用的当前机器谓词 |

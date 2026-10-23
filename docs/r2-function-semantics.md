@@ -36,12 +36,12 @@ dispatch rejects this native-only body explicitly.
 
 | Concern | Actual implementation and contract |
 | --- | --- |
-| Stored function identity | `Body::Services(Function)` in [value_function.rs](../crates/cordis-kernel/src/value_function.rs); no opaque callback substitutes for this body |
-| Declaration and realm binding | `Function::bind` in [service_function.rs](../crates/cordis-kernel/src/service_function.rs) resolves every stored key through the registered recipe, preserving operations and branches; the first registered match takes precedence over inherited aliases |
+| Stored function identity | `Body::Services(Function)` in [reversible_value/function.rs](../crates/cordis-kernel/src/reversible_value/function.rs); no opaque callback substitutes for this body |
+| Declaration and realm binding | `Function::bind` in [reversible_value/service_function.rs](../crates/cordis-kernel/src/reversible_value/service_function.rs) resolves every stored key through the registered recipe, preserving operations and branches; the first registered match takes precedence over inherited aliases |
 | Admission and completion | `NativeRuntime::run_service_root` checks the actual owner, lifecycle admission and current recipe; its real execution result determines root failure and completion |
-| Actual calls | `Execution::run_service_program` in [service_program.rs](../crates/cordis-kernel/src/service_program.rs) resolves each slot, executes the actual operation and registers its inverse before continuing |
-| Whole finite interpretation | [service_composition.rs](../crates/cordis-kernel/src/service_composition.rs) proves grammar membership for every resolution schedule and relates the actual success/failure report to its selected schedule |
-| Accumulated inverse | [service_stack.rs](../crates/cordis-kernel/src/service_stack.rs) identifies the semantic reverse stack with the actual queue suffix, including failed prefixes |
+| Actual calls | `Execution::run_service_program` in [reversible_value/services.rs](../crates/cordis-kernel/src/reversible_value/services.rs) resolves each slot, executes the actual operation and registers its inverse before continuing |
+| Whole finite interpretation | [reversible_value/service_composition.rs](../crates/cordis-kernel/src/reversible_value/service_composition.rs) proves grammar membership for every resolution schedule and relates the actual success/failure report to its selected schedule |
+| Accumulated inverse | [reversible_value/service_stack.rs](../crates/cordis-kernel/src/reversible_value/service_stack.rs) identifies the semantic reverse stack with the actual queue suffix, including failed prefixes |
 | User-visible path | `Plugin::native_service_program`, native initialization and Child registration in [runtime.rs](../crates/cordis/src/runtime.rs), through [native.rs](../crates/cordis-driver/src/shared/native.rs) |
 
 Missing declarations, including those in unreachable instructions, are rejected
@@ -119,9 +119,9 @@ ordinary host callback. They are persistent proof resources and erase from the
 runtime artifact, including their maps and Journal references. The existing
 bounded Journal commit is reused; this does not add a runtime effect log.
 
-Review `Evidence::retain` in [value_registration.rs](../crates/cordis-kernel/src/value_registration.rs),
-the actual producers in [value_program.rs](../crates/cordis-kernel/src/value_program.rs)
-and [service_program.rs](../crates/cordis-kernel/src/service_program.rs), and
+Review `Evidence::retain` in [reversible_value/registration.rs](../crates/cordis-kernel/src/reversible_value/registration.rs),
+the actual producers in [reversible_value/program.rs](../crates/cordis-kernel/src/reversible_value/program.rs)
+and [reversible_value/services.rs](../crates/cordis-kernel/src/reversible_value/services.rs), and
 `record_recipes_following` in [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs).
 The two registered root entry points supply those actual reports and expose the
 return interval theorem. This strengthens the implementation connection for

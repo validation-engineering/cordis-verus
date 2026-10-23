@@ -51,14 +51,14 @@ Journal 实例与分配键构成。服务端口是查找名称；多个端口可
 
 | 操作族与实际代码 | 读取与修改 | 定义域和恢复责任 |
 | --- | --- | --- |
-| [分配与快照](../crates/cordis-kernel/src/reversible_value.rs)：`new_in`、`snapshot`；[类型化分配](../crates/cordis-kernel/src/shared_payload.rs)：`new_in`、`capture` | 在真实 Journal 分配对象；在对象锁内读取状态及对应历史。 | 新标量的逆操作深度为零。快照描述获取时刻，不冻结未来值。`new_in_following` 另返回晚于先前截面的真实出生收据。 |
+| [分配与快照](../crates/cordis-kernel/src/reversible_value.rs)：`new_in`、`snapshot`；[类型化分配](../crates/cordis-kernel/src/reversible_value/payload.rs)：`new_in`、`capture` | 在真实 Journal 分配对象；在对象锁内读取状态及对应历史。 | 新标量的逆操作深度为零。快照描述获取时刻，不冻结未来值。`new_in_following` 另返回晚于先前截面的真实出生收据。 |
 | [标量操作](../crates/cordis-kernel/src/reversible_value.rs)：`apply`、`apply_pending_following` | 读取并修改选定对象的值／深度，产生真实逆操作和 Journal 条目。 | 检查算术与深度容量；逆操作只在捕获的 after-state 有定义。原始逆操作的持有者负责恢复或登记它。 |
-| [受控托管标量](../crates/cordis-kernel/src/controlled_effect.rs)：`apply_controlled_effect`；[原生选择](../crates/cordis-kernel/src/native_effect.rs)：`apply_native_controlled` | 检查声明选择和执行所有者，在值锁内运行数据指令，将真实逆操作登记到该所有者的清理队列。 | 准入关闭时在写入前拒绝；其他失败遵循实际原语定义域。成功调用不会把逆操作记到虚构的对象或队列。 |
-| [可扩展计算](../crates/cordis-kernel/src/scalar_effect.rs)：`prepare_effect`、`commit_calculation`；[原生落地](../crates/cordis-kernel/src/native_effect.rs)：`apply_native_effect` | 观察保留对象，执行 `ScalarEffect::compute`，再检查并提交捕获的输入。 | 已有返回值合同和干扰拒绝合同；trait 不禁止 `compute` 内额外共享写入。受控重放入口会拒绝这条路径。 |
-| [类型化替换与逆操作](../crates/cordis-kernel/src/payload_inverse.rs)：`apply_captured_following`、`restore_following`；[原生捕获](../crates/cordis-kernel/src/native_payload.rs)：`capture_native_payload`、`land` | 保留选定载荷所有者，检查实际存活／版本／栈状态，替换值并记录真实逆操作。 | 明确检查旧捕获、retirement 和容量；恢复所需语义状态时，防旧回复 revision 可以递增。`T` 内部及析构需要独立边界合同。 |
-| [槽位替换与别名](../crates/cordis-kernel/src/value_slot.rs)：`capture`、`replace`、`capture_binding` | 修改版本化槽位当前对象，已有 capture 保留此前对象。 | [别名投影](../crates/cordis-kernel/src/value_alias.rs)同时更新指向同一对象的全部名称。字面单端口语义需要明确的单绑定条件；不同端口名不能推出独立性。 |
-| [发布](../crates/cordis-kernel/src/publication.rs)及[撤回](../crates/cordis-kernel/src/publication_cleanup.rs) | 修改所属 Episode 的服务发布与清理义务；consumer 保留已提交 provider。 | 需要组合发布、撤回、consumer 保留与真实载荷所有权。publication 消失不等于所有外部资源已释放。 |
-| [root 解释](../crates/cordis-kernel/src/managed_root.rs)：`run_managed_root`；[函数执行](../crates/cordis-kernel/src/managed_function.rs)：`run_function` | 首个效果前解析全部声明端口，执行真实参数、按真实结果选分支，并登记成功前缀的逆操作。 | 检查有限存储函数及分支下标；受控准入也检查未访问的回调分支。任意回调效果仍不能被当作完整观察不变。 |
+| [受控托管标量](../crates/cordis-kernel/src/reversible_value/controlled.rs)：`apply_controlled_effect`；[原生选择](../crates/cordis-kernel/src/reversible_value/native_effect.rs)：`apply_native_controlled` | 检查声明选择和执行所有者，在值锁内运行数据指令，将真实逆操作登记到该所有者的清理队列。 | 准入关闭时在写入前拒绝；其他失败遵循实际原语定义域。成功调用不会把逆操作记到虚构的对象或队列。 |
+| [可扩展计算](../crates/cordis-kernel/src/reversible_value/effect.rs)：`prepare_effect`、`commit_calculation`；[原生落地](../crates/cordis-kernel/src/reversible_value/native_effect.rs)：`apply_native_effect` | 观察保留对象，执行 `ScalarEffect::compute`，再检查并提交捕获的输入。 | 已有返回值合同和干扰拒绝合同；trait 不禁止 `compute` 内额外共享写入。受控重放入口会拒绝这条路径。 |
+| [类型化替换与逆操作](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs)：`apply_captured_following`、`restore_following`；[原生捕获](../crates/cordis-kernel/src/reversible_value/native_payload.rs)：`capture_native_payload`、`land` | 保留选定载荷所有者，检查实际存活／版本／栈状态，替换值并记录真实逆操作。 | 明确检查旧捕获、retirement 和容量；恢复所需语义状态时，防旧回复 revision 可以递增。`T` 内部及析构需要独立边界合同。 |
+| [槽位替换与别名](../crates/cordis-kernel/src/reversible_value/slot.rs)：`capture`、`replace`、`capture_binding` | 修改版本化槽位当前对象，已有 capture 保留此前对象。 | [别名投影](../crates/cordis-kernel/src/reversible_value/alias.rs)同时更新指向同一对象的全部名称。字面单端口语义需要明确的单绑定条件；不同端口名不能推出独立性。 |
+| [发布](../crates/cordis-kernel/src/publication.rs)及[撤回](../crates/cordis-kernel/src/publication/cleanup.rs) | 修改所属 Episode 的服务发布与清理义务；consumer 保留已提交 provider。 | 需要组合发布、撤回、consumer 保留与真实载荷所有权。publication 消失不等于所有外部资源已释放。 |
+| [root 解释](../crates/cordis-kernel/src/reversible_value/managed/root.rs)：`run_managed_root`；[函数执行](../crates/cordis-kernel/src/reversible_value/managed.rs)：`run_function` | 首个效果前解析全部声明端口，执行真实参数、按真实结果选分支，并登记成功前缀的逆操作。 | 检查有限存储函数及分支下标；受控准入也检查未访问的回调分支。任意回调效果仍不能被当作完整观察不变。 |
 | [Child 所有权](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs)及[原生注册](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`register_shared_child`、`retire_shared_child` | 修改出生／父子／注册记录及真实父所有者的清理义务。 | 注册准入有服务表之外的守卫。retirement、Child 终态和注册删除不同。R04 仍需组合 consumer 和重复 Episode 恢复。 |
 | [清理与重试](../crates/cordis-kernel/src/cleanup_groups.rs)：`dispatch`、`complete`、`retry`；[原生清理](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`begin_cleanup`、`retry_managed_execution` | 发出真实动作，保留被阻塞的逆操作，区分失败，并在推进前匹配当前票据。 | 可重试失败保留动作；已消耗的 `FnOnce` 失败合同不同。宿主成功确认是协议事实，不证明任意外部资源已恢复。 |
 | [异步落地](../crates/cordis-kernel/src/cleanup_queue/landing.rs)及[轮询／重启控制](../crates/cordis-kernel/src/poll_control.rs) | 记录实际所有者、pending 结果、失败和重启状态，根据当前状态接收或转移结果。 | 旧所有者／票据检查是安全性条件。Future 最终完成及宿主调度属于独立的 G04 条件。 |
@@ -93,7 +93,7 @@ batch::run / batch::run_controlled
 
 ## 严格标量迁移与恢复式
 
-[堆迁移证明](../crates/cordis-kernel/src/managed_replay_heap.rs)通过这个单射映射关联源与
+[堆迁移证明](../crates/cordis-kernel/src/reversible_value/managed/replay/bank/heap.rs)通过这个单射映射关联源与
 目标标量堆。关系包含缺失条目，以及完整的 `(值, 深度)` 观察。
 `Bank::scalar_contract` 证明保留的数据指令具有相同的正向定义域、结果选择分支和
 对应的更新状态；对任意一对相关恢复输入，捕获的两份逆映射也具有相同定义域，
@@ -114,7 +114,7 @@ batch::run / batch::run_controlled
 
 ## 检查来源连续性与真实标量观察
 
-[`continuity::check`](../crates/cordis-kernel/src/managed_replay_continuity.rs)
+[`continuity::check`](../crates/cordis-kernel/src/reversible_value/managed/replay/continuity.rs)
 按给定调用顺序检查从真实逆操作所有者保留的成功步骤；batch 使用已有的认证来源排序器
 产生此顺序。对每次重复访问的分配，下次实际输入必须等于前次实际输出。标量比较包含
 逆操作深度；typed 比较由持久历史推出 value／head／depth 相等，不调用 `T::eq`、
@@ -125,7 +125,7 @@ batch::run / batch::run_controlled
 不宣称它们来自同一个全局瞬时快照。检查识别的是状态不连续，并不识别每个遗漏事件：
 如果中间操作返回了同一完整观察，仍需要另行组合完整历史 census。
 
-[`batch::run_checked_scalar`](../crates/cordis-kernel/src/managed_replay_batch.rs)
+[`batch::run_checked_scalar`](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs)
 将来源检查接入真实标量目标执行：
 
 1. 检查完整保留函数，包括未走到的分支。这个入口接受已成功且全部指令为 `Kernel`
@@ -154,7 +154,7 @@ batch::run / batch::run_controlled
 
 ## 真实 provider 与分配对象选择
 
-[`check_scalar_replay`](../crates/cordis-kernel/src/managed_replay_selection.rs)
+[`check_scalar_replay`](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs)
 在状态核对之外增加分配对象对应。`run_checked_scalar` 会在每次实际调用返回后、Finish 前
 执行它。证据沿真实生产路径传递：
 

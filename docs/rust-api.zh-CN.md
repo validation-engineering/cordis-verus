@@ -228,7 +228,7 @@ fn adjust(ctx: &AsyncSetup, key: ServiceKey<ReversibleValue>)
 可见。不同服务名本身不表示独立性。精确论文映射见
 [原生效果与别名](r2-execution.zh-CN.md#原生可扩展效果与别名感知的论文映射)。
 
-新增原语可参照 [`ScaleAdd`](../crates/cordis-kernel/src/scalar_effect.rs)，实现并
+新增原语可参照 [`ScaleAdd`](../crates/cordis-kernel/src/reversible_value/effect.rs)，实现并
 验证 `ScalarEffect` 的模型／结果合同，无需扩展内核固定操作枚举或提供 inverse。
 Verus 检查原语和泛型组合器；仅实现擦除后的 Rust trait 不会证明任意代码。
 该 API 当前覆盖标量计算，不覆盖任意服务对象或外部 I/O。证明与剩余集成工作见

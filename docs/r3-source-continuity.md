@@ -161,22 +161,22 @@ post-Unload quiet-tail premise.
 
 | Review step | Source |
 | --- | --- |
-| Actual locked restore capture | [payload_inverse.rs](../crates/cordis-kernel/src/payload_inverse.rs), [payload_attempt.rs](../crates/cordis-kernel/src/payload_attempt.rs) |
-| Persistent prefix merge and agreement | [shared_value_sources.rs](../crates/cordis-kernel/src/shared_value_sources.rs) |
-| Report/dispatch evidence and decoding | [managed_value_sources.rs](../crates/cordis-kernel/src/managed_value_sources.rs), [cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs) |
-| Executed raw forward/restore capture | [managed_lifecycle_values.rs](../crates/cordis-kernel/src/managed_lifecycle_values.rs) |
-| Maintained production chronology | [managed_source_order.rs](../crates/cordis-kernel/src/managed_source_order.rs), [managed_lifecycle_order.rs](../crates/cordis-kernel/src/managed_lifecycle_order.rs) |
-| Linear last-write ownership and complete allocation projection | [joint_owner_history.rs](../crates/cordis-kernel/src/joint_owner_history.rs), [joint_execution.rs](../crates/cordis-kernel/src/joint_execution.rs) |
-| Actual scalar inverse leases, creation and unique consumption | [scalar_ownership.rs](../crates/cordis-kernel/src/scalar_ownership.rs), [reversible_value.rs](../crates/cordis-kernel/src/reversible_value.rs) |
-| Typed predecessor, unique restoration and retained terminal sources | [payload_semantic_history.rs](../crates/cordis-kernel/src/payload_semantic_history.rs), [payload_source_history.rs](../crates/cordis-kernel/src/payload_source_history.rs) |
-| Unified producer certificate returned by the host | [managed_producer_sources.rs](../crates/cordis-kernel/src/managed_producer_sources.rs), [managed_lifecycle_values.rs](../crates/cordis-kernel/src/managed_lifecycle_values.rs) |
-| Full Journal census and derived read/tail gaps | [managed_source_coverage.rs](../crates/cordis-kernel/src/managed_source_coverage.rs) |
-| Source-to-value continuity | [managed_source_link.rs](../crates/cordis-kernel/src/managed_source_link.rs) |
-| Source-to-outstanding-inverse membership | [managed_source_obligations.rs](../crates/cordis-kernel/src/managed_source_obligations.rs) |
-| Owned history invariant and public recovery entry | [managed_lifecycle_history.rs](../crates/cordis-kernel/src/managed_lifecycle_history.rs), [managed_lifecycle_sources.rs](../crates/cordis-kernel/src/managed_lifecycle_sources.rs) |
-| Automatic interval and pre-interval obligations | [managed_producer_interval.rs](../crates/cordis-kernel/src/managed_producer_interval.rs), [managed_producer_event.rs](../crates/cordis-kernel/src/managed_producer_event.rs) |
-| Actual host capture and registered root/Child recovery | [managed_producer_capture.rs](../crates/cordis-kernel/src/managed_producer_capture.rs), [managed_producer_recovery.rs](../crates/cordis-kernel/src/managed_producer_recovery.rs) |
-| Actual common native cut | [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs) |
+| Actual locked restore capture | [reversible_value/payload/restoration.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs), [reversible_value/payload/restoration/attempt.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs) |
+| Persistent prefix merge and agreement | [reversible_value/history/sources.rs](../crates/cordis-kernel/src/reversible_value/history/sources.rs) |
+| Report/dispatch evidence and decoding | [reversible_value/managed/interleaving/sources.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources.rs), [cleanup_groups/payload/recovery.rs](../crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs) |
+| Executed raw forward/restore capture | [reversible_value/managed/interleaving/history/lifecycle/values.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs) |
+| Maintained production chronology | [reversible_value/managed/interleaving/sources/order.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/order.rs), [reversible_value/managed/interleaving/history/lifecycle/order.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/order.rs) |
+| Linear last-write ownership and complete allocation projection | [reversible_value/joint/ownership.rs](../crates/cordis-kernel/src/reversible_value/joint/ownership.rs), [reversible_value/joint.rs](../crates/cordis-kernel/src/reversible_value/joint.rs) |
+| Actual scalar inverse leases, creation and unique consumption | [reversible_value/ownership.rs](../crates/cordis-kernel/src/reversible_value/ownership.rs), [reversible_value.rs](../crates/cordis-kernel/src/reversible_value.rs) |
+| Typed predecessor, unique restoration and retained terminal sources | [reversible_value/payload/semantic_history.rs](../crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs), [reversible_value/payload/source.rs](../crates/cordis-kernel/src/reversible_value/payload/source.rs) |
+| Unified producer certificate returned by the host | [reversible_value/managed/interleaving/sources/producer.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/producer.rs), [reversible_value/managed/interleaving/history/lifecycle/values.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs) |
+| Full Journal census and derived read/tail gaps | [reversible_value/managed/interleaving/sources/coverage.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/coverage.rs) |
+| Source-to-value continuity | [reversible_value/managed/interleaving/sources/link.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/link.rs) |
+| Source-to-outstanding-inverse membership | [reversible_value/managed/interleaving/sources/origins.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/origins.rs) |
+| Owned history invariant and public recovery entry | [reversible_value/managed/interleaving/history/lifecycle.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs), [reversible_value/managed/interleaving/history/lifecycle/sources.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs) |
+| Automatic interval and pre-interval obligations | [reversible_value/managed/interleaving/sources/interval.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/interval.rs), [reversible_value/managed/interleaving/sources/produced.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/produced.rs) |
+| Actual host capture and registered root/Child recovery | [reversible_value/managed/interleaving/history/lifecycle/producer_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_capture.rs), [reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs) |
+| Actual common native cut | [reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs) |
 
 ## Historical interval validation and remaining boundaries
 
@@ -219,7 +219,7 @@ objects. Verus checks their provenance, recovery implication and obstruction
 contracts.
 
 The added regression `producer_snapshots_cover_raw_calls_repeated_states_and_retirement`
-in [managed_function.rs](../crates/cordis-kernel/tests/managed_function.rs)
+in [reversible_value/managed.rs](../crates/cordis-kernel/tests/managed_function.rs)
 executes raw calls outside the facade, failed scalar restoration and retry,
 repeated scalar states, repeated typed contents, old typed inverse rejection,
 replacement, retirement and repeated terminal source collection. It also checks

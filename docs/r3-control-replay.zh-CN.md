@@ -48,7 +48,7 @@ let retained_kernel = replay.execution.kernel();
 | --- | --- |
 | 来源区间推出可运行计划 | [lifecycle_state/native/runtime/history/deletion/replay.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/replay.rs)：`executable_step`、`executable_path`、`replay_control_window` |
 | 真实注册参数 | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs)：`Command::from_registration` |
-| 连续分配与身份转换 | [kernel_replay_names.rs](../crates/cordis-kernel/src/kernel_replay_names.rs)：`compact`、`prepare`；[allocation_names.rs](../crates/cordis-kernel/src/allocation_names.rs)：`prefix_pairing` |
+| 连续分配与身份转换 | [kernel_replay/names.rs](../crates/cordis-kernel/src/kernel_replay/names.rs)：`compact`、`prepare`；[mixed_driver/fresh/names.rs](../crates/cordis-kernel/src/mixed_driver/fresh/names.rs)：`prefix_pairing` |
 | 真实调用准入与准确后继 | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs)：`replay_admission`、`unique`、`replay_one`、`execute` |
 | 实际 generation 计数 | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs)：`generations`、`represented_generations` |
 

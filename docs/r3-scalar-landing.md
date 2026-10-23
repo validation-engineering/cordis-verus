@@ -77,14 +77,14 @@ constructive surviving-execution obligation under R3's recovery items
 68, 69 and 79 in the [paper plan](paper-refinement-map.md).
 It is not yet the general recovery conclusion of Equation (55).
 
-Read [the executable source bridge](../crates/cordis-kernel/src/managed_replay_scalar.rs),
-[the native capture/landing path](../crates/cordis-kernel/src/native_effect.rs),
-and [the scalar computation contract](../crates/cordis-kernel/src/scalar_effect.rs)
+Read [the executable source bridge](../crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs),
+[the native capture/landing path](../crates/cordis-kernel/src/reversible_value/native_effect.rs),
+and [the scalar computation contract](../crates/cordis-kernel/src/reversible_value/effect.rs)
 together. The source operands are retained by replay opt-in; the new read,
 Journal and inverse correspondence evidence erases in ordinary builds.
 
 The runtime cases in
-[managed_replay.rs](../crates/cordis-kernel/tests/managed_replay.rs) cover real
+[reversible_value/managed/replay.rs](../crates/cordis-kernel/tests/managed_replay.rs) cover real
 branch/depth progression and cleanup, a same-value/different-depth rejection,
 interference followed by actual restoration and retry, unrelated writes, and
 wrong or withdrawn owners. The strict

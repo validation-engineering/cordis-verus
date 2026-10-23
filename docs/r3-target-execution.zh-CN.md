@@ -67,11 +67,11 @@ let mut target = captured.source.instantiate(&mut target_runtime, Destination {
 
 | 义务 | 代码／证明入口 |
 | --- | --- |
-| 实际保存的函数及来源回执 | `managed_replay.rs`：`run_replayable_root`、`Source::wf` |
+| 实际保存的函数及来源回执 | `reversible_value/managed/replay.rs`：`run_replayable_root`、`Source::wf` |
 | 完整来源切面 | `Source::bind_control`、`lifecycle_state/native/runtime.rs`：`publication_snapshot_following` |
 | 新目标 work 确实进入解释器 | `registered_root_ready`、`root_ready`、`managed_invocation_ready`、`Source::instantiate` |
-| 输入捕获与目标资源初始化 | `managed_replay.rs`：`Source::seed_input`；`managed_replay_inputs.rs`：`capture`、`captured`、`initializes`、`seeded_operation` |
-| 标量与 typed 步骤的真实对应 | `managed_replay_transport.rs`：`derive`、`paired`、`TargetRun::pair_step` |
+| 输入捕获与目标资源初始化 | `reversible_value/managed/replay.rs`：`Source::seed_input`；`reversible_value/managed/replay/inputs.rs`：`capture`、`captured`、`initializes`、`seeded_operation` |
+| 标量与 typed 步骤的真实对应 | `reversible_value/managed/replay/transport.rs`：`derive`、`paired`、`TargetRun::pair_step` |
 | 目标逆操作及恢复 | 返回的 `RecordedExecution`、`capture_release_census` |
 
 运行用例覆盖源注销、目标 ID 偏移、不同资源、不同输入上的真实失败前缀、typed 清理干扰、新重试票据、最终恢复切面及执行前拒绝。`python3 scripts/check-profile-controls.py target-execution` 单独检查跳过真实解释器或用空函数替换保留源函数时，指定证明合同必须拒绝。

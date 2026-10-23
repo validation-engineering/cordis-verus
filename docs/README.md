@@ -19,6 +19,8 @@ separately from the main review path.
 | Goal | Guide |
 | --- | --- |
 | Reproduce update, cleanup failure, retry and release | [Provider/consumer/Child case](cases/update-recovery.md) · [中文](cases/update-recovery.zh-CN.md) |
+| Generate/reduce histories and compare test/proof detection | [Generated lifecycle evidence](cases/generated-lifecycle.md) · [中文](cases/generated-lifecycle.zh-CN.md) |
+| Locate state ownership and the five review paths | [Review map](review-map.md) · [中文](review-map.zh-CN.md) |
 | Follow paper → real API → contract → evidence | [Paper review](paper-review-guide.md) · [中文](paper-review-guide.zh-CN.md) |
 | Understand ownership, dependencies and trust boundaries | [Architecture](architecture.md) and [semantics](semantics.md) |
 | Inspect remaining whole-paper work | [Fixed inventory](paper-mapping-inventory.md) · [中文](paper-mapping-inventory.zh-CN.md) |

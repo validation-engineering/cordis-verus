@@ -3,7 +3,6 @@
 //! distinct states. Filesystem truth, serialization and external writers remain
 //! adapter premises, not consequences of a successful callback result.
 use vstd::prelude::*;
-#[path = "configuration_source.rs"]
 pub mod sources;
 
 verus! {

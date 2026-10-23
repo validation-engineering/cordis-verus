@@ -101,7 +101,7 @@ consumer may temporarily disagree with its current target.
   `finish_cleanup`. Its postcondition includes both the control rule and
   restoration of `resource(id)` to `initial(id)`.
 - [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) and
-  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs): public `unload`
+  [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs): public `unload`
   succeeds iff `unload_enabled`, combining Kernel cleanup permission with a
   defined `restore_receipts` over the actual journal. `undo_one` implements the
   corresponding strict inverse; the loop preserves restoring and decreases
@@ -121,7 +121,7 @@ consumer may temporarily disagree with its current target.
   ordinary Rust host's `Drained` policy for consumed `FnOnce` failures. Host reports and external inverse effects remain outside the proof.
 - [lifecycle_state.rs](../crates/cordis-kernel/src/lifecycle_state.rs),
   [lifecycle_actions/resources.rs](../crates/cordis-kernel/src/lifecycle_actions/resources.rs) and
-  [publication_cleanup.rs](../crates/cordis-kernel/src/publication_cleanup.rs):
+  [publication/cleanup.rs](../crates/cordis-kernel/src/publication/cleanup.rs):
   the actual shared owner keeps Kernel/protocol together. Managed finish checks
   domain, receipt, resource provenance and manifest completeness; an atomic
   registry batch precedes commitment release. Rejection preserves the finish
@@ -149,7 +149,7 @@ consumer may temporarily disagree with its current target.
   exactly the supplied retry value or returns it unchanged on rejection. `retry`
   requires a retained value; `is_empty` rules out orphaned stored or issued work.
   What factory the executor returns and what that factory does remain host obligations.
-- [runtime.rs](../crates/cordis/src/runtime.rs): ordinary Rust
+- [runtime/poll.rs](../crates/cordis/src/runtime/poll.rs): ordinary Rust
   `Runtime::poll_settle` calls the shared lifecycle Driver around
   host callback execution. This is an actual integration path, not a proof of
   arbitrary callback or Future behavior.
@@ -225,8 +225,8 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   `unload` calls `ChildEpisode::finish_restore`; success ensures
   `ownership::child_unload` and an empty journal.
 - [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) and
-  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs):
-  [`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs)
+  [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs):
+  [`mixed_driver/recovery.rs`](../crates/cordis-kernel/src/mixed_driver/recovery.rs)
   connects a represented well-formed source's retained
   child identities to the actual receipts. `history_sound` alone only gives
   inverse definedness at the original landing; retention is the current-state
@@ -247,7 +247,7 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   foreign-replay recovery equation. Lemma 57 and Theorem 73 remain partial.
 
 - [`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) and
-  [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+  [`mixed_driver/provision_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/provision_recovery.rs)
   extend the actual-journal result to Unit/Child/Provision. Execution from empty
   derives `live_provisions`: each retained Provision has an occupied owner slot,
   with distinct provision keys within each live owner journal. Foreign Xor may
@@ -257,7 +257,7 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   the property from real histories. The following stronger result also covers
   journals containing Xor.
 - [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs) and
-  [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs)
+  [`mixed_driver/recovery_all.rs`](../crates/cordis-kernel/src/mixed_driver/recovery_all.rs)
   establish `journal_recovery` for all four concrete receipt variants.
   `live_operations` derives current captured-provider resolution, provider/value
   retention and the order condition that a later Provision cannot remove an
@@ -273,7 +273,7 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   foreign-replay equation or global termination. The owner-table result is
   established by the coverage bridge below.
 - [`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs) and
-  [`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+  [`mixed_driver/owner_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/owner_recovery.rs)
   connect Corollary 69's empty-owner-table conclusion to executable recovery.
   `provided_journals` covers every current owner slot with a retained Provision
   inverse. This is the converse of keeping each recorded Provision's value live.
@@ -287,7 +287,7 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   retires the child without clearing its independent table. The general
   foreign-replay equation, arbitrary host effects and global progress remain
   separate, so Corollary 69 stays partial.
-- [`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) connects a
+- [`mixed_driver/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/terminal_replay.rs) connects a
   terminal value equation to actual **Mixed** `ScriptReport` output. A matching
   Begin, last successful owner Unload and no interior owner Unload identify the
   episode directly from `transitions`. `terminal_recovery(bank)` automatically
@@ -304,7 +304,7 @@ needs the identity. Unrestricted O-Remove can remove that identity too early.
   execution after deleting owner steps or restored registry identities.
 - [`fresh_recovery.rs`](../crates/cordis-kernel/src/fresh_recovery.rs) follows
   actual allocation choices in each Fresh source landing, using the same receipt
-  and value algebra. [`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+  and value algebra. [`mixed_driver/fresh/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs)
   connects that history to the actual Fresh `run_script` postcondition
   `terminal_recovery(bank)`. The matching Begin/Unload interval is derived from
   the log, not assumed; foreign cleanup uses the actual captured inverse

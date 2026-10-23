@@ -228,21 +228,21 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 | 编号 | 前提／来源 | 类型 | 审查 |
 | --- | --- | --- | --- |
-| <a id="m01"></a>M01 | **统一的上下文与失败解释** — R1 已证明 finite-strict-context/v1；三项明确修订不等于原文无限制 Γ。 | `specification` | [reified_context.rs::reified_representation](../crates/cordis-kernel/src/reified_context.rs); [typed_child_domain.rs::no_single_recovery_and_admission_relation](../crates/cordis-kernel/src/typed_child_domain.rs) |
-| <a id="m02"></a>M02 | **原语恢复与声明访问范围** — 已有内置标量与类型化替换定律；仍需覆盖全部纳入保证的效果，并防止隐藏共享写入。 | `code_contract` | [scalar_effect.rs::commit_calculation](../crates/cordis-kernel/src/scalar_effect.rs); [managed_semantics.rs::primitive_theory](../crates/cordis-kernel/src/managed_semantics.rs) |
-| <a id="m03"></a>M03 | **真实来源与所有权历史** — 记录型 owner 保留实际调用、登记、释放与生产者证据；一般闭合选择仍须由这些证据推出。 | `code_contract` | [chain.rs::inverse_source](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs); [managed_producer_recovery.rs::recorded_census](../crates/cordis-kernel/src/managed_producer_recovery.rs) |
-| <a id="m04"></a>M04 | **目标身份与当前状态对应** — 实际分配收据建立 Bank 单射映射；受守卫标量基本操作在写入前检查实际版本化选择，typed 游标推导容量与新鲜 head 迁移，包含真实恢复后的后续调用。自动 root／Child 执行全程保持完整当前堆的所有权、一般绑定及完整引用迁移仍未解除。 | `undischarged` | [managed_replay_bank.rs::bind](../crates/cordis-kernel/src/managed_replay_bank.rs); [managed_replay_transport.rs::pair_step](../crates/cordis-kernel/src/managed_replay_transport.rs); [managed_replay_selection.rs::check_scalar_replay](../crates/cordis-kernel/src/managed_replay_selection.rs) |
+| <a id="m01"></a>M01 | **统一的上下文与失败解释** — R1 已证明 finite-strict-context/v1；三项明确修订不等于原文无限制 Γ。 | `specification` | [context.rs::reified_representation](../crates/cordis-kernel/src/mixed_driver/context.rs); [typed_child_domain.rs::no_single_recovery_and_admission_relation](../crates/cordis-kernel/src/typed_child_domain.rs) |
+| <a id="m02"></a>M02 | **原语恢复与声明访问范围** — 已有内置标量与类型化替换定律；仍需覆盖全部纳入保证的效果，并防止隐藏共享写入。 | `code_contract` | [effect.rs::commit_calculation](../crates/cordis-kernel/src/reversible_value/effect.rs); [semantics.rs::primitive_theory](../crates/cordis-kernel/src/reversible_value/managed/semantics.rs) |
+| <a id="m03"></a>M03 | **真实来源与所有权历史** — 记录型 owner 保留实际调用、登记、释放与生产者证据；一般闭合选择仍须由这些证据推出。 | `code_contract` | [chain.rs::inverse_source](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs); [producer_recovery.rs::recorded_census](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs) |
+| <a id="m04"></a>M04 | **目标身份与当前状态对应** — 实际分配收据建立 Bank 单射映射；受守卫标量基本操作在写入前检查实际版本化选择，typed 游标推导容量与新鲜 head 迁移，包含真实恢复后的后续调用。自动 root／Child 执行全程保持完整当前堆的所有权、一般绑定及完整引用迁移仍未解除。 | `undischarged` | [bank.rs::bind](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs); [transport.rs::pair_step](../crates/cordis-kernel/src/reversible_value/managed/replay/transport.rs); [selection.rs::check_scalar_replay](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs) |
 | <a id="m05"></a>M05 | **独立性包含定义域与续体** — 严格语法结果需要具体共享键定律；声明本身不能证明交换性或回调纯度。 | `undischarged` | [dependent_independence.rs::grammar_independence](../crates/cordis-kernel/src/dependent_independence.rs); [paper_trace_independence.rs::strict_source_commutative_key](../crates/cordis-kernel/src/paper_trace_independence.rs) |
-| <a id="m06"></a>M06 | **外部生产者与原始 Child 义务闭合** — 已有实际 census 与终态证据；跨选定 Episode 的完整闭合仍是待证明义务。 | `undischarged` | [managed_foreign_closure.rs::closed_from_owners](../crates/cordis-kernel/src/managed_foreign_closure.rs); [managed_child_completion.rs::native_child_endpoint](../crates/cordis-kernel/src/managed_child_completion.rs) |
+| <a id="m06"></a>M06 | **外部生产者与原始 Child 义务闭合** — 已有实际 census 与终态证据；跨选定 Episode 的完整闭合仍是待证明义务。 | `undischarged` | [foreign.rs::closed_from_owners](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs); [completion.rs::native_child_endpoint](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs) |
 | <a id="m07"></a>M07 | **准入与最终完成分开** — 票据绑定真实准入并拒绝旧落地；中间调用可能改变操作定义域，发出票据不蕴含完成。 | `code_contract` | [typed_child_domain.rs::no_single_recovery_and_admission_relation](../crates/cordis-kernel/src/typed_child_domain.rs); [landing.rs::land_result](../crates/cordis-kernel/src/cleanup_queue/landing.rs) |
 | <a id="m08"></a>M08 | **静止性前提有真实来源** — 无环先行关系、有限名称、迭代界与完全发布需要代码证书或精确的应用义务。 | `undischarged` | [global.rs::precedence_ranking](../crates/cordis-kernel/src/global.rs); [paper_invariants.rs::totality_is_not_a_current_state_test](../crates/cordis-kernel/src/paper_invariants.rs); [global.rs::control_no_deadlock](../crates/cordis-kernel/src/global.rs) |
 | <a id="m09"></a>M09 | **宿主调度与最终响应** — 公平调度及不透明 Future 终止不是内核不变量；只在依赖它们的结论中明确列出。 | `environment` | [configuration_future.rs::poll_apply](../crates/cordis-kernel/src/configuration_future.rs); [completion.rs::complete_future](../crates/cordis-kernel/src/cleanup_queue/completion.rs) |
 | <a id="m10"></a>M10 | **外部效果与宿主表示真实性** — JS/Rust 回调效果、可变载荷内部、FFI 转换及文件系统真实性需要逐资源合同；确认消息不能替代证明。 | `environment` | [loader.rs::as_paper_entry](../crates/cordis/src/loader.rs); [cleanup_queue.rs::complete](../crates/cordis-kernel/src/cleanup_queue.rs) |
-| <a id="m11"></a>M11 | **完整的固定函数字段观察** — 真实收据已有函数解释；不能把票据相同或更强的控制敏感关系默认为原文的任意输入观察。 | `undischarged` | [reified_context.rs::function_correspondence](../crates/cordis-kernel/src/reified_context.rs); [strict_partial_quotient_boundary.rs::pure_table_self_relation_fails](../crates/cordis-kernel/src/strict_partial_quotient_boundary.rs) |
-| <a id="m12"></a>M12 | **完整输入与历史名称一同迁移** — Fresh 封闭程序已有结构自然性；任意回调与字面外部名称不会自动继承该性质。 | `undischarged` | [external_inputs.rs::natural_execution_inputs](../crates/cordis-kernel/src/external_inputs.rs); [fresh_compaction.rs::compact](../crates/cordis-kernel/src/fresh_compaction.rs) |
-| <a id="m13"></a>M13 | **失败与容量属于明确的定义域** — 溢出、身份耗尽、失败前缀和清理重试保留为可观察结果；准入成功不等于总性。 | `code_contract` | [managed_function.rs::failed_report](../crates/cordis-kernel/src/managed_function.rs); [managed_replay.rs::instantiate_controlled](../crates/cordis-kernel/src/managed_replay.rs) |
+| <a id="m11"></a>M11 | **完整的固定函数字段观察** — 真实收据已有函数解释；不能把票据相同或更强的控制敏感关系默认为原文的任意输入观察。 | `undischarged` | [context.rs::function_correspondence](../crates/cordis-kernel/src/mixed_driver/context.rs); [strict_partial_quotient_boundary.rs::pure_table_self_relation_fails](../crates/cordis-kernel/src/strict_partial_quotient_boundary.rs) |
+| <a id="m12"></a>M12 | **完整输入与历史名称一同迁移** — Fresh 封闭程序已有结构自然性；任意回调与字面外部名称不会自动继承该性质。 | `undischarged` | [external_inputs.rs::natural_execution_inputs](../crates/cordis-kernel/src/external_inputs.rs); [compaction.rs::compact](../crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs) |
+| <a id="m13"></a>M13 | **失败与容量属于明确的定义域** — 溢出、身份耗尽、失败前缀和清理重试保留为可观察结果；准入成功不等于总性。 | `code_contract` | [managed.rs::failed_report](../crates/cordis-kernel/src/reversible_value/managed.rs); [replay.rs::instantiate_controlled](../crates/cordis-kernel/src/reversible_value/managed/replay.rs) |
 | <a id="m14"></a>M14 | **支持关系使用真实出生来源** — 外部插入与生命周期创建的子组件有区别；provider 无环不蕴含父子/provider 并关系良基。 | `undischarged` | [orchestration_support_cycle.rs::actual_execution](../crates/cordis-kernel/src/orchestration_support_cycle.rs); [child_history.rs::retained_protocol_quiet_support](../crates/cordis-kernel/src/child_history.rs) |
-| <a id="m15"></a>M15 | **证据绑定检查范围与源码** — 清单一致性不是验证；既有开发及选定负控记录不能改称新鲜验收或整篇通过。 | `acceptance` | [inspected_run.rs::run_inspected](../crates/cordis-kernel/src/inspected_run.rs) |
+| <a id="m15"></a>M15 | **证据绑定检查范围与源码** — 清单一致性不是验证；既有开发及选定负控记录不能改称新鲜验收或整篇通过。 | `acceptance` | [inspected.rs::run_inspected](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs) |
 
 ## 逐项关闭合同
 
@@ -265,7 +265,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M01](#m01), [M11](#m11). **关闭依赖:** —.
 
-**现有审查路径:** [recursive_context.rs::unrestricted_accumulator_obstruction](../crates/cordis-kernel/src/recursive_context.rs); [reified_context.rs::reified_representation](../crates/cordis-kernel/src/reified_context.rs)
+**现有审查路径:** [recursive_context.rs::unrestricted_accumulator_obstruction](../crates/cordis-kernel/src/recursive_context.rs); [context.rs::reified_representation](../crates/cordis-kernel/src/mixed_driver/context.rs)
 
 <a id="s02"></a>
 
@@ -307,7 +307,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M11](#m11), [M12](#m12). **关闭依赖:** [S01](#s01), [S02](#s02).
 
-**现有审查路径:** [reified_context.rs::function_correspondence](../crates/cordis-kernel/src/reified_context.rs); [strict_partial_quotient_boundary.rs::pure_table_self_relation_fails](../crates/cordis-kernel/src/strict_partial_quotient_boundary.rs); [external_inputs.rs::natural_execution_inputs](../crates/cordis-kernel/src/external_inputs.rs)
+**现有审查路径:** [context.rs::function_correspondence](../crates/cordis-kernel/src/mixed_driver/context.rs); [strict_partial_quotient_boundary.rs::pure_table_self_relation_fails](../crates/cordis-kernel/src/strict_partial_quotient_boundary.rs); [external_inputs.rs::natural_execution_inputs](../crates/cordis-kernel/src/external_inputs.rs)
 
 <a id="s04"></a>
 
@@ -391,7 +391,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M14](#m14). **关闭依赖:** —.
 
-**现有审查路径:** [child_history.rs::retained_protocol_quiet_support](../crates/cordis-kernel/src/child_history.rs); [managed_child_completion.rs::native_child_endpoint](../crates/cordis-kernel/src/managed_child_completion.rs)
+**现有审查路径:** [child_history.rs::retained_protocol_quiet_support](../crates/cordis-kernel/src/child_history.rs); [completion.rs::native_child_endpoint](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs)
 
 <a id="p01"></a>
 
@@ -412,7 +412,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M02](#m02), [M13](#m13). **关闭依赖:** [S02](#s02).
 
-**现有审查路径:** [scalar_effect.rs::commit_calculation](../crates/cordis-kernel/src/scalar_effect.rs); [controlled_effect.rs::apply_controlled_effect](../crates/cordis-kernel/src/controlled_effect.rs); [managed_function.rs::controlled_execution](../crates/cordis-kernel/src/managed_function.rs); [managed_replay_observation.rs::is_scalar_program](../crates/cordis-kernel/src/managed_replay_observation.rs); [scalar_effect.rs::prepare_instruction_observed](../crates/cordis-kernel/src/scalar_effect.rs); [managed_replay_typed.rs::apply](../crates/cordis-kernel/src/managed_replay_typed.rs)
+**现有审查路径:** [effect.rs::commit_calculation](../crates/cordis-kernel/src/reversible_value/effect.rs); [controlled.rs::apply_controlled_effect](../crates/cordis-kernel/src/reversible_value/controlled.rs); [managed.rs::controlled_execution](../crates/cordis-kernel/src/reversible_value/managed.rs); [observation.rs::is_scalar_program](../crates/cordis-kernel/src/reversible_value/managed/replay/observation.rs); [effect.rs::prepare_instruction_observed](../crates/cordis-kernel/src/reversible_value/effect.rs); [typed.rs::apply](../crates/cordis-kernel/src/reversible_value/managed/replay/typed.rs)
 
 <a id="p02"></a>
 
@@ -433,7 +433,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M01](#m01), [M02](#m02), [M11](#m11), [M13](#m13). **关闭依赖:** [S02](#s02), [P01](#p01).
 
-**现有审查路径:** [managed_semantics.rs::component](../crates/cordis-kernel/src/managed_semantics.rs); [managed_function.rs::execute_call](../crates/cordis-kernel/src/managed_function.rs); [reified_context.rs::root_component](../crates/cordis-kernel/src/reified_context.rs)
+**现有审查路径:** [semantics.rs::component](../crates/cordis-kernel/src/reversible_value/managed/semantics.rs); [managed.rs::execute_call](../crates/cordis-kernel/src/reversible_value/managed.rs); [context.rs::root_component](../crates/cordis-kernel/src/mixed_driver/context.rs)
 
 <a id="p03"></a>
 
@@ -454,7 +454,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M02](#m02), [M04](#m04), [M05](#m05), [M12](#m12). **关闭依赖:** [S02](#s02), [P01](#p01).
 
-**现有审查路径:** [managed_semantics.rs::alias_frame](../crates/cordis-kernel/src/managed_semantics.rs); [managed_semantics.rs::single_key_projection](../crates/cordis-kernel/src/managed_semantics.rs); [history.rs::publication_retained](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs); [value_slot.rs::initial_selection](../crates/cordis-kernel/src/value_slot.rs); [managed_host.rs::provide](../crates/cordis-kernel/src/managed_host.rs); [execution.rs::provide](../crates/cordis-kernel/src/execution.rs); [managed_replay_binding.rs::prepare_mapped_scalar](../crates/cordis-kernel/src/managed_replay_binding.rs)
+**现有审查路径:** [semantics.rs::alias_frame](../crates/cordis-kernel/src/reversible_value/managed/semantics.rs); [semantics.rs::single_key_projection](../crates/cordis-kernel/src/reversible_value/managed/semantics.rs); [history.rs::publication_retained](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs); [slot.rs::initial_selection](../crates/cordis-kernel/src/reversible_value/slot.rs); [host.rs::provide](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs); [execution.rs::provide](../crates/cordis-kernel/src/execution.rs); [binding.rs::prepare_mapped_scalar](../crates/cordis-kernel/src/reversible_value/managed/replay/binding.rs)
 
 <a id="p04"></a>
 
@@ -475,7 +475,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M07](#m07), [M11](#m11), [M13](#m13). **关闭依赖:** [S03](#s03), [P02](#p02), [P03](#p03).
 
-**现有审查路径:** [joint_classification.rs::classify_history](../crates/cordis-kernel/src/joint_classification.rs); [managed_lifecycle_function.rs::run_function](../crates/cordis-kernel/src/managed_lifecycle_function.rs); [configuration_source_history.rs::complete_projection](../crates/cordis-kernel/src/configuration_source_history.rs)
+**现有审查路径:** [classification.rs::classify_history](../crates/cordis-kernel/src/reversible_value/joint/classification.rs); [function.rs::run_function](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs); [configuration_source_history.rs::complete_projection](../crates/cordis-kernel/src/configuration_source_history.rs)
 
 <a id="p05"></a>
 
@@ -517,7 +517,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M04](#m04), [M12](#m12), [M13](#m13). **关闭依赖:** [P01](#p01), [P03](#p03), [S03](#s03).
 
-**现有审查路径:** [managed_replay_bank.rs::bind](../crates/cordis-kernel/src/managed_replay_bank.rs); [managed_replay_batch.rs::run_controlled](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_replay_transport.rs::pair_step](../crates/cordis-kernel/src/managed_replay_transport.rs); [managed_replay_bank.rs::mapping_injective](../crates/cordis-kernel/src/managed_replay_bank.rs); [managed_replay_inputs.rs::seed_following](../crates/cordis-kernel/src/managed_replay_inputs.rs); [joint_execution.rs::allocate_following](../crates/cordis-kernel/src/joint_execution.rs); [reversible_value.rs::new_in_following](../crates/cordis-kernel/src/reversible_value.rs); [shared_payload.rs::new_in_following](../crates/cordis-kernel/src/shared_payload.rs); [managed_replay_continuity.rs::check](../crates/cordis-kernel/src/managed_replay_continuity.rs); [managed_replay_inputs.rs::continues](../crates/cordis-kernel/src/managed_replay_inputs.rs); [managed_replay_payload_history.rs::continues_payload](../crates/cordis-kernel/src/managed_replay_payload_history.rs); [managed_replay_observation.rs::check_scalar_observations](../crates/cordis-kernel/src/managed_replay_observation.rs); [managed_replay_batch.rs::run_checked_scalar](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_replay.rs::instantiate](../crates/cordis-kernel/src/managed_replay.rs); [managed_replay_selection.rs::check_scalar_replay](../crates/cordis-kernel/src/managed_replay_selection.rs); [managed_replay_bank.rs::find](../crates/cordis-kernel/src/managed_replay_bank.rs); [managed_replay_batch.rs::scalar_aliases](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_replay_binding.rs::prepare_mapped_scalar](../crates/cordis-kernel/src/managed_replay_binding.rs); [managed_replay_typed.rs::apply](../crates/cordis-kernel/src/managed_replay_typed.rs); [managed_replay_scalar.rs::land](../crates/cordis-kernel/src/managed_replay_scalar.rs); [scalar_effect.rs::prepare_instruction_observed](../crates/cordis-kernel/src/scalar_effect.rs); [native_effect.rs::prepare_instruction_at](../crates/cordis-kernel/src/native_effect.rs); [native_payload.rs::land](../crates/cordis-kernel/src/native_payload.rs); [payload_cleanup.rs::apply_payload_captured_following](../crates/cordis-kernel/src/payload_cleanup.rs); [payload_inverse.rs::apply_captured_following](../crates/cordis-kernel/src/payload_inverse.rs); [shared_payload.rs::same_head](../crates/cordis-kernel/src/shared_payload.rs); [value_slot.rs::same_revision](../crates/cordis-kernel/src/value_slot.rs); [managed_replay_inputs.rs::duplicate](../crates/cordis-kernel/src/managed_replay_inputs.rs); [managed_replay_payload_history.rs::same_payload_before](../crates/cordis-kernel/src/managed_replay_payload_history.rs); [managed_replay_bank.rs::first_input](../crates/cordis-kernel/src/managed_replay_bank.rs); [managed_replay_selection.rs::check_payload_capture](../crates/cordis-kernel/src/managed_replay_selection.rs); [managed_replay.rs::input_spec](../crates/cordis-kernel/src/managed_replay.rs); [protected_value.rs::acquire_exclusive](../crates/cordis-kernel/src/protected_value.rs); [protected_slot.rs::acquire_exclusive](../crates/cordis-kernel/src/protected_slot.rs); [protected_function.rs::execution](../crates/cordis-kernel/src/protected_function.rs); [managed_replay_protected.rs::check_source](../crates/cordis-kernel/src/managed_replay_protected.rs); [managed_replay_protected.rs::instantiate_protected](../crates/cordis-kernel/src/managed_replay_protected.rs); [managed_replay_batch.rs::run_exclusive](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_replay_batch.rs::exclusive_prefix](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_function.rs::run_function_with](../crates/cordis-kernel/src/managed_function.rs); [scalar_effect.rs::commit_calculation_in](../crates/cordis-kernel/src/scalar_effect.rs); [protected_payload.rs::apply](../crates/cordis-kernel/src/protected_payload.rs); [protected_typed_function.rs::apply](../crates/cordis-kernel/src/protected_typed_function.rs); [managed_replay_typed_protected.rs::check_initial_entry](../crates/cordis-kernel/src/managed_replay_typed_protected.rs); [managed_replay_batch.rs::run_exclusive_typed](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_function.rs::run_function_in](../crates/cordis-kernel/src/managed_function.rs); [payload_inverse.rs::apply_captured_in](../crates/cordis-kernel/src/payload_inverse.rs); [managed_replay_typed_tracker.rs::prepare](../crates/cordis-kernel/src/managed_replay_typed_tracker.rs); [managed_replay_typed_tracker.rs::advance](../crates/cordis-kernel/src/managed_replay_typed_tracker.rs); [managed_replay_typed_correspondence.rs::compose](../crates/cordis-kernel/src/managed_replay_typed_correspondence.rs); [managed_replay_typed_correspondence.rs::certify](../crates/cordis-kernel/src/managed_replay_typed_correspondence.rs); [managed_replay_typed_correspondence.rs::inverse](../crates/cordis-kernel/src/managed_replay_typed_correspondence.rs); [managed_replay_batch.rs::typed_replay_matches](../crates/cordis-kernel/src/managed_replay_batch.rs); [managed_replay_batch.rs::typed_aliases](../crates/cordis-kernel/src/managed_replay_batch.rs)
+**现有审查路径:** [bank.rs::bind](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs); [batch.rs::run_controlled](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [transport.rs::pair_step](../crates/cordis-kernel/src/reversible_value/managed/replay/transport.rs); [bank.rs::mapping_injective](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs); [inputs.rs::seed_following](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs); [joint.rs::allocate_following](../crates/cordis-kernel/src/reversible_value/joint.rs); [reversible_value.rs::new_in_following](../crates/cordis-kernel/src/reversible_value.rs); [payload.rs::new_in_following](../crates/cordis-kernel/src/reversible_value/payload.rs); [continuity.rs::check](../crates/cordis-kernel/src/reversible_value/managed/replay/continuity.rs); [inputs.rs::continues](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs); [payload_history.rs::continues_payload](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs); [observation.rs::check_scalar_observations](../crates/cordis-kernel/src/reversible_value/managed/replay/observation.rs); [batch.rs::run_checked_scalar](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [replay.rs::instantiate](../crates/cordis-kernel/src/reversible_value/managed/replay.rs); [selection.rs::check_scalar_replay](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs); [bank.rs::find](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs); [batch.rs::scalar_aliases](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [binding.rs::prepare_mapped_scalar](../crates/cordis-kernel/src/reversible_value/managed/replay/binding.rs); [typed.rs::apply](../crates/cordis-kernel/src/reversible_value/managed/replay/typed.rs); [scalar.rs::land](../crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs); [effect.rs::prepare_instruction_observed](../crates/cordis-kernel/src/reversible_value/effect.rs); [native_effect.rs::prepare_instruction_at](../crates/cordis-kernel/src/reversible_value/native_effect.rs); [native_payload.rs::land](../crates/cordis-kernel/src/reversible_value/native_payload.rs); [payload.rs::apply_payload_captured_following](../crates/cordis-kernel/src/cleanup_groups/payload.rs); [restoration.rs::apply_captured_following](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs); [payload.rs::same_head](../crates/cordis-kernel/src/reversible_value/payload.rs); [slot.rs::same_revision](../crates/cordis-kernel/src/reversible_value/slot.rs); [inputs.rs::duplicate](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs); [payload_history.rs::same_payload_before](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs); [bank.rs::first_input](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs); [selection.rs::check_payload_capture](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs); [replay.rs::input_spec](../crates/cordis-kernel/src/reversible_value/managed/replay.rs); [protected.rs::acquire_exclusive](../crates/cordis-kernel/src/reversible_value/protected.rs); [protected.rs::acquire_exclusive](../crates/cordis-kernel/src/reversible_value/slot/protected.rs); [protected.rs::execution](../crates/cordis-kernel/src/reversible_value/managed/protected.rs); [protected.rs::check_source](../crates/cordis-kernel/src/reversible_value/managed/replay/protected.rs); [protected.rs::instantiate_protected](../crates/cordis-kernel/src/reversible_value/managed/replay/protected.rs); [batch.rs::run_exclusive](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [batch.rs::exclusive_prefix](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [managed.rs::run_function_with](../crates/cordis-kernel/src/reversible_value/managed.rs); [effect.rs::commit_calculation_in](../crates/cordis-kernel/src/reversible_value/effect.rs); [protected.rs::apply](../crates/cordis-kernel/src/reversible_value/payload/protected.rs); [protected_typed.rs::apply](../crates/cordis-kernel/src/reversible_value/managed/protected_typed.rs); [typed_protected.rs::check_initial_entry](../crates/cordis-kernel/src/reversible_value/managed/replay/typed_protected.rs); [batch.rs::run_exclusive_typed](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [managed.rs::run_function_in](../crates/cordis-kernel/src/reversible_value/managed.rs); [restoration.rs::apply_captured_in](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs); [typed_tracker.rs::prepare](../crates/cordis-kernel/src/reversible_value/managed/replay/typed_tracker.rs); [typed_tracker.rs::advance](../crates/cordis-kernel/src/reversible_value/managed/replay/typed_tracker.rs); [typed_correspondence.rs::compose](../crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs); [typed_correspondence.rs::certify](../crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs); [typed_correspondence.rs::inverse](../crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs); [batch.rs::typed_replay_matches](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [batch.rs::typed_aliases](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs)
 
 <a id="r02"></a>
 
@@ -538,7 +538,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M04](#m04), [M07](#m07), [M13](#m13). **关闭依赖:** [R01](#r01), [P02](#p02), [P04](#p04).
 
-**现有审查路径:** [kernel_replay.rs::from_registration](../crates/cordis-kernel/src/kernel_replay.rs); [managed_replay.rs::instantiate_controlled](../crates/cordis-kernel/src/managed_replay.rs); [cleanup.rs::unload_at](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs); [managed_replay_batch.rs::run_ordered](../crates/cordis-kernel/src/managed_replay_batch.rs); [services.rs::finish_native_execution](../crates/cordis-kernel/src/lifecycle_state/services.rs); [native.rs::finish_native_execution](../crates/cordis-kernel/src/lifecycle_state/native.rs); [managed.rs::finish_managed_execution](../crates/cordis-kernel/src/lifecycle_state/native/managed.rs); [runtime.rs::finish_managed_execution](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs); [managed_lifecycle_native.rs::finish](../crates/cordis-kernel/src/managed_lifecycle_native.rs); [managed_lifecycle_native.rs::run_recorded_root](../crates/cordis-kernel/src/managed_lifecycle_native.rs); [managed_replay_selection.rs::preserve_providers](../crates/cordis-kernel/src/managed_replay_selection.rs)
+**现有审查路径:** [kernel_replay.rs::from_registration](../crates/cordis-kernel/src/kernel_replay.rs); [replay.rs::instantiate_controlled](../crates/cordis-kernel/src/reversible_value/managed/replay.rs); [cleanup.rs::unload_at](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs); [batch.rs::run_ordered](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs); [services.rs::finish_native_execution](../crates/cordis-kernel/src/lifecycle_state/services.rs); [native.rs::finish_native_execution](../crates/cordis-kernel/src/lifecycle_state/native.rs); [managed.rs::finish_managed_execution](../crates/cordis-kernel/src/lifecycle_state/native/managed.rs); [runtime.rs::finish_managed_execution](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs); [native.rs::finish](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs); [native.rs::run_recorded_root](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs); [selection.rs::preserve_providers](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs)
 
 <a id="r03"></a>
 
@@ -559,7 +559,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M06](#m06). **关闭依赖:** [P01](#p01), [P04](#p04).
 
-**现有审查路径:** [managed_producer_recovery.rs::recorded_census](../crates/cordis-kernel/src/managed_producer_recovery.rs); [managed_source_obligations.rs::available](../crates/cordis-kernel/src/managed_source_obligations.rs); [managed_foreign_closure.rs::closed_from_owners](../crates/cordis-kernel/src/managed_foreign_closure.rs)
+**现有审查路径:** [producer_recovery.rs::recorded_census](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs); [origins.rs::available](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/origins.rs); [foreign.rs::closed_from_owners](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs)
 
 <a id="r04"></a>
 
@@ -580,7 +580,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M06](#m06), [M14](#m14). **关闭依赖:** [R02](#r02), [R03](#r03), [S04](#s04).
 
-**现有审查路径:** [managed_child_completion.rs::native_child_endpoint](../crates/cordis-kernel/src/managed_child_completion.rs); [managed_recovery_cut.rs::unload_recovers_with_children](../crates/cordis-kernel/src/managed_recovery_cut.rs); [managed_unload_census.rs::unload_census](../crates/cordis-kernel/src/managed_unload_census.rs)
+**现有审查路径:** [completion.rs::native_child_endpoint](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs); [cut.rs::unload_recovers_with_children](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs); [unload_census.rs::unload_census](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_census.rs)
 
 <a id="r05"></a>
 
@@ -601,7 +601,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M06](#m06), [M12](#m12). **关闭依赖:** [S03](#s03), [S04](#s04), [R03](#r03).
 
-**现有审查路径:** [fresh_compaction.rs::compact](../crates/cordis-kernel/src/fresh_compaction.rs); [fresh_script_completeness.rs::establish_replay](../crates/cordis-kernel/src/fresh_script_completeness.rs); [closed_region_execution.rs::step](../crates/cordis-kernel/src/closed_region_execution.rs)
+**现有审查路径:** [compaction.rs::compact](../crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs); [replay.rs::establish_replay](../crates/cordis-kernel/src/mixed_driver/fresh/replay.rs); [execution.rs::step](../crates/cordis-kernel/src/closed_region_deletion/execution.rs)
 
 <a id="r06"></a>
 
@@ -664,7 +664,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M01](#m01), [M02](#m02), [M03](#m03), [M04](#m04), [M05](#m05), [M06](#m06), [M11](#m11). **关闭依赖:** [R01](#r01), [R02](#r02), [R03](#r03), [R04](#r04), [R05](#r05), [R06](#r06), [R07](#r07), [G02](#g02).
 
-**现有审查路径:** [episode_replay.rs::restored_observation_from_source](../crates/cordis-kernel/src/episode_replay.rs); [managed_recovery_cut.rs::unload_recovers_from_source_history](../crates/cordis-kernel/src/managed_recovery_cut.rs); [fresh_episode_replay.rs::recover_cut](../crates/cordis-kernel/src/fresh_episode_replay.rs); [managed_replay_heap.rs::scalar_contract](../crates/cordis-kernel/src/managed_replay_heap.rs); [managed_replay_heap.rs::captured_scalar_contract](../crates/cordis-kernel/src/managed_replay_heap.rs); [managed_replay_continuity.rs::recovery](../crates/cordis-kernel/src/managed_replay_continuity.rs); [managed_replay_observation.rs::scalar_inverse](../crates/cordis-kernel/src/managed_replay_observation.rs); [managed_replay_selection.rs::mapped_inverse](../crates/cordis-kernel/src/managed_replay_selection.rs); [managed_replay_typed.rs::apply](../crates/cordis-kernel/src/managed_replay_typed.rs)
+**现有审查路径:** [episode_replay.rs::restored_observation_from_source](../crates/cordis-kernel/src/mixed_driver/episode_replay.rs); [cut.rs::unload_recovers_from_source_history](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs); [episode_replay.rs::recover_cut](../crates/cordis-kernel/src/mixed_driver/fresh/episode_replay.rs); [heap.rs::scalar_contract](../crates/cordis-kernel/src/reversible_value/managed/replay/bank/heap.rs); [heap.rs::captured_scalar_contract](../crates/cordis-kernel/src/reversible_value/managed/replay/bank/heap.rs); [continuity.rs::recovery](../crates/cordis-kernel/src/reversible_value/managed/replay/continuity.rs); [observation.rs::scalar_inverse](../crates/cordis-kernel/src/reversible_value/managed/replay/observation.rs); [selection.rs::mapped_inverse](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs); [typed.rs::apply](../crates/cordis-kernel/src/reversible_value/managed/replay/typed.rs)
 
 <a id="r09"></a>
 
@@ -685,7 +685,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M04](#m04), [M06](#m06), [M12](#m12). **关闭依赖:** [R02](#r02), [R04](#r04), [R05](#r05), [S04](#s04), [G02](#g02).
 
-**现有审查路径:** [deletion.rs::transport](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs); [closed_region_execution.rs::step](../crates/cordis-kernel/src/closed_region_execution.rs); [foreign_child_deletion_example.rs::actual_closed_deletion](../crates/cordis-kernel/src/foreign_child_deletion_example.rs)
+**现有审查路径:** [deletion.rs::transport](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs); [execution.rs::step](../crates/cordis-kernel/src/closed_region_deletion/execution.rs); [foreign_child_deletion_example.rs::actual_closed_deletion](../crates/cordis-kernel/src/foreign_child_deletion_example.rs)
 
 <a id="g01"></a>
 
@@ -706,7 +706,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M03](#m03), [M07](#m07), [M13](#m13). **关闭依赖:** [P04](#p04), [S02](#s02).
 
-**现有审查路径:** [lifecycle_ordering.rs::committed_prefix](../crates/cordis-kernel/src/lifecycle_ordering.rs); [admitted_script.rs::run_script](../crates/cordis-kernel/src/admitted_script.rs); [history.rs::owner_retained](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs)
+**现有审查路径:** [lifecycle_ordering.rs::committed_prefix](../crates/cordis-kernel/src/lifecycle_ordering.rs); [script.rs::run_script](../crates/cordis-kernel/src/mixed_driver/fresh/admitted/script.rs); [history.rs::owner_retained](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs)
 
 <a id="g02"></a>
 
@@ -727,7 +727,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M02](#m02), [M05](#m05), [M11](#m11), [M12](#m12). **关闭依赖:** [P01](#p01), [P02](#p02), [P03](#p03), [S03](#s03).
 
-**现有审查路径:** [dependent_independence.rs::grammar_independence](../crates/cordis-kernel/src/dependent_independence.rs); [mixed_observational_transport.rs::iteration_suffix](../crates/cordis-kernel/src/mixed_observational_transport.rs); [paper_trace_independence.rs::strict_source_commutative_key](../crates/cordis-kernel/src/paper_trace_independence.rs); [managed_replay_bank.rs::scalar_independence](../crates/cordis-kernel/src/managed_replay_bank.rs)
+**现有审查路径:** [dependent_independence.rs::grammar_independence](../crates/cordis-kernel/src/dependent_independence.rs); [mixed_observational_transport.rs::iteration_suffix](../crates/cordis-kernel/src/mixed_observational_transport.rs); [paper_trace_independence.rs::strict_source_commutative_key](../crates/cordis-kernel/src/paper_trace_independence.rs); [bank.rs::scalar_independence](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs)
 
 <a id="g03"></a>
 
@@ -748,7 +748,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M08](#m08), [M13](#m13). **关闭依赖:** [P02](#p02), [G01](#g01).
 
-**现有审查路径:** [paper_invariants.rs::totality_is_not_a_current_state_test](../crates/cordis-kernel/src/paper_invariants.rs); [fresh_script_completeness.rs::source_call_at](../crates/cordis-kernel/src/fresh_script_completeness.rs); [fresh_terminal_replay.rs::terminal_replay](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+**现有审查路径:** [paper_invariants.rs::totality_is_not_a_current_state_test](../crates/cordis-kernel/src/paper_invariants.rs); [replay.rs::source_call_at](../crates/cordis-kernel/src/mixed_driver/fresh/replay.rs); [terminal_replay.rs::terminal_replay](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs)
 
 <a id="g04"></a>
 
@@ -769,7 +769,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M07](#m07), [M08](#m08), [M09](#m09), [M13](#m13). **关闭依赖:** [G03](#g03), [G01](#g01), [R08](#r08), [S05](#s05), [R06](#r06).
 
-**现有审查路径:** [global.rs::control_no_deadlock](../crates/cordis-kernel/src/global.rs); [fresh_terminal_replay.rs::terminal_replay](../crates/cordis-kernel/src/fresh_terminal_replay.rs); [resolution_completion_counterexample.rs::arbitrary_delay](../crates/cordis-kernel/src/resolution_completion_counterexample.rs)
+**现有审查路径:** [global.rs::control_no_deadlock](../crates/cordis-kernel/src/global.rs); [terminal_replay.rs::terminal_replay](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs); [resolution_completion_counterexample.rs::arbitrary_delay](../crates/cordis-kernel/src/resolution_completion_counterexample.rs)
 
 <a id="g05"></a>
 
@@ -874,7 +874,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M01](#m01), [M02](#m02), [M03](#m03), [M04](#m04), [M05](#m05), [M06](#m06), [M07](#m07), [M08](#m08), [M09](#m09), [M10](#m10), [M11](#m11), [M12](#m12), [M13](#m13), [M14](#m14), [M15](#m15). **关闭依赖:** [S01](#s01), [S02](#s02), [S03](#s03), [S04](#s04), [S05](#s05), [S06](#s06), [S07](#s07), [P01](#p01), [P02](#p02), [P03](#p03), [P04](#p04), [P05](#p05), [R08](#r08), [R09](#r09), [G01](#g01), [G07](#g07), [C01](#c01).
 
-**现有审查路径:** [inspected_run.rs::run_inspected](../crates/cordis-kernel/src/inspected_run.rs); [managed_lifecycle_function.rs::run_function](../crates/cordis-kernel/src/managed_lifecycle_function.rs)
+**现有审查路径:** [inspected.rs::run_inspected](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs); [function.rs::run_function](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs)
 
 <a id="d02"></a>
 
@@ -895,7 +895,7 @@ S／P／R／G／C／D 是盘点单元前缀。例如 R01 是恢复义务，不�
 
 **前提来源:** [M15](#m15). **关闭依赖:** [D01](#d01).
 
-**现有审查路径:** [inspected_run.rs::run_inspected](../crates/cordis-kernel/src/inspected_run.rs)
+**现有审查路径:** [inspected.rs::run_inspected](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs)
 
 ## 更新与检查基线
 

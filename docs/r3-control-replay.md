@@ -48,7 +48,7 @@ Commands now come automatically from successful production transitions and the a
 | --- | --- |
 | Source window implies a runnable plan | [lifecycle_state/native/runtime/history/deletion/replay.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/replay.rs): `executable_step`, `executable_path`, `replay_control_window` |
 | Preserve real insertion arguments | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs): `Command::from_registration` |
-| Consecutive allocations and consistent name transport | [kernel_replay_names.rs](../crates/cordis-kernel/src/kernel_replay_names.rs): `compact`, `prepare`; [allocation_names.rs](../crates/cordis-kernel/src/allocation_names.rs): `prefix_pairing` |
+| Consecutive allocations and consistent name transport | [kernel_replay/names.rs](../crates/cordis-kernel/src/kernel_replay/names.rs): `compact`, `prepare`; [mixed_driver/fresh/names.rs](../crates/cordis-kernel/src/mixed_driver/fresh/names.rs): `prefix_pairing` |
 | Source rules enable actual methods; actual successors are exact | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs): `replay_admission`, `unique`, `replay_one`, `execute` |
 | Actual generation accounting | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs): `generations`, `represented_generations` |
 

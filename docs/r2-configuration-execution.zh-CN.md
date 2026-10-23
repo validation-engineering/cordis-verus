@@ -99,9 +99,9 @@ allocation。普通路径索引只是缓存：`Tree::get` 会核对真实节点�
 见下文；完整 group/include Component 含义、模块／配置含义及 native／Node／配置共同 Journal
 仍需各自的解释。
 
-审查入口为可执行的[身份代码](../crates/cordis-kernel/src/configuration_identity.rs)、
-[选择与移除](../crates/cordis-kernel/src/configuration_selection.rs)、
-[重建循环](../crates/cordis-kernel/src/configuration_reconstruction.rs)及其
+审查入口为可执行的[身份代码](../crates/cordis-kernel/src/configuration_tree/identity.rs)、
+[选择与移除](../crates/cordis-kernel/src/configuration_tree/selection.rs)、
+[重建循环](../crates/cordis-kernel/src/configuration_tree/reconstruction.rs)及其
 [Loader 调用者](../crates/cordis/src/loader.rs)。
 
 本批次待集中补齐的集成证据：
@@ -183,7 +183,7 @@ Loader／更新／服务配置／持久化案例）。证明命令同时编译�
 ## 实际登记配方的完整批量采用
 
 `Runtime::adopt_config_recipes` 现在通过原生 driver 调用受验证的
-[`NativeRuntime::adopt_configurations`](../crates/cordis-kernel/src/configuration_adoption.rs)，
+[`NativeRuntime::adopt_configurations`](../crates/cordis-kernel/src/configuration_runtime/adoption.rs)，
 传入自己持有的真实目标、setup 函数体和元数据批次。普通宿主保留插件／接口兼容性检查，
 不再自行驱动目标去重和容量预检，也不再用预检后的 `expect` 来替代整批替换成功的证明。
 
@@ -222,7 +222,7 @@ panic 后的回滚，也不证明回调副作用、析构语义或任意替换�
 生产原生 owner 现在保存擦除的
 [`recipe_history::History<R>`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)，
 记录准确的 `RegisteredPlugin<R>` 值。私有 ledger 与生命周期、对象写入、槽位、工作和
-清理共用同一个 Journal。[`Recipes` 记录](../crates/cordis-kernel/src/recipe_execution.rs)
+清理共用同一个 Journal。[`Recipes` 记录](../crates/cordis-kernel/src/reversible_value/joint/recipes.rs)
 投影真实运行域、组件、父级、anchor、realm、声明和配方版本，不为任意回调函数体编造语义。
 
 普通注册和 SharedChild 注册记录版本为零的真实函数体；移除记录实际移除的条目。
@@ -272,7 +272,7 @@ Node 对象／Fiber／HMR 解释、完整配置含义和跨宿主语义组合仍
 
 [`configuration_history::History`](../crates/cordis-kernel/src/configuration_history.rs)
 以擦除证据保存准确的候选、恢复载荷和更新计划，并将它们索引到共同 Journal 的
-[`Configuration` 记录](../crates/cordis-kernel/src/configuration_execution.rs)。
+[`Configuration` 记录](../crates/cordis-kernel/src/reversible_value/joint/configuration.rs)。
 `Snapshot::complete_projection` 证明捕获的共同轨迹中，该配置记录的每次修改都有对应
 带类型条目，允许其他所有者交错。`History::commit_inputs` 从历史推导真实成功前缀及
 提交的原始候选；`accepted_origin` 将已接受载荷追溯到实际初值或明确的提交／重建／refresh。
@@ -332,7 +332,7 @@ Node 对象／Fiber／HMR 解释、完整配置含义和跨宿主语义组合仍
 保留已处理前缀与待同步标志的规则。I/O 和接受期间，适配层独占借用整个所有者，
 保存报告不能再修改另一个源对象。
 
-源记录器由真实配置 ledger 构造。[`Sources` 转换](../crates/cordis-kernel/src/source_execution.rs)
+源记录器由真实配置 ledger 构造。[`Sources` 转换](../crates/cordis-kernel/src/reversible_value/joint/sources.rs)
 在同一个 Journal 写锁期间认证该配置记录，并要求没有待完成事务。事件记录观察到的
 配置状态，既包含已接受修订号，也包含执行序号：恢复和 refresh 可以保持修订号，
 但仍对应不同的带序号状态。源转换必须走 `Member::update_guarded`，普通更新接口
@@ -398,7 +398,7 @@ checkpoint 保留、同步失败与无改写同步重试、外域拒绝及提交
 ## 从真实保存推导源 checkpoint
 
 实际 `Loader::configuration.sources` 由
-[`configuration_save::sources::Source`](../crates/cordis-kernel/src/configuration_source.rs)
+[`configuration_save::sources::Source`](../crates/cordis-kernel/src/configuration_save/sources.rs)
 持有：加载的 root／文本／include 解析结果，以及每条路径的本地配置值和待同步标志。
 `load`、`clear` 和已接受保存进入同一擦除历史；清空运行状态不会抹掉证明历史。
 加载保留同名 checkpoint 尚未完成的同步；JSON 适配层只能读取这些字段。

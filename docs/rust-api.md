@@ -265,7 +265,7 @@ by themselves imply independence. The precise paper mapping is documented in
 [native effects and aliases](r2-execution.md#native-extensible-effects-and-the-alias-aware-paper-mapping).
 
 For a new primitive, implement and verify `ScalarEffect`'s model/result contract
-as illustrated by [`ScaleAdd`](../crates/cordis-kernel/src/scalar_effect.rs).
+as illustrated by [`ScaleAdd`](../crates/cordis-kernel/src/reversible_value/effect.rs).
 There is no need to extend the kernel's fixed operation enum or supply an
 inverse. Verus checks the primitive and the generic combinators; implementing
 the erased Rust trait alone does not prove arbitrary code. This API currently

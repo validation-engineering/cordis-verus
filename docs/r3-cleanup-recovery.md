@@ -84,12 +84,12 @@ retry remain separate obligations.
 
 ## Review and validation
 
-- [cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs): actual
+- [cleanup_groups/payload/recovery.rs](../crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs): actual
   observations, strict domains, remaining-stack preservation and retry composition.
-- [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs) and
+- [cleanup_groups/payload.rs](../crates/cordis-kernel/src/cleanup_groups/payload.rs) and
   [cleanup_queue/completion.rs](../crates/cordis-kernel/src/cleanup_queue/completion.rs):
   real dispatch, erased boundary retention and propagated postconditions.
-- [managed_cleanup_path.rs](../crates/cordis-kernel/src/managed_cleanup_path.rs):
+- [reversible_value/managed/cleanup_path.rs](../crates/cordis-kernel/src/reversible_value/managed/cleanup_path.rs):
   finite composition from real results back to registered Begin values.
 - [execution.rs](../crates/cordis-kernel/src/execution.rs): production retry
   postconditions; [runtime.rs](../crates/cordis/src/runtime.rs): host caller.

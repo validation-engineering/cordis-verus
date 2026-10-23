@@ -657,74 +657,49 @@ pub proof fn history_interpretation(snapshot:&Snapshot,key:Port,table:Map<Port,V
 }
 }
 
-#[path = "value_program.rs"]
 pub mod program;
 
-#[path = "scalar_effect.rs"]
 pub mod effect;
 
-#[path = "shared_value_history.rs"]
 pub mod history;
 
-#[path = "value_cursor.rs"]
 pub mod cursor;
 
-#[path = "value_slot.rs"]
 pub mod slot;
 
-#[path = "value_heap.rs"]
 pub mod heap;
 
-#[path = "joint_execution.rs"]
 pub mod joint;
 
-#[path = "value_access.rs"]
 pub mod access;
-#[path = "value_alias.rs"]
 pub mod alias;
-#[path = "native_effect.rs"]
 pub mod native_effect;
-#[path = "native_payload.rs"]
 pub mod native_payload;
 
-#[path = "value_function.rs"]
 pub mod function;
 
-#[path = "service_program.rs"]
 pub mod services;
 
-#[path = "service_function.rs"]
 pub mod service_function;
 
-#[path = "service_composition.rs"]
 pub mod service_composition;
 
-#[path = "service_stack.rs"]
 pub mod service_stack;
 
-#[path = "value_registration.rs"]
 pub mod registration;
 
-#[path = "value_attempt.rs"]
 pub mod attempt;
 
-#[path = "value_restoration.rs"]
 pub mod restoration;
 
-#[path = "shared_payload.rs"]
 pub mod payload;
 
-#[path = "managed_function.rs"]
 pub mod managed;
 
-#[path = "scalar_ownership.rs"]
 pub mod ownership;
 
-#[path = "controlled_effect.rs"]
 pub mod controlled;
 
-#[path = "protected_value.rs"]
 pub(crate) mod protected;
 
-#[path = "closed_value.rs"]
 pub mod closed;

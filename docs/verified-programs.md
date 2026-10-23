@@ -126,7 +126,7 @@ Provision，再覆盖 Xor inverse 的 strict 状态域；Unit 在模型中叫 `T
 receipt 分类。这是定义 52 及引理 57／定理 73 的受限连接，不补齐推论 69 的一般
 foreign replay 方程或整个系统终止；具体 owner 表空由下述覆盖桥另证，相关 partial 状态不变。
 
-进一步的 [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+进一步的 [`mixed_driver/provision_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/provision_recovery.rs)
 覆盖 `unit_child_provision_journal(actor)`，允许同一真实日志包含 Unit、Child 和
 Provision。源 `live_provisions` 由从 empty 的 Mixed/Fresh 执行导出，说明保留的
 Provision 对应仍有值的 owner 槽，且同一日志的 Provision key 互异；因此逆序删除
@@ -137,7 +137,7 @@ Provision 对应仍有值的 owner 槽，且同一日志的 Provision key 互异
 自身含 Xor 的日志由下述更强结论覆盖，一般 foreign replay 仍是独立义务；
 Bootstrap 的 SetupFailed 诊断范围也未扩大。详见[Provision 恢复合同](progress-contracts.zh-CN.md#provision-值保留到真实-inverse-执行)。
 
-完整的具体日志由 [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs)
+完整的具体日志由 [`mixed_driver/recovery_all.rs`](../crates/cordis-kernel/src/mixed_driver/recovery_all.rs)
 覆盖。源 [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs)
 导出的 `live_operations` 保证保留 operation 的 captured provider 仍可由 episode
 commitment 解析、仍已登记且目标槽有值，并保证较后 Provision 不会删去较早 operation
@@ -153,7 +153,7 @@ Kernel 清理守卫，脚本 Unload 失败则意味着真实停止状态不允�
 具体指令语言，任意 plugin scalar、宿主 callback、一般 foreign replay 观察方程、
 全局终止仍未由此证明。详见[Xor 恢复域](progress-contracts.zh-CN.md#xor-补齐具体日志的当前状态恢复域)。
 
-Owner 表空由 [`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+Owner 表空由 [`mixed_driver/owner_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/owner_recovery.rs)
 另行连接。源 [`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs)
 从真实 Mixed/Fresh 历史导出 `provided_journals`：每个现存 owner 值都有对应的
 Provision 逆记录。该反向覆盖补充先前的“每条逆记录仍有值”，并通过真实 receipt
@@ -166,7 +166,7 @@ Unload／其 `apply` 分支成功后保证实际 `table(actor)` 为空。单独 
 实现的推论 69 空 owner 表部分，完整 foreign replay 观察方程、宿主资源与全局进展
 仍有独立义务。详见[owner 表恢复合同](progress-contracts.zh-CN.md#成功恢复后真实-owner-表为空)。
 
-**Mixed** 的 [`ScriptReport::terminal_recovery`](../crates/cordis-kernel/src/terminal_replay.rs)
+**Mixed** 的 [`ScriptReport::terminal_recovery`](../crates/cordis-kernel/src/mixed_driver/terminal_replay.rs)
 还把终态值方程接到实际脚本返回。`terminal_episode` 从成功 `transitions` 中识别
 匹配的 Begin、末条 owner Unload，并排除中途 owner Unload。`run_script` 自动建立
 匹配 episode 的源执行见证、空 owner 表和 `value_observation() == foreign_replay(...)`；
@@ -180,7 +180,7 @@ Unload／其 `apply` 分支成功后保证实际 `table(actor)` 为空。单独 
 命令仍合法，也不声明 registry 或 allocator 回退。任意 scalar、宿主效果及全局进展仍未由此证明，定理
 68／推论 69 保持 partial。详见[Mixed 终态值重放](progress-contracts.zh-CN.md#mixed-脚本终态等于其-foreign-only-值重放)。
 
-**Fresh** 的 [`ScriptReport::terminal_recovery`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+**Fresh** 的 [`ScriptReport::terminal_recovery`](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs)
 现提供对应的终态报告保证。`fresh_recovery` 对每次实际 landing 使用真实 child
 choice，不把动态蓝图改写为固定 child 程序；同一蓝图重复激活产生不同身份也在
 合同内。Fresh `run_script` 直接建立该后置条件，保留 foreign cleanup 的捕获日志，

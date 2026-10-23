@@ -66,7 +66,7 @@ publication／owner／pending 恢复**相同的实际切点**，起点是该调�
 
 代码见[原生删除](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs)、
 [区间构造](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/trace.rs)、
-[共同捕获结果](../crates/cordis-kernel/src/managed_deletion_capture.rs)。
+[共同捕获结果](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs)。
 本包不改变原论文账本或 R3 验收标准。
 
 ## 非空证据

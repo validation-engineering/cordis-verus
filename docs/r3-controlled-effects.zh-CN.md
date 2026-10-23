@@ -23,10 +23,10 @@ ManagedInstruction::scalar / Effect::Kernel
 
 | 论文到代码义务 | 实际实现与合同 |
 | --- | --- |
-| 原语使用真实输入 | [`Instruction::evaluate` 与 `commit_calculation`](../crates/cordis-kernel/src/scalar_effect.rs) 在同一次值写锁持有期间，从真实状态计算。受控操作成功等价于原语在该实际状态有定义，并排除回调计算干扰。 |
-| 声明选择、别名 frame、真实逆操作所有权 | [`apply_native_controlled`](../crates/cordis-kernel/src/native_effect.rs) 重新检查执行 owner 和准入，连接真实先前票据，导出现有服务／别名解释。[`apply_controlled_effect`](../crates/cordis-kernel/src/controlled_effect.rs) 把实际逆操作登记进原清理队列。 |
-| 依赖函数成员资格及真实执行 | [`managed_function.rs`](../crates/cordis-kernel/src/managed_function.rs) 和 [`managed_semantics.rs`](../crates/cordis-kernel/src/managed_semantics.rs) 将受控指令接入同一个函数语义与成功前缀报告。`controlled_execution` 从实际报告推导无标量干扰，使用既有 R1 函数解释和原可执行解释器。 |
-| 目标执行保留完整源函数 | [`Source::instantiate_controlled`](../crates/cordis-kernel/src/managed_replay.rs) 在目标注册之前检查所有指令，包括未执行分支。[`batch::run_controlled`](../crates/cordis-kernel/src/managed_replay_batch.rs) 在创建 provider 前检查每个源函数，之后使用原共享对象批量执行和真实源顺序。 |
+| 原语使用真实输入 | [`Instruction::evaluate` 与 `commit_calculation`](../crates/cordis-kernel/src/reversible_value/effect.rs) 在同一次值写锁持有期间，从真实状态计算。受控操作成功等价于原语在该实际状态有定义，并排除回调计算干扰。 |
+| 声明选择、别名 frame、真实逆操作所有权 | [`apply_native_controlled`](../crates/cordis-kernel/src/reversible_value/native_effect.rs) 重新检查执行 owner 和准入，连接真实先前票据，导出现有服务／别名解释。[`apply_controlled_effect`](../crates/cordis-kernel/src/reversible_value/controlled.rs) 把实际逆操作登记进原清理队列。 |
+| 依赖函数成员资格及真实执行 | [`reversible_value/managed.rs`](../crates/cordis-kernel/src/reversible_value/managed.rs) 和 [`reversible_value/managed/semantics.rs`](../crates/cordis-kernel/src/reversible_value/managed/semantics.rs) 将受控指令接入同一个函数语义与成功前缀报告。`controlled_execution` 从实际报告推导无标量干扰，使用既有 R1 函数解释和原可执行解释器。 |
+| 目标执行保留完整源函数 | [`Source::instantiate_controlled`](../crates/cordis-kernel/src/reversible_value/managed/replay.rs) 在目标注册之前检查所有指令，包括未执行分支。[`batch::run_controlled`](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs) 在创建 provider 前检查每个源函数，之后使用原共享对象批量执行和真实源顺序。 |
 
 论文条目导航：操作及 mediated grammar 对应 Definition 29/30，组件对应 Definition 48，confinement 对应 Definition 55，见[论文台账](paper-coverage.md)。上述合同在已审查的 R1 解释下加强这些条目的运行前提。一般恢复对应 Theorem 68 / Corollary 69，恢复表达式是 Equation (55)；受控原语／函数路径没有因此完成这些一般恢复结果。
 

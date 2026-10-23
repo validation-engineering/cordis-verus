@@ -298,57 +298,57 @@ Child 控制需拒绝用退休、父插件 Unload 或其他 Episode 替代真实
 native member／父插件，遗漏退休或清理封闭前驱，拒绝后伪造完成，以及取消后分配。
 这些新增控制尚待验收；运行拒绝案例不能替代证明变异检查。
 
-- [managed_interleaving.rs](../crates/cordis-kernel/src/managed_interleaving.rs)：来源
+- [reversible_value/managed/interleaving.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving.rs)：来源
   载体、实际收据／读取条件、初始保留队列及 registered 有限历史恢复。
-- [managed_interleaving_completion.rs](../crates/cordis-kernel/src/managed_interleaving_completion.rs)：
+- [reversible_value/managed/interleaving/completion.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/completion.rs)：
   真实后续恢复覆盖，以及逆操作记录已全部消费的推导。
-- [managed_release_path.rs](../crates/cordis-kernel/src/managed_release_path.rs)：
+- [reversible_value/managed/interleaving/release.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/release.rs)：
   来源覆盖、本地成功推导及 `unload_recovers_from_cleanup`。
-- [managed_release_membership.rs](../crates/cordis-kernel/src/managed_release_membership.rs)：
+- [reversible_value/managed/interleaving/release/membership.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/release/membership.rs)：
   实际入队成员归属、早于封闭的顺序及 `unload_recovers_registered`。
-- [managed_cleanup_history.rs](../crates/cordis-kernel/src/managed_cleanup_history.rs)：
+- [reversible_value/managed/interleaving/history.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs)：
   实际派发／重试的记录入口，以及保留槽位的守恒。
-- [managed_lifecycle_history.rs](../crates/cordis-kernel/src/managed_lifecycle_history.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs)：
   真实 Execution 所有权、连续派发／重试历史、跨组观察、动态组来源、后续注册及提前移除边界。
-- [managed_lifecycle_callbacks.rs](../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle/callbacks.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/callbacks.rs)：
   限定宿主重试载荷、同步／实际等待结果确认，以及与受管逆操作消费的隔离。
-- [managed_lifecycle_work.rs](../crates/cordis-kernel/src/managed_lifecycle_work.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle/work.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/work.rs)：
   实际 work receipt、执行器借出／scope／落地及排空后的退休。
-- [managed_lifecycle_children.rs](../crates/cordis-kernel/src/managed_lifecycle_children.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle/children.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs)：
   Child 原子准入、保留的逆操作义务，以及创建者 Episode 与实际取消／Child 释放的关联。
 - [lifecycle_state/native/runtime/child_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_recovery.rs) 与
   [lifecycle_state/registration/shared_child.rs](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs)：持久槽位决策、真实
   退休／Unload 组合及普通 Rust 入口。
 - [lifecycle_state/native/runtime/child_history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history.rs)、
   [lifecycle_state/native/runtime/child_history/completion.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/completion.rs)
-  和 [managed_child_completion.rs](../crates/cordis-kernel/src/managed_child_completion.rs)：
+  和 [reversible_value/managed/interleaving/history/lifecycle/children/completion.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs)：
   自动出生／退休／Unload 来源、已提交前缀覆盖及创建者原始 native 逆操作的完整性。
-- [managed_lifecycle_function.rs](../crates/cordis-kernel/src/managed_lifecycle_function.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle/function.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs)：
   后续实际受管调用、返回检查点及调用／清理收据组合。
-- [cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs) 与
-  [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs)：真实
+- [cleanup_groups/payload/recovery.rs](../crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs) 与
+  [cleanup_groups/payload.rs](../crates/cordis-kernel/src/cleanup_groups/payload.rs)：真实
   Pop／恢复／确认的因果关系及同 Journal 读取边界。
 - [execution.rs](../crates/cordis-kernel/src/execution.rs)：
   `observe_execution_following` 在同一读取周期确认实际所有者状态与收据包含关系。
-- [managed_lifecycle_native.rs](../crates/cordis-kernel/src/managed_lifecycle_native.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle/native.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs)：
   已注册 root 接入、Finish、撤回、native 重试及 Unload。
-- [managed_owned_release.rs](../crates/cordis-kernel/src/managed_owned_release.rs)：
+- [reversible_value/managed/interleaving/history/lifecycle/recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery.rs)：
   直接使用生命周期所有者所存证据的恢复定理。
-- [managed_history_release.rs](../crates/cordis-kernel/src/managed_history_release.rs)：
+- [reversible_value/managed/interleaving/history/release.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/release.rs)：
   推导确认覆盖、`unload_recovers_from_history` 及直接消费成功 `ReleaseObservation`
   的组合定理。
-- [group_release_history.rs](../crates/cordis-kernel/src/group_release_history.rs) 与
-  [cleanup_release_history.rs](../crates/cordis-kernel/src/cleanup_release_history.rs)：
+- [reversible_value/joint/groups/release.rs](../crates/cordis-kernel/src/reversible_value/joint/groups/release.rs) 与
+  [reversible_value/joint/episode/release.rs](../crates/cordis-kernel/src/reversible_value/joint/episode/release.rs)：
   真实移除／封闭守卫，以及由此定位的先前 token 完成事件。
-- [managed_interleaving_endpoint.rs](../crates/cordis-kernel/src/managed_interleaving_endpoint.rs)：
+- [reversible_value/managed/interleaving/endpoint.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/endpoint.rs)：
   真实终点解码、尾部无修改条件及 `unload_recovers_begin`。
 - [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs) 与
   [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：真实成功释放、索引
   owner 来源和擦除的 Unload 证据。
-- [recovery_obligations.rs](../crates/cordis-kernel/src/recovery_obligations.rs)：深度
+- [reversible_value/managed/interleaving/obligations.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/obligations.rs)：深度
   约束、从历史推出的单对象顺序及逆操作消费。
 - [reversible_value.rs](../crates/cordis-kernel/src/reversible_value.rs) 与
-  [payload_inverse.rs](../crates/cordis-kernel/src/payload_inverse.rs)：真实
+  [reversible_value/payload/restoration.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs)：真实
   `restore_observed` 入口及正向来源规律。
 
 值存储、清理、Execution、work／effect／Child、宿主状态、生命周期动作及 native 恢复路径的

@@ -96,10 +96,10 @@ Full negative regression is separate and remains `not_run` unless explicitly run
 | Connection | Source |
 | --- | --- |
 | Actual snapshot, source checks, obstruction, native transport | [lifecycle_state/native/runtime/history/deletion/joint.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/joint.rs): `Selection::check`, `edge`, `endpoint`, `Snapshot::delete_effect_window` |
-| Event positions, pending conservation, inverse provenance | [joint_erasure.rs](../crates/cordis-kernel/src/joint_erasure.rs): `pending_edge`, `construct`, `restoration_sources` |
-| Exact reads of the production guards | [joint_erasure_reads.rs](../crates/cordis-kernel/src/joint_erasure_reads.rs): `same`, `transport` |
-| Nonempty source and surviving execution | [joint_erasure_client.rs](../crates/cordis-kernel/src/joint_erasure_client.rs): `source_valid`, `nonempty` |
-| Same-cut value/Child composition | [managed_deletion_capture.rs](../crates/cordis-kernel/src/managed_deletion_capture.rs): `with_effects` |
+| Event positions, pending conservation, inverse provenance | [reversible_value/joint/erasure.rs](../crates/cordis-kernel/src/reversible_value/joint/erasure.rs): `pending_edge`, `construct`, `restoration_sources` |
+| Exact reads of the production guards | [reversible_value/joint/erasure/reads.rs](../crates/cordis-kernel/src/reversible_value/joint/erasure/reads.rs): `same`, `transport` |
+| Nonempty source and surviving execution | [reversible_value/joint/erasure/client.rs](../crates/cordis-kernel/src/reversible_value/joint/erasure/client.rs): `source_valid`, `nonempty` |
+| Same-cut value/Child composition | [reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs): `with_effects` |
 
 Retained Journal allocation keys are erased proof identities. Concrete registry
 IDs, Kernel generations, action tickets, work domains and opaque payload identities

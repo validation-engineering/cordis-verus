@@ -40,7 +40,7 @@ let replay = captured.source.replay(&captured.cut, &keep, Ghost(window))?;
 | 每次真实转换参与记录 | [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`transition`、`wf` |
 | 每个 Unload 都有真实清理来源 | [lifecycle_state/native/runtime/control_source/cleanup.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs)：`complete`、`unload_collected`、`Source::unload_at` |
 | 命令、typed publication 与逆操作来源共用 Journal | [lifecycle_state/native/runtime/control_source/chain.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs) |
-| 复用真实 managed 恢复切面 | [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs)、[managed_deletion_capture.rs](../crates/cordis-kernel/src/managed_deletion_capture.rs) |
+| 复用真实 managed 恢复切面 | [reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs)、[reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs) |
 | 普通 Rust driver 入口 | [native.rs](../crates/cordis-driver/src/shared/native.rs)：`NativeDriver::new_recorded` |
 
 运行回归改用自动命令完成 24→13 步控制重放，并覆盖继承声明和 anchor、关闭／零容量／耗尽、失败调用不记账和独立快照。已有的标量／typed 干扰、清理失败、新重试票据及 Child 后续释放场景，也从相同真实恢复快照重放控制，并检查捕获没有额外保留 payload 引用。

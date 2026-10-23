@@ -133,9 +133,9 @@ factory effects. Source-backed structural expansion is connected below; complete
 group/include Component meaning, module/configuration meaning and the common
 native/Node/configuration Journal still need their own interpretation.
 
-Review the executable [identity](../crates/cordis-kernel/src/configuration_identity.rs),
-[selection and removal](../crates/cordis-kernel/src/configuration_selection.rs),
-[reconstruction](../crates/cordis-kernel/src/configuration_reconstruction.rs),
+Review the executable [identity](../crates/cordis-kernel/src/configuration_tree/identity.rs),
+[selection and removal](../crates/cordis-kernel/src/configuration_tree/selection.rs),
+[reconstruction](../crates/cordis-kernel/src/configuration_tree/reconstruction.rs),
 and their [Loader callers](../crates/cordis/src/loader.rs).
 
 Deferred integration evidence for this batch:
@@ -251,7 +251,7 @@ integration cases above and the complete development record remain pending.
 ## Complete adoption of actual registered recipes
 
 `Runtime::adopt_config_recipes` now calls the checked
-[`NativeRuntime::adopt_configurations`](../crates/cordis-kernel/src/configuration_adoption.rs)
+[`NativeRuntime::adopt_configurations`](../crates/cordis-kernel/src/configuration_runtime/adoption.rs)
 through the native driver. It supplies the owned batch of actual targets, setup
 bodies and metadata. The ordinary host retains plugin/interface compatibility
 checks; it no longer implements the distinct-target/capacity loop or relies on
@@ -310,7 +310,7 @@ The production native owner now retains an erased
 [`recipe_history::History<R>`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)
 of the exact `RegisteredPlugin<R>` values. Its private ledger commits to the
 same Journal as lifecycle, value writes, slots, work and cleanup. The common
-[`Recipes` record](../crates/cordis-kernel/src/recipe_execution.rs) projects the
+[`Recipes` record](../crates/cordis-kernel/src/reversible_value/joint/recipes.rs) projects the
 real domain, component, parent, anchor, realms, declarations and recipe revision;
 it does not invent an interpretation for arbitrary callback bodies.
 
@@ -381,7 +381,7 @@ accepted result from the retained payload's actual reconstruction callback.
 [`configuration_history::History`](../crates/cordis-kernel/src/configuration_history.rs)
 keeps exact typed candidates, recovery payloads and update plans in erased
 evidence. Its entries are indexed into the shared Journal's
-[`Configuration` records](../crates/cordis-kernel/src/configuration_execution.rs).
+[`Configuration` records](../crates/cordis-kernel/src/reversible_value/joint/configuration.rs).
 `Snapshot::complete_projection` proves every change of that configuration record
 in the captured common trace has its typed entry; unrelated records may interleave.
 `History::commit_inputs` derives the complete owned success prefix and exact
@@ -463,7 +463,7 @@ borrows the whole owner exclusively during I/O and acknowledgement; its report
 cannot update a separate source object.
 
 The source recorder is constructed from the actual configuration ledger. Its
-[`Sources` transition](../crates/cordis-kernel/src/source_execution.rs) authenticates
+[`Sources` transition](../crates/cordis-kernel/src/reversible_value/joint/sources.rs) authenticates
 that configuration record under the same held Journal write epoch, requiring no
 pending transaction. The event contains the observed configuration state,
 including its execution index as well as its accepted revision. Recovery and
@@ -553,7 +553,7 @@ above and below; a per-file save protocol does not discharge the remaining laws.
 ## Source checkpoints derived from the actual save
 
 The real `Loader::configuration.sources` is
-[`configuration_save::sources::Source`](../crates/cordis-kernel/src/configuration_source.rs).
+[`configuration_save::sources::Source`](../crates/cordis-kernel/src/configuration_save/sources.rs).
 It owns loaded root/text/include resolutions and a single checkpoint record per
 path containing both the local configuration value and its pending-sync flag.
 `load`, `clear` and accepted saves extend one erased history; clearing runtime

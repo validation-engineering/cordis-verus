@@ -47,7 +47,7 @@
    普通宿主随后按返回的 slot 删除不透明值句柄，并更新自身记录。
 4. [Domain.dispatch / Fiber._cleanup](../packages/compat-cordis/runtime.js)
    执行真实回调并发送完成报告。独立的 Rust
-   [Runtime::poll_settle](../crates/cordis/src/runtime.rs) 通过经过验证的
+   [Runtime::poll_settle](../crates/cordis/src/runtime/poll.rs) 通过经过验证的
    `CleanupJournal` 管理真实 inverse。保留的失败报告 `Failed`；日志排空后报告
    `Succeeded`，如果有已消耗的 `FnOnce` 失败则报告 `Drained`。
 
@@ -90,7 +90,7 @@ Withdraw、Retire 和 Remove 构成的任意有限序列。受管 `finish_cleanu
 被受管清理消费；携带不同 domain 的注册表即使有相同的本地 publication／lease ID，
 也会被拒绝。这里检查 domain 数值；实际 Driver 的 domain 唯一分配仍属于宿主责任。
 
-[`PublicationRegistry::cleanup_batch`](../crates/cordis-kernel/src/publication_cleanup.rs)
+[`PublicationRegistry::cleanup_batch`](../crates/cordis-kernel/src/publication/cleanup.rs)
 检查租约消费者、publication 的 owner/generation、撤销和保留状态、重复项以及剩余
 持有者。它还对照注册表检查**完整性**：不能遗漏该消费者 episode 的租约，也不能
 遗漏该 owner/generation 仍保留的 publication。调用者不需要假设清单正确。

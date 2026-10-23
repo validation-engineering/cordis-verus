@@ -5,7 +5,7 @@
     {
       "name": "r3-source-call-fabricates-position",
       "mutation": {
-        "file": "managed_replay_order.rs",
+        "file": "reversible_value/managed/replay/order.rs",
         "old": "{Self {revision,stream}}",
         "new": "{Self {revision:Some(0),stream}}"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::order::CallPosition::new",
           "module": "reversible_value::managed::replay::order",
-          "file": "managed_replay_order.rs",
+          "file": "reversible_value/managed/replay/order.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out.revision==revision,out.stream==stream,"
         }
@@ -31,7 +31,7 @@
     {
       "name": "r3-typed-landing-skips-version",
       "mutation": {
-        "file": "payload_inverse.rs",
+        "file": "reversible_value/payload/restoration.rs",
         "old": "if revision!=expected.revision() {",
         "new": "if false {"
       },
@@ -47,7 +47,7 @@
         {
           "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_captured_in",
           "module": "reversible_value::payload::restoration",
-          "file": "payload_inverse.rs",
+          "file": "reversible_value/payload/restoration.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(cell.authority@.events() =~= expected.observation().states);"
         }

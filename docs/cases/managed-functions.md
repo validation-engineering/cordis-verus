@@ -60,12 +60,12 @@ host dispatch returns an explicit error.
 | Preserve real causality through local/foreign/local calls | `Journal::join_receipts`, actual locked observations and writes | Every earlier same-Journal write and inverse registration precedes the later write, even when another Journal intervenes. `execution_interval` connects these witnesses to the real invocation return. |
 | Report the real failure without losing the prefix | Capture/read guards, scalar rejection receipts and locked typed rejection observations | `Failure::explained` distinguishes kind/availability, stale-computation, capacity and retired-payload failures. A rejected scalar attempt preserves the complete recorded state and pending obligations. |
 
-The executable interpreter is [managed_function.rs](../../crates/cordis-kernel/src/managed_function.rs),
+The executable interpreter is [reversible_value/managed.rs](../../crates/cordis-kernel/src/reversible_value/managed.rs),
 the universal operation/function laws are in
-[managed_semantics.rs](../../crates/cordis-kernel/src/managed_semantics.rs),
+[reversible_value/managed/semantics.rs](../../crates/cordis-kernel/src/reversible_value/managed/semantics.rs),
 and the actual queue/trace connection is in
-[managed_trace.rs](../../crates/cordis-kernel/src/managed_trace.rs).
-[managed_root.rs](../../crates/cordis-kernel/src/managed_root.rs) is the entry
+[reversible_value/managed/trace.rs](../../crates/cordis-kernel/src/reversible_value/managed/trace.rs).
+[reversible_value/managed/root.rs](../../crates/cordis-kernel/src/reversible_value/managed/root.rs) is the entry
 called through the driver by the ordinary Rust host. These files are both Verus
 inputs and Cargo-compiled production source; there is no substitute interpreter
 used only for proofs.

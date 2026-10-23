@@ -47,8 +47,8 @@ constructed target using that same witness.
 
 | Review step | Source |
 | --- | --- |
-| Actual script witness and establishment | [episode_replay.rs](../crates/cordis-kernel/src/episode_replay.rs) |
-| Source guards, target constructor and report query | [script_deletion.rs](../crates/cordis-kernel/src/script_deletion.rs) |
+| Actual script witness and establishment | [mixed_driver/episode_replay.rs](../crates/cordis-kernel/src/mixed_driver/episode_replay.rs) |
+| Source guards, target constructor and report query | [mixed_driver/deletion.rs](../crates/cordis-kernel/src/mixed_driver/deletion.rs) |
 | Actual Xor library's strict interface | [xor_recovery_algebra.rs](../crates/cordis-kernel/src/xor_recovery_algebra.rs): `strict_interface` |
 | Guard and inverse transport for the constructed execution | [foreign_child_deletion.rs](../crates/cordis-kernel/src/foreign_child_deletion.rs): `closed_deletion` |
 

@@ -17,31 +17,20 @@ use crate::Phase;
 use crate::{Error, Port};
 use std::collections::{BTreeMap, BTreeSet};
 use vstd::prelude::*;
-#[path = "node_bridge.rs"]
 pub mod bridge;
-#[path = "node_history.rs"]
 pub mod history;
-#[path = "node_production.rs"]
 pub mod production;
 use history::History;
-#[path = "node_policy.rs"]
 pub mod policy;
 use policy::{Policy, PolicyError, Profile};
-#[path = "node_episode.rs"]
 pub mod episode;
 use episode::{Command as EpisodeCommand, Episode, EpisodeError};
-#[path = "node_handles.rs"]
 pub mod handles;
-#[path = "node_interfaces.rs"]
 pub mod interfaces;
 use interfaces::Interface;
-#[path = "node_scope_path.rs"]
 pub mod paths;
-#[path = "node_reads.rs"]
 pub mod reads;
-#[path = "node_resources.rs"]
 pub mod resources;
-#[path = "node_scopes.rs"]
 pub mod scopes;
 #[cfg(verus_keep_ghost)]
 use history::{Event, Observation};

@@ -210,14 +210,9 @@ pub proof fn run<A,X,U,B,I>(lib:g::Library<A,X,U,B>,node:g::Node<A,X,U,B,I>,a:s:
 }
 }
 
-#[path = "closed_region_example.rs"]
 pub mod example;
-#[path = "closed_region_execution.rs"]
 pub mod execution;
-#[path = "closed_region_trace.rs"]
 pub mod trace;
 
-#[path = "closed_region_fresh.rs"]
 pub mod fresh;
-#[path = "closed_region_fresh_trace.rs"]
 pub mod fresh_trace;

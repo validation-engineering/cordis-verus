@@ -5,7 +5,7 @@
     {
       "name": "r3-replay-discards-foreign-history",
       "mutation": {
-        "file": "episode_replay.rs",
+        "file": "mixed_driver/episode_replay.rs",
         "old": "e::foreign_state(mr::events(library(),programs(bank),states.subrange(begin+1,end+1),\n        labels(transitions).subrange(begin+1,end),owner),p::project(states[begin+1].state,ISet::full()))",
         "new": "e::foreign_state(Seq::empty(),p::project(states[begin+1].state,ISet::full()))"
       },
@@ -20,7 +20,7 @@
         {
           "function": "cordis_negative::mixed_driver::episode_replay::recover_cut",
           "module": "mixed_driver::episode_replay",
-          "file": "episode_replay.rs",
+          "file": "mixed_driver/episode_replay.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures recovered_at(bank,states,transitions,owner,begin,end),"
         }
@@ -30,7 +30,7 @@
     {
       "name": "r3-recovery-discards-stored-receipts",
       "mutation": {
-        "file": "episode_replay.rs",
+        "file": "mixed_driver/episode_replay.rs",
         "old": "match super::restore_receipts(self.journal(owner),self.primitive_state())",
         "new": "match super::restore_receipts(Seq::empty(),self.primitive_state())"
       },
@@ -45,7 +45,7 @@
         {
           "function": "cordis_negative::mixed_driver::MixedDriver::observe_restored",
           "module": "mixed_driver::episode_replay",
-          "file": "episode_replay.rs",
+          "file": "mixed_driver/episode_replay.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures self.restored_observation(owner)==Some(p::project(super::restore_receipts(self.journal(owner),self.primitive_state()).unwrap(),ISet::full())),"
         }

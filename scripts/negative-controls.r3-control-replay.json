@@ -5,7 +5,7 @@
     {
       "name": "r3-control-replay-keeps-source-allocation",
       "mutation": {
-        "file": "kernel_replay_names.rs",
+        "file": "kernel_replay/names.rs",
         "old": "names.pair(*actor,next);",
         "new": "names.pair(*actor,*actor);"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::kernel_replay::names::prepare",
           "module": "kernel_replay::names",
-          "file": "kernel_replay_names.rs",
+          "file": "kernel_replay/names.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(names.name_spec(*actor)==prior_next);"
         }

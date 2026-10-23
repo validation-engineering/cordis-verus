@@ -1,0 +1,1434 @@
+{
+  "cases": [
+    {
+      "schema": "cordis-verus.lifecycle-scenario/v1",
+      "profile": "native-managed/v1",
+      "id": "native-0000-260824",
+      "seed": 260824,
+      "generator": "native-lifecycle/1",
+      "category": "admitted",
+      "families": [
+        "no-fault",
+        "one-child",
+        "provider-update"
+      ],
+      "purpose": "campaign",
+      "parameters": {
+        "values": [
+          100,
+          56,
+          14
+        ],
+        "consumer_delta": 7,
+        "child_delta": 7
+      },
+      "commands": [
+        {
+          "action": {
+            "op": "register",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "register",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "start",
+            "actor": "provider",
+            "revision": 0
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "start",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 107,
+                "depth": 1
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "spawn"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "observe"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "observe"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "replace"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "retire_child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 114,
+                "depth": 2
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "child",
+            "ticket": "restore-1"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 107,
+                "depth": 1
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 107,
+                "depth": 1
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 107,
+                "depth": 1
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "consumer",
+            "ticket": "restore-2"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 107,
+                "depth": 1
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "consumer",
+            "ticket": "restore-3"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "remove",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "start",
+            "actor": "provider",
+            "revision": 1
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "start",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 63,
+                "depth": 1
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "spawn"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "replace"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "retire_child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 70,
+                "depth": 2
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "child",
+            "ticket": "restore-4"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 63,
+                "depth": 1
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 63,
+                "depth": 1
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 63,
+                "depth": 1
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "consumer",
+            "ticket": "restore-5"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 63,
+                "depth": 1
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "consumer",
+            "ticket": "restore-6"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "remove",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "start",
+            "actor": "provider",
+            "revision": 2
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "start",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 21,
+                "depth": 1
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "spawn"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "retire",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "retire",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "retire_child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "withdraw",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 28,
+                "depth": 2
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "child",
+            "ticket": "restore-7"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 21,
+                "depth": 1
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 21,
+                "depth": 1
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 21,
+                "depth": 1
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "consumer",
+            "ticket": "restore-8"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 21,
+                "depth": 1
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "restore",
+            "actor": "consumer",
+            "ticket": "restore-9"
+          },
+          "expect": {
+            "status": "restored",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "remove",
+            "actor": "child"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "remove",
+            "actor": "consumer"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "begin_cleanup",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "release",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        },
+        {
+          "action": {
+            "op": "remove",
+            "actor": "provider"
+          },
+          "expect": {
+            "status": "ok",
+            "values": [
+              {
+                "value": 100,
+                "depth": 0
+              },
+              {
+                "value": 56,
+                "depth": 0
+              },
+              {
+                "value": 14,
+                "depth": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

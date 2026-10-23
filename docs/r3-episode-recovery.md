@@ -52,9 +52,9 @@ A request that was rejected, and commands after it, add no source transitions.
 | One actual source execution for all queries | `ScriptReport::recovery_history_witness`; `establish_recovery_history` is called by the actual Mixed/Fresh `run_script` establishment path |
 | Values, functions and recovery at the public inspection entry point | `run_inspected` propagates `recovery_history` alongside its R1 interpretation certificate |
 
-The implementation is in [episode_replay.rs](../crates/cordis-kernel/src/episode_replay.rs),
-[fresh_episode_replay.rs](../crates/cordis-kernel/src/fresh_episode_replay.rs), and
-[inspected_run.rs](../crates/cordis-kernel/src/inspected_run.rs). `recovery_source`
+The implementation is in [mixed_driver/episode_replay.rs](../crates/cordis-kernel/src/mixed_driver/episode_replay.rs),
+[mixed_driver/fresh/episode_replay.rs](../crates/cordis-kernel/src/mixed_driver/fresh/episode_replay.rs), and
+[mixed_driver/fresh/inspected.rs](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs). `recovery_source`
 extracts the shared source witness. `current_recovery` returns that witness and
 the current actual-journal equation. All these histories and queries are ghost
 proof data; the batch adds no runtime history buffer or user dependency.

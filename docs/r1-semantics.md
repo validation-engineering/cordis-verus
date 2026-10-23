@@ -115,8 +115,8 @@ reject these changes after mutant compilation succeeds.
 | Obligation | Review entry |
 | --- | --- |
 | Complete stated carrier, parent and continuation contracts | [guarded_components.rs](../crates/cordis-kernel/src/guarded_components.rs) |
-| Actual values, code, all-input inverse denotation and machine limits | [reified_context.rs](../crates/cordis-kernel/src/reified_context.rs) |
-| Executable caller constructing its own evidence | [inspected_run.rs](../crates/cordis-kernel/src/inspected_run.rs) |
+| Actual values, code, all-input inverse denotation and machine limits | [mixed_driver/context.rs](../crates/cordis-kernel/src/mixed_driver/context.rs) |
+| Executable caller constructing its own evidence | [mixed_driver/fresh/inspected.rs](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs) |
 | Why the single recovery/admission relation cannot suffice | [typed_child_domain.rs](../crates/cordis-kernel/src/typed_child_domain.rs) |
 | Runtime fault case | [semantic_context.rs](../crates/cordis-kernel/tests/semantic_context.rs) |
 

@@ -383,30 +383,30 @@ conditions remain explicit.
 
 ## Review and validation
 
-- [managed_interleaving.rs](../crates/cordis-kernel/src/managed_interleaving.rs):
+- [reversible_value/managed/interleaving.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving.rs):
   source carriers, actual receipt/read conditions, initial retained queue and
   registered finite-history recovery.
-- [managed_interleaving_completion.rs](../crates/cordis-kernel/src/managed_interleaving_completion.rs):
+- [reversible_value/managed/interleaving/completion.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/completion.rs):
   actual later-restore coverage and derived exhaustion of the inverse record.
-- [managed_release_path.rs](../crates/cordis-kernel/src/managed_release_path.rs):
+- [reversible_value/managed/interleaving/release.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/release.rs):
   source coverage, derived local success and `unload_recovers_from_cleanup`.
-- [managed_release_membership.rs](../crates/cordis-kernel/src/managed_release_membership.rs):
+- [reversible_value/managed/interleaving/release/membership.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/release/membership.rs):
   actual insertion membership, the ordering before seal, and
   `unload_recovers_registered`.
-- [managed_cleanup_history.rs](../crates/cordis-kernel/src/managed_cleanup_history.rs):
+- [reversible_value/managed/interleaving/history.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs):
   the actual dispatch/retry recording entries and retained-slot conservation.
-- [managed_lifecycle_history.rs](../crates/cordis-kernel/src/managed_lifecycle_history.rs):
+- [reversible_value/managed/interleaving/history/lifecycle.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs):
   actual Execution ownership, continuous dispatch/retry histories, authentic
   recovery boundaries, cross-group observations, dynamic origins and retained removal boundaries.
-- [cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs) and
-  [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs):
+- [cleanup_groups/payload/recovery.rs](../crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs) and
+  [cleanup_groups/payload.rs](../crates/cordis-kernel/src/cleanup_groups/payload.rs):
   actual Pop/restore/acknowledgement causality and same-Journal read boundaries.
-- [managed_lifecycle_callbacks.rs](../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs):
+- [reversible_value/managed/interleaving/history/lifecycle/callbacks.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/callbacks.rs):
   restricted host retry payloads, synchronous/awaited acknowledgement and
   separation from managed inverse consumption.
-- [managed_lifecycle_work.rs](../crates/cordis-kernel/src/managed_lifecycle_work.rs):
+- [reversible_value/managed/interleaving/history/lifecycle/work.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/work.rs):
   actual request receipts, effect checkout/scope/landing and drained retirement.
-- [managed_lifecycle_children.rs](../crates/cordis-kernel/src/managed_lifecycle_children.rs):
+- [reversible_value/managed/interleaving/history/lifecycle/children.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs):
   atomic Child admission, retained inverse obligations and the creating-episode
   relation to actual cancellation or Child release.
 - [lifecycle_state/native/runtime/child_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_recovery.rs) and
@@ -414,32 +414,32 @@ conditions remain explicit.
   decisions, actual retirement/Unload composition and the ordinary Rust entry.
 - [lifecycle_state/native/runtime/child_history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history.rs),
   [lifecycle_state/native/runtime/child_history/completion.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/completion.rs)
-  and [managed_child_completion.rs](../crates/cordis-kernel/src/managed_child_completion.rs):
+  and [reversible_value/managed/interleaving/history/lifecycle/children/completion.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs):
   automatic birth/retirement/Unload sources, committed-prefix coverage and
   completeness against the creating execution's original native inverses.
-- [managed_lifecycle_function.rs](../crates/cordis-kernel/src/managed_lifecycle_function.rs):
+- [reversible_value/managed/interleaving/history/lifecycle/function.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs):
   actual subsequent managed calls, return checkpoints and call/cleanup receipt composition.
 - [execution.rs](../crates/cordis-kernel/src/execution.rs):
   `observe_execution_following` certifies actual owner state and receipt inclusion in one read epoch.
-- [managed_lifecycle_native.rs](../crates/cordis-kernel/src/managed_lifecycle_native.rs):
+- [reversible_value/managed/interleaving/history/lifecycle/native.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs):
   real registered-root attachment, Finish, withdrawal, native retry and Unload.
-- [managed_owned_release.rs](../crates/cordis-kernel/src/managed_owned_release.rs):
+- [reversible_value/managed/interleaving/history/lifecycle/recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery.rs):
   recovery using the lifecycle owner's stored evidence.
-- [managed_history_release.rs](../crates/cordis-kernel/src/managed_history_release.rs):
+- [reversible_value/managed/interleaving/history/release.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/release.rs):
   derived acknowledgement coverage, `unload_recovers_from_history` and direct
   composition with the successful `ReleaseObservation`.
-- [group_release_history.rs](../crates/cordis-kernel/src/group_release_history.rs)
-  and [cleanup_release_history.rs](../crates/cordis-kernel/src/cleanup_release_history.rs):
+- [reversible_value/joint/groups/release.rs](../crates/cordis-kernel/src/reversible_value/joint/groups/release.rs)
+  and [reversible_value/joint/episode/release.rs](../crates/cordis-kernel/src/reversible_value/joint/episode/release.rs):
   real removal/seal guards and the earlier token completion they require.
-- [managed_interleaving_endpoint.rs](../crates/cordis-kernel/src/managed_interleaving_endpoint.rs):
+- [reversible_value/managed/interleaving/endpoint.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/endpoint.rs):
   actual final-cut decoding, quiet tails and `unload_recovers_begin`.
 - [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs)
   and [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs): real
   successful release, indexed owner provenance and erased Unload evidence.
-- [recovery_obligations.rs](../crates/cordis-kernel/src/recovery_obligations.rs):
+- [reversible_value/managed/interleaving/obligations.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/obligations.rs):
   depth bounds, derived per-allocation ordering and inverse removal.
 - [reversible_value.rs](../crates/cordis-kernel/src/reversible_value.rs) and
-  [payload_inverse.rs](../crates/cordis-kernel/src/payload_inverse.rs): the real
+  [reversible_value/payload/restoration.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs): the real
   `restore_observed` entry points and forward source law.
 
 The combined value-storage, cleanup, execution, work/effect/Child, host status,

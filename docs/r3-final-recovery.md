@@ -98,12 +98,12 @@ premise of the proof client. Verus checks those contracts separately.
 
 | Entry | Role |
 | --- | --- |
-| [managed_release_path.rs](../crates/cordis-kernel/src/managed_release_path.rs) | The real Unload guard identifies the local restore. |
-| [managed_producer_matching.rs](../crates/cordis-kernel/src/managed_producer_matching.rs) | Match actual scalar/typed restores to the complete producer projection. |
-| [managed_unload_census.rs](../crates/cordis-kernel/src/managed_unload_census.rs) | Total source query, concrete obstructions and same-snapshot recovery theorem. |
-| [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs) | Executable capture from actual release results, snapshots and storage. |
-| [managed_unload_client.rs](../crates/cordis-kernel/src/managed_unload_client.rs) | Nonempty foreign-owner/Child composition. |
-| [managed_function.rs](../crates/cordis-kernel/tests/managed_function.rs) | Reachable failure/retry and later-Child runtime case. |
+| [reversible_value/managed/interleaving/release.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/release.rs) | The real Unload guard identifies the local restore. |
+| [reversible_value/managed/interleaving/sources/matching.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/matching.rs) | Match actual scalar/typed restores to the complete producer projection. |
+| [reversible_value/managed/interleaving/history/lifecycle/unload_census.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_census.rs) | Total source query, concrete obstructions and same-snapshot recovery theorem. |
+| [reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs) | Executable capture from actual release results, snapshots and storage. |
+| [reversible_value/managed/interleaving/history/lifecycle/unload_client.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_client.rs) | Nonempty foreign-owner/Child composition. |
+| [reversible_value/managed.rs](../crates/cordis-kernel/tests/managed_function.rs) | Reachable failure/retry and later-Child runtime case. |
 
 Reproduce the integrated checks with the pinned toolchain:
 

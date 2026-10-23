@@ -124,14 +124,14 @@ quiet，就能推出恢复成功。这些结论由实际 restore 与 typed 清�
 
 | 连接 | 源码 |
 | --- | --- |
-| 可比较的真实历史 | [shared_value_history.rs](../crates/cordis-kernel/src/shared_value_history.rs)：`Witness::prefix`、`compatible_map` |
-| 运行 admission 与报告保留 | [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs)、[managed_function.rs](../crates/cordis-kernel/src/managed_function.rs) |
-| Journal 间隔到实际 scalar／typed 状态衔接 | [managed_recovery.rs](../crates/cordis-kernel/src/managed_recovery.rs)：`linked_pair`、`establish_recovery` |
-| 混合逆序列及真实队列后缀 | [managed_recovery_word.rs](../crates/cordis-kernel/src/managed_recovery_word.rs)：`defined`、`recover_retained` |
-| 真实 Begin 及 registered 执行区间 | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs)、[managed_episode.rs](../crates/cordis-kernel/src/managed_episode.rs)、[managed_root.rs](../crates/cordis-kernel/src/managed_root.rs) |
-| 真实 Begin／返回值与保留队列恢复 | [managed_endpoint.rs](../crates/cordis-kernel/src/managed_endpoint.rs)、[managed_root_recovery.rs](../crates/cordis-kernel/src/managed_root_recovery.rs) |
-| typed 变更历史与已恢复干扰 | [payload_semantic_history.rs](../crates/cordis-kernel/src/payload_semantic_history.rs)、[managed_restored.rs](../crates/cordis-kernel/src/managed_restored.rs) |
-| typed 尝试、失败原因与严格定义域 | [payload_attempt.rs](../crates/cordis-kernel/src/payload_attempt.rs)、[payload_recovery.rs](../crates/cordis-kernel/src/payload_recovery.rs) |
+| 可比较的真实历史 | [reversible_value/history.rs](../crates/cordis-kernel/src/reversible_value/history.rs)：`Witness::prefix`、`compatible_map` |
+| 运行 admission 与报告保留 | [cleanup_groups/payload.rs](../crates/cordis-kernel/src/cleanup_groups/payload.rs)、[reversible_value/managed.rs](../crates/cordis-kernel/src/reversible_value/managed.rs) |
+| Journal 间隔到实际 scalar／typed 状态衔接 | [reversible_value/managed/recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/recovery.rs)：`linked_pair`、`establish_recovery` |
+| 混合逆序列及真实队列后缀 | [reversible_value/managed/recovery/word.rs](../crates/cordis-kernel/src/reversible_value/managed/recovery/word.rs)：`defined`、`recover_retained` |
+| 真实 Begin 及 registered 执行区间 | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs)、[reversible_value/managed/episode.rs](../crates/cordis-kernel/src/reversible_value/managed/episode.rs)、[reversible_value/managed/root.rs](../crates/cordis-kernel/src/reversible_value/managed/root.rs) |
+| 真实 Begin／返回值与保留队列恢复 | [reversible_value/managed/episode/endpoint.rs](../crates/cordis-kernel/src/reversible_value/managed/episode/endpoint.rs)、[reversible_value/managed/root/recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/root/recovery.rs) |
+| typed 变更历史与已恢复干扰 | [reversible_value/payload/semantic_history.rs](../crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs)、[reversible_value/managed/recovery/restored.rs](../crates/cordis-kernel/src/reversible_value/managed/recovery/restored.rs) |
+| typed 尝试、失败原因与严格定义域 | [reversible_value/payload/restoration/attempt.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs)、[reversible_value/payload/restoration/attempt/recovery.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/recovery.rs) |
 
 [运行案例](../crates/cordis-kernel/tests/managed_function.rs)包括：两个 provider 的别名指向
 同一 scalar／typed 对象；外部同值写入仍会阻塞清理；真实逆操作保留；新票据重试；混合

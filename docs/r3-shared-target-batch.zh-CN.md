@@ -28,7 +28,7 @@
 4. `batch::run` 从实际 Call 位置导出时间顺序置换、检查共同源流，再准备端口绑定，再注册真实 provider，执行其 Begin、空 managed root、服务发布与 Finish。随后通过 `Source::instantiate` 和现有 registered root 解释器逐个运行保留函数，并实际执行 Finish。
 5. 每次调用保留真实 action/work 来源、报告和 `RecordedExecution`；provider 也保留报告与 owner。中途失败时返回已完成前缀，以及已经创建的失败调用 owner；不回滚、不丢弃逆操作、不把未完成清理当作成功。注册或 Begin 失败时，如已创建注册项，也会返回其 ID。
 
-可执行入口为 [`managed_replay_batch.rs`](../crates/cordis-kernel/src/managed_replay_batch.rs)。调用者保留真实调用产生的 `Source`，提供目标 runtime、源命名 Journal 和起始 anchor/work 编号，再检查返回的 `failure`、`calls`、`providers` 与 `bank`。后续可以使用已有的退出、清理、重试和释放接口。anchor/work 编号耗尽会被检查。
+可执行入口为 [`reversible_value/managed/replay/batch.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs)。调用者保留真实调用产生的 `Source`，提供目标 runtime、源命名 Journal 和起始 anchor/work 编号，再检查返回的 `failure`、`calls`、`providers` 与 `bank`。后续可以使用已有的退出、清理、重试和释放接口。anchor/work 编号耗尽会被检查。
 
 ## 已证明合同及边界
 
@@ -54,7 +54,7 @@ batch 支持有限 root 函数，其声明依赖必须能从已捕获成功步�
 
 ## 集中验收
 
-[`managed_replay.rs`](../crates/cordis-kernel/tests/managed_replay.rs) 的运行案例覆盖：
+[`reversible_value/managed/replay.rs`](../crates/cordis-kernel/tests/managed_replay.rs) 的运行案例覆盖：
 
 - 两次真实调用、四个服务名、两个共享标量／typed 对象；
 - 由真实操作产生的目标标量深度 `0 → 1 → 2`；

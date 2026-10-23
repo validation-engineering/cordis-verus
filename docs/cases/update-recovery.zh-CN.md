@@ -82,7 +82,7 @@ provider 提供可逆计数器。consumer 显式依赖计数器并提供 marker�
 源码：[依赖链证明](../../crates/cordis-kernel/src/lifecycle_state/cleanup/update.rs)、
 [清理协议](../../crates/cordis-kernel/src/lifecycle_state/cleanup.rs)、
 [真实工作与队列释放](../../crates/cordis-kernel/src/lifecycle_state/execution.rs)、
-[受管确认边界](../../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs)、
+[受管确认边界](../../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/callbacks.rs)、
 [原生案例](../../crates/cordis-kernel/examples/support/update_recovery.rs)、
 [Runtime 案例](../../crates/cordis/examples/support/update_recovery.rs)。每份案例实现由
 可运行示例与集成测试共用。

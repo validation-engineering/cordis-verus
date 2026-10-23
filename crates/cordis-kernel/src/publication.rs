@@ -490,11 +490,9 @@ impl PublicationRegistry {
 
 }
 
-#[path = "publication_cleanup.rs"]
 pub mod cleanup;
 pub use cleanup::ReleasedPublication;
 
-#[path = "publication_values.rs"]
 pub mod values;
 
 #[cfg(test)]

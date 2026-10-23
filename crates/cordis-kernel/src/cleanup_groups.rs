@@ -819,5 +819,4 @@ impl<C,X> CleanupGroups<crate::lifecycle_state::registration::shared_child::Chil
 
 }
 
-#[path = "payload_cleanup.rs"]
 pub mod payload;

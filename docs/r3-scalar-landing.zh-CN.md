@@ -44,6 +44,6 @@ let target_step = prepared.land(&mut target_owner, group_id)?;
 
 基本操作的定义域、结果、延续及严格逆操作，使用 R1/R2 同一份 `managed::semantics` 解释。这是[论文计划](paper-refinement-map.md)中 R3 恢复条目 68、69、79 所需的“构造真实剩余执行”的局部成果，还不是公式 (55) 的一般恢复结论。
 
-审查时结合[可执行源桥接](../crates/cordis-kernel/src/managed_replay_scalar.rs)、[原生捕获与落地](../crates/cordis-kernel/src/native_effect.rs)及[标量计算合同](../crates/cordis-kernel/src/scalar_effect.rs)。源操作数仅由显式 replay 捕获保留；本轮新增的读取、Journal 和逆操作对应证据在普通构建中擦除。
+审查时结合[可执行源桥接](../crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs)、[原生捕获与落地](../crates/cordis-kernel/src/reversible_value/native_effect.rs)及[标量计算合同](../crates/cordis-kernel/src/reversible_value/effect.rs)。源操作数仅由显式 replay 捕获保留；本轮新增的读取、Journal 和逆操作对应证据在普通构建中擦除。
 
 [运行案例](../crates/cordis-kernel/tests/managed_replay.rs)覆盖实际分支／深度推进与清理、数值相同但深度不同的拒绝、干扰后的真实恢复重试、其他对象写入，以及错误／已撤销 owner。严格负控 `scripts/check-profile-controls.py scalar-landing` 删除深度检查，要求错误实现仍可编译，并在指定输入相等断言处被验证器拒绝。限定范围证据不替代完整开发验收、全量负控或发布验收。

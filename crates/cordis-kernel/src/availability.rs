@@ -6,7 +6,6 @@ use crate::publication::PublicationId;
 use crate::{lifecycle_state::LifecycleState, Phase, Port};
 use std::collections::BTreeMap;
 use vstd::prelude::*;
-#[path = "node_admission.rs"]
 pub mod admission;
 #[cfg(verus_keep_ghost)]
 use vstd::std_specs::iter::IteratorSpec;

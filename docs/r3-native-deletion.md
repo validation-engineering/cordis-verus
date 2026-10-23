@@ -78,7 +78,7 @@ separate results deliberately retain that distinction.
 
 Sources: [native deletion](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs),
 [window construction](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/trace.rs),
-[combined capture](../crates/cordis-kernel/src/managed_deletion_capture.rs).
+[combined capture](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs).
 The original paper ledger and R3 acceptance criteria are unchanged.
 
 ## Nonempty evidence

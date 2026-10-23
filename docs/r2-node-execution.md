@@ -39,11 +39,11 @@ runtime event log are retained for this proof.
 
 The executable owner is [`node_runtime.rs`](../crates/cordis-kernel/src/node_runtime.rs);
 the transition relations and interval proofs are in
-[`node_history.rs`](../crates/cordis-kernel/src/node_history.rs). The ordinary
+[`node_runtime/history.rs`](../crates/cordis-kernel/src/node_runtime/history.rs). The ordinary
 [`Node adapter`](../crates/cordis-driver/src/node.rs) translates errors and wire
 tickets; [`availability.rs`](../crates/cordis-driver/src/availability.rs) retains
 only availability diagnostic text. The private checked maps retain the actual
-`Admission` and [`Episode`](../crates/cordis-kernel/src/node_episode.rs) payloads;
+`Admission` and [`Episode`](../crates/cordis-kernel/src/node_runtime/episode.rs) payloads;
 the adapter reads them immutably. Pending wire tickets come directly from the
 action ledger, with no separate Node pending-ticket cache.
 
@@ -65,7 +65,7 @@ Four finite-history contracts connect ownership to execution:
 - `release_has_origin`: a successful release consumes the retained Begin owner
   at its original generation under the real cleanup/resource guard.
 
-The actual [`scope owner`](../crates/cordis-kernel/src/node_scopes.rs) additionally
+The actual [`scope owner`](../crates/cordis-kernel/src/node_runtime/scopes.rs) additionally
 proves `scope_origin`, `scope_retained`, `scope_block_has_origin` and
 `finished_scope_stays_inactive`. A live receipt comes from a real issuance at the
 then-current generation. Cleanup and release do not implicitly finish callbacks;
@@ -74,7 +74,7 @@ current generation and committed dependency/ownership relationships. Issuance
 also supports preparation and cleanup callbacks; it does not assert that every
 callback owns an active admission or a service lease.
 
-The [`resource path`](../crates/cordis-kernel/src/node_resources.rs) proves
+The [`resource path`](../crates/cordis-kernel/src/node_runtime/resources.rs) proves
 `publication_origin`, `restoring_origin` and `released_publication_has_origin`.
 The release list is derived from the authoritative registry, in allocation order,
 without a second per-node cache. The scan includes retained invisible versions;
@@ -87,7 +87,7 @@ history prefix and proves every selected slot hidden, with payloads, revisions
 and leases unchanged. The registry scan allocates only a temporary ID vector;
 no runtime proof trace or duplicate historical payloads are introduced.
 
-The actual [`handle-delivery path`](../crates/cordis-kernel/src/node_handles.rs)
+The actual [`handle-delivery path`](../crates/cordis-kernel/src/node_runtime/handles.rs)
 now owns the former driver's `released` queue. The same transition that replaces,
 reclaims or releases a slot enqueues its actual old payload; rejected operations
 and same-value replacements do not add candidates. `removed_is_queued` proves the
@@ -123,7 +123,7 @@ changes are whole-context paper stutters or arbitrary Component functions.
 
 ## Actual reads and the paper connection
 
-[`NodeRuntime::resolve`](../crates/cordis-kernel/src/node_reads.rs) now executes the
+[`NodeRuntime::resolve`](../crates/cordis-kernel/src/node_runtime/reads.rs) now executes the
 selection previously implemented in `Driver::resolve`. The JSON command and
 Rust/Node typed-import and call-authority paths use this same operation. It checks
 actual membership and optional generation, returns the real handle and revision,
@@ -164,7 +164,7 @@ source-bound development record and full negative-suite acceptance remain distin
 
 ## Actual interfaces and dynamic provider handoff
 
-The [`interface owner`](../crates/cordis-kernel/src/node_interfaces.rs) now holds
+The [`interface owner`](../crates/cordis-kernel/src/node_runtime/interfaces.rs) now holds
 `NodeRuntime::{interfaces, dynamic}`. The driver reads the real parent, initial
 provisions and current dependency vector directly; it no longer stores its own
 Node/interface or declaration maps. Insert, successful dependency reconfiguration,
@@ -212,7 +212,7 @@ rerun for this batch. No R2 completion claim follows from these local contracts.
 
 ## Admission policy and notification selection
 
-[`node_policy.rs`](../crates/cordis-kernel/src/node_policy.rs) owns the real
+[`node_runtime/policy.rs`](../crates/cordis-kernel/src/node_runtime/policy.rs) owns the real
 `Policy { profile, configured }`. `Driver` no longer stores either field or
 selects notification retries. Its configure, mount, seal and notify commands call
 this same executable owner; the JSON profile enum is translated at the boundary.
@@ -246,7 +246,7 @@ whole-R2 acceptance.
 
 The production path is JS `beginInvocation` → Node-API `NativeInvocation` →
 `Driver::begin_invocation` → the checked
-[`NodeRuntime::begin_invocation`](../crates/cordis-kernel/src/node_scope_path.rs).
+[`NodeRuntime::begin_invocation`](../crates/cordis-kernel/src/node_runtime/paths.rs).
 The constructor validates every selected parent handle before issuing a new
 receipt and returns a private `Path`: exactly the parent's captured chain followed
 by the new receipt. No mutable handle-list access is exported. Node-API passes

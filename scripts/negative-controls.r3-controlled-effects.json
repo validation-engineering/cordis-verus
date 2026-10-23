@@ -5,7 +5,7 @@
     {
       "name": "r3-controlled-replay-admits-callback",
       "mutation": {
-        "file": "managed_replay.rs",
+        "file": "reversible_value/managed/replay.rs",
         "old": "if !self.is_controlled() {return Err(StartError::ExternalEffect {host:destination.host});}",
         "new": "if false {return Err(StartError::ExternalEffect {host:destination.host});}"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate_controlled",
           "module": "reversible_value::managed::replay",
-          "file": "managed_replay.rs",
+          "file": "reversible_value/managed/replay.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.program().controlled());"
         }
@@ -31,7 +31,7 @@
     {
       "name": "r3-controlled-evaluation-uses-wrong-input",
       "mutation": {
-        "file": "scalar_effect.rs",
+        "file": "reversible_value/effect.rs",
         "old": "Calculation::Kernel(instruction)=>(before,instruction.evaluate(before.value))",
         "new": "Calculation::Kernel(instruction)=>(before,instruction.evaluate(0))"
       },
@@ -47,7 +47,7 @@
         {
           "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
           "module": "reversible_value::effect",
-          "file": "scalar_effect.rs",
+          "file": "reversible_value/effect.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(decision==code(expected.value));"
         }

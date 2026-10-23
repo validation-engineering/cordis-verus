@@ -81,12 +81,12 @@ let recovery = owner.capture_release_census(
 
 | 入口 | 作用 |
 | --- | --- |
-| [managed_release_path.rs](../crates/cordis-kernel/src/managed_release_path.rs) | 实际 Unload 守卫定位本地成功恢复。 |
-| [managed_producer_matching.rs](../crates/cordis-kernel/src/managed_producer_matching.rs) | 将实际 scalar／typed 恢复匹配到完整生产者投影。 |
-| [managed_unload_census.rs](../crates/cordis-kernel/src/managed_unload_census.rs) | 完整来源查询、具体阻断及同快照恢复定理。 |
-| [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs) | 从实际释放结果、快照和存储执行捕获。 |
-| [managed_unload_client.rs](../crates/cordis-kernel/src/managed_unload_client.rs) | 非空外部 owner／Child 组合。 |
-| [managed_function.rs](../crates/cordis-kernel/tests/managed_function.rs) | 可达的失败重试与 Child 延后释放案例。 |
+| [reversible_value/managed/interleaving/release.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/release.rs) | 实际 Unload 守卫定位本地成功恢复。 |
+| [reversible_value/managed/interleaving/sources/matching.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/matching.rs) | 将实际 scalar／typed 恢复匹配到完整生产者投影。 |
+| [reversible_value/managed/interleaving/history/lifecycle/unload_census.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_census.rs) | 完整来源查询、具体阻断及同快照恢复定理。 |
+| [reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs) | 从实际释放结果、快照和存储执行捕获。 |
+| [reversible_value/managed/interleaving/history/lifecycle/unload_client.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_client.rs) | 非空外部 owner／Child 组合。 |
+| [reversible_value/managed.rs](../crates/cordis-kernel/tests/managed_function.rs) | 可达的失败重试与 Child 延后释放案例。 |
 
 使用固定工具链复现集中检查：
 

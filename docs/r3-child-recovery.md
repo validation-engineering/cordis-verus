@@ -133,10 +133,10 @@ all production effects or change the original paper audit statuses.
 | [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs): `retire_shared_child_observed`, `release_managed_execution_following` | Actual retirement observation and causally ordered release |
 | [lifecycle_state/native/runtime/child_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_recovery.rs): `Retirement`, `retire_and_release_child`, `release_retired_child` | Executable composition, exact endpoint relation and derived release facts |
 | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs): `lifecycle_source`, `current_unload` | Actual Unload transition and pre/post projections |
-| [managed_lifecycle_children.rs](../crates/cordis-kernel/src/managed_lifecycle_children.rs): `owned_child_retirement`, `native_child_released`, `native_child_unassigned` | Relation to the creating episode's retained inverse |
+| [reversible_value/managed/interleaving/history/lifecycle/children.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs): `owned_child_retirement`, `native_child_released`, `native_child_unassigned` | Relation to the creating episode's retained inverse |
 | [lifecycle_state/native/runtime/child_history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history.rs): `Birth`, `Ledger`, `child_birth`, `covered` | Actual Insert/parent provenance, automatic collection and committed-prefix coverage |
 | [lifecycle_state/native/runtime/child_history/completion.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/completion.rs): `records`, `settle_retirement`, `settle_release` | Source-derived cancellation, quiescent retirement or own-Unload completion |
-| [managed_child_completion.rs](../crates/cordis-kernel/src/managed_child_completion.rs): `native_children_resolved`, `native_child_endpoint` | Completeness against retained original inverses and exact creating-episode identity |
+| [reversible_value/managed/interleaving/history/lifecycle/children/completion.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs): `native_children_resolved`, `native_child_endpoint` | Completeness against retained original inverses and exact creating-episode identity |
 
 ## Evidence and remaining work
 

@@ -56,7 +56,7 @@ paper item or establish Corollary 69 for arbitrary callbacks.
    and updates its host bookkeeping.
 4. [Domain.dispatch / Fiber._cleanup](../packages/compat-cordis/runtime.js)
    runs the actual callbacks and sends the completion report. The separate Rust
-   [Runtime::poll_settle](../crates/cordis/src/runtime.rs) uses the checked
+   [Runtime::poll_settle](../crates/cordis/src/runtime/poll.rs) uses the checked
    `CleanupJournal` for actual inverses. Retained failures report `Failed`; an
    exhausted journal reports `Succeeded`, or `Drained` if a consumed `FnOnce`
    inverse failed.
@@ -111,7 +111,7 @@ be consumed by managed cleanup, and a registry carrying a different domain is re
 publication and lease IDs happen to match. The domain number is checked here;
 unique domain allocation remains the real Driver's host responsibility.
 
-[`PublicationRegistry::cleanup_batch`](../crates/cordis-kernel/src/publication_cleanup.rs)
+[`PublicationRegistry::cleanup_batch`](../crates/cordis-kernel/src/publication/cleanup.rs)
 checks every selected lease's consumer, every publication's owner/generation,
 revoked/retained state, uniqueness and all remaining holders. It also checks
 **completeness** against the registry: no lease of this consumer episode or

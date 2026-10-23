@@ -299,10 +299,10 @@ inverse。没有增加运行时别名禁令，也没有假定虚假的独立性�
 回归通过。**未运行**整内核证明、完整开发／R2 验收、全量负例与校准、Node 运行回归、
 性能或发版／平台验收。下文此前批次的结果是历史证据。
 
-审查：[`native_effect.rs`](../crates/cordis-kernel/src/native_effect.rs)、
-[`value_alias.rs`](../crates/cordis-kernel/src/value_alias.rs)、
-[`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs)、
-[`value_access.rs`](../crates/cordis-kernel/src/value_access.rs)。
+审查：[`reversible_value/native_effect.rs`](../crates/cordis-kernel/src/reversible_value/native_effect.rs)、
+[`reversible_value/alias.rs`](../crates/cordis-kernel/src/reversible_value/alias.rs)、
+[`reversible_value/effect.rs`](../crates/cordis-kernel/src/reversible_value/effect.rs)、
+[`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs)。
 
 ## 多服务原生函数体与动态访问范围
 
@@ -340,8 +340,8 @@ Node／配置组合仍未关闭。新多服务 API 仅支持原生宿主；已�
 宿主路径保留。已登记的单服务 root 函数体继续可用；新增有限子函数体由实际普通
 回调调用。
 
-审查入口：[`service_program.rs`](../crates/cordis-kernel/src/service_program.rs)、
-[`value_access.rs`](../crates/cordis-kernel/src/value_access.rs)、
+审查入口：[`reversible_value/services.rs`](../crates/cordis-kernel/src/reversible_value/services.rs)、
+[`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs)、
 [effects](paper-refinement-map.md#effects)、[components](paper-refinement-map.md#components)。
 B 工作包从 11/15 推进到 12/15，没有正式集成义务因此关闭。
 
@@ -390,8 +390,8 @@ Begin 中的 owned／imported 服务，核对声明端口并保留实际选中�
 
 审查入口：[效果](paper-refinement-map.md#effects)、[观察](paper-refinement-map.md#observations)、
 [组件](paper-refinement-map.md#components)、
-[`value_access.rs`](../crates/cordis-kernel/src/value_access.rs)、
-[`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)、
+[`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs)、
+[`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs)、
 [`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)。
 该较早批次把函数字段工作包从 10/15 推进到 11/15；没有正式集成义务因此关闭。
 该批次的历史 R2 工程估计为 **76%（72–82%）**。
@@ -447,9 +447,9 @@ imports 观察；既有并发生产检查点回归也通过。**七个严格可�
 解释、普通宿主指针／mutex 关联、Node／配置组合及完整 R2 验收仍开放。
 不按证明数量提高完成比例。
 
-审查入口：[`value_references.rs`](../crates/cordis-kernel/src/value_references.rs)、
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)、
-[`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs)、
+审查入口：[`reversible_value/joint/references.rs`](../crates/cordis-kernel/src/reversible_value/joint/references.rs)、
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)、
+[`reversible_value/slot.rs`](../crates/cordis-kernel/src/reversible_value/slot.rs)、
 [`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)
 及 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)。
 
@@ -531,11 +531,11 @@ pending 责任映射**，不产生新的待登记写入，也不结算已有责�
 这些合同限定四类受管标量入口；原始写入、外部回调副作用、panic／abort 恢复及全局终止不在保证内。
 本轮证据与剩余清理义务见下文。
 
-审查入口：[`value_attempt.rs`](../crates/cordis-kernel/src/value_attempt.rs)、
-[`value_registration.rs`](../crates/cordis-kernel/src/value_registration.rs)、
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)、
-[`value_program.rs`](../crates/cordis-kernel/src/value_program.rs)、
-[`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)。
+审查入口：[`reversible_value/attempt.rs`](../crates/cordis-kernel/src/reversible_value/attempt.rs)、
+[`reversible_value/registration.rs`](../crates/cordis-kernel/src/reversible_value/registration.rs)、
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)、
+[`reversible_value/program.rs`](../crates/cordis-kernel/src/reversible_value/program.rs)、
+[`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs)。
 [混合 native episode 回归](../crates/cordis-kernel/tests/registered_value_function.rs)
 组合保存的 root、直接写入、受验证计算、游标、异域对象和失败程序前缀，最后按清理顺序
 恢复两个真实对象。`r2-register-inverse-omits-edge` 检查擦除的因果记录；既有 inverse
@@ -665,7 +665,7 @@ Begin／work 身份连接到同一受认证时刻的实际 work 和清理成员�
 
 审查入口：[`lifecycle_state/services.rs`](../crates/cordis-kernel/src/lifecycle_state/services.rs)、
 [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs)、
-[`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs)、
+[`reversible_value/joint/episode/interval.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs)、
 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
 [`runtime.rs`](../crates/cordis/src/runtime.rs)。
 
@@ -714,7 +714,7 @@ owner、work、清理和受管理槽位。这些实现事件接到已有生命�
 发版／平台验收。这些是该批次源码的历史结果；当前上下文批次的证据见上节。
 
 审查入口：[`poll_control.rs`](../crates/cordis-kernel/src/poll_control.rs)、
-[`control_execution.rs`](../crates/cordis-kernel/src/control_execution.rs)、
+[`reversible_value/joint/control.rs`](../crates/cordis-kernel/src/reversible_value/joint/control.rs)、
 [`host_status.rs`](../crates/cordis-kernel/src/host_status.rs)、
 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
 [`runtime.rs`](../crates/cordis/src/runtime.rs)。
@@ -768,7 +768,7 @@ Verus 检查**、0 错误及完整 crate 编译；**198 个运行回归**（本�
 **75%（规划区间 71–81%）**，没有额外工作包被标为关闭。
 
 审查入口：[`host_status.rs`](../crates/cordis-kernel/src/host_status.rs)、
-[`host_execution.rs`](../crates/cordis-kernel/src/host_execution.rs)、
+[`reversible_value/joint/host.rs`](../crates/cordis-kernel/src/reversible_value/joint/host.rs)、
 [`runtime.rs`](../crates/cordis/src/runtime.rs)、
 [`static_host.rs`](../crates/cordis/src/runtime/static_host.rs)。
 
@@ -809,10 +809,10 @@ episode 对应操作遍历实际 owned 与 imports。完整性由真实表推出
 标志／逃逸句柄关联、Node／配置组合、一般论文步骤组合仍未关闭，也没有证明调度公平。
 剩余 R2 工作包尚未关闭，该批次工程估算保持 **75%（71–81%）**。
 
-审查入口：[`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs)、
+审查入口：[`reversible_value/slot.rs`](../crates/cordis-kernel/src/reversible_value/slot.rs)、
 [`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)、
 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)。
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)。
 
 ## 原生 publication 与完整类型化历史
 
@@ -856,7 +856,7 @@ publication 检查点。Journal 读锁内不运行回调、析构，也不获取
 版本／动态接口、配置事务及一般论文步骤组合仍是剩余义务。Finish／Unload 的前提继续
 由已有受验证执行协议建立；新读取检查点没有替代全局排空协议。
 
-审查入口：[`native_execution.rs`](../crates/cordis-kernel/src/native_execution.rs)、
+审查入口：[`reversible_value/joint/native.rs`](../crates/cordis-kernel/src/reversible_value/joint/native.rs)、
 [`lifecycle_state/native/runtime/history.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs)、
 [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs)。
@@ -896,9 +896,9 @@ continuation 已结算，且所有载荷槽为空。封闭会检查**每个存�
 写锁区间，封闭时增加一次元数据遍历；这里不宣称性能提升。原生 publication／
 owner 历史现已按上文合并；剩余包括共享宿主标志、一般回调／读写范围解释、Node 和配置路径。
 
-审查入口：[`group_execution.rs`](../crates/cordis-kernel/src/group_execution.rs)、
+审查入口：[`reversible_value/joint/groups.rs`](../crates/cordis-kernel/src/reversible_value/joint/groups.rs)、
 [`cleanup_groups.rs`](../crates/cordis-kernel/src/cleanup_groups.rs)、
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)、
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)、
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs)。
 
 ## 每个中间状态中的已派发清理责任
@@ -933,11 +933,11 @@ owner 历史现已按上文合并；剩余包括共享宿主标志、一般回�
 221 个正式突变／诊断锚点全部通过预检；这些负向记录不作为成员关系改动后的源码验收依据。
 该批未跑整个内核、全量负向回归、R2 集成或发版验收。
 
-审查入口：[`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs)、
-[`value_restoration.rs`](../crates/cordis-kernel/src/value_restoration.rs)、
+审查入口：[`reversible_value/joint/episode/interval.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs)、
+[`reversible_value/restoration.rs`](../crates/cordis-kernel/src/reversible_value/restoration.rs)、
 [`cleanup_queue/completion.rs`](../crates/cordis-kernel/src/cleanup_queue/completion.rs)、
 [`cleanup_journal.rs`](../crates/cordis-kernel/src/cleanup_journal.rs)、
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)。
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)。
 
 ## work 与清理接入同一轨迹
 
@@ -964,7 +964,7 @@ payload 身份及其效果含义继续由既有强类型合同约束。inverse �
 尚未证明它们在所有并发观察下合成一个论文步骤。移除后保留的历史记录不代表
 资源仍存活，也不证明物理释放；快照不证明任意回调终止或调度公平。
 
-审查入口：[`episode_execution.rs`](../crates/cordis-kernel/src/episode_execution.rs)、
+审查入口：[`reversible_value/joint/episode.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode.rs)、
 [`setup_work.rs`](../crates/cordis-kernel/src/setup_work.rs)、
 [`cleanup_queue.rs`](../crates/cordis-kernel/src/cleanup_queue.rs)、
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs)。
@@ -1036,9 +1036,9 @@ Journal 确实增加了同步操作。锁顺序为对象／槽位，再到 Journ
 本轮没有据此证明吞吐量、竞争开销、调度公平或全局终止。定向检查也不等于整个内核、
 完整 R2 或发布验收。
 
-审查路径：[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)
+审查路径：[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)
 → [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)
-→ [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)
+→ [`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs)
 → [`runtime.rs`](../crates/cordis/src/runtime.rs) 中的
 `Plugin::native_value_program` / `Runtime::reversible_value`。
 
@@ -1088,9 +1088,9 @@ provider；另一个插件撤销写入后，显式重试完成清理。案例同
 这个案例暴露的别名缺口由下文的强类型槽位／对象连接继续处理。原先的
 单端口标量定理仍只是该投影，不能作为别名端口在完整观察中的 frame 定理。
 
-审查路径：[`shared_value_history.rs`](../crates/cordis-kernel/src/shared_value_history.rs)
+审查路径：[`reversible_value/history.rs`](../crates/cordis-kernel/src/reversible_value/history.rs)
 → `Snapshot::extends` / `ReversibleValue::snapshot_after` →
-[`value_cursor.rs`](../crates/cordis-kernel/src/value_cursor.rs) →
+[`reversible_value/cursor.rs`](../crates/cordis-kernel/src/reversible_value/cursor.rs) →
 `AsyncSetup::{start_value_program, advance_value_program}` →
 [`interleaved_program.rs`](../crates/cordis/examples/interleaved_program.rs)。
 新增标准负控分别移除 owner 检查、跳过实际 continuation、漏登记逆操作。
@@ -1121,7 +1121,7 @@ episode mutex 仍属于宿主边界。
 slot 使用对应的受验证存储。用户 predicate 与任意载荷析构在存储锁外运行；
 替换将旧 Arc 交还调用者。
 
-`value_heap.rs` 区分端口选择与按分配身份索引的对象堆。解释由生产快照的
+`reversible_value/heap.rs` 区分端口选择与按分配身份索引的对象堆。解释由生产快照的
 认证历史推出，对象身份来自这个真实快照。写入或恢复影响所有选择该对象的
 端口，其他对象保持不变。槽位替换推进所有指向同一槽位的当前选择；另一个
 槽位可以继续选择旧对象。此前的捕获、游标目标及逆操作不会改指新对象。
@@ -1143,16 +1143,16 @@ slot 使用对应的受验证存储。用户 predicate 与任意载荷析构在�
 所选开发探测要求新鲜的正向验证、可编译错误实现及指定合同拒绝；它们与
 全量负控和完整 R2 验收分开记录。
 
-审查路径：[`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs)
-→ `NativeEpisode::read_reversible` → [`value_cursor.rs`](../crates/cordis-kernel/src/value_cursor.rs)
+审查路径：[`reversible_value/slot.rs`](../crates/cordis-kernel/src/reversible_value/slot.rs)
+→ `NativeEpisode::read_reversible` → [`reversible_value/cursor.rs`](../crates/cordis-kernel/src/reversible_value/cursor.rs)
 中的 `Execution::begin_native_value_program`
-→ [`value_heap.rs`](../crates/cordis-kernel/src/value_heap.rs)
+→ [`reversible_value/heap.rs`](../crates/cordis-kernel/src/reversible_value/heap.rs)
 → [`interleaved_program.rs`](../crates/cordis/examples/interleaved_program.rs)。
 
 ## Node 准入与保留至清理的资源
 
 真实 `Driver::ready` 和 `NodeDriver::begin_checked` 现在调用
-[`node_admission.rs`](../crates/cordis-kernel/src/node_admission.rs)。验证操作读取
+[`availability/admission.rs`](../crates/cordis-kernel/src/availability/admission.rs)。验证操作读取
 真实生命周期 target、provider generation、publication 身份和已接受的检查缓存。
 ready 合同是充要条件，不能用“一律不可用”来满足；Begin 也有包含实际依赖数量和
 容量的精确成功条件。
@@ -1323,7 +1323,7 @@ Node 容器保存的是实际的 `u64` JavaScript 值句柄；Rust 值单元保�
 
 ## 与论文的对应
 
-`publication_projection.rs` 把真实容器解释为键值查找表。
+`publication/values/projection.rs` 把真实容器解释为键值查找表。
 `publish`、`replace`、`revoke` 在自己的函数体中使用相应证明：
 
 - 发布向当前不可见的键插入实际传入值。
@@ -1708,10 +1708,10 @@ dependent-grammar 轨迹，并保持其他表键不变。全部成功前缀的 i
 此前表定理解释某个键上的标量；`value_alias` 现已提供真实别名投影和带条件的单键映射，
 完整回调与多次调用的上下文解释仍开放。
 
-审查路径：[`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs) 中的
+审查路径：[`reversible_value/effect.rs`](../crates/cordis-kernel/src/reversible_value/effect.rs) 中的
 `ScalarEffect`、`primitive_theory`、`prepare_effect`、`apply_prepared_effect`、
 `forward_interpretation`、`terminal_component` →
-[`runtime.rs`](../crates/cordis/src/runtime.rs) 的 `update_reversible_with`。
+[`runtime/setup.rs`](../crates/cordis/src/runtime/setup.rs) 的 `update_reversible_with`。
 用法见[尚未发布的 API](rust-api.zh-CN.md#可扩展可逆值尚未发布)。原生与静态 setup
 均接入该入口。普通 Rust 实现不会仅因实现 trait 而自动获得证明，仍须验证其模型定律。
 外部副作用、任意可变服务载荷不在标量合同范围内。本轮选定运行／负向证据见上文
@@ -1740,7 +1740,7 @@ Node 的替换版本进入真实 `PublicationStore`，不再由宿主维护另�
 的对象状态。JavaScript 对象内容、predicate 真实性与 wire 转换仍需单独合同。
 
 审查：[`versioned_value.rs`](../crates/cordis-kernel/src/versioned_value.rs)、
-[`publication_values.rs`](../crates/cordis-kernel/src/publication_values.rs)、
+[`publication/values.rs`](../crates/cordis-kernel/src/publication/values.rs)、
 [`availability.rs`](../crates/cordis-kernel/src/availability.rs) →
 [`Driver 适配层`](../crates/cordis-driver/src/availability.rs)、
 [`Runtime 槽`](../crates/cordis/src/runtime.rs)。
@@ -2003,10 +2003,10 @@ frame 同时保持其他每个记录的值及存在性。完整已记录状态�
 函数失败返回也为已成功执行的前缀保留保证。其他写入者仍可有 pending 义务；登记
 不等于 inverse 最终执行或恢复成功。
 
-审查入口：[joint_classification.rs](../crates/cordis-kernel/src/joint_classification.rs)、
-[Journal 生产者](../crates/cordis-kernel/src/joint_execution.rs)、
+审查入口：[reversible_value/joint/classification.rs](../crates/cordis-kernel/src/reversible_value/joint/classification.rs)、
+[Journal 生产者](../crates/cordis-kernel/src/reversible_value/joint.rs)、
 [原生返回生产者](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
-[Value](../crates/cordis-kernel/src/value_function.rs)／[Service](../crates/cordis-kernel/src/service_function.rs)
+[Value](../crates/cordis-kernel/src/reversible_value/function.rs)／[Service](../crates/cordis-kernel/src/reversible_value/service_function.rs)
 报告。`classify_step` 组合对象操作、所有者转换、frame、拒绝和 inverse 来源引理，
 使用现有求解器限额。
 
@@ -2027,7 +2027,7 @@ frame 同时保持其他每个记录的值及存在性。完整已记录状态�
 
 ## 真实执行中的共享强类型载荷
 
-原生宿主现在用 [`SharedPayload<T>`](../crates/cordis-kernel/src/shared_payload.rs)
+原生宿主现在用 [`SharedPayload<T>`](../crates/cordis-kernel/src/reversible_value/payload.rs)
 存储非标量服务，包括实际的 `Arc<dyn Any + Send + Sync>`。它替代普通宿主中的
 `Mutex<VersionedValue<Value>>`。真实载荷、版本、私有锁、权威强类型历史和 Journal
 成员由受验证 owner 共同持有；历史及对应凭据在 Cargo 编译后擦除。
@@ -2078,8 +2078,8 @@ group／源合并含义仍待完成。三个 partial 项和原有 R2 退出标�
 
 审查路径：实际 [`runtime.rs`](../crates/cordis/src/runtime.rs) 的存储与工厂
 → [`Execution::new_payload`](../crates/cordis-kernel/src/execution.rs)
-→ [`shared_payload.rs`](../crates/cordis-kernel/src/shared_payload.rs)
-→ [`payload_execution.rs`](../crates/cordis-kernel/src/payload_execution.rs)
+→ [`reversible_value/payload.rs`](../crates/cordis-kernel/src/reversible_value/payload.rs)
+→ [`reversible_value/joint/payload.rs`](../crates/cordis-kernel/src/reversible_value/joint/payload.rs)
 → 上述联合服务投影和 Runtime 检查点。
 
 最终源码通过 **955 项定向 Verus 检查、0 错误**、完整内核编译、**102 项既有 Rust
@@ -2132,8 +2132,8 @@ Verus 检查，绑定它的原始状态历史。后来的 managed 写入会阻�
 都包含这两种新修改。恢复被拒绝时保留载荷，不伪造成功写入或成功逆操作。
 
 论文审查路径为 Definition 29／式 (31) →
-[`operation`、`primitive_law`、`Inverse::interpretation`、`roundtrip`](../crates/cordis-kernel/src/payload_inverse.rs)
-→ [`apply_native_payload`、`apply_payload`、`dispatch_payload_cleanup`](../crates/cordis-kernel/src/payload_cleanup.rs)
+[`operation`、`primitive_law`、`Inverse::interpretation`、`roundtrip`](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs)
+→ [`apply_native_payload`、`apply_payload`、`dispatch_payload_cleanup`](../crates/cordis-kernel/src/cleanup_groups/payload.rs)
 → [runtime.rs](../crates/cordis/src/runtime.rs) 中的真实宿主入口。
 操作定律覆盖整个强类型语义载体；真实 owner 选择的新 head 是显式操作参数。
 `roundtrip` 从相互衔接的逆操作栈推出恢复结果，没有另行假设每个逆操作成功。
@@ -2181,11 +2181,11 @@ committed providers。`microsteps` 保留分类轨迹中的全部交错提交。
 `completed_attempt_stays_closed` 都证明该旧票据在任何认证后续历史中不能重新生效，
 包括产生新 attempt 编号的重试。不同 Journal 仍保留独立历史，不推导跨域总序。
 
-审查入口为 [`payload_attempt.rs`](../crates/cordis-kernel/src/payload_attempt.rs)、
-[`payload_inverse.rs`](../crates/cordis-kernel/src/payload_inverse.rs) 中的实际读取／恢复，
-[`payload_cleanup.rs`](../crates/cordis-kernel/src/payload_cleanup.rs) 中的队列组合，以及
-[`payload_restoration.rs`](../crates/cordis-kernel/src/payload_restoration.rs)、
-[`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs) 中的区间和后续历史定理。
+审查入口为 [`reversible_value/payload/restoration/attempt.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs)、
+[`reversible_value/payload/restoration.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs) 中的实际读取／恢复，
+[`cleanup_groups/payload.rs`](../crates/cordis-kernel/src/cleanup_groups/payload.rs) 中的队列组合，以及
+[`reversible_value/payload/restoration/attempt/protocol.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs)、
+[`reversible_value/joint/episode/interval.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs) 中的区间和后续历史定理。
 这将 Definition 29／式 (31) 的具体逆操作定律连接到实际清理，并与 Definitions 58／63
 的既有控制投影衔接。它补齐这一强类型协议区间，不证明任意回调、`T` 内部修改、调度
 活性或剩余的一般函数、Node 和配置语义。R2 仍在推进中。

@@ -66,8 +66,8 @@ cargo run -p cordis-kernel --example semantic_context --offline
 | 义务 | 审查入口 |
 | --- | --- |
 | 完整载体、父组件、续体合同 | [guarded_components.rs](../crates/cordis-kernel/src/guarded_components.rs) |
-| 真实值、代码、任意输入的逆操作解释、机器边界 | [reified_context.rs](../crates/cordis-kernel/src/reified_context.rs) |
-| 自行构造证据的可执行调用者 | [inspected_run.rs](../crates/cordis-kernel/src/inspected_run.rs) |
+| 真实值、代码、任意输入的逆操作解释、机器边界 | [mixed_driver/context.rs](../crates/cordis-kernel/src/mixed_driver/context.rs) |
+| 自行构造证据的可执行调用者 | [mixed_driver/fresh/inspected.rs](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs) |
 | 单一恢复／准入关系为何不足 | [typed_child_domain.rs](../crates/cordis-kernel/src/typed_child_domain.rs) |
 | 运行时故障案例 | [semantic_context.rs](../crates/cordis-kernel/tests/semantic_context.rs) |
 

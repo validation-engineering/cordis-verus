@@ -5,7 +5,7 @@
     {
       "name": "r3-managed-gap-ignores-writes",
       "mutation": {
-        "file": "managed_recovery.rs",
+        "file": "reversible_value/managed/recovery.rs",
         "old": "e.key!=key || joint::state_at(frames,i as nat).contains_pair(key,e.after)",
         "new": "true || joint::state_at(frames,i as nat).contains_pair(key,e.after)"
       },
@@ -20,7 +20,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::recovery::quiet_record",
           "module": "reversible_value::managed::recovery",
-          "file": "managed_recovery.rs",
+          "file": "reversible_value/managed/recovery.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures joint::state_at(frames,end).contains_pair(key,joint::state_at(frames,start)[key]),"
         }
@@ -30,7 +30,7 @@
     {
       "name": "r3-typed-restores-consumed-head",
       "mutation": {
-        "file": "payload_inverse.rs",
+        "file": "reversible_value/payload/restoration.rs",
         "old": "if cell.head!=self.expected {",
         "new": "if cell.head>self.expected {"
       },
@@ -45,7 +45,7 @@
         {
           "function": "cordis_negative::reversible_value::payload::restoration::Inverse::restore_live",
           "module": "reversible_value::payload::restoration",
-          "file": "payload_inverse.rs",
+          "file": "reversible_value/payload/restoration.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(cell.state()==self.after().state());"
         }

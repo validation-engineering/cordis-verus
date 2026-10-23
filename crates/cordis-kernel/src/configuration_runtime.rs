@@ -5,7 +5,6 @@ use crate::lifecycle_state::native::runtime::NativeRuntime;
 use crate::reversible_value::joint;
 use crate::{Error, Phase};
 use vstd::prelude::*;
-#[path = "configuration_adoption.rs"]
 pub mod adoption;
 verus! {
 #[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]

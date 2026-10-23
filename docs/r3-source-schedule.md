@@ -59,12 +59,12 @@ explicit boundary; an `Arc<T>` is not a deep snapshot of arbitrary user state.
 
 | Obligation | Executable implementation and contract |
 | --- | --- |
-| Actual position, no invented ordinal | [`lifecycle_state/native/runtime/recipes.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs), [`managed_replay.rs`](../crates/cordis-kernel/src/managed_replay.rs): `Ledger::revision`, `Source::wf`, `run_replayable_root` |
-| Same stream, complete chronological permutation | [`managed_replay_order.rs`](../crates/cordis-kernel/src/managed_replay_order.rs): `plan`, `prefix`, `chronological` |
-| Plan drives real calls | [`managed_replay_batch.rs`](../crates/cordis-kernel/src/managed_replay_batch.rs): `run`, `actual_prefix` |
-| Typed source continuity | [`managed_replay_payload_history.rs`](../crates/cordis-kernel/src/managed_replay_payload_history.rs): `continues_payload` |
-| Atomic input guard and real inverse | [`payload_inverse.rs`](../crates/cordis-kernel/src/payload_inverse.rs): `apply_captured_following` |
-| Actual selection and cleanup ownership | [`native_payload.rs`](../crates/cordis-kernel/src/native_payload.rs), [`payload_cleanup.rs`](../crates/cordis-kernel/src/payload_cleanup.rs): `land`, `apply_payload_captured_following` |
+| Actual position, no invented ordinal | [`lifecycle_state/native/runtime/recipes.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs), [`reversible_value/managed/replay.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay.rs): `Ledger::revision`, `Source::wf`, `run_replayable_root` |
+| Same stream, complete chronological permutation | [`reversible_value/managed/replay/order.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/order.rs): `plan`, `prefix`, `chronological` |
+| Plan drives real calls | [`reversible_value/managed/replay/batch.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs): `run`, `actual_prefix` |
+| Typed source continuity | [`reversible_value/managed/replay/inputs/payload_history.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs): `continues_payload` |
+| Atomic input guard and real inverse | [`reversible_value/payload/restoration.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs): `apply_captured_following` |
+| Actual selection and cleanup ownership | [`reversible_value/native_payload.rs`](../crates/cordis-kernel/src/reversible_value/native_payload.rs), [`cleanup_groups/payload.rs`](../crates/cordis-kernel/src/cleanup_groups/payload.rs): `land`, `apply_payload_captured_following` |
 
 These support the existing recovery work package for paper items 68, 69 and 79;
 they do not change the audited Equation (55) interpretation or its exit criteria.

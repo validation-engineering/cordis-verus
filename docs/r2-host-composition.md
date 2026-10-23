@@ -84,8 +84,8 @@ merely because lifecycle projection is unchanged. See the
 [paper map](paper-refinement-map.md) for the still-partial composition obligation.
 
 Review the executable contracts in
-[`node_bridge.rs`](../crates/cordis-kernel/src/node_bridge.rs),
-[`node_reads.rs`](../crates/cordis-kernel/src/node_reads.rs),
+[`node_runtime/bridge.rs`](../crates/cordis-kernel/src/node_runtime/bridge.rs),
+[`node_runtime/reads.rs`](../crates/cordis-kernel/src/node_runtime/reads.rs),
 [`static_values.rs`](../crates/cordis-kernel/src/static_values.rs) and
 [`host_context.rs`](../crates/cordis-kernel/src/host_context.rs).
 Their callers are the

@@ -2,14 +2,14 @@
 
 English · [简体中文](verification-plan.zh-CN.md) · [Update recovery case](cases/update-recovery.md) · [Remaining paper obligations](paper-mapping-inventory.md)
 
-**Updated: 2026-10-24.** Refactoring proceeds on `main`, starting from the archive
-`codex/archive-before-refactor-2026-10-24` at `60bdd89`. The archive contains the
-implementation at `82145ca` and the preceding verification plan. The shared Driver
-and lifecycle/cleanup module layout now follow their Rust
-module ownership, the ordinary host has a separate cleanup adapter, and scoped
-controls use one explicit profile command. Generated scenarios and paired
-test/proof mutation comparisons remain planned. Existing results retain their
-original source-bound reports and scopes.
+**Updated: 2026-10-24.** Work continues on `main`; the fixed pre-refactor archive
+is `codex/archive-before-refactor-2026-10-24` at `60bdd89`. The bounded iteration's
+code, ownership map, module layout, generator, reducer, upstream comparison and
+paired-control runner are implemented. The final-source gate is
+`python3 -B scripts/check-lifecycle-campaign.py accept`; only a passing record for
+the current sources constitutes integrated acceptance. See the
+[review map](review-map.md) and [reproduction guide](cases/generated-lifecycle.md).
+The whole-paper target remains open.
 
 The goal is to make paper constraints useful in running software: a plugin author
 can update a provider, understand a blocked cleanup, retry safely and inspect the
@@ -190,9 +190,16 @@ source; moving a file does not refresh an old pass. The original files and
 superseded wrappers remain in the fixed archive. No unique theorem, counterexample
 or evidence record was removed, and no paper obligation was closed by these moves.
 
-Further domain moves should remain separate from semantic changes and removal of
-unique evidence. The next feature batch is the seeded scenario generator/reducer
-below; reorganizing every research module is not a prerequisite for it.
+The second layout batch moves 212 further kernel files to their existing logical
+module paths and removes the remaining 214 path attributes. Setup, service-handle
+methods and polling now have separate ordinary-host modules; `runtime.rs` is
+3,139 lines. Function bodies and contracts are preserved. The
+[review map](review-map.md) records the ownership classification and disposition;
+unique research results and frozen evidence remain retained.
+
+The [generated lifecycle case](cases/generated-lifecycle.md) is the implementation
+and reproduction entry for steps 3–6 below. It records intentional cleanup-policy
+differences without calling them upstream agreement.
 
 ### Archive and branch discipline
 
@@ -209,20 +216,20 @@ Remote synchronization is separate from this local archive.
 
 ## Work sequence and exit criteria
 
-The archive is complete and the first structural pass has started. The larger
-items remain open. Dependencies identify acceptance order, not a requirement to
-run the full suite after every edit. This sequence replaces the earlier ordering;
-it does not add another milestone taxonomy.
+The bounded deliverables below have implementation and review entry points. Acceptance
+is source-bound: the final audit requires fresh development, scenario, comparison
+and paired-control records together. Dependencies do not require full-suite runs
+after each edit; these items do not introduce another paper milestone taxonomy.
 
 | Order / state | Deliverable | Dependency | Exit criterion |
 | --- | --- | --- | --- |
 | 0. Archive · complete | Frozen code and prior plan on the named branch; active work stays on `main` | Existing working tree | Archive resolves to `60bdd89`; tracked work is preserved and history is not rewritten |
-| 1. Scope and ownership · started | Contract/evidence matrix plus production/proof/research inventory and candidate removal decisions | Archive and existing case | Every guarantee has a real caller, exact observation and premise; every proposed removal has an accountable replacement or disposition |
-| 2. Structure and cleanup · started | Organize one domain at a time; consolidate repeated code and prose; separate research navigation | 1 for the affected domain; existing regressions | Clear ownership, no lost proof/negative anchors, migrated callers and packaging; preserved guarantees or an explicit scope change |
-| 3. Generate and shrink · planned | Seeded real Native lifecycle scenarios and reducer | 1 and the relevant stable interfaces from 2 | Existing failure/retry reproduced, required families covered and replayable reduced failures demonstrated with a known control |
-| 4. Compare with Cordis · planned | Node/native and pinned-upstream adapters for the supported common scenario subset | 1; reuse 3's format/reducer | Raw traces, complete outcome accounting and no unexplained difference accepted as compatibility |
-| 5. Test/proof detection · planned | Paired behavioral and proof results for the five existing implementation mutations | 3; 4 where a control exercises Node | Fresh baseline, valid mutant compilation, intended contract rejection and separately recorded behavioral result |
-| 6. Integrated review · pending | Final contract, source, scenario, mutation and architecture evidence | 1–5 | One final source passes the applicable concentrated acceptance; reviewers can reconstruct the full guarantee chain |
+| 1. Scope and ownership · implemented | Contract/evidence matrix plus production/proof/research inventory and candidate removal decisions | Archive and existing case | Every guarantee has a real caller, exact observation and premise; every proposed removal has an accountable replacement or disposition |
+| 2. Structure and cleanup · implemented | Organize one domain at a time; consolidate repeated code and prose; separate research navigation | 1 for the affected domain; existing regressions | Clear ownership, no lost proof/negative anchors, migrated callers and packaging; preserved guarantees or an explicit scope change |
+| 3. Generate and shrink · implemented | Seeded real Native lifecycle scenarios and reducer | 1 and the relevant stable interfaces from 2 | Existing failure/retry reproduced, required families covered and replayable reduced failures demonstrated with a known control |
+| 4. Compare with Cordis · implemented | Node/native and pinned-upstream adapters for the supported common scenario subset | 1; reuse 3's format/reducer | Raw traces, complete outcome accounting and no unexplained difference accepted as compatibility |
+| 5. Test/proof detection · implemented | Paired behavioral and proof results for the five existing implementation mutations | 3; 4 where a control exercises Node | Fresh baseline, valid mutant compilation, intended contract rejection and separately recorded behavioral result |
+| 6. Integrated review · final-source gate | Final contract, source, scenario, mutation and architecture evidence | 1–5 | One final source passes the applicable concentrated acceptance; reviewers can reconstruct the full guarantee chain |
 
 ### Generated scenarios
 

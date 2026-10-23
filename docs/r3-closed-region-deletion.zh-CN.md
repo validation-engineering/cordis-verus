@@ -159,21 +159,21 @@ Child 压缩后让同一个 consumer 绑定新 provider 重复激活。**26 个�
 | 义务 | 代码 |
 | --- | --- |
 | 来源闭包、原语读写范围、真实逆操作迁移 | [closed_region_deletion.rs](../crates/cordis-kernel/src/closed_region_deletion.rs)：`closed`、`local`、`run`、`restore` |
-| 完整生命周期转换 | [closed_region_execution.rs](../crates/cordis-kernel/src/closed_region_execution.rs)：`step` |
-| 执行构造及闭合观察 | [closed_region_trace.rs](../crates/cordis-kernel/src/closed_region_trace.rs)：`from_source`、`closing_observation` |
-| Fresh 实际选择与轨迹构造 | [closed_region_fresh.rs](../crates/cordis-kernel/src/closed_region_fresh.rs)、[closed_region_fresh_trace.rs](../crates/cordis-kernel/src/closed_region_fresh_trace.rs) |
-| 实际 Mixed／Fresh 报告查询 | [script_deletion.rs](../crates/cordis-kernel/src/script_deletion.rs)、[fresh_region_deletion.rs](../crates/cordis-kernel/src/fresh_region_deletion.rs)：`delete_closed_region` |
-| 实际分配历史及 Insert 参数 | [fresh_allocation_history.rs](../crates/cordis-kernel/src/fresh_allocation_history.rs)、[fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs)：`run_script` |
-| 可执行名称映射与命令准备 | [allocation_names.rs](../crates/cordis-kernel/src/allocation_names.rs)：`pair`；[fresh_compaction.rs](../crates/cordis-kernel/src/fresh_compaction.rs)：`compact`、`commands` |
-| 从来源推出创建完整性及计划轨迹 | [fresh_compaction_origins.rs](../crates/cordis-kernel/src/fresh_compaction_origins.rs)：`from_region`；[fresh_compaction_source.rs](../crates/cordis-kernel/src/fresh_compaction_source.rs)：`source_execution` |
-| 真实分派输入域与空闲日志 | [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs)：`apply`、`run_script`；[fresh_dispatch.rs](../crates/cordis-kernel/src/fresh_dispatch.rs)：`command_enabled` |
-| 源调用到实际准入 | [fresh_dispatch_source.rs](../crates/cordis-kernel/src/fresh_dispatch_source.rs)：`source_command_admission`；[fresh_dispatch_step.rs](../crates/cordis-kernel/src/fresh_dispatch_step.rs) |
-| 真实运行形状及压缩保持 | [fresh_execution_shape.rs](../crates/cordis-kernel/src/fresh_execution_shape.rs)：`source_runtime_shape`、`deleted_trace`、`renamed_trace` |
-| 精确后继与同步分支传递 | [fresh_dispatch_exact.rs](../crates/cordis-kernel/src/fresh_dispatch_exact.rs)：`unique`、`exact_successor`；[fresh_synchronous_transport.rs](../crates/cordis-kernel/src/fresh_synchronous_transport.rs) |
-| 实际有限机器元数据 | [lib.rs](../crates/cordis-kernel/src/lib.rs)：`synchronous_metadata`；[fresh_runtime_metadata.rs](../crates/cordis-kernel/src/fresh_runtime_metadata.rs)：`metadata_progress`、`metadata_admission` |
-| 真实整段脚本完备性与计划结果 | [fresh_script_completeness.rs](../crates/cordis-kernel/src/fresh_script_completeness.rs)：`source_call_at`、`unique_path`、`replays`；[fresh_compaction_source.rs](../crates/cordis-kernel/src/fresh_compaction_source.rs)：`replay_result` |
-| 真实重放回归 | [fresh_compaction.rs](../crates/cordis-kernel/tests/fresh_compaction.rs) |
-| 非空客户端及不完整区域的拒绝 | [closed_region_example.rs](../crates/cordis-kernel/src/closed_region_example.rs)：`nonempty`、`source_guards` |
+| 完整生命周期转换 | [closed_region_deletion/execution.rs](../crates/cordis-kernel/src/closed_region_deletion/execution.rs)：`step` |
+| 执行构造及闭合观察 | [closed_region_deletion/trace.rs](../crates/cordis-kernel/src/closed_region_deletion/trace.rs)：`from_source`、`closing_observation` |
+| Fresh 实际选择与轨迹构造 | [closed_region_deletion/fresh.rs](../crates/cordis-kernel/src/closed_region_deletion/fresh.rs)、[closed_region_deletion/fresh_trace.rs](../crates/cordis-kernel/src/closed_region_deletion/fresh_trace.rs) |
+| 实际 Mixed／Fresh 报告查询 | [mixed_driver/deletion.rs](../crates/cordis-kernel/src/mixed_driver/deletion.rs)、[mixed_driver/fresh/deletion.rs](../crates/cordis-kernel/src/mixed_driver/fresh/deletion.rs)：`delete_closed_region` |
+| 实际分配历史及 Insert 参数 | [mixed_driver/fresh/allocation.rs](../crates/cordis-kernel/src/mixed_driver/fresh/allocation.rs)、[mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs)：`run_script` |
+| 可执行名称映射与命令准备 | [mixed_driver/fresh/names.rs](../crates/cordis-kernel/src/mixed_driver/fresh/names.rs)：`pair`；[mixed_driver/fresh/compaction.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs)：`compact`、`commands` |
+| 从来源推出创建完整性及计划轨迹 | [mixed_driver/fresh/compaction/execution_origins.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction/execution_origins.rs)：`from_region`；[mixed_driver/fresh/compaction/source.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction/source.rs)：`source_execution` |
+| 真实分派输入域与空闲日志 | [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs)：`apply`、`run_script`；[mixed_driver/fresh/dispatch.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch.rs)：`command_enabled` |
+| 源调用到实际准入 | [mixed_driver/fresh/dispatch/source.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/source.rs)：`source_command_admission`；[mixed_driver/fresh/dispatch/forward.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/forward.rs) |
+| 真实运行形状及压缩保持 | [mixed_driver/fresh/dispatch/shape.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/shape.rs)：`source_runtime_shape`、`deleted_trace`、`renamed_trace` |
+| 精确后继与同步分支传递 | [mixed_driver/fresh/dispatch/exact.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/exact.rs)：`unique`、`exact_successor`；[mixed_driver/fresh/dispatch/exact/transport.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/exact/transport.rs) |
+| 实际有限机器元数据 | [lib.rs](../crates/cordis-kernel/src/lib.rs)：`synchronous_metadata`；[mixed_driver/fresh/dispatch/metadata.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/metadata.rs)：`metadata_progress`、`metadata_admission` |
+| 真实整段脚本完备性与计划结果 | [mixed_driver/fresh/replay.rs](../crates/cordis-kernel/src/mixed_driver/fresh/replay.rs)：`source_call_at`、`unique_path`、`replays`；[mixed_driver/fresh/compaction/source.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction/source.rs)：`replay_result` |
+| 真实重放回归 | [mixed_driver/fresh/compaction.rs](../crates/cordis-kernel/tests/fresh_compaction.rs) |
+| 非空客户端及不完整区域的拒绝 | [closed_region_deletion/example.rs](../crates/cordis-kernel/src/closed_region_deletion/example.rs)：`nonempty`、`source_guards` |
 
 这是对应引理 79 的一类可接受构造。已有单 Episode 值恢复定理仍承担式 (55)/(56) 的
 对应；删除闭合的一组 Episode 不能替代无条件的单 owner 删除定理，也不改变原论文

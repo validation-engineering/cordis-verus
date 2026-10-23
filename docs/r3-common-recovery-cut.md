@@ -101,9 +101,9 @@ original claims.
 | [lifecycle_state/native/runtime/history/lifetime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/lifetime.rs) | Actual allocation bounds, fresh insertions, terminal preservation and source indices |
 | [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | Invariant maintained by actual transitions; existing snapshot exports source coverage |
 | [lifecycle_state/native/runtime/child_history/cut.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/cut.rs) | Each assigned Child's terminal state at the actual later checkpoint |
-| [managed_child_cut.rs](../crates/cordis-kernel/src/managed_child_cut.rs) | All original native Child obligations use the same checkpoint |
-| [managed_pending_cut.rs](../crates/cordis-kernel/src/managed_pending_cut.rs) | Actual forward registrations stay settled at that checkpoint |
-| [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs) | Value decoding and the composed `unload_recovers_with_children` theorem |
+| [reversible_value/managed/interleaving/history/lifecycle/children/completion/cut.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion/cut.rs) | All original native Child obligations use the same checkpoint |
+| [reversible_value/managed/interleaving/history/lifecycle/recovery/cut/pending.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/pending.rs) | Actual forward registrations stay settled at that checkpoint |
+| [reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs) | Value decoding and the composed `unload_recovers_with_children` theorem |
 
 Validation results and commands are maintained in the [interleaved recovery
 guide](r3-interleaved-recovery.md#review-and-validation). New mutation controls and

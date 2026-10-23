@@ -164,14 +164,14 @@ runs its inverse or that a scheduler eventually retries cleanup.
 
 | Link | Source |
 | --- | --- |
-| Authentic comparable history | [shared_value_history.rs](../crates/cordis-kernel/src/shared_value_history.rs): `Witness::prefix`, `compatible_map` |
-| Runtime admission and report retention | [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs), [managed_function.rs](../crates/cordis-kernel/src/managed_function.rs) |
-| Journal gaps to actual scalar/typed state composition | [managed_recovery.rs](../crates/cordis-kernel/src/managed_recovery.rs): `linked_pair`, `establish_recovery` |
-| Defined mixed word and actual queue suffix | [managed_recovery_word.rs](../crates/cordis-kernel/src/managed_recovery_word.rs): `defined`, `recover_retained` |
-| Actual Begin and registered execution interval | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs), [managed_episode.rs](../crates/cordis-kernel/src/managed_episode.rs), [managed_root.rs](../crates/cordis-kernel/src/managed_root.rs) |
-| Actual Begin/return values and retained queue recovery | [managed_endpoint.rs](../crates/cordis-kernel/src/managed_endpoint.rs), [managed_root_recovery.rs](../crates/cordis-kernel/src/managed_root_recovery.rs) |
-| Typed mutation history and restored interference | [payload_semantic_history.rs](../crates/cordis-kernel/src/payload_semantic_history.rs), [managed_restored.rs](../crates/cordis-kernel/src/managed_restored.rs) |
-| Real typed attempt, failure cause and strict domain | [payload_attempt.rs](../crates/cordis-kernel/src/payload_attempt.rs), [payload_recovery.rs](../crates/cordis-kernel/src/payload_recovery.rs) |
+| Authentic comparable history | [reversible_value/history.rs](../crates/cordis-kernel/src/reversible_value/history.rs): `Witness::prefix`, `compatible_map` |
+| Runtime admission and report retention | [cleanup_groups/payload.rs](../crates/cordis-kernel/src/cleanup_groups/payload.rs), [reversible_value/managed.rs](../crates/cordis-kernel/src/reversible_value/managed.rs) |
+| Journal gaps to actual scalar/typed state composition | [reversible_value/managed/recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/recovery.rs): `linked_pair`, `establish_recovery` |
+| Defined mixed word and actual queue suffix | [reversible_value/managed/recovery/word.rs](../crates/cordis-kernel/src/reversible_value/managed/recovery/word.rs): `defined`, `recover_retained` |
+| Actual Begin and registered execution interval | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs), [reversible_value/managed/episode.rs](../crates/cordis-kernel/src/reversible_value/managed/episode.rs), [reversible_value/managed/root.rs](../crates/cordis-kernel/src/reversible_value/managed/root.rs) |
+| Actual Begin/return values and retained queue recovery | [reversible_value/managed/episode/endpoint.rs](../crates/cordis-kernel/src/reversible_value/managed/episode/endpoint.rs), [reversible_value/managed/root/recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/root/recovery.rs) |
+| Typed mutation history and restored interference | [reversible_value/payload/semantic_history.rs](../crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs), [reversible_value/managed/recovery/restored.rs](../crates/cordis-kernel/src/reversible_value/managed/recovery/restored.rs) |
+| Real typed attempt, failure cause and strict domain | [reversible_value/payload/restoration/attempt.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs), [reversible_value/payload/restoration/attempt/recovery.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/recovery.rs) |
 
 The [runtime cases](../crates/cordis-kernel/tests/managed_function.rs) include two
 providers exposing aliases to the same scalar and typed allocations, an external

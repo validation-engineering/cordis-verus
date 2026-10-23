@@ -33,10 +33,10 @@ episode 状态、实际存活的 callback scope、撤回后的 publication 回�
 | 修改动态声明、接管初始 publication | `publish`、`configure`、`reconcile_publications`、`drive` | 声明变化与 generation-zero 接管显式记录；接管保持载荷／版本、publication 身份和既有租约。 |
 
 可执行所有者见 [`node_runtime.rs`](../crates/cordis-kernel/src/node_runtime.rs)，
-转换关系与区间证明见 [`node_history.rs`](../crates/cordis-kernel/src/node_history.rs)。
+转换关系与区间证明见 [`node_runtime/history.rs`](../crates/cordis-kernel/src/node_runtime/history.rs)。
 普通 [Node 适配层](../crates/cordis-driver/src/node.rs) 翻译错误和序列化票据，
 [`availability.rs`](../crates/cordis-driver/src/availability.rs) 只保留 availability 诊断文本。内核私有 map 保存真实 `Admission` 和
-[`Episode`](../crates/cordis-kernel/src/node_episode.rs) 载荷，适配层只读访问；
+[`Episode`](../crates/cordis-kernel/src/node_runtime/episode.rs) 载荷，适配层只读访问；
 待处理票据直接来自 action ledger，不再另存 Node 票据缓存。
 
 `History::replacement_rejects_old_check` 沿真实请求、成功替换和最终回复证明，任意其他
@@ -51,14 +51,14 @@ episode 状态、实际存活的 callback scope、撤回后的 publication 回�
 - `rejected_reply_preserves_episode`：被拒绝的清理／setup 回复不改变 admission、状态或错误载荷。
 - `release_has_origin`：成功释放消费真实 Begin 产生的 owner，并检查其原代次及实际清理／资源守卫。
 
-实际 [scope 所有者](../crates/cordis-kernel/src/node_scopes.rs) 还证明
+实际 [scope 所有者](../crates/cordis-kernel/src/node_runtime/scopes.rs) 还证明
 `scope_origin`、`scope_retained`、`scope_block_has_origin` 和
 `finished_scope_stays_inactive`。存活 receipt 必须来自同一历史中、当时代次下的真实签发。
 清理与释放不会隐式结束回调；迟到的结束仍可核销原 receipt，但等待必须检查当前代次及
 已提交依赖／ownership 关系。准备和清理回调也可签发 scope；这不声称每个回调都持有
 活动 admission 或服务租约。
 
-[资源路径](../crates/cordis-kernel/src/node_resources.rs) 证明 `publication_origin`、
+[资源路径](../crates/cordis-kernel/src/node_runtime/resources.rs) 证明 `publication_origin`、
 `restoring_origin`、`released_publication_has_origin`。释放清单直接按分配顺序扫描真实
 registry 构造，不再使用每个 Node 的重复缓存；清单包含保留的不可见旧版本，实际释放
 仍先检查代次、清理成功和全部存活租约。清理回读选择必须来自真实可见槽位，显式 revoke
@@ -66,7 +66,7 @@ registry 构造，不再使用每个 Node 的重复缓存；清单包含保留�
 批量撤回还证明原历史前缀保留，全部选定槽位被隐藏，而载荷、版本和租约保持。
 扫描只分配临时 ID 向量，不增加运行时证明日志或历史载荷副本。
 
-实际[句柄交付路径](../crates/cordis-kernel/src/node_handles.rs) 现持有原先 Driver 的
+实际[句柄交付路径](../crates/cordis-kernel/src/node_runtime/handles.rs) 现持有原先 Driver 的
 `released` 队列。替换、reclaim 或释放槽位的同一次转换将实际旧载荷入队；被拒绝操作和
 相同值替换不产生候选。`removed_is_queued` 证明反向义务：槽位丢失旧载荷时，不能漏掉
 对应回收候选。`payload_origin`、`queued_handle_origin`、`delivered_handle_origin`
@@ -92,7 +92,7 @@ restart 保留明确的扩展含义。值或检查事件可以保持控制不变
 
 ## 实际读取与论文的连接
 
-[`NodeRuntime::resolve`](../crates/cordis-kernel/src/node_reads.rs) 现在执行原先由
+[`NodeRuntime::resolve`](../crates/cordis-kernel/src/node_runtime/reads.rs) 现在执行原先由
 `Driver::resolve` 实现的选择逻辑。JSON 命令、Rust／Node typed import 和调用授权路径
 都使用同一操作：检查实际注册状态和可选代次，返回真实句柄及版本，将请求／结果记入
 擦除历史，保持全部受管状态不变。线协议仍返回 publication、owner 和 value；Rust 结果
@@ -124,7 +124,7 @@ episode 的成功释放不能消费这些租约。`committed_read_origin` 把读
 
 ## 实际接口与动态 provider 交接
 
-[接口所有者](../crates/cordis-kernel/src/node_interfaces.rs) 现在持有
+[接口所有者](../crates/cordis-kernel/src/node_runtime/interfaces.rs) 现在持有
 `NodeRuntime::{interfaces, dynamic}`。Driver 直接读取真实 parent、初始 provisions 和
 当前 dependency 向量，不再另存 Node／接口或声明表。Insert、成功的依赖重配置、声明
 释放和 Node 移除，与生命周期变化在同一个记录操作内更新这些字段；失败保持对应字段。
@@ -158,7 +158,7 @@ episode 的成功释放不能消费这些租约。`committed_read_origin` 把读
 
 ## 准入策略与通知选择
 
-[`node_policy.rs`](../crates/cordis-kernel/src/node_policy.rs) 持有真实的
+[`node_runtime/policy.rs`](../crates/cordis-kernel/src/node_runtime/policy.rs) 持有真实的
 `Policy { profile, configured }`。`Driver` 不再另存这两个字段，也不再自行选择通知重试对象；
 configure、mount、seal、notify 命令均调用同一个可执行所有者，JSON profile 枚举在边界翻译。
 
@@ -183,7 +183,7 @@ configure、mount、seal、notify 命令均调用同一个可执行所有者，J
 
 生产路径是 JS `beginInvocation` → Node-API `NativeInvocation` →
 `Driver::begin_invocation` → 受验证的
-[`NodeRuntime::begin_invocation`](../crates/cordis-kernel/src/node_scope_path.rs)。
+[`NodeRuntime::begin_invocation`](../crates/cordis-kernel/src/node_runtime/paths.rs)。
 构造器先验证所选父路径中的每个句柄，再签发新 receipt，返回私有 `Path`：
 准确的父路径前缀加上本次新 receipt。它不暴露可变句柄列表。后续 Node-API 查询
 直接传入该原生对象，JS 不再在每次等待时重建列表。绑定声明 `scopeProtocol: 2`，

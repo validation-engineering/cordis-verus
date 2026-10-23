@@ -40,12 +40,12 @@ commit/inverse implementation and corresponding laws.
 
 | Connection | Actual implementation and guarantee |
 | --- | --- |
-| Objects and first inputs | [Bank](../crates/cordis-kernel/src/managed_replay_bank.rs) authenticates birth/operand records and constructs an injective physical allocation map. [Projection](../crates/cordis-kernel/src/closed_objects.rs) covers the complete declared table. Unvisited objects with unsupported inverse debt are rejected. |
-| Mixed root and Child bodies | [Session](../crates/cordis-kernel/src/managed_replay_session.rs) acquires the original locks, checks retained source inputs and reserves revision space before running the [original interpreter](../crates/cordis-kernel/src/managed_function.rs). Successful reports establish scalar value/depth and typed value/head/depth correspondence. |
-| History across calls | [Archive](../crates/cordis-kernel/src/managed_replay_archive.rs) retains historical checkpoints and monotonically extends head maps. Real cleanup can restore an earlier head while the anti-stale revision advances; a later call checks this state before proceeding. Retired payloads that a later body does not visit do not prevent that body from running. |
-| Slots and aliases | [Operand slots](../crates/cordis-kernel/src/managed_replay_slots.rs) and [declaration slots](../crates/cordis-kernel/src/closed_slots.rs) distinguish slot identity from object identity. Aliases of one source slot share one target slot; independent slots selecting the same object stay independent. Replacements use real compare-and-swap and preserve historical version maps. |
-| Publications | [Finalization](../crates/cordis-kernel/src/managed_replay_finalization.rs) binds post-root own services to the real successful Finish. Services belonging to one source provider share one target cleanup owner. Early and late provides retain their original phase; Finish retries retain the already installed prefix. |
-| Plugin identity | [Fiber records](../crates/cordis-kernel/src/managed_replay_fibers.rs) bind source/target IDs to real call receipts. A repeated source plugin reuses its target registration and obtains a new Episode ticket. The closed wrapper checks the actual source parent against prior mapped calls; it rejects an unknown or different parent. |
+| Objects and first inputs | [Bank](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs) authenticates birth/operand records and constructs an injective physical allocation map. [Projection](../crates/cordis-kernel/src/reversible_value/closed/objects.rs) covers the complete declared table. Unvisited objects with unsupported inverse debt are rejected. |
+| Mixed root and Child bodies | [Session](../crates/cordis-kernel/src/reversible_value/managed/replay/session.rs) acquires the original locks, checks retained source inputs and reserves revision space before running the [original interpreter](../crates/cordis-kernel/src/reversible_value/managed.rs). Successful reports establish scalar value/depth and typed value/head/depth correspondence. |
+| History across calls | [Archive](../crates/cordis-kernel/src/reversible_value/managed/replay/archive.rs) retains historical checkpoints and monotonically extends head maps. Real cleanup can restore an earlier head while the anti-stale revision advances; a later call checks this state before proceeding. Retired payloads that a later body does not visit do not prevent that body from running. |
+| Slots and aliases | [Operand slots](../crates/cordis-kernel/src/reversible_value/managed/replay/slots.rs) and [declaration slots](../crates/cordis-kernel/src/reversible_value/closed/slots.rs) distinguish slot identity from object identity. Aliases of one source slot share one target slot; independent slots selecting the same object stay independent. Replacements use real compare-and-swap and preserve historical version maps. |
+| Publications | [Finalization](../crates/cordis-kernel/src/reversible_value/managed/replay/finalization.rs) binds post-root own services to the real successful Finish. Services belonging to one source provider share one target cleanup owner. Early and late provides retain their original phase; Finish retries retain the already installed prefix. |
+| Plugin identity | [Fiber records](../crates/cordis-kernel/src/reversible_value/closed/replay/fibers.rs) bind source/target IDs to real call receipts. A repeated source plugin reuses its target registration and obtains a new Episode ticket. The closed wrapper checks the actual source parent against prior mapped calls; it rejects an unknown or different parent. |
 | Cleanup and retries | The original native protocol retains dependencies, inverse owners and failed attempts. `Error::After` retains the real report and cleanup owner when post-root declaration synchronization fails. Completing or retrying Finish preserves the report correspondence. |
 
 First observations are chosen in authentic call order, independently of the input
@@ -60,7 +60,7 @@ contracts, not fairness or eventual termination.
 
 ## Paper-facing function evidence
 
-[`paper_contract`](../crates/cordis-kernel/src/closed_contract.rs) selects the
+[`paper_contract`](../crates/cordis-kernel/src/reversible_value/closed/contract.rs) selects the
 actual source program, target report, object projection and retained inverse
 words. It does not accept replacement programs or an expected result.
 

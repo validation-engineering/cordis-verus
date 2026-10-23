@@ -5,7 +5,7 @@
     {
       "name": "r01-exclusive-source-ignores-input",
       "mutation": {
-        "file": "managed_replay_protected.rs",
+        "file": "reversible_value/managed/replay/protected.rs",
         "old": "if values[index].value!=expected.value || values[index].depth!=expected.depth {return Err(Error::SourceState {step:i});}",
         "new": "if false {return Err(Error::SourceState {step:i});}"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected::Context::check_source",
           "module": "reversible_value::managed::replay::protected",
-          "file": "managed_replay_protected.rs",
+          "file": "reversible_value/managed/replay/protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(values@[index as int]==*expected);"
         }
@@ -31,7 +31,7 @@
     {
       "name": "r01-exclusive-source-ignores-allocation",
       "mutation": {
-        "file": "managed_replay_protected.rs",
+        "file": "reversible_value/managed/replay/protected.rs",
         "old": "if mapped!=index {return Err(Error::SourceState {step:i});}",
         "new": "if false {return Err(Error::SourceState {step:i});}"
       },
@@ -47,7 +47,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected::Context::check_source",
           "module": "reversible_value::managed::replay::protected",
-          "file": "managed_replay_protected.rs",
+          "file": "reversible_value/managed/replay/protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(mapped==index);"
         }
@@ -57,7 +57,7 @@
     {
       "name": "r01-typed-seed-ignores-inverse-debt",
       "mutation": {
-        "file": "managed_replay_typed_protected.rs",
+        "file": "reversible_value/managed/replay/typed_protected.rs",
         "old": "if *depth!=0 {return Err(Error::OutstandingHistory {entry:i});}",
         "new": "if false {return Err(Error::OutstandingHistory {entry:i});}"
       },
@@ -73,7 +73,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry",
           "module": "reversible_value::managed::replay::typed_protected",
-          "file": "managed_replay_typed_protected.rs",
+          "file": "reversible_value/managed/replay/typed_protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(first.source().before()->Payload_0.depth==0);"
         }
@@ -83,7 +83,7 @@
     {
       "name": "r01-typed-seed-ignores-revision",
       "mutation": {
-        "file": "managed_replay_typed_protected.rs",
+        "file": "reversible_value/managed/replay/typed_protected.rs",
         "old": "if current.revision()!=0 {return Err(Error::ChangedVersion {entry:i});}",
         "new": "if false {return Err(Error::ChangedVersion {entry:i});}"
       },
@@ -99,7 +99,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry",
           "module": "reversible_value::managed::replay::typed_protected",
-          "file": "managed_replay_typed_protected.rs",
+          "file": "reversible_value/managed/replay/typed_protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(current.revision_spec()==0);"
         }
@@ -109,7 +109,7 @@
     {
       "name": "r01-typed-call-ignores-source-history",
       "mutation": {
-        "file": "managed_replay_typed_tracker.rs",
+        "file": "reversible_value/managed/replay/typed_tracker.rs",
         "old": "if !same {return Err(Error::SourceState {step});}",
         "new": "if false {return Err(Error::SourceState {step});}"
       },
@@ -125,7 +125,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::typed_tracker::Tracker::advance",
           "module": "reversible_value::managed::replay::typed_tracker",
-          "file": "managed_replay_typed_tracker.rs",
+          "file": "reversible_value/managed/replay/typed_tracker.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(input.source().before()->Payload_0==previous.state());"
         }

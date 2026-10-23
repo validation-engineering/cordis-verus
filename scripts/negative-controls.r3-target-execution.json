@@ -5,7 +5,7 @@
     {
       "name": "r3-target-execution-skips-interpreter",
       "mutation": {
-        "file": "managed_replay.rs",
+        "file": "reversible_value/managed/replay.rs",
         "old": "let (owner,report)=runtime.run_recorded_root(id,execution);",
         "new": "let (owner,report)=(RecordedExecution::new(execution),Err::<RegisteredReport<E,T>,AdmissionError>(AdmissionError::NotAdmitted));"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
           "module": "reversible_value::managed::replay",
-          "file": "managed_replay.rs",
+          "file": "reversible_value/managed/replay.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(report.is_ok());"
         }
@@ -31,7 +31,7 @@
     {
       "name": "r3-target-execution-drops-source-body",
       "mutation": {
-        "file": "managed_replay.rs",
+        "file": "reversible_value/managed/replay.rs",
         "old": "Body::Managed(self.function.duplicate())",
         "new": "Body::Managed(Function::<E,T> {code:Vec::new()})"
       },
@@ -47,7 +47,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
           "module": "reversible_value::managed::replay",
-          "file": "managed_replay.rs",
+          "file": "reversible_value/managed/replay.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(recipe.payload()->Managed_0.code()==self.program().code());"
         }

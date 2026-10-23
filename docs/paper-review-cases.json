@@ -78,7 +78,7 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis/src/runtime.rs",
+          "file": "crates/cordis/src/runtime/poll.rs",
           "symbol": "poll_settle",
           "kind": "fn"
         },
@@ -123,7 +123,7 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery_all.rs",
           "symbol": "operations_from_source",
           "kind": "fn"
         },
@@ -138,12 +138,12 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/publication_cleanup.rs",
+          "file": "crates/cordis-kernel/src/publication/cleanup.rs",
           "symbol": "cleanup_batch",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/publication_cleanup.rs",
+          "file": "crates/cordis-kernel/src/publication/cleanup.rs",
           "symbol": "episode_resources_cleared",
           "kind": "fn"
         },
@@ -410,27 +410,27 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery.rs",
           "symbol": "unit_child_receipts",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery.rs",
           "symbol": "restore_unit_children",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery.rs",
           "symbol": "retained_children_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery.rs",
           "symbol": "unit_child_recovery_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/unit_child_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery.rs",
           "symbol": "unit_child_unload_domain",
           "kind": "fn"
         },
@@ -455,22 +455,22 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh.rs",
           "symbol": "unload",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh.rs",
           "symbol": "apply",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh.rs",
           "symbol": "run_script",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_bootstrap.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs",
           "symbol": "run_from_empty",
           "kind": "fn"
         },
@@ -495,27 +495,27 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs",
           "symbol": "live_receipts",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs",
           "symbol": "restore_unit_child_provisions",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs",
           "symbol": "provisions_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs",
           "symbol": "provision_recovery_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/provision_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs",
           "symbol": "provision_unload_domain",
           "kind": "fn"
         },
@@ -540,27 +540,27 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery_all.rs",
           "symbol": "live_xors",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery_all.rs",
           "symbol": "restore_all",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery_all.rs",
           "symbol": "operations_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery_all.rs",
           "symbol": "journal_recovery_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/journal_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/recovery_all.rs",
           "symbol": "journal_unload_domain",
           "kind": "fn"
         },
@@ -590,17 +590,17 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/owner_table_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/owner_recovery.rs",
           "symbol": "owner_table_recovery",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/owner_table_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/owner_recovery.rs",
           "symbol": "owner_table_recovery_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/owner_table_recovery.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/owner_recovery.rs",
           "symbol": "same_owner_table_recovery",
           "kind": "fn"
         },
@@ -630,47 +630,47 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "terminal_episode",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "foreign_replay",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "value_observation",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "value_observation_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "terminal_replay_witness",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "terminal_recovery",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "terminal_replay_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "establish_terminal_recovery",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs",
           "symbol": "terminal_replay",
           "kind": "fn"
         },
@@ -695,27 +695,27 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs",
           "symbol": "foreign_replay",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs",
           "symbol": "value_observation_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs",
           "symbol": "terminal_recovery",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs",
           "symbol": "terminal_replay_from_source",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_terminal_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs",
           "symbol": "terminal_replay",
           "kind": "fn"
         }

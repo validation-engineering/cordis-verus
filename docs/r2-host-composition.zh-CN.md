@@ -68,8 +68,8 @@
 [论文映射](paper-refinement-map.md)。
 
 可执行合同位于
-[`node_bridge.rs`](../crates/cordis-kernel/src/node_bridge.rs)、
-[`node_reads.rs`](../crates/cordis-kernel/src/node_reads.rs)、
+[`node_runtime/bridge.rs`](../crates/cordis-kernel/src/node_runtime/bridge.rs)、
+[`node_runtime/reads.rs`](../crates/cordis-kernel/src/node_runtime/reads.rs)、
 [`static_values.rs`](../crates/cordis-kernel/src/static_values.rs) 和
 [`host_context.rs`](../crates/cordis-kernel/src/host_context.rs)。生产调用者包括
 [driver bridge](../crates/cordis-driver/src/objects.rs)、

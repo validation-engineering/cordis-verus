@@ -58,9 +58,9 @@ owners or infer that equal numeric domain IDs prove object identity.
 
 | Paper connection | Review entry |
 | --- | --- |
-| Definitions 58/63, complete execution/control steps | [lifecycle_state/native/runtime/production.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/production.rs): `production_step`, `production_trace`; [node_production.rs](../crates/cordis-kernel/src/node_production.rs): the same entry points |
+| Definitions 58/63, complete execution/control steps | [lifecycle_state/native/runtime/production.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/production.rs): `production_step`, `production_trace`; [node_runtime/production.rs](../crates/cordis-kernel/src/node_runtime/production.rs): the same entry points |
 | Definition 29 / equation (31), real values and inverse domains | Existing [managed function](r2-function-semantics.md) and typed/scalar operation proofs remain attached to actual receipts; full-record classification retains their pending obligations. |
-| Begin, callback dispatch and retained references | [node_bridge_history.rs](../crates/cordis-kernel/src/node_bridge_history.rs): `step`, `object_origin`, `claim_origin`; [node_bridge.rs](../crates/cordis-kernel/src/node_bridge.rs): actual mutators and snapshot |
+| Begin, callback dispatch and retained references | [node_runtime/bridge/trace.rs](../crates/cordis-kernel/src/node_runtime/bridge/trace.rs): `step`, `object_origin`, `claim_origin`; [node_runtime/bridge.rs](../crates/cordis-kernel/src/node_runtime/bridge.rs): actual mutators and snapshot |
 | Definition 81 and group/Child elaboration | [configuration_runtime.rs](../crates/cordis-kernel/src/configuration_runtime.rs): actual allocation; [lifecycle_state/native/runtime/history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs): `insertion_origin`; [configuration_tree.rs](../crates/cordis-kernel/src/configuration_tree.rs): `elaboration` |
 | Configuration/source transaction composition | [lifecycle_state/native/runtime/configuration.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs): `production_trace`, `covered`, `source_reviewed`; [package 3](r2-configuration-semantics.md): actual data, module and source semantics |
 

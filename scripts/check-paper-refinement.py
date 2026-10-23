@@ -122,17 +122,17 @@ def validate(data, ledger, root=ROOT):
         require(len(revisions) == 3 and {r['id'] for r in revisions} == {'R1-CONTEXT', 'R1-DOMAIN', 'R1-FIELDS'},
                 'R1 requires all three explicit semantic revisions')
         required = {
-            'R1-CONTEXT': {('reified_context.rs', 'nontrivial_carrier'), ('reified_context.rs', 'reified_representation')},
-            'R1-DOMAIN': {('guarded_components.rs', 'member_is_component'), ('reified_context.rs', 'root_component'),
+            'R1-CONTEXT': {('mixed_driver/context.rs', 'nontrivial_carrier'), ('mixed_driver/context.rs', 'reified_representation')},
+            'R1-DOMAIN': {('guarded_components.rs', 'member_is_component'), ('mixed_driver/context.rs', 'root_component'),
                           ('typed_child_domain.rs', 'no_single_recovery_and_admission_relation')},
-            'R1-FIELDS': {('reified_context.rs', 'function_correspondence'), ('inspected_run.rs', 'run_inspected')},
+            'R1-FIELDS': {('mixed_driver/context.rs', 'function_correspondence'), ('mixed_driver/fresh/inspected.rs', 'run_inspected')},
         }
         for revision in revisions:
             require(bool(revision.get('decision')), 'Missing R1 revision decision')
             require(revision.get('paperItems') and all(type(n) is int and 1 <= n <= 81 for n in revision['paperItems']),
                     'Invalid R1 original-paper references')
             review = revision.get('reviewPath', [])
-            require(required[revision['id']] <= {(Path(e['file']).name, e['symbol']) for e in review},
+            require(required[revision['id']] <= {(Path(e['file']).relative_to('crates/cordis-kernel/src').as_posix(), e['symbol']) for e in review},
                     'Missing R1 semantic or executable evidence')
             for evidence in review:
                 review_evidence(evidence, root, revision['id'])

@@ -392,10 +392,10 @@ regressions pass. Whole-kernel verification, full development/R2 acceptance,
 full negative regression/calibration, Node runtime, benchmarks and release/platform
 acceptance were **not run**. Prior batch results below are historical.
 
-Review: [`native_effect.rs`](../crates/cordis-kernel/src/native_effect.rs),
-[`value_alias.rs`](../crates/cordis-kernel/src/value_alias.rs),
-[`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs),
-[`value_access.rs`](../crates/cordis-kernel/src/value_access.rs).
+Review: [`reversible_value/native_effect.rs`](../crates/cordis-kernel/src/reversible_value/native_effect.rs),
+[`reversible_value/alias.rs`](../crates/cordis-kernel/src/reversible_value/alias.rs),
+[`reversible_value/effect.rs`](../crates/cordis-kernel/src/reversible_value/effect.rs),
+[`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs).
 
 ## Multi-service native bodies and dynamic footprints
 
@@ -447,8 +447,8 @@ The new multi-service API is native-only; existing single-service APIs retain
 their static-host path. Stored single-service root bodies remain available;
 this new finite sub-body is invoked by actual ordinary callbacks.
 
-Review: [`service_program.rs`](../crates/cordis-kernel/src/service_program.rs),
-[`value_access.rs`](../crates/cordis-kernel/src/value_access.rs),
+Review: [`reversible_value/services.rs`](../crates/cordis-kernel/src/reversible_value/services.rs),
+[`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs),
 [effects](paper-refinement-map.md#effects),
 [components](paper-refinement-map.md#components). The B package advances from
 11/15 to 12/15. No canonical integration obligation is closed.
@@ -522,8 +522,8 @@ inputs and ordinary host pointer/mutex association are not proved by these calls
 Review links: [effects](paper-refinement-map.md#effects),
 [observations](paper-refinement-map.md#observations),
 [components](paper-refinement-map.md#components);
-[`value_access.rs`](../crates/cordis-kernel/src/value_access.rs),
-[`value_function.rs`](../crates/cordis-kernel/src/value_function.rs),
+[`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs),
+[`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs),
 [`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs).
 That earlier batch advanced the function-field package from 10/15 to 11/15; it closes no
 canonical integration obligation. Its historical R2 estimate was **76% (72–82%)**.
@@ -598,9 +598,9 @@ projection are now established; general function/Child interpretation, ordinary
 host pointer/mutex association, Node/configuration composition and whole-R2
 acceptance remain open. Proof counts do not determine the completion estimate.
 
-Review: [`value_references.rs`](../crates/cordis-kernel/src/value_references.rs),
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs),
-[`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs),
+Review: [`reversible_value/joint/references.rs`](../crates/cordis-kernel/src/reversible_value/joint/references.rs),
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs),
+[`reversible_value/slot.rs`](../crates/cordis-kernel/src/reversible_value/slot.rs),
 [`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)
 and [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs).
 
@@ -705,11 +705,11 @@ They cover the four managed scalar entries; raw writes, external callback side
 effects, panic/abort recovery and global termination remain outside the guarantee.
 Current batch evidence and the remaining cleanup obligations are listed below.
 
-Review: [`value_attempt.rs`](../crates/cordis-kernel/src/value_attempt.rs),
-[`value_registration.rs`](../crates/cordis-kernel/src/value_registration.rs),
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs),
-[`value_program.rs`](../crates/cordis-kernel/src/value_program.rs),
-[`value_function.rs`](../crates/cordis-kernel/src/value_function.rs).
+Review: [`reversible_value/attempt.rs`](../crates/cordis-kernel/src/reversible_value/attempt.rs),
+[`reversible_value/registration.rs`](../crates/cordis-kernel/src/reversible_value/registration.rs),
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs),
+[`reversible_value/program.rs`](../crates/cordis-kernel/src/reversible_value/program.rs),
+[`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs).
 The [mixed native episode regression](../crates/cordis-kernel/tests/registered_value_function.rs)
 combines a stored root, direct write, checked computation, cursor, foreign
 object and failed program prefix, then restores both actual objects in cleanup
@@ -887,7 +887,7 @@ acceptance were **not run**.
 
 Review: [`lifecycle_state/services.rs`](../crates/cordis-kernel/src/lifecycle_state/services.rs),
 [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs),
-[`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs),
+[`reversible_value/joint/episode/interval.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs),
 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
 
@@ -952,7 +952,7 @@ runtime and release/platform acceptance were **not run**. These are historical
 results for that batch's source; current context-batch evidence is above.
 
 Review: [`poll_control.rs`](../crates/cordis-kernel/src/poll_control.rs),
-[`control_execution.rs`](../crates/cordis-kernel/src/control_execution.rs),
+[`reversible_value/joint/control.rs`](../crates/cordis-kernel/src/reversible_value/joint/control.rs),
 [`host_status.rs`](../crates/cordis-kernel/src/host_status.rs),
 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
@@ -1023,7 +1023,7 @@ acceptance were **not run**. Earlier counts describe their original sources.
 At that batch R2 remained **75% (planning range 71–81%)**, with no additional work package closed.
 
 Review: [`host_status.rs`](../crates/cordis-kernel/src/host_status.rs),
-[`host_execution.rs`](../crates/cordis-kernel/src/host_execution.rs),
+[`reversible_value/joint/host.rs`](../crates/cordis-kernel/src/reversible_value/joint/host.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs),
 [`static_host.rs`](../crates/cordis/src/runtime/static_host.rs).
 
@@ -1079,10 +1079,10 @@ and general paper-step grouping remain open. This does not establish scheduler
 fairness. At that batch the engineering estimate stayed at **75% (71–81%)** because the remaining
 R2 packages have not closed.
 
-Review: [`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs),
+Review: [`reversible_value/slot.rs`](../crates/cordis-kernel/src/reversible_value/slot.rs),
 [`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs),
 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs).
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs).
 
 ## Native publication and complete typed history
 
@@ -1148,7 +1148,7 @@ configuration transactions and general paper-step grouping remain separate
 obligations. Finish/Unload preconditions still come from their existing checked
 execution protocol; the new read checkpoint is not a new global drain protocol.
 
-Review: [`native_execution.rs`](../crates/cordis-kernel/src/native_execution.rs),
+Review: [`reversible_value/joint/native.rs`](../crates/cordis-kernel/src/reversible_value/joint/native.rs),
 [`lifecycle_state/native/runtime/history.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs),
 [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs),
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs).
@@ -1200,9 +1200,9 @@ seal. It makes no performance claim. Native publication/owner history now joins
 this map as described above; remaining work includes shared host flags, general
 callback/footprint interpretation, Node and configuration composition.
 
-Review: [`group_execution.rs`](../crates/cordis-kernel/src/group_execution.rs),
+Review: [`reversible_value/joint/groups.rs`](../crates/cordis-kernel/src/reversible_value/joint/groups.rs),
 [`cleanup_groups.rs`](../crates/cordis-kernel/src/cleanup_groups.rs),
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs),
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs),
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs).
 
 ## Issued responsibility at every intervening state
@@ -1252,11 +1252,11 @@ canonical mutation/diagnostic anchors passed preflight. Those negative records
 are not reused as current-source evidence after membership changes. Whole-kernel, full
 negative-regression, R2 integration and release acceptance were not run.
 
-Review: [`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs),
-[`value_restoration.rs`](../crates/cordis-kernel/src/value_restoration.rs),
+Review: [`reversible_value/joint/episode/interval.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs),
+[`reversible_value/restoration.rs`](../crates/cordis-kernel/src/reversible_value/restoration.rs),
 [`cleanup_queue/completion.rs`](../crates/cordis-kernel/src/cleanup_queue/completion.rs),
 [`cleanup_journal.rs`](../crates/cordis-kernel/src/cleanup_journal.rs),
-[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs).
+[`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs).
 
 ## Work and cleanup in the same trajectory
 
@@ -1291,7 +1291,7 @@ proved single paper step under every concurrent observation. The map retains
 historical records after removal and does not prove physical resource release.
 Snapshots do not prove arbitrary callbacks terminate or scheduling is fair.
 
-Review: [`episode_execution.rs`](../crates/cordis-kernel/src/episode_execution.rs),
+Review: [`reversible_value/joint/episode.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode.rs),
 [`setup_work.rs`](../crates/cordis-kernel/src/setup_work.rs),
 [`cleanup_queue.rs`](../crates/cordis-kernel/src/cleanup_queue.rs),
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs).
@@ -1391,9 +1391,9 @@ Throughput, contention, scheduler fairness and termination are not established
 by this proof batch. Selected checks are not whole-kernel, whole-R2 or release
 acceptance.
 
-Review: [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)
+Review: [`reversible_value/joint.rs`](../crates/cordis-kernel/src/reversible_value/joint.rs)
 → [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)
-→ [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)
+→ [`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs)
 → `Plugin::native_value_program` / `Runtime::reversible_value` in
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
 
@@ -1455,9 +1455,9 @@ The aliasing gap exposed by this probe is addressed by the typed slot/object
 connection below. The single-port scalar theorem remains only that projection;
 it is not a full-observation frame theorem for aliased ports.
 
-Review: [`shared_value_history.rs`](../crates/cordis-kernel/src/shared_value_history.rs)
+Review: [`reversible_value/history.rs`](../crates/cordis-kernel/src/reversible_value/history.rs)
 → `Snapshot::extends` / `ReversibleValue::snapshot_after` →
-[`value_cursor.rs`](../crates/cordis-kernel/src/value_cursor.rs) →
+[`reversible_value/cursor.rs`](../crates/cordis-kernel/src/reversible_value/cursor.rs) →
 `AsyncSetup::{start_value_program, advance_value_program}` →
 [`interleaved_program.rs`](../crates/cordis/examples/interleaved_program.rs).
 The canonical negative controls remove owner authentication, skip the stored
@@ -1493,7 +1493,7 @@ Ordinary reads, dynamic `ServiceHandle` replacement and static typed slots all
 use these checked stores. User predicates and arbitrary payload destructors run
 outside their storage locks; replacing a payload returns the displaced Arc.
 
-`value_heap.rs` separates port selections from allocation-keyed heap values.
+`reversible_value/heap.rs` separates port selections from allocation-keyed heap values.
 Its interpretation is derived from a certified production snapshot, with the
 allocation identity supplied by that snapshot. A write or restoration affects
 every port selecting that object and frames the other objects. Slot replacement
@@ -1522,16 +1522,16 @@ the wrong realm. Selected development probes require a fresh positive, a
 compiling mutant and rejection at the named contract; full regression and
 whole-R2 acceptance are separate.
 
-Review: [`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs)
+Review: [`reversible_value/slot.rs`](../crates/cordis-kernel/src/reversible_value/slot.rs)
 → `NativeEpisode::read_reversible` → `Execution::begin_native_value_program`
-in [`value_cursor.rs`](../crates/cordis-kernel/src/value_cursor.rs)
-→ [`value_heap.rs`](../crates/cordis-kernel/src/value_heap.rs)
+in [`reversible_value/cursor.rs`](../crates/cordis-kernel/src/reversible_value/cursor.rs)
+→ [`reversible_value/heap.rs`](../crates/cordis-kernel/src/reversible_value/heap.rs)
 → [`interleaved_program.rs`](../crates/cordis/examples/interleaved_program.rs).
 
 ## Node admission through retained cleanup resources
 
 The real `Driver::ready` and `NodeDriver::begin_checked` now call
-[`node_admission.rs`](../crates/cordis-kernel/src/node_admission.rs). The checked
+[`availability/admission.rs`](../crates/cordis-kernel/src/availability/admission.rs). The checked
 operation reads the actual lifecycle target, provider generations, publication
 identities and accepted check cache. Its readiness contract is an equivalence;
 it cannot satisfy the contract by always reporting unavailable. Begin also has
@@ -1756,7 +1756,7 @@ reenter the host.
 
 ## Relation to the paper
 
-`publication_projection.rs` interprets the actual store as a key/value lookup
+`publication/values/projection.rs` interprets the actual store as a key/value lookup
 table. `publish`, `replace` and `revoke` call its proofs in their own bodies:
 
 - Publication inserts the supplied value at a previously absent visible key.
@@ -2267,10 +2267,10 @@ The older table theorem interprets a chosen scalar at one key. `value_alias` now
 provides the actual alias-aware projection and the conditional single-key lift;
 the whole callback and multi-call context interpretation remains open.
 
-Review path: [`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs)
+Review path: [`reversible_value/effect.rs`](../crates/cordis-kernel/src/reversible_value/effect.rs)
 (`ScalarEffect`, `primitive_theory`, `prepare_effect`, `apply_prepared_effect`,
 `forward_interpretation`, `terminal_component`) →
-[`runtime.rs`](../crates/cordis/src/runtime.rs) (`update_reversible_with`).
+[`runtime/setup.rs`](../crates/cordis/src/runtime/setup.rs) (`update_reversible_with`).
 See the [unreleased API usage](rust-api.md#extensible-reversible-values-unreleased).
 Both native and static setup use this entry. Ordinary Rust implementations do
 not inherit a proof merely by implementing the trait; their model law must be
@@ -2316,7 +2316,7 @@ every later object state. JavaScript object contents, predicate truth and wire
 translation still need their separate host contracts.
 
 Review: [`versioned_value.rs`](../crates/cordis-kernel/src/versioned_value.rs),
-[`publication_values.rs`](../crates/cordis-kernel/src/publication_values.rs),
+[`publication/values.rs`](../crates/cordis-kernel/src/publication/values.rs),
 [`availability.rs`](../crates/cordis-kernel/src/availability.rs) →
 [`Driver adapter`](../crates/cordis-driver/src/availability.rs),
 [`Runtime slot`](../crates/cordis/src/runtime.rs).
@@ -2669,10 +2669,10 @@ and `unique_settlement` excludes a second consumption. Failed function returns
 retain this guarantee for their successful prefix. Other writers may still have
 pending obligations; registration is not eventual inverse execution or success.
 
-Review [joint_classification.rs](../crates/cordis-kernel/src/joint_classification.rs),
-[the Journal producer](../crates/cordis-kernel/src/joint_execution.rs),
+Review [reversible_value/joint/classification.rs](../crates/cordis-kernel/src/reversible_value/joint/classification.rs),
+[the Journal producer](../crates/cordis-kernel/src/reversible_value/joint.rs),
 [the native return producer](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) and
-[Value](../crates/cordis-kernel/src/value_function.rs)/[Service](../crates/cordis-kernel/src/service_function.rs)
+[Value](../crates/cordis-kernel/src/reversible_value/function.rs)/[Service](../crates/cordis-kernel/src/reversible_value/service_function.rs)
 reports. `classify_step` composes separate value, owner, framing, rejection and
 inverse-origin lemmas; it uses the existing solver limits.
 
@@ -2703,7 +2703,7 @@ negative definitions are unchanged.
 ## Shared typed payloads in the actual execution
 
 The native host now stores non-scalar services in
-[`SharedPayload<T>`](../crates/cordis-kernel/src/shared_payload.rs), including its
+[`SharedPayload<T>`](../crates/cordis-kernel/src/reversible_value/payload.rs), including its
 actual `Arc<dyn Any + Send + Sync>` payload. This replaces the ordinary host
 `Mutex<VersionedValue<Value>>`. The checked owner holds the real payload, version,
 private lock, authoritative typed history and Journal member; the history and
@@ -2769,8 +2769,8 @@ open. The three partial R2 items and original exit criteria stay unchanged.
 
 Review: actual [`runtime.rs`](../crates/cordis/src/runtime.rs) storage and factories
 → [`Execution::new_payload`](../crates/cordis-kernel/src/execution.rs)
-→ [`shared_payload.rs`](../crates/cordis-kernel/src/shared_payload.rs)
-→ [`payload_execution.rs`](../crates/cordis-kernel/src/payload_execution.rs)
+→ [`reversible_value/payload.rs`](../crates/cordis-kernel/src/reversible_value/payload.rs)
+→ [`reversible_value/joint/payload.rs`](../crates/cordis-kernel/src/reversible_value/joint/payload.rs)
 → combined service projections and Runtime checkpoints above.
 
 The final source passed **955 scoped Verus checks, zero errors**, full kernel
@@ -2839,8 +2839,8 @@ include both new mutation kinds. Rejected restoration preserves the payload;
 it does not fabricate a successful write or inverse.
 
 The paper review path is Definition 29/equation (31) →
-[`operation`, `primitive_law`, `Inverse::interpretation` and `roundtrip`](../crates/cordis-kernel/src/payload_inverse.rs)
-→ [`apply_native_payload`, `apply_payload` and `dispatch_payload_cleanup`](../crates/cordis-kernel/src/payload_cleanup.rs)
+[`operation`, `primitive_law`, `Inverse::interpretation` and `roundtrip`](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs)
+→ [`apply_native_payload`, `apply_payload` and `dispatch_payload_cleanup`](../crates/cordis-kernel/src/cleanup_groups/payload.rs)
 → the actual host API in [runtime.rs](../crates/cordis/src/runtime.rs).
 The operation law covers every input in the typed semantic carrier. The fresh
 head selected by the real owner is an explicit operation argument. `roundtrip`
@@ -2907,12 +2907,12 @@ extension, including a retry with a fresh attempt number. Foreign Journals remai
 separate; there is no inferred cross-domain total order.
 
 Review the actual read/restore in
-[`payload_attempt.rs`](../crates/cordis-kernel/src/payload_attempt.rs) and
-[`payload_inverse.rs`](../crates/cordis-kernel/src/payload_inverse.rs), the queue
-composition in [`payload_cleanup.rs`](../crates/cordis-kernel/src/payload_cleanup.rs),
+[`reversible_value/payload/restoration/attempt.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs) and
+[`reversible_value/payload/restoration.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs), the queue
+composition in [`cleanup_groups/payload.rs`](../crates/cordis-kernel/src/cleanup_groups/payload.rs),
 and the interval/extension theorems in
-[`payload_restoration.rs`](../crates/cordis-kernel/src/payload_restoration.rs) and
-[`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs).
+[`reversible_value/payload/restoration/attempt/protocol.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs) and
+[`reversible_value/joint/episode/interval.rs`](../crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs).
 This connects the concrete inverse law of Definition 29/equation (31) to actual
 cleanup execution and the existing control projection of Definitions 58/63.
 It closes this typed protocol interval; it does not prove arbitrary callbacks,

@@ -36,8 +36,8 @@ Inactive。外部调用在目标状态上重新解释，其逆操作票据映射
 
 | 审查环节 | 源码 |
 | --- | --- |
-| 实际脚本见证及建立路径 | [episode_replay.rs](../crates/cordis-kernel/src/episode_replay.rs) |
-| 来源守卫、目标构造及报告查询 | [script_deletion.rs](../crates/cordis-kernel/src/script_deletion.rs) |
+| 实际脚本见证及建立路径 | [mixed_driver/episode_replay.rs](../crates/cordis-kernel/src/mixed_driver/episode_replay.rs) |
+| 来源守卫、目标构造及报告查询 | [mixed_driver/deletion.rs](../crates/cordis-kernel/src/mixed_driver/deletion.rs) |
 | 实际 Xor 库的严格接口 | [xor_recovery_algebra.rs](../crates/cordis-kernel/src/xor_recovery_algebra.rs)：`strict_interface` |
 | 合法转换及逆操作映射 | [foreign_child_deletion.rs](../crates/cordis-kernel/src/foreign_child_deletion.rs)：`closed_deletion` |
 

@@ -46,10 +46,10 @@ let capture = runtime.publication_snapshot()
 ## 审查路径与剩余边界
 
 - [lifecycle_state/native/runtime/history/deletion/joint.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/joint.rs)：真实快照、来源阻断、native 转换及终点。
-- [joint_erasure.rs](../crates/cordis-kernel/src/joint_erasure.rs)：压缩位置、pending 守恒、逆操作来源与唯一消费。
-- [joint_erasure_reads.rs](../crates/cordis-kernel/src/joint_erasure_reads.rs)：实际守卫所需的准确读取。
-- [joint_erasure_client.rs](../crates/cordis-kernel/src/joint_erasure_client.rs)：非空来源与剩余执行。
-- [managed_deletion_capture.rs](../crates/cordis-kernel/src/managed_deletion_capture.rs)：同切点 value／Child 组合。
+- [reversible_value/joint/erasure.rs](../crates/cordis-kernel/src/reversible_value/joint/erasure.rs)：压缩位置、pending 守恒、逆操作来源与唯一消费。
+- [reversible_value/joint/erasure/reads.rs](../crates/cordis-kernel/src/reversible_value/joint/erasure/reads.rs)：实际守卫所需的准确读取。
+- [reversible_value/joint/erasure/client.rs](../crates/cordis-kernel/src/reversible_value/joint/erasure/client.rs)：非空来源与剩余执行。
+- [reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs)：同切点 value／Child 组合。
 
 Journal 分配 key 是擦除的证明身份；真实注册表 ID、Kernel generation、action ticket、work domain 和不透明 payload 身份需要各自的转换合同。[Native 控制重放](r3-control-replay.zh-CN.md)现已通过原 Kernel 实际调用完成注册表 ID 压缩与 generation 重新生成，但尚未执行这里的完整 Journal 关系。两者的组合仍需完整生产者解释、typed inverse payload 来源和引用／票据转换。准确前态／读检查会保守拒绝部分可恢复的共享写入和带版本变化的 payload／槽位路径。完整堆恢复、Mixed／Fresh 按 Episode 重放、异步 landing 转换及 Node 独立协议恢复仍待推进。同一切点组合多个证书并未消除这些义务。
 

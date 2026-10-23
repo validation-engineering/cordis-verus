@@ -68,11 +68,11 @@ and legal surviving execution construction remain open.
 
 ## Review and validation
 
-- [managed_lifecycle_observer.rs](../crates/cordis-kernel/src/managed_lifecycle_observer.rs): executable observed calls/dispatches and receipt joins.
-- [managed_lifecycle_function.rs](../crates/cordis-kernel/src/managed_lifecycle_function.rs): source ownership from the actual returned prefix.
-- [managed_foreign_closure.rs](../crates/cordis-kernel/src/managed_foreign_closure.rs): observation preservation, terminal-slot restoration and closure over recorded owners.
-- [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs): the composed recovery entry.
-- [managed_function.rs](../crates/cordis-kernel/tests/managed_function.rs): `observed_foreign_owner_restores_failed_prefix_before_native_retry` exercises two actual owners, a failed call prefix, same-value typed interference, rejected release, foreign cleanup and native retry.
+- [reversible_value/managed/interleaving/history/lifecycle/observer.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/observer.rs): executable observed calls/dispatches and receipt joins.
+- [reversible_value/managed/interleaving/history/lifecycle/function.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs): source ownership from the actual returned prefix.
+- [reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs): observation preservation, terminal-slot restoration and closure over recorded owners.
+- [reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs): the composed recovery entry.
+- [reversible_value/managed.rs](../crates/cordis-kernel/tests/managed_function.rs): `observed_foreign_owner_restores_failed_prefix_before_native_retry` exercises two actual owners, a failed call prefix, same-value typed interference, rejected release, foreign cleanup and native retry.
 
 Current scoped results and reproduction commands are in the [interleaved recovery
 guide](r3-interleaved-recovery.md#review-and-validation). The runtime case does not

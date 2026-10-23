@@ -21,12 +21,12 @@
 
 | 连接 | 实际实现与保证 |
 | --- | --- |
-| 对象与首次输入 | [Bank](../crates/cordis-kernel/src/managed_replay_bank.rs) 核对实际出生／输入记录，构造物理分配单射。[Projection](../crates/cordis-kernel/src/closed_objects.rs) 覆盖完整声明表；未访问但带有不支持逆操作债务的对象会被拒绝。 |
-| 混合 root／Child 函数体 | [Session](../crates/cordis-kernel/src/managed_replay_session.rs) 获取原有锁、检查保留源输入、预留修订号空间，再运行[原解释器](../crates/cordis-kernel/src/managed_function.rs)。成功报告建立标量值／深度和 typed 值／head／深度对应。 |
-| 跨调用历史 | [Archive](../crates/cordis-kernel/src/managed_replay_archive.rs) 保留历史检查点并单调扩展 head 映射。真实清理可以恢复旧 head，同时递增防旧回复修订号；后续调用先检查该状态。后续函数没有访问的已退休 payload 不阻止该函数执行。 |
-| 槽位与别名 | [操作数槽位](../crates/cordis-kernel/src/managed_replay_slots.rs)及[声明槽位](../crates/cordis-kernel/src/closed_slots.rs) 区分槽身份和对象身份。同一源槽的别名共享目标槽，选择同一对象的不同槽仍独立。替换使用真实 CAS，并保留历史版本映射。 |
-| 发布 | [Finalization](../crates/cordis-kernel/src/managed_replay_finalization.rs) 将 root 后的自有服务绑定到实际成功 Finish。同一源 provider 的服务共用一个目标清理 owner；早期／后期 provide 保留原阶段，Finish 重试保留已安装前缀。 |
-| 插件身份 | [Fiber 记录](../crates/cordis-kernel/src/managed_replay_fibers.rs) 用实际调用收据关联源／目标 ID。同一源插件后续启动复用目标登记，并取得新的 Episode 票据。封闭包装层根据先前映射调用检查实际源父节点，拒绝未知或不同父节点。 |
+| 对象与首次输入 | [Bank](../crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs) 核对实际出生／输入记录，构造物理分配单射。[Projection](../crates/cordis-kernel/src/reversible_value/closed/objects.rs) 覆盖完整声明表；未访问但带有不支持逆操作债务的对象会被拒绝。 |
+| 混合 root／Child 函数体 | [Session](../crates/cordis-kernel/src/reversible_value/managed/replay/session.rs) 获取原有锁、检查保留源输入、预留修订号空间，再运行[原解释器](../crates/cordis-kernel/src/reversible_value/managed.rs)。成功报告建立标量值／深度和 typed 值／head／深度对应。 |
+| 跨调用历史 | [Archive](../crates/cordis-kernel/src/reversible_value/managed/replay/archive.rs) 保留历史检查点并单调扩展 head 映射。真实清理可以恢复旧 head，同时递增防旧回复修订号；后续调用先检查该状态。后续函数没有访问的已退休 payload 不阻止该函数执行。 |
+| 槽位与别名 | [操作数槽位](../crates/cordis-kernel/src/reversible_value/managed/replay/slots.rs)及[声明槽位](../crates/cordis-kernel/src/reversible_value/closed/slots.rs) 区分槽身份和对象身份。同一源槽的别名共享目标槽，选择同一对象的不同槽仍独立。替换使用真实 CAS，并保留历史版本映射。 |
+| 发布 | [Finalization](../crates/cordis-kernel/src/reversible_value/managed/replay/finalization.rs) 将 root 后的自有服务绑定到实际成功 Finish。同一源 provider 的服务共用一个目标清理 owner；早期／后期 provide 保留原阶段，Finish 重试保留已安装前缀。 |
+| 插件身份 | [Fiber 记录](../crates/cordis-kernel/src/reversible_value/closed/replay/fibers.rs) 用实际调用收据关联源／目标 ID。同一源插件后续启动复用目标登记，并取得新的 Episode 票据。封闭包装层根据先前映射调用检查实际源父节点，拒绝未知或不同父节点。 |
 | 清理与重试 | 原生协议保留依赖、逆操作 owner 及失败尝试。root 后声明同步失败时，`Error::After` 保留真实报告和清理 owner；完成或重试 Finish 保持报告对应关系。 |
 
 首次观察按真实调用顺序选择，不受输入 `Vec` 顺序影响。已声明但未访问的槽也被纳入。同一次声明捕获中，同一槽的观察互相矛盾时明确拒绝；身份分配耗尽、旧目标版本及不支持的源历史也明确失败。
@@ -35,7 +35,7 @@
 
 ## 面向论文的函数证据
 
-[`paper_contract`](../crates/cordis-kernel/src/closed_contract.rs) 从实际源程序、目标报告、对象投影和保留逆操作字构造证据，不接收替代程序或预期结果。
+[`paper_contract`](../crates/cordis-kernel/src/reversible_value/closed/contract.rs) 从实际源程序、目标报告、对象投影和保留逆操作字构造证据，不接收替代程序或预期结果。
 
 - `functions` 在任意成对测试输入上关联 root／当前续体调用。绑定是输入上下文的一部分；未来 typed head 从准入时钟生成，并扩展已有历史映射。
 - `inverses` 关联真实标量／typed 逆操作字的严格定义域及结果，包含对象缺失和当前状态不匹配。

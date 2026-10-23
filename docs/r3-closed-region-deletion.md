@@ -202,21 +202,21 @@ all records match, and the final service value remains `8`.
 | Obligation | Code |
 | --- | --- |
 | Source closure, primitive footprints, actual inverse transport | [closed_region_deletion.rs](../crates/cordis-kernel/src/closed_region_deletion.rs): `closed`, `local`, `run`, `restore` |
-| Complete lifecycle step transport | [closed_region_execution.rs](../crates/cordis-kernel/src/closed_region_execution.rs): `step` |
-| Constructed execution and closing observation | [closed_region_trace.rs](../crates/cordis-kernel/src/closed_region_trace.rs): `from_source`, `closing_observation` |
-| Actual Fresh choices and trace construction | [closed_region_fresh.rs](../crates/cordis-kernel/src/closed_region_fresh.rs), [closed_region_fresh_trace.rs](../crates/cordis-kernel/src/closed_region_fresh_trace.rs) |
-| Actual Mixed / Fresh report queries | [script_deletion.rs](../crates/cordis-kernel/src/script_deletion.rs), [fresh_region_deletion.rs](../crates/cordis-kernel/src/fresh_region_deletion.rs): `delete_closed_region` |
-| Actual allocator history and Insert payloads | [fresh_allocation_history.rs](../crates/cordis-kernel/src/fresh_allocation_history.rs), [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs): `run_script` |
-| Executable name map and command preparation | [allocation_names.rs](../crates/cordis-kernel/src/allocation_names.rs): `pair`; [fresh_compaction.rs](../crates/cordis-kernel/src/fresh_compaction.rs): `compact`, `commands` |
-| Source-derived origins and plan execution | [fresh_compaction_origins.rs](../crates/cordis-kernel/src/fresh_compaction_origins.rs): `from_region`; [fresh_compaction_source.rs](../crates/cordis-kernel/src/fresh_compaction_source.rs): `source_execution` |
-| Exact real dispatcher and quiescent journals | [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs): `apply`, `run_script`; [fresh_dispatch.rs](../crates/cordis-kernel/src/fresh_dispatch.rs): `command_enabled` |
-| Source call to executable admission | [fresh_dispatch_source.rs](../crates/cordis-kernel/src/fresh_dispatch_source.rs): `source_command_admission`; [fresh_dispatch_step.rs](../crates/cordis-kernel/src/fresh_dispatch_step.rs) |
-| Actual runtime shape and compaction preservation | [fresh_execution_shape.rs](../crates/cordis-kernel/src/fresh_execution_shape.rs): `source_runtime_shape`, `deleted_trace`, `renamed_trace` |
-| Exact successors and synchronous branch transport | [fresh_dispatch_exact.rs](../crates/cordis-kernel/src/fresh_dispatch_exact.rs): `unique`, `exact_successor`; [fresh_synchronous_transport.rs](../crates/cordis-kernel/src/fresh_synchronous_transport.rs) |
-| Actual finite-machine metadata | [lib.rs](../crates/cordis-kernel/src/lib.rs): `synchronous_metadata`; [fresh_runtime_metadata.rs](../crates/cordis-kernel/src/fresh_runtime_metadata.rs): `metadata_progress`, `metadata_admission` |
-| Whole real-script completeness and plan result | [fresh_script_completeness.rs](../crates/cordis-kernel/src/fresh_script_completeness.rs): `source_call_at`, `unique_path`, `replays`; [fresh_compaction_source.rs](../crates/cordis-kernel/src/fresh_compaction_source.rs): `replay_result` |
-| Executable replay regression | [fresh_compaction.rs](../crates/cordis-kernel/tests/fresh_compaction.rs) |
-| Nonempty client and rejected incomplete regions | [closed_region_example.rs](../crates/cordis-kernel/src/closed_region_example.rs): `nonempty`, `source_guards` |
+| Complete lifecycle step transport | [closed_region_deletion/execution.rs](../crates/cordis-kernel/src/closed_region_deletion/execution.rs): `step` |
+| Constructed execution and closing observation | [closed_region_deletion/trace.rs](../crates/cordis-kernel/src/closed_region_deletion/trace.rs): `from_source`, `closing_observation` |
+| Actual Fresh choices and trace construction | [closed_region_deletion/fresh.rs](../crates/cordis-kernel/src/closed_region_deletion/fresh.rs), [closed_region_deletion/fresh_trace.rs](../crates/cordis-kernel/src/closed_region_deletion/fresh_trace.rs) |
+| Actual Mixed / Fresh report queries | [mixed_driver/deletion.rs](../crates/cordis-kernel/src/mixed_driver/deletion.rs), [mixed_driver/fresh/deletion.rs](../crates/cordis-kernel/src/mixed_driver/fresh/deletion.rs): `delete_closed_region` |
+| Actual allocator history and Insert payloads | [mixed_driver/fresh/allocation.rs](../crates/cordis-kernel/src/mixed_driver/fresh/allocation.rs), [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs): `run_script` |
+| Executable name map and command preparation | [mixed_driver/fresh/names.rs](../crates/cordis-kernel/src/mixed_driver/fresh/names.rs): `pair`; [mixed_driver/fresh/compaction.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs): `compact`, `commands` |
+| Source-derived origins and plan execution | [mixed_driver/fresh/compaction/execution_origins.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction/execution_origins.rs): `from_region`; [mixed_driver/fresh/compaction/source.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction/source.rs): `source_execution` |
+| Exact real dispatcher and quiescent journals | [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs): `apply`, `run_script`; [mixed_driver/fresh/dispatch.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch.rs): `command_enabled` |
+| Source call to executable admission | [mixed_driver/fresh/dispatch/source.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/source.rs): `source_command_admission`; [mixed_driver/fresh/dispatch/forward.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/forward.rs) |
+| Actual runtime shape and compaction preservation | [mixed_driver/fresh/dispatch/shape.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/shape.rs): `source_runtime_shape`, `deleted_trace`, `renamed_trace` |
+| Exact successors and synchronous branch transport | [mixed_driver/fresh/dispatch/exact.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/exact.rs): `unique`, `exact_successor`; [mixed_driver/fresh/dispatch/exact/transport.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/exact/transport.rs) |
+| Actual finite-machine metadata | [lib.rs](../crates/cordis-kernel/src/lib.rs): `synchronous_metadata`; [mixed_driver/fresh/dispatch/metadata.rs](../crates/cordis-kernel/src/mixed_driver/fresh/dispatch/metadata.rs): `metadata_progress`, `metadata_admission` |
+| Whole real-script completeness and plan result | [mixed_driver/fresh/replay.rs](../crates/cordis-kernel/src/mixed_driver/fresh/replay.rs): `source_call_at`, `unique_path`, `replays`; [mixed_driver/fresh/compaction/source.rs](../crates/cordis-kernel/src/mixed_driver/fresh/compaction/source.rs): `replay_result` |
+| Executable replay regression | [mixed_driver/fresh/compaction.rs](../crates/cordis-kernel/tests/fresh_compaction.rs) |
+| Nonempty client and rejected incomplete regions | [closed_region_deletion/example.rs](../crates/cordis-kernel/src/closed_region_deletion/example.rs): `nonempty`, `source_guards` |
 
 This is an admitted constructive case relevant to Lemma 79. The existing
 single-episode value theorem remains the Equation (55)/(56) result. Deleting a

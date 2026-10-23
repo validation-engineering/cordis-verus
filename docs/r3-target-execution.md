@@ -127,11 +127,11 @@ always returns its real cleanup owner.
 
 | Obligation | Executable/proof path |
 | --- | --- |
-| Actual retained body and source receipt | `managed_replay.rs`: `run_replayable_root`, `Source::wf` |
+| Actual retained body and source receipt | `reversible_value/managed/replay.rs`: `run_replayable_root`, `Source::wf` |
 | Same complete source cut | `Source::bind_control`, `lifecycle_state/native/runtime.rs`: `publication_snapshot_following` |
 | Fresh target work really enters the interpreter | `registered_root_ready`, `root_ready`, `managed_invocation_ready`, `Source::instantiate` |
-| Captured operands and fresh resource initialization | `managed_replay.rs`: `Source::seed_input`; `managed_replay_inputs.rs`: `capture`, `captured`, `initializes`, `seeded_operation` |
-| Actual scalar/payload step transport | `managed_replay_transport.rs`: `derive`, `paired`, `TargetRun::pair_step` |
+| Captured operands and fresh resource initialization | `reversible_value/managed/replay.rs`: `Source::seed_input`; `reversible_value/managed/replay/inputs.rs`: `capture`, `captured`, `initializes`, `seeded_operation` |
+| Actual scalar/payload step transport | `reversible_value/managed/replay/transport.rs`: `derive`, `paired`, `TargetRun::pair_step` |
 | Target inverses and recovery | Returned `RecordedExecution`, `capture_release_census` |
 
 The runtime cases cover source removal, shifted target IDs, separate resources,

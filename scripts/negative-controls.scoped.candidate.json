@@ -5,7 +5,7 @@
     {
       "name": "r2-node-profile-reopens",
       "mutation": {
-        "file": "node_policy.rs",
+        "file": "node_runtime/policy.rs",
         "old": "if self.policy.configured {Err(PolicyError::ProfileFrozen)}",
         "new": "if false {Err(PolicyError::ProfileFrozen)}"
       },
@@ -20,7 +20,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::configure_profile",
           "module": "node_runtime::policy",
-          "file": "node_policy.rs",
+          "file": "node_runtime/policy.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures final(self).wf(),out==if old(self).observation().policy.configured {Err(PolicyError::ProfileFrozen)} else {Ok(())},"
         }
@@ -30,7 +30,7 @@
     {
       "name": "r2-node-mount-ignores-parent",
       "mutation": {
-        "file": "node_policy.rs",
+        "file": "node_runtime/policy.rs",
         "old": "Some(id) if !self.control.kernel().contains(id) || self.control.kernel().retired(id) || self.control.kernel().phase(id)==Some(Phase::Unloading)=>Err(PolicyError::ParentClosed),",
         "new": "Some(_id) if false=>Err(PolicyError::ParentClosed),"
       },
@@ -45,7 +45,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::gate",
           "module": "node_runtime::policy",
-          "file": "node_policy.rs",
+          "file": "node_runtime/policy.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "self.record(before,Event::Gate {gate,out});"
         }
@@ -55,7 +55,7 @@
     {
       "name": "r2-node-notify-clears-cleanup-failure",
       "mutation": {
-        "file": "node_policy.rs",
+        "file": "node_runtime/policy.rs",
         "old": "!e.cleanup_failed && intersects(interface.dependencies.as_slice(),ports)",
         "new": "intersects(interface.dependencies.as_slice(),ports)"
       },
@@ -70,7 +70,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::retry_notified",
           "module": "node_runtime::policy",
-          "file": "node_policy.rs",
+          "file": "node_runtime/policy.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(should_retry==selected(before,*id,ports@));"
         }
@@ -80,7 +80,7 @@
     {
       "name": "r2-node-read-wrong-payload",
       "mutation": {
-        "file": "node_reads.rs",
+        "file": "node_runtime/reads.rs",
         "old": "Read {publication:id,owner:entry.owner,value:*value,revision,source}",
         "new": "Read {publication:id,owner:entry.owner,value:*value ^ 1,revision,source}"
       },
@@ -95,7 +95,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::read_value",
           "module": "node_runtime::reads",
-          "file": "node_reads.rs",
+          "file": "node_runtime/reads.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures valid_read(self.observation(),out),out==materialized(self.observation(),id,source),"
         }
@@ -105,7 +105,7 @@
     {
       "name": "r2-node-read-ignores-generation",
       "mutation": {
-        "file": "node_reads.rs",
+        "file": "node_runtime/reads.rs",
         "old": "if self.control.kernel().episode_generation(id)!=Some(generation) {return Err(ReadError::Stale);}",
         "new": "if false {return Err(ReadError::Stale);}"
       },
@@ -120,7 +120,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::lookup",
           "module": "node_runtime::reads",
-          "file": "node_reads.rs",
+          "file": "node_runtime/reads.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.control.control().generation_of(id)==Some(generation));"
         }
@@ -130,7 +130,7 @@
     {
       "name": "r2-node-read-bypasses-commit",
       "mutation": {
-        "file": "node_reads.rs",
+        "file": "node_runtime/reads.rs",
         "old": "if let Some(index)=self.bound_index(id,port) {",
         "new": "if let Some(index)=None::<usize> {"
       },
@@ -145,7 +145,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::lookup",
           "module": "node_runtime::reads",
-          "file": "node_reads.rs",
+          "file": "node_runtime/reads.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(first_binding(bindings(self.observation(),id),port).is_none());"
         }
@@ -155,7 +155,7 @@
     {
       "name": "r2-node-drain-retained-handle",
       "mutation": {
-        "file": "node_handles.rs",
+        "file": "node_runtime/handles.rs",
         "old": "if !self.store.contains_handle(value) {out.push(value);}",
         "new": "if true {out.push(value);}"
       },
@@ -170,7 +170,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::drain_released",
           "module": "node_runtime::handles",
-          "file": "node_handles.rs",
+          "file": "node_runtime/handles.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "out@==pending@.take(i as int).filter(unheld(before.store))"
         }
@@ -180,7 +180,7 @@
     {
       "name": "r2-node-release-wrong-candidate",
       "mutation": {
-        "file": "node_handles.rs",
+        "file": "node_runtime/handles.rs",
         "old": "self.released.push(items[i].value);",
         "new": "self.released.push(items[i].value ^ 1);"
       },
@@ -195,7 +195,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::queue_released",
           "module": "node_runtime::handles",
-          "file": "node_handles.rs",
+          "file": "node_runtime/handles.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "self.observation()==(Observation {released:before.released+values(items@.take(i as int)),..before})"
         }
@@ -281,7 +281,7 @@
     {
       "name": "r2-node-path-truncates-ancestors",
       "mutation": {
-        "file": "node_scope_path.rs",
+        "file": "node_runtime/paths.rs",
         "old": "while i<parent.handles.len()",
         "new": "while i<parent.handles.len() && i==0"
       },
@@ -296,7 +296,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::begin_invocation",
           "module": "node_runtime::paths",
-          "file": "node_scope_path.rs",
+          "file": "node_runtime/paths.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "proof {assert(handles@==ancestors(parent));}"
         }
@@ -306,7 +306,7 @@
     {
       "name": "r2-node-path-waits-only-own",
       "mutation": {
-        "file": "node_scope_path.rs",
+        "file": "node_runtime/paths.rs",
         "old": "let ghost prior=*self;let out=self.check_scope_wait(path.handles.as_slice(),target);",
         "new": "let ghost prior=*self;let own=vec![path.own()];let out=self.check_scope_wait(own.as_slice(),target);"
       },
@@ -321,7 +321,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::check_invocation_wait",
           "module": "node_runtime::paths",
-          "file": "node_scope_path.rs",
+          "file": "node_runtime/paths.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "proof {recorded_scope(prior,*self,Event::ScopeWait {handles:path.chain(),target,out});reveal(scopes::wait_result);}"
         }
@@ -331,7 +331,7 @@
     {
       "name": "r2-node-scope-wrong-owner",
       "mutation": {
-        "file": "node_scopes.rs",
+        "file": "node_runtime/scopes.rs",
         "old": "self.scopes.begin(self.control.kernel(),id,generation)",
         "new": "self.scopes.begin(self.control.kernel(),id ^ 1,generation)"
       },
@@ -346,7 +346,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::begin_scope",
           "module": "node_runtime::scopes",
-          "file": "node_scopes.rs",
+          "file": "node_runtime/scopes.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "self.record(before,Event::BeginScope {id,generation,out});"
         }
@@ -356,7 +356,7 @@
     {
       "name": "r2-node-scope-skips-completion",
       "mutation": {
-        "file": "node_scopes.rs",
+        "file": "node_runtime/scopes.rs",
         "old": "let out=self.scopes.finish(handle);",
         "new": "let out=Ok(());"
       },
@@ -371,7 +371,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::finish_scope",
           "module": "node_runtime::scopes",
-          "file": "node_scopes.rs",
+          "file": "node_runtime/scopes.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "self.record(before,Event::FinishScope {handle,out});"
         }
@@ -381,7 +381,7 @@
     {
       "name": "r2-node-manifest-omits-withdrawn",
       "mutation": {
-        "file": "node_resources.rs",
+        "file": "node_runtime/resources.rs",
         "old": "if p.owner==owner && p.retained && (!visible || p.visible) {out.push(id);}",
         "new": "if p.owner==owner && p.retained && p.visible && (!visible || p.visible) {out.push(id);}"
       },
@@ -396,7 +396,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::publication_manifest",
           "module": "node_runtime::resources",
-          "file": "node_resources.rs",
+          "file": "node_runtime/resources.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(out[out.len()-1]==id);"
         }
@@ -406,7 +406,7 @@
     {
       "name": "r2-node-withdraw-stops-early",
       "mutation": {
-        "file": "node_resources.rs",
+        "file": "node_runtime/resources.rs",
         "old": "while i<ids.len()\n            invariant self.wf(),i<=ids.len(),manifest",
         "new": "while i<ids.len() && i==0\n            invariant self.wf(),i<=ids.len(),manifest"
       },
@@ -421,7 +421,7 @@
         {
           "function": "cordis_negative::node_runtime::NodeRuntime::withdraw_publications",
           "module": "node_runtime::resources",
-          "file": "node_resources.rs",
+          "file": "node_runtime/resources.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(ids@.take(i as int)==ids@);"
         }
@@ -690,7 +690,7 @@
     {
       "name": "r2-source-saves-unprocessed",
       "mutation": {
-        "file": "configuration_source.rs",
+        "file": "configuration_save/sources.rs",
         "old": "if phase==Stage::Sync || phase==Stage::Done {",
         "new": "if true {"
       },
@@ -705,7 +705,7 @@
         {
           "function": "cordis_negative::configuration_save::Save::apply_sources",
           "module": "configuration_save::sources",
-          "file": "configuration_source.rs",
+          "file": "configuration_save/sources.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "source.observation()==(Observation {checkpoints:advanced(before.checkpoints,records.take(i as int)),..before}),"
         }
@@ -715,7 +715,7 @@
     {
       "name": "r2-source-discards-sync-retry",
       "mutation": {
-        "file": "configuration_source.rs",
+        "file": "configuration_save/sources.rs",
         "old": "source.checkpoints.insert(target.key,Checkpoint {value:target.value,pending_sync:phase==Stage::Sync});",
         "new": "source.checkpoints.insert(target.key,Checkpoint {value:target.value,pending_sync:false});"
       },
@@ -730,7 +730,7 @@
         {
           "function": "cordis_negative::configuration_save::Save::apply_sources",
           "module": "configuration_save::sources",
-          "file": "configuration_source.rs",
+          "file": "configuration_save/sources.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "source.observation()==(Observation {checkpoints:advanced(before.checkpoints,records.take(i as int)),..before}),"
         }
@@ -740,7 +740,7 @@
     {
       "name": "r2-source-accepts-stale-review",
       "mutation": {
-        "file": "configuration_source.rs",
+        "file": "configuration_save/sources.rs",
         "old": "Some(stamp)=>if !self.accepts_save(domain,stamp) {return Err(save);},",
         "new": "Some(_stamp)=>{},"
       },
@@ -755,7 +755,7 @@
         {
           "function": "cordis_negative::configuration_transaction::Configuration::accept_saved_sources",
           "module": "configuration_save::sources",
-          "file": "configuration_source.rs",
+          "file": "configuration_save/sources.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok()==(self.staged().is_none() && save.review().is_some() && domain==save.review().unwrap().domain() && self.version()==save.review().unwrap().revision()),"
         }
@@ -2996,7 +2996,7 @@
     {
       "name": "fresh-driver-child-blueprint",
       "mutation": {
-        "file": "fresh_driver.rs",
+        "file": "mixed_driver/fresh.rs",
         "old": "super::Instruction::Child {blueprint,next,..}=>super::Instruction::Child {expected:draft.rows.len(),blueprint,next},",
         "new": "super::Instruction::Child {blueprint:_,next,..}=>super::Instruction::Child {expected:draft.rows.len(),blueprint:0,next},"
       },
@@ -3012,12 +3012,12 @@
         {
           "function": "cordis_negative::mixed_driver::fresh::instantiate_template",
           "module": "mixed_driver::fresh",
-          "file": "fresh_driver.rs",
+          "file": "mixed_driver/fresh.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out==match template {\n        super::Instruction::Child {blueprint:child_blueprint,next:child_next,..}=>super::Instruction::Child {\n            expected:draft.rows.len(),blueprint:child_blueprint,next:child_next,\n        },\n        _=>template,\n    },"
         }
       ],
-      "selectionRationale": "The executable instantiate_template helper preserves the original child blueprint and continuation while substituting the actual fresh identity. FreshDriver::step executes its returned instruction. Its postcondition detects fresh-driver-child-blueprint; the mutation remains the exact canonical change to fresh_driver.rs. A fresh same-function positive and a complete mutant compilation are required before accepting the diagnostic."
+      "selectionRationale": "The executable instantiate_template helper preserves the original child blueprint and continuation while substituting the actual fresh identity. FreshDriver::step executes its returned instruction. Its postcondition detects fresh-driver-child-blueprint; the mutation remains the exact canonical change to mixed_driver/fresh.rs. A fresh same-function positive and a complete mutant compilation are required before accepting the diagnostic."
     },
     {
       "name": "shared-unload-keeps-uncompressed-token",
@@ -3100,7 +3100,7 @@
     {
       "name": "admitted-fresh-generation-guard",
       "mutation": {
-        "file": "admitted_fresh_driver.rs",
+        "file": "mixed_driver/fresh/admitted.rs",
         "old": "if draft.kernel.episode_generation(actor)!=Some(self.generation) {return Err(AdmissionError::StaleAdmission);}",
         "new": "let _unchecked_generation=draft.kernel.episode_generation(actor);"
       },
@@ -3115,7 +3115,7 @@
         {
           "function": "cordis_negative::mixed_driver::fresh::admitted::Admission::land",
           "module": "mixed_driver::fresh::admitted",
-          "file": "admitted_fresh_driver.rs",
+          "file": "mixed_driver/fresh/admitted.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.bound(&self.machine));"
         }
@@ -3125,7 +3125,7 @@
     {
       "name": "admitted-script-event-provenance",
       "mutation": {
-        "file": "admitted_script.rs",
+        "file": "mixed_driver/fresh/admitted/script.rs",
         "old": "events.push(ScriptEvent {action_index:i,effect});",
         "new": "events.push(ScriptEvent {action_index:i+1,effect});"
       },
@@ -3141,7 +3141,7 @@
         {
           "function": "cordis_negative::mixed_driver::fresh::admitted::script::run_script",
           "module": "mixed_driver::fresh::admitted::script",
-          "file": "admitted_script.rs",
+          "file": "mixed_driver/fresh/admitted/script.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert forall|k:int|0<=k<events.len() implies events[k].action_index!=j by {\n                            if k<previous.len() {assert(events[k]==previous[k]);}else{assert(events[k].action_index==i);}\n                        }\n                    }"
         }
@@ -4061,7 +4061,7 @@
     {
       "name": "cleanup-batch-ignores-lease-owner",
       "mutation": {
-        "file": "publication_cleanup.rs",
+        "file": "publication/cleanup.rs",
         "old": "if entry.consumer!=Some(owner) {return Err(PublicationError::InvalidState);}",
         "new": "if false {return Err(PublicationError::InvalidState);}"
       },
@@ -4076,7 +4076,7 @@
         {
           "function": "cordis_negative::publication::PublicationRegistry::check_cleanup_batch",
           "module": "publication::cleanup",
-          "file": "publication_cleanup.rs",
+          "file": "publication/cleanup.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "forall|k:int| 0<=k<i ==> self.active_lease(leases[k]).is_some()\n                    && self.active_lease(leases[k]).unwrap().consumer==Some(owner),"
         }
@@ -4446,7 +4446,7 @@
     {
       "name": "reified-service-read-returns-none",
       "mutation": {
-        "file": "fresh_driver.rs",
+        "file": "mixed_driver/fresh.rs",
         "old": "    {self.inner.read(actor,key)}",
         "new": "    {None}"
       },
@@ -4462,7 +4462,7 @@
         {
           "function": "cordis_negative::mixed_driver::fresh::FreshDriver::read",
           "module": "mixed_driver::fresh",
-          "file": "fresh_driver.rs",
+          "file": "mixed_driver/fresh.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out==super::context::read(self.reified(),actor,key),"
         }
@@ -4472,7 +4472,7 @@
     {
       "name": "reified-inverse-inspection-fabricates-unit",
       "mutation": {
-        "file": "fresh_driver.rs",
+        "file": "mixed_driver/fresh.rs",
         "old": "    {self.inner.inverse_at(actor,index)}",
         "new": "    {match self.inner.inverse_at(actor,index) {Some(_)=>Some(super::Receipt {actor,inverse:super::Inverse::Unit}),None=>None}}"
       },
@@ -4488,7 +4488,7 @@
         {
           "function": "cordis_negative::mixed_driver::fresh::FreshDriver::inverse_at",
           "module": "mixed_driver::fresh",
-          "file": "fresh_driver.rs",
+          "file": "mixed_driver/fresh.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out==if r::registered(self.control(),actor) && index<self.journal(actor).len() {Some(self.journal(actor)[index as int])} else {None},"
         }
@@ -4524,7 +4524,7 @@
     {
       "name": "r2-publication-value-read-returns-none",
       "mutation": {
-        "file": "publication_values.rs",
+        "file": "publication/values.rs",
         "old": "if id.0>=self.payloads.len() {None} else {self.payloads[id.0].as_ref()}",
         "new": "None"
       },
@@ -4540,7 +4540,7 @@
         {
           "function": "cordis_negative::publication::values::PublicationStore::value",
           "module": "publication::values",
-          "file": "publication_values.rs",
+          "file": "publication/values.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out.is_some()==(id.0<self.values().len() && self.values()[id.0 as int].is_some()),\n            out.is_some() ==> *out.unwrap()==self.values()[id.0 as int].unwrap(),"
         }
@@ -4600,7 +4600,7 @@
     {
       "name": "r2-lease-substitutes-publication-identity",
       "mutation": {
-        "file": "publication_values.rs",
+        "file": "publication/values.rs",
         "old": "Ok((lease.publication,self.payloads[lease.publication.0].as_ref().unwrap()))",
         "new": "Ok((PublicationId(0),self.payloads[lease.publication.0].as_ref().unwrap()))"
       },
@@ -4616,7 +4616,7 @@
         {
           "function": "cordis_negative::publication::values::PublicationStore::leased_value",
           "module": "publication::values",
-          "file": "publication_values.rs",
+          "file": "publication/values.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.0==self.registry_view().active_lease(token).unwrap().publication\n                && self.values()[out->Ok_0.0.0 as int]==Some(*out->Ok_0.1),"
         }
@@ -5606,7 +5606,7 @@
     {
       "name": "r2-value-program-skips-continuation",
       "mutation": {
-        "file": "value_program.rs",
+        "file": "reversible_value/program.rs",
         "old": "current=forward.next;outcomes.push(forward.outcome);",
         "new": "current=None;outcomes.push(forward.outcome);"
       },
@@ -5621,7 +5621,7 @@
         {
           "function": "cordis_negative::reversible_value::ReversibleValue::run_following",
           "module": "reversible_value::program",
-          "file": "value_program.rs",
+          "file": "reversible_value/program.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "prefix(program.code(),points,outcomes@),points.last().state==cell.state,points.last().next==current"
         }
@@ -6131,7 +6131,7 @@
     {
       "name": "r2-cursor-skips-owner",
       "mutation": {
-        "file": "value_cursor.rs",
+        "file": "reversible_value/cursor.rs",
         "old": "if !self.accepts_acquisition(id) || !cursor.owner.check(self,id) {return Err(ValueError::Closed);}",
         "new": "if !self.accepts_acquisition(id) {return Err(ValueError::Closed);}"
       },
@@ -6146,7 +6146,7 @@
         {
           "function": "cordis_negative::execution::Execution::advance_value_program",
           "module": "reversible_value::cursor",
-          "file": "value_cursor.rs",
+          "file": "reversible_value/cursor.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "(out==Err(ValueError::Closed))==!(old(cursor).owner().matches(old(self),id)"
         }
@@ -6156,7 +6156,7 @@
     {
       "name": "r2-cursor-skips-stored-continuation",
       "mutation": {
-        "file": "value_cursor.rs",
+        "file": "reversible_value/cursor.rs",
         "old": "self.checkpoint=snapshot;self.next=next;",
         "new": "self.checkpoint=snapshot;self.next=None;"
       },
@@ -6171,7 +6171,7 @@
         {
           "function": "cordis_negative::reversible_value::cursor::Cursor::advance",
           "module": "reversible_value::cursor",
-          "file": "value_cursor.rs",
+          "file": "reversible_value/cursor.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures final(self).wf(),final(self).same_program(old(self)),final(self).checkpoint().extends(&old(self).checkpoint()),"
         }
@@ -6181,7 +6181,7 @@
     {
       "name": "r2-cursor-drops-registered-inverse",
       "mutation": {
-        "file": "value_cursor.rs",
+        "file": "reversible_value/cursor.rs",
         "old": "let _registered=self.register_inverse(id,applied);\n        proof {cursor.last_registration=Ghost(Some(_registered.evidence@));}",
         "new": "let _inverse=applied.inverse;\n        proof {cursor.last_registration=Ghost(None);}"
       },
@@ -6196,7 +6196,7 @@
         {
           "function": "cordis_negative::execution::Execution::advance_value_program",
           "module": "reversible_value::cursor",
-          "file": "value_cursor.rs",
+          "file": "reversible_value/cursor.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() && out->Ok_0.is_some() ==> {\n                let slots=final(self).cleanup_state().queues()[id].slots();let prior=old(self).cleanup_state().queues()[id].slots();"
         }
@@ -6357,7 +6357,7 @@
     {
       "name": "r2-service-function-substitutes-operation",
       "mutation": {
-        "file": "service_function.rs",
+        "file": "reversible_value/service_function.rs",
         "old": "code.push(Call {port,instruction:call.instruction});i+=1;",
         "new": "code.push(Call {port,instruction:Instruction {operation:super::Operation::Replace(0),branch:call.instruction.branch}});i+=1;"
       },
@@ -6372,7 +6372,7 @@
         {
           "function": "cordis_negative::reversible_value::service_function::Function::bind",
           "module": "reversible_value::service_function",
-          "file": "service_function.rs",
+          "file": "reversible_value/service_function.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "forall|j:int| 0<=j<i ==> (#[trigger] code@[j]).instruction==self.code()[j].instruction"
         }
@@ -6382,7 +6382,7 @@
     {
       "name": "r2-service-resolution-discards-domain",
       "mutation": {
-        "file": "service_composition.rs",
+        "file": "reversible_value/service_composition.rs",
         "old": "Address {journal:receipt.journal(),key:receipt.event().key}",
         "new": "Address {journal:arbitrary(),key:receipt.event().key}"
       },
@@ -6398,7 +6398,7 @@
         {
           "function": "cordis_negative::reversible_value::service_composition::address_origin",
           "module": "reversible_value::service_composition",
-          "file": "service_composition.rs",
+          "file": "reversible_value/service_composition.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "address(write).journal==write.admission.registration().write().journal(),"
         }
@@ -6408,7 +6408,7 @@
     {
       "name": "r2-service-stack-restores-oldest-first",
       "mutation": {
-        "file": "service_stack.rs",
+        "file": "reversible_value/service_stack.rs",
         "old": "match inverse_step(inverses.last(),heap) {Some(previous)=>queued_undo(inverses.drop_last(),previous),None=>None}",
         "new": "match inverse_step(inverses.first(),heap) {Some(previous)=>queued_undo(inverses.drop_last(),previous),None=>None}"
       },
@@ -6423,7 +6423,7 @@
         {
           "function": "cordis_negative::reversible_value::service_stack::same_stack",
           "module": "reversible_value::service_stack",
-          "file": "service_stack.rs",
+          "file": "reversible_value/service_stack.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures queued_undo(inverses,heap)==undo(steps,heap),"
         }
@@ -6433,7 +6433,7 @@
     {
       "name": "r2-multiservice-accepts-undeclared-body",
       "mutation": {
-        "file": "service_program.rs",
+        "file": "reversible_value/services.rs",
         "old": "if !episode.declares_service(self.code[i].port) {return Some(i);}",
         "new": "if false {return Some(i);}"
       },
@@ -6449,7 +6449,7 @@
         {
           "function": "cordis_negative::reversible_value::services::Program::missing",
           "module": "reversible_value::services",
-          "file": "service_program.rs",
+          "file": "reversible_value/services.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "forall|j:int| 0<=j<i ==> access::declared(*episode,#[trigger] self.code()[j].port)"
         }
@@ -6459,7 +6459,7 @@
     {
       "name": "r2-multiservice-discards-failed-prefix",
       "mutation": {
-        "file": "service_program.rs",
+        "file": "reversible_value/services.rs",
         "old": "Self {steps,failure:Some(failure),receipts}",
         "new": "Self {steps,failure:None,receipts}"
       },
@@ -6475,7 +6475,7 @@
         {
           "function": "cordis_negative::reversible_value::services::Report::failed",
           "module": "reversible_value::services",
-          "file": "service_program.rs",
+          "file": "reversible_value/services.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.failure==Some(failure),"
         }
@@ -6485,7 +6485,7 @@
     {
       "name": "r2-multiservice-loses-prior-cause",
       "mutation": {
-        "file": "joint_execution.rs",
+        "file": "reversible_value/joint.rs",
         "old": "if let Some(ref receipt)=second {if receipt.journal()==*self {_cell.history.borrow().extends(&receipt.witness);}}",
         "new": "// Negative: omit the actual prior completion witness."
       },
@@ -6501,7 +6501,7 @@
         {
           "function": "cordis_negative::reversible_value::joint::Journal::join_causes",
           "module": "reversible_value::joint",
-          "file": "joint_execution.rs",
+          "file": "reversible_value/joint.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "second.is_some() && second.unwrap().journal()==*self ==> out@.is_some() && out@.unwrap().covers(&second.unwrap())"
         }
@@ -6511,7 +6511,7 @@
     {
       "name": "r2-multiservice-frames-only-first-write",
       "mutation": {
-        "file": "service_program.rs",
+        "file": "reversible_value/services.rs",
         "old": "values.dom().filter(|key:K|exists|i:int|0<=i<self.steps.len() && {",
         "new": "values.dom().filter(|key:K|exists|i:int|i==0 && 0<=i<self.steps.len() && {"
       },
@@ -6527,7 +6527,7 @@
         {
           "function": "cordis_negative::reversible_value::services::Report::includes_affected",
           "module": "reversible_value::services",
-          "file": "service_program.rs",
+          "file": "reversible_value/services.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures self.affected(values,journal).contains(key),"
         }
@@ -6537,7 +6537,7 @@
     {
       "name": "r2-native-call-substitutes-declared-port",
       "mutation": {
-        "file": "value_access.rs",
+        "file": "reversible_value/access.rs",
         "old": "let binding=match values.read_reversible(port) {Ok(binding)=>binding,Err(error)=>return Err(Error::Read(error))};",
         "new": "let binding=match values.read_reversible(Port {key:0,realm:port.realm}) {Ok(binding)=>binding,Err(error)=>return Err(Error::Read(error))};"
       },
@@ -6552,7 +6552,7 @@
         {
           "function": "cordis_negative::execution::Execution::apply_native_value",
           "module": "reversible_value::access",
-          "file": "value_access.rs",
+          "file": "reversible_value/access.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;"
         }
@@ -6614,7 +6614,7 @@
     {
       "name": "r2-slot-allocates-without-object-receipt",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "journal.allocate_referencing(Ghost(joint::Record::Slot {source,revision:0,object:value.object()}),Tracked(Some(target)))",
         "new": "journal.allocate_referencing(Ghost(joint::Record::Slot {source,revision:0,object:value.object()}),Tracked(None))"
       },
@@ -6630,7 +6630,7 @@
         {
           "function": "cordis_negative::reversible_value::slot::Slot::new",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "journal.allocate_referencing(Ghost(joint::Record::Slot {source,revision:0,object:value.object()}),Tracked(None))"
         }
@@ -6640,7 +6640,7 @@
     {
       "name": "r2-slot-replacement-borrows-old-object-receipt",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "let (_domain,Tracked(target))=value.reference();\n        let (mut cell,guard)=self.inner.acquire_write();\n        let previous=cell.capture(self);",
         "new": "let (_domain,Tracked(target))=self.capture().value().reference();\n        let (mut cell,guard)=self.inner.acquire_write();\n        let previous=cell.capture(self);"
       },
@@ -6656,7 +6656,7 @@
         {
           "function": "cordis_negative::reversible_value::slot::Slot::replace",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "cell.joint.update_following(Ghost(joint::Record::Slot {source:self.source(),revision:cell.value.revision_spec(),object:value.object()}),\n                    Ghost(joint::Change::Replace),Tracked(Some(target)),Ghost(false),Tracked(None));\n                let current=cell.capture(self);\n                proof {assert(current.history().take(previous.history().len() as int) =~= previous.history());}\n                guard.release_write(cell);\n                Ok(Replacement {previous,current})"
         }
@@ -6666,7 +6666,7 @@
     {
       "name": "r2-slot-projection-reads-slot-as-object",
       "mutation": {
-        "file": "value_references.rs",
+        "file": "reversible_value/joint/references.rs",
         "old": "source:state[object.key]->Object_source,state:state[object.key]->Object_state",
         "new": "source:state[object.key]->Object_source,state:state[key]->Object_state"
       },
@@ -6682,7 +6682,7 @@
         {
           "function": "cordis_negative::reversible_value::joint::references::aliases",
           "module": "reversible_value::joint::references",
-          "file": "value_references.rs",
+          "file": "reversible_value/joint/references.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "resolve(state,domain,a).unwrap()->Local_state==resolve(state,domain,b).unwrap()->Local_state"
         }
@@ -6692,7 +6692,7 @@
     {
       "name": "r2-slot-capture-borrows-other-commit",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "let tracked commit=self.joint.receipt();",
         "new": "let other=Slot::new(value.clone());let Tracked(commit)=other.receipt();"
       },
@@ -6708,7 +6708,7 @@
         {
           "function": "cordis_negative::reversible_value::slot::Cell::capture",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.wf(),out.slot()==*slot,out.revision_spec()==self.value.revision_spec()"
         }
@@ -6769,7 +6769,7 @@
     {
       "name": "r2-slot-accepts-stale-capture",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "let accepted=result && current.revision==self.revision;",
         "new": "let accepted=result;"
       },
@@ -6784,7 +6784,7 @@
         {
           "function": "cordis_negative::reversible_value::slot::Capture::check_result",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.accepted_spec()==(result && out.current().revision_spec()==self.revision_spec())"
         }
@@ -6794,7 +6794,7 @@
     {
       "name": "r2-slot-substitutes-replacement",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "let previous=cell.capture(self);\n        match cell.value.replace(value)",
         "new": "let previous=cell.capture(self);let value=cell.value.get().clone();let (_domain,Tracked(target))=value.reference();\n        match cell.value.replace(value)"
       },
@@ -6809,14 +6809,14 @@
         {
           "function": "cordis_negative::reversible_value::slot::Slot::replace",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.wf() && out->Ok_0.previous().slot()==*self\n            && out->Ok_0.current().value_spec()==value"
         },
         {
           "function": "cordis_negative::reversible_value::slot::Slot::replace",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_err() ==> out->Err_0.value==value && out->Err_0.error==crate::versioned_value::ReplaceError::Capacity"
         }
@@ -6826,7 +6826,7 @@
     {
       "name": "r2-slot-reads-wrong-realm",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "match self.read(port) {Ok(value)=>value,Err(error)=>return Err(ReadError::Native(error))}",
         "new": "match self.read(Port {key:port.key,realm:0}) {Ok(value)=>value,Err(error)=>return Err(ReadError::Native(error))}"
       },
@@ -6841,7 +6841,7 @@
         {
           "function": "cordis_negative::lifecycle_state::services::NativeEpisode::read_reversible",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> !self.closed() && out->Ok_0.wf() && out->Ok_0.port_spec()==port\n            && self.selects_slot(out->Ok_0.provider_spec(),port,out->Ok_0.capture_spec().slot())"
         }
@@ -6954,7 +6954,7 @@
     {
       "name": "r2-function-skips-root-status",
       "mutation": {
-        "file": "value_function.rs",
+        "file": "reversible_value/function.rs",
         "old": "fn root_running(status:RootStatus)->(out:bool)\n    ensures out==(status==RootStatus::Queued || status==RootStatus::Running),\n{status==RootStatus::Queued || status==RootStatus::Running}",
         "new": "fn root_running(status:RootStatus)->(out:bool)\n    ensures out==(status==RootStatus::Queued || status==RootStatus::Running),\n{true}"
       },
@@ -6969,7 +6969,7 @@
         {
           "function": "cordis_negative::reversible_value::function::root_running",
           "module": "reversible_value::function",
-          "file": "value_function.rs",
+          "file": "reversible_value/function.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out==(status==RootStatus::Queued || status==RootStatus::Running),"
         }
@@ -6979,7 +6979,7 @@
     {
       "name": "r2-value-return-omits-effect-witnesses",
       "mutation": {
-        "file": "value_function.rs",
+        "file": "reversible_value/function.rs",
         "old": "Ok(report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),report.program.receipt_witnesses()),",
         "new": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),"
       },
@@ -6994,7 +6994,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_value_root",
           "module": "reversible_value::function",
-          "file": "value_function.rs",
+          "file": "reversible_value/function.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
         }
@@ -7004,7 +7004,7 @@
     {
       "name": "r2-service-return-omits-effect-witnesses",
       "mutation": {
-        "file": "service_function.rs",
+        "file": "reversible_value/service_function.rs",
         "old": "Ok(report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),report.receipt_witnesses()),",
         "new": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),"
       },
@@ -7019,7 +7019,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_service_root",
           "module": "reversible_value::service_function",
-          "file": "service_function.rs",
+          "file": "reversible_value/service_function.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
         }
@@ -7029,7 +7029,7 @@
     {
       "name": "r2-registered-function-substitutes-body",
       "mutation": {
-        "file": "value_function.rs",
+        "file": "reversible_value/function.rs",
         "old": "let result=function.run(execution,port);",
         "new": "let substitute=Function::new(function.key(),Program::new(Vec::new()).unwrap());\n        let function=&substitute;\n        let result=function.run(execution,port);"
       },
@@ -7044,7 +7044,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_value_root",
           "module": "reversible_value::function",
-          "file": "value_function.rs",
+          "file": "reversible_value/function.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
         }
@@ -7054,7 +7054,7 @@
     {
       "name": "r2-registered-function-confirms-failure",
       "mutation": {
-        "file": "value_function.rs",
+        "file": "reversible_value/function.rs",
         "old": "let outcome:Result<(),()>=if successful {Ok(())} else {Err(())};",
         "new": "let outcome:Result<(),()>=Ok(());"
       },
@@ -7069,7 +7069,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_value_root",
           "module": "reversible_value::function",
-          "file": "value_function.rs",
+          "file": "reversible_value/function.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_ok() ==> {\n                let report=out->Ok_0;let recipe=old(self).registry().entries()[id].recipe();"
         }
@@ -7212,7 +7212,7 @@
     {
       "name": "r2-registration-drops-pending-capability",
       "mutation": {
-        "file": "value_registration.rs",
+        "file": "reversible_value/registration.rs",
         "old": "self.groups.register_following(id,ChildCleanup::Value(applied.inverse),Tracked(cause),applied.pending)",
         "new": "self.groups.register_following(id,ChildCleanup::Value(applied.inverse),Tracked(cause),Tracked(None))"
       },
@@ -7227,7 +7227,7 @@
         {
           "function": "cordis_negative::execution::Execution::register_inverse",
           "module": "reversible_value::registration",
-          "file": "value_registration.rs",
+          "file": "reversible_value/registration.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.evidence@.records(applied.inverse,final(self).cleanup_state().queues()[id].link(),final(self).cleanup_state().queues()[id].protocol().domain_id(),out.token),"
         }
@@ -7263,7 +7263,7 @@
     {
       "name": "r2-prepared-discards-write-as-error",
       "mutation": {
-        "file": "scalar_effect.rs",
+        "file": "reversible_value/effect.rs",
         "old": "let outcome=applied.outcome;let next=applied.next;\n        let registered=self.register_inverse(id,applied);\n        Ok(ValueAdmission {outcome,next,token:registered.token,evidence:registered.evidence})",
         "new": "let _discarded=applied;\n        Err(EffectError::Rejected)"
       },
@@ -7278,7 +7278,7 @@
         {
           "function": "cordis_negative::execution::Execution::apply_prepared_effect",
           "module": "reversible_value::effect",
-          "file": "scalar_effect.rs",
+          "file": "reversible_value/effect.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_err() && out!=Err(EffectError::Closed) ==>\n                super::attempt::effect_rejection(final(self).value_attempts().event(),prepared.code(),prepared.expected(),out->Err_0),"
         }
@@ -7288,7 +7288,7 @@
     {
       "name": "r2-cursor-discards-write-as-error",
       "mutation": {
-        "file": "value_cursor.rs",
+        "file": "reversible_value/cursor.rs",
         "old": "        let outcome=applied.outcome;\n        let _registered=self.register_inverse(id,applied);\n        proof {cursor.last_registration=Ghost(Some(_registered.evidence@));}\n        proof {\n            let prior=old(self).cleanup_state().queues()[id].slots();\n            assert(prior.push(Some(ChildCleanup::<Cb,X>::Value(applied.inverse))).take(prior.len() as int) =~= prior);\n        }\n        Ok(Some(outcome))",
         "new": "        let _discarded=applied;\n        Err(ValueError::Overflow)"
       },
@@ -7303,7 +7303,7 @@
         {
           "function": "cordis_negative::execution::Execution::advance_value_program",
           "module": "reversible_value::cursor",
-          "file": "value_cursor.rs",
+          "file": "reversible_value/cursor.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_err() && out!=Err(ValueError::Closed) ==> old(cursor).next().is_some()\n                && super::attempt::value_rejection(final(cursor).checkpoint().history().last(),"
         }
@@ -7313,7 +7313,7 @@
     {
       "name": "r2-program-discards-failed-prefix",
       "mutation": {
-        "file": "value_program.rs",
+        "file": "reversible_value/program.rs",
         "old": "let batch=value.run_following(program,Ghost(managed),Tracked(cause));let ghost all=batch.items@;",
         "new": "let batch=value.run_following(program,Ghost(managed),Tracked(cause));\n        if batch.report.error.is_some() {return Err(ValueError::Overflow);}\n        let ghost all=batch.items@;"
       },
@@ -7328,7 +7328,7 @@
         {
           "function": "cordis_negative::execution::Execution::run_value_program_following",
           "module": "reversible_value::program",
-          "file": "value_program.rs",
+          "file": "reversible_value/program.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_err() ==> *final(self)==*old(self) && out==Err(ValueError::Closed),"
         }
@@ -7389,7 +7389,7 @@
     {
       "name": "r2-effect-forges-stale-rejection",
       "mutation": {
-        "file": "scalar_effect.rs",
+        "file": "reversible_value/effect.rs",
         "old": "return Err(EffectError::Interference);",
         "new": "return Err(EffectError::Rejected);"
       },
@@ -7404,7 +7404,7 @@
         {
           "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
           "module": "reversible_value::effect",
-          "file": "scalar_effect.rs",
+          "file": "reversible_value/effect.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out.is_err() ==> super::attempt::effect_rejection(final(attempts).event(),code,calculation.input(final(attempts).event().before()),out->Err_0)"
         }
@@ -7414,7 +7414,7 @@
     {
       "name": "r2-alias-forgets-other-bindings",
       "mutation": {
-        "file": "value_alias.rs",
+        "file": "reversible_value/alias.rs",
         "old": "targets.contains_key(key) && targets[key]==object && aliases(targets,object)==set![key]",
         "new": "targets.contains_key(key) && targets[key]==object"
       },
@@ -7429,7 +7429,7 @@
         {
           "function": "cordis_negative::reversible_value::alias::single_key_write",
           "module": "reversible_value::alias",
-          "file": "value_alias.rs",
+          "file": "reversible_value/alias.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "view(targets,heap.insert(object,value)) =~= view(targets,heap).insert(key,value)"
         }
@@ -7439,7 +7439,7 @@
     {
       "name": "r2-native-effect-skips-owner-check",
       "mutation": {
-        "file": "native_effect.rs",
+        "file": "reversible_value/native_effect.rs",
         "old": "if !self.accepts_acquisition(id) {return false;}\n        owner.check(self,id)",
         "new": "if !self.accepts_acquisition(id) {return false;}\n        true"
       },
@@ -7454,7 +7454,7 @@
         {
           "function": "cordis_negative::execution::Execution::admits_native_effect",
           "module": "reversible_value::native_effect",
-          "file": "native_effect.rs",
+          "file": "reversible_value/native_effect.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "out==(self.work_state().accepts() && self.cleanup_state().acquisition_open(id) && owner.matches(self,id))"
         }
@@ -7464,7 +7464,7 @@
     {
       "name": "r2-effect-omits-read-cause",
       "mutation": {
-        "file": "scalar_effect.rs",
+        "file": "reversible_value/effect.rs",
         "old": "let (pending,lease)=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(Some(cause.duplicate())),Tracked(None));",
         "new": "let (pending,lease)=cell.record_following(Ghost(before),Ghost(Event::Computed {code,branch,before,after,outcome,next}),Ghost(managed),Tracked(None),Tracked(None));"
       },
@@ -7479,7 +7479,7 @@
         {
           "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
           "module": "reversible_value::effect",
-          "file": "scalar_effect.rs",
+          "file": "reversible_value/effect.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "final(attempts).events().last().follows(&cause)"
         }
@@ -7647,7 +7647,7 @@
     {
       "name": "r2-issued-protocol-allows-ticket-revival",
       "mutation": {
-        "file": "episode_execution.rs",
+        "file": "reversible_value/joint/episode.rs",
         "old": "&& ticket==(RestoreTicket {domain:a.domain,attempt:a.next,token:a.selected.unwrap().token})\n            && ticket.attempt>a.selected.unwrap().attempt",
         "new": "&& ((ticket==(RestoreTicket {domain:a.domain,attempt:a.next,token:a.selected.unwrap().token})\n            && ticket.attempt>a.selected.unwrap().attempt) || ticket==a.selected.unwrap())"
       },
@@ -7663,7 +7663,7 @@
         {
           "function": "cordis_negative::reversible_value::joint::episode::interval::one_step",
           "module": "reversible_value::joint::episode::interval",
-          "file": "cleanup_interval.rs",
+          "file": "reversible_value/joint/episode/interval.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ticket.attempt<a.next && active(b,ticket) ==> active(a,ticket),"
         }
@@ -7725,7 +7725,7 @@
     {
       "name": "r2-host-object-substitution",
       "mutation": {
-        "file": "node_bridge.rs",
+        "file": "node_runtime/bridge.rs",
         "old": "self.objects.get(&key.id())",
         "new": "self.objects.get(&self.next)"
       },
@@ -7740,7 +7740,7 @@
         {
           "function": "cordis_negative::node_runtime::bridge::Bridge::get",
           "module": "node_runtime::bridge",
-          "file": "node_bridge.rs",
+          "file": "node_runtime/bridge.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "requires self.wf(),ensures out.is_some()==(key.domain()==self.domain_id() && self.objects().contains_key(key.id())),"
         }
@@ -7750,7 +7750,7 @@
     {
       "name": "r2-host-dispatch-ignores-ticket",
       "mutation": {
-        "file": "node_bridge.rs",
+        "file": "node_runtime/bridge.rs",
         "old": "if !node.state().pending_matches(ticket) {return Err(BridgeError::Stale);}",
         "new": "if false {return Err(BridgeError::Stale);}"
       },
@@ -7765,7 +7765,7 @@
         {
           "function": "cordis_negative::node_runtime::bridge::Bridge::begin_call",
           "module": "node_runtime::bridge",
-          "file": "node_bridge.rs",
+          "file": "node_runtime/bridge.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "self.record(trace::Event::Begin {claim:Claim {ticket,fiber:fiber.id(),recipe:recipe.id()},node:node.history()});"
         }
@@ -7775,7 +7775,7 @@
     {
       "name": "r2-host-drops-retained-object",
       "mutation": {
-        "file": "node_bridge.rs",
+        "file": "node_runtime/bridge.rs",
         "old": "if node.store().contains_handle(id) {return Err(BridgeError::Retained);}",
         "new": "if false {return Err(BridgeError::Retained);}"
       },
@@ -7790,7 +7790,7 @@
         {
           "function": "cordis_negative::node_runtime::bridge::Bridge::remove",
           "module": "node_runtime::bridge",
-          "file": "node_bridge.rs",
+          "file": "node_runtime/bridge.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "self.record(trace::Event::Remove {id,node:node.history()});"
         }
@@ -7850,7 +7850,7 @@
     {
       "name": "r2-managed-return-omits-effects",
       "mutation": {
-        "file": "managed_root.rs",
+        "file": "reversible_value/managed/root.rs",
         "old": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(_report.receipt_witnesses())),",
         "new": "Ok(_report)=>self.record_recipes_following::<(int,bool)>(Ghost(joint::recipes::Event::Call {id,version:revision,origin,work}),Tracked(&empty)),"
       },
@@ -7865,7 +7865,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::run_managed_root",
           "module": "reversible_value::managed::root",
-          "file": "managed_root.rs",
+          "file": "reversible_value/managed/root.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "report.execution_interval();"
         }
@@ -7875,7 +7875,7 @@
     {
       "name": "r2-managed-drops-continuation",
       "mutation": {
-        "file": "managed_function.rs",
+        "file": "reversible_value/managed.rs",
         "old": "pc=step.next;append_step::<E,T,M>",
         "new": "pc=None;append_step::<E,T,M>"
       },
@@ -7890,7 +7890,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::Owner::run_function",
           "module": "reversible_value::managed",
-          "file": "managed_function.rs",
+          "file": "reversible_value/managed.rs",
           "diagnosticKind": "invariant not satisfied",
           "uniqueSourceAnchor": "prefix(function.code(),ports@,steps@,values),pc==next(function.code().len(),steps@),pc.is_some() ==> pc.unwrap()<function.code().len(),"
         }
@@ -7900,7 +7900,7 @@
     {
       "name": "r2-managed-forges-read-rejection",
       "mutation": {
-        "file": "value_slot.rs",
+        "file": "reversible_value/slot.rs",
         "old": "let error=ReadError::NotReversible {provider};",
         "new": "let error=ReadError::Native(NativeReadError {reason:crate::lifecycle_state::services::NativeValueError::Closed,provider:None});"
       },
@@ -7915,7 +7915,7 @@
         {
           "function": "cordis_negative::lifecycle_state::services::NativeEpisode::read_reversible",
           "module": "reversible_value::slot",
-          "file": "value_slot.rs",
+          "file": "reversible_value/slot.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.reversible_read_failed(port,error));"
         }
@@ -7925,7 +7925,7 @@
     {
       "name": "r2-managed-payload-forgets-earlier-causes",
       "mutation": {
-        "file": "payload_inverse.rs",
+        "file": "reversible_value/payload/restoration.rs",
         "old": "journal.join_receipts::<(int,bool)>(Tracked(causes),Tracked(None))",
         "new": "journal.join_receipts::<(int,bool)>(Tracked(&Map::tracked_empty()),Tracked(None))"
       },
@@ -7940,7 +7940,7 @@
         {
           "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_captured_in",
           "module": "reversible_value::payload::restoration",
-          "file": "payload_inverse.rs",
+          "file": "reversible_value/payload/restoration.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "after@.commit.after_cover(&cause.unwrap(),&causes[k]);"
         }
@@ -8075,7 +8075,7 @@
     {
       "name": "r3-replay-discards-foreign-history",
       "mutation": {
-        "file": "episode_replay.rs",
+        "file": "mixed_driver/episode_replay.rs",
         "old": "e::foreign_state(mr::events(library(),programs(bank),states.subrange(begin+1,end+1),\n        labels(transitions).subrange(begin+1,end),owner),p::project(states[begin+1].state,ISet::full()))",
         "new": "e::foreign_state(Seq::empty(),p::project(states[begin+1].state,ISet::full()))"
       },
@@ -8090,7 +8090,7 @@
         {
           "function": "cordis_negative::mixed_driver::episode_replay::recover_cut",
           "module": "mixed_driver::episode_replay",
-          "file": "episode_replay.rs",
+          "file": "mixed_driver/episode_replay.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures recovered_at(bank,states,transitions,owner,begin,end),"
         }
@@ -8100,7 +8100,7 @@
     {
       "name": "r3-recovery-discards-stored-receipts",
       "mutation": {
-        "file": "episode_replay.rs",
+        "file": "mixed_driver/episode_replay.rs",
         "old": "match super::restore_receipts(self.journal(owner),self.primitive_state())",
         "new": "match super::restore_receipts(Seq::empty(),self.primitive_state())"
       },
@@ -8115,7 +8115,7 @@
         {
           "function": "cordis_negative::mixed_driver::MixedDriver::observe_restored",
           "module": "mixed_driver::episode_replay",
-          "file": "episode_replay.rs",
+          "file": "mixed_driver/episode_replay.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures self.restored_observation(owner)==Some(p::project(super::restore_receipts(self.journal(owner),self.primitive_state()).unwrap(),ISet::full())),"
         }
@@ -8125,7 +8125,7 @@
     {
       "name": "r3-managed-gap-ignores-writes",
       "mutation": {
-        "file": "managed_recovery.rs",
+        "file": "reversible_value/managed/recovery.rs",
         "old": "e.key!=key || joint::state_at(frames,i as nat).contains_pair(key,e.after)",
         "new": "true || joint::state_at(frames,i as nat).contains_pair(key,e.after)"
       },
@@ -8140,7 +8140,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::recovery::quiet_record",
           "module": "reversible_value::managed::recovery",
-          "file": "managed_recovery.rs",
+          "file": "reversible_value/managed/recovery.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures joint::state_at(frames,end).contains_pair(key,joint::state_at(frames,start)[key]),"
         }
@@ -8150,7 +8150,7 @@
     {
       "name": "r3-typed-restores-consumed-head",
       "mutation": {
-        "file": "payload_inverse.rs",
+        "file": "reversible_value/payload/restoration.rs",
         "old": "if cell.head!=self.expected {",
         "new": "if cell.head>self.expected {"
       },
@@ -8165,7 +8165,7 @@
         {
           "function": "cordis_negative::reversible_value::payload::restoration::Inverse::restore_live",
           "module": "reversible_value::payload::restoration",
-          "file": "payload_inverse.rs",
+          "file": "reversible_value/payload/restoration.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(cell.state()==self.after().state());"
         }
@@ -8175,7 +8175,7 @@
     {
       "name": "r3-final-cut-skips-foreign",
       "mutation": {
-        "file": "managed_unload_census.rs",
+        "file": "reversible_value/managed/interleaving/history/lifecycle/unload_census.rs",
         "old": "if exists|i:int|0<=i<interval.events.len() && (#[trigger] interval.events[i]).forward()\n            && !completion::later(interval.events,interval.events[i].inverse(),(i+1) as nat) {",
         "new": "if false && (exists|i:int|0<=i<interval.events.len() && (#[trigger] interval.events[i]).forward()\n            && !completion::later(interval.events,interval.events[i].inverse(),(i+1) as nat)) {"
       },
@@ -8190,7 +8190,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::root::RegisteredReport::unload_census",
           "module": "reversible_value::managed::interleaving::history::lifecycle::unload_census",
-          "file": "managed_unload_census.rs",
+          "file": "reversible_value/managed/interleaving/history/lifecycle/unload_census.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(completion::settled(interval.events,self.obligations(owner.baseline(),id,offset),self.return_values().dom()));"
         }
@@ -8200,7 +8200,7 @@
     {
       "name": "r3-final-cut-skips-child",
       "mutation": {
-        "file": "managed_unload_census.rs",
+        "file": "reversible_value/managed/interleaving/history/lifecycle/unload_census.rs",
         "old": "if exists|group:usize,token:int|(#[trigger] owner.native_child_source(group,token)).is_some()\n            && !(exists|resolution:Resolution|owner.native_child_completion(ledger,group,token,resolution)) {",
         "new": "if false && (exists|group:usize,token:int|(#[trigger] owner.native_child_source(group,token)).is_some()\n            && !(exists|resolution:Resolution|owner.native_child_completion(ledger,group,token,resolution))) {"
       },
@@ -8215,7 +8215,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::root::RegisteredReport::unload_census",
           "module": "reversible_value::managed::interleaving::history::lifecycle::unload_census",
-          "file": "managed_unload_census.rs",
+          "file": "reversible_value/managed/interleaving/history/lifecycle/unload_census.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(owner.native_children_resolved(ledger));owner.native_children_at_cut(ledger,cut);"
         }
@@ -8275,7 +8275,7 @@
     {
       "name": "r3-host-skips-append-history",
       "mutation": {
-        "file": "managed_host.rs",
+        "file": "reversible_value/managed/interleaving/history/lifecycle/host.rs",
         "old": "history.extend(queue);\n            assert(history.current()==queue.slots());",
         "new": "assert(history.current()==queue.slots());"
       },
@@ -8290,7 +8290,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::appended",
           "module": "reversible_value::managed::interleaving::history::lifecycle::host",
-          "file": "managed_host.rs",
+          "file": "reversible_value/managed/interleaving/history/lifecycle/host.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(history.current()==queue.slots());"
         }
@@ -8300,7 +8300,7 @@
     {
       "name": "r3-host-drops-terminal-history",
       "mutation": {
-        "file": "managed_lifecycle_native.rs",
+        "file": "reversible_value/managed/interleaving/history/lifecycle/native.rs",
         "old": "self.terminal=Ghost(self.terminal@.union_prefer_right(out.2@.unwrap().queues()));\n                assert(self.terminal().dom()==self.histories().dom());",
         "new": "self.terminal=Ghost(self.terminal@);\n                assert(self.terminal().dom()==self.histories().dom());"
       },
@@ -8315,7 +8315,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::release_controlled",
           "module": "reversible_value::managed::interleaving::history::lifecycle::native",
-          "file": "managed_lifecycle_native.rs",
+          "file": "reversible_value/managed/interleaving/history/lifecycle/native.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.terminal().dom()==self.histories().dom());"
         }
@@ -8401,7 +8401,7 @@
     {
       "name": "r3-effect-deletion-keeps-source-index",
       "mutation": {
-        "file": "joint_erasure.rs",
+        "file": "reversible_value/joint/erasure.rs",
         "old": "Change::RegisterInverse {write:self.rank(write)}",
         "new": "Change::RegisterInverse {write}"
       },
@@ -8417,7 +8417,7 @@
         {
           "function": "cordis_negative::reversible_value::joint::erasure::Plan::registration_position",
           "module": "reversible_value::joint::erasure",
-          "file": "joint_erasure.rs",
+          "file": "reversible_value/joint/erasure.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.event(source,i).change->RegisterInverse_write<self.rank(i)\n            && self.positions(i)[self.event(source,i).change->RegisterInverse_write as int]==source[i as int].event.change->RegisterInverse_write);"
         }
@@ -8427,7 +8427,7 @@
     {
       "name": "r3-control-replay-keeps-source-allocation",
       "mutation": {
-        "file": "kernel_replay_names.rs",
+        "file": "kernel_replay/names.rs",
         "old": "names.pair(*actor,next);",
         "new": "names.pair(*actor,*actor);"
       },
@@ -8443,7 +8443,7 @@
         {
           "function": "cordis_negative::kernel_replay::names::prepare",
           "module": "kernel_replay::names",
-          "file": "kernel_replay_names.rs",
+          "file": "kernel_replay/names.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(names.name_spec(*actor)==prior_next);"
         }
@@ -8530,7 +8530,7 @@
     {
       "name": "r3-target-execution-skips-interpreter",
       "mutation": {
-        "file": "managed_replay.rs",
+        "file": "reversible_value/managed/replay.rs",
         "old": "let (owner,report)=runtime.run_recorded_root(id,execution);",
         "new": "let (owner,report)=(RecordedExecution::new(execution),Err::<RegisteredReport<E,T>,AdmissionError>(AdmissionError::NotAdmitted));"
       },
@@ -8546,7 +8546,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
           "module": "reversible_value::managed::replay",
-          "file": "managed_replay.rs",
+          "file": "reversible_value/managed/replay.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(report.is_ok());"
         }
@@ -8556,7 +8556,7 @@
     {
       "name": "r3-controlled-replay-admits-callback",
       "mutation": {
-        "file": "managed_replay.rs",
+        "file": "reversible_value/managed/replay.rs",
         "old": "if !self.is_controlled() {return Err(StartError::ExternalEffect {host:destination.host});}",
         "new": "if false {return Err(StartError::ExternalEffect {host:destination.host});}"
       },
@@ -8572,7 +8572,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate_controlled",
           "module": "reversible_value::managed::replay",
-          "file": "managed_replay.rs",
+          "file": "reversible_value/managed/replay.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.program().controlled());"
         }
@@ -8582,7 +8582,7 @@
     {
       "name": "r01-typed-call-ignores-source-history",
       "mutation": {
-        "file": "managed_replay_typed_tracker.rs",
+        "file": "reversible_value/managed/replay/typed_tracker.rs",
         "old": "if !same {return Err(Error::SourceState {step});}",
         "new": "if false {return Err(Error::SourceState {step});}"
       },
@@ -8598,7 +8598,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::typed_tracker::Tracker::advance",
           "module": "reversible_value::managed::replay::typed_tracker",
-          "file": "managed_replay_typed_tracker.rs",
+          "file": "reversible_value/managed/replay/typed_tracker.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(input.source().before()->Payload_0==previous.state());"
         }
@@ -8608,7 +8608,7 @@
     {
       "name": "r01-typed-seed-ignores-inverse-debt",
       "mutation": {
-        "file": "managed_replay_typed_protected.rs",
+        "file": "reversible_value/managed/replay/typed_protected.rs",
         "old": "if *depth!=0 {return Err(Error::OutstandingHistory {entry:i});}",
         "new": "if false {return Err(Error::OutstandingHistory {entry:i});}"
       },
@@ -8624,7 +8624,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry",
           "module": "reversible_value::managed::replay::typed_protected",
-          "file": "managed_replay_typed_protected.rs",
+          "file": "reversible_value/managed/replay/typed_protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(first.source().before()->Payload_0.depth==0);"
         }
@@ -8634,7 +8634,7 @@
     {
       "name": "r01-typed-seed-ignores-revision",
       "mutation": {
-        "file": "managed_replay_typed_protected.rs",
+        "file": "reversible_value/managed/replay/typed_protected.rs",
         "old": "if current.revision()!=0 {return Err(Error::ChangedVersion {entry:i});}",
         "new": "if false {return Err(Error::ChangedVersion {entry:i});}"
       },
@@ -8650,7 +8650,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected_typed::Context::check_initial_entry",
           "module": "reversible_value::managed::replay::typed_protected",
-          "file": "managed_replay_typed_protected.rs",
+          "file": "reversible_value/managed/replay/typed_protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(current.revision_spec()==0);"
         }
@@ -8660,7 +8660,7 @@
     {
       "name": "r01-exclusive-source-ignores-input",
       "mutation": {
-        "file": "managed_replay_protected.rs",
+        "file": "reversible_value/managed/replay/protected.rs",
         "old": "if values[index].value!=expected.value || values[index].depth!=expected.depth {return Err(Error::SourceState {step:i});}",
         "new": "if false {return Err(Error::SourceState {step:i});}"
       },
@@ -8676,7 +8676,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected::Context::check_source",
           "module": "reversible_value::managed::replay::protected",
-          "file": "managed_replay_protected.rs",
+          "file": "reversible_value/managed/replay/protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(values@[index as int]==*expected);"
         }
@@ -8686,7 +8686,7 @@
     {
       "name": "r01-exclusive-source-ignores-allocation",
       "mutation": {
-        "file": "managed_replay_protected.rs",
+        "file": "reversible_value/managed/replay/protected.rs",
         "old": "if mapped!=index {return Err(Error::SourceState {step:i});}",
         "new": "if false {return Err(Error::SourceState {step:i});}"
       },
@@ -8702,7 +8702,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::protected::Context::check_source",
           "module": "reversible_value::managed::replay::protected",
-          "file": "managed_replay_protected.rs",
+          "file": "reversible_value/managed/replay/protected.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(mapped==index);"
         }
@@ -8712,7 +8712,7 @@
     {
       "name": "r3-controlled-evaluation-uses-wrong-input",
       "mutation": {
-        "file": "scalar_effect.rs",
+        "file": "reversible_value/effect.rs",
         "old": "Calculation::Kernel(instruction)=>(before,instruction.evaluate(before.value))",
         "new": "Calculation::Kernel(instruction)=>(before,instruction.evaluate(0))"
       },
@@ -8728,7 +8728,7 @@
         {
           "function": "cordis_negative::reversible_value::effect::commit_calculation_in",
           "module": "reversible_value::effect",
-          "file": "scalar_effect.rs",
+          "file": "reversible_value/effect.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(decision==code(expected.value));"
         }
@@ -8738,7 +8738,7 @@
     {
       "name": "r3-source-call-fabricates-position",
       "mutation": {
-        "file": "managed_replay_order.rs",
+        "file": "reversible_value/managed/replay/order.rs",
         "old": "{Self {revision,stream}}",
         "new": "{Self {revision:Some(0),stream}}"
       },
@@ -8754,7 +8754,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::order::CallPosition::new",
           "module": "reversible_value::managed::replay::order",
-          "file": "managed_replay_order.rs",
+          "file": "reversible_value/managed/replay/order.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "ensures out.revision==revision,out.stream==stream,"
         }
@@ -8764,7 +8764,7 @@
     {
       "name": "r3-typed-landing-skips-version",
       "mutation": {
-        "file": "payload_inverse.rs",
+        "file": "reversible_value/payload/restoration.rs",
         "old": "if revision!=expected.revision() {",
         "new": "if false {"
       },
@@ -8780,7 +8780,7 @@
         {
           "function": "cordis_negative::reversible_value::payload::SharedPayload::apply_captured_in",
           "module": "reversible_value::payload::restoration",
-          "file": "payload_inverse.rs",
+          "file": "reversible_value/payload/restoration.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(cell.authority@.events() =~= expected.observation().states);"
         }
@@ -8790,7 +8790,7 @@
     {
       "name": "r3-scalar-landing-ignores-depth",
       "mutation": {
-        "file": "native_effect.rs",
+        "file": "reversible_value/native_effect.rs",
         "old": "if snapshot.value()!=expected.value || snapshot.depth()!=expected.depth {return Err(snapshot);}",
         "new": "if snapshot.value()!=expected.value {return Err(snapshot);}"
       },
@@ -8806,7 +8806,7 @@
         {
           "function": "cordis_negative::reversible_value::native_effect::Capture::prepare_at",
           "module": "reversible_value::native_effect",
-          "file": "native_effect.rs",
+          "file": "reversible_value/native_effect.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(snapshot.state()==expected);"
         }
@@ -8816,7 +8816,7 @@
     {
       "name": "r3-target-execution-drops-source-body",
       "mutation": {
-        "file": "managed_replay.rs",
+        "file": "reversible_value/managed/replay.rs",
         "old": "Body::Managed(self.function.duplicate())",
         "new": "Body::Managed(Function::<E,T> {code:Vec::new()})"
       },
@@ -8832,7 +8832,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::replay::Source::instantiate",
           "module": "reversible_value::managed::replay",
-          "file": "managed_replay.rs",
+          "file": "reversible_value/managed/replay.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(recipe.payload()->Managed_0.code()==self.program().code());"
         }
@@ -8842,7 +8842,7 @@
     {
       "name": "r2-node-confuses-control-stutter",
       "mutation": {
-        "file": "node_production.rs",
+        "file": "node_runtime/production.rs",
         "old": "if b.same(a) {Kind::Internal}",
         "new": "if a.control.control().paper()==b.control.control().paper() {Kind::Internal}"
       },
@@ -8857,7 +8857,7 @@
         {
           "function": "cordis_negative::node_runtime::history::History::production_step",
           "module": "node_runtime::production",
-          "file": "node_production.rs",
+          "file": "node_runtime/production.rs",
           "diagnosticKind": "postcondition not satisfied",
           "uniqueSourceAnchor": "requires self.valid(),0<=index<self.events.len(),ensures classified(*self,index),"
         }
@@ -8867,7 +8867,7 @@
     {
       "name": "r2-host-finishes-pending-claim",
       "mutation": {
-        "file": "node_bridge.rs",
+        "file": "node_runtime/bridge.rs",
         "old": "if node.state().pending_matches(call.ticket) {return Err(BridgeError::Busy);}",
         "new": "if false {return Err(BridgeError::Busy);}"
       },
@@ -8882,7 +8882,7 @@
         {
           "function": "cordis_negative::node_runtime::bridge::Bridge::finish_call",
           "module": "node_runtime::bridge",
-          "file": "node_bridge.rs",
+          "file": "node_runtime/bridge.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "self.record(trace::Event::Finish {claim:Claim {ticket:call.ticket,fiber:call.fiber.id(),recipe:call.recipe.id()},node:node.history()});"
         }

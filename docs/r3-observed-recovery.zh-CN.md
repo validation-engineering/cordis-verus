@@ -53,11 +53,11 @@ pending 恢复、普通宿主全面接入及合法保留执行的构造仍待完
 
 ## 审查与验证
 
-- [managed_lifecycle_observer.rs](../crates/cordis-kernel/src/managed_lifecycle_observer.rs)：可执行的观察调用／派发及收据边界合并。
-- [managed_lifecycle_function.rs](../crates/cordis-kernel/src/managed_lifecycle_function.rs)：从实际返回前缀建立来源归属。
-- [managed_foreign_closure.rs](../crates/cordis-kernel/src/managed_foreign_closure.rs)：观察保持、终态槽位恢复及记录所有者的恢复闭合。
-- [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs)：组合恢复入口。
-- [managed_function.rs](../crates/cordis-kernel/tests/managed_function.rs)：`observed_foreign_owner_restores_failed_prefix_before_native_retry` 使用两个真实所有者，覆盖失败调用前缀、typed 同值写入干扰、拒绝释放、外部清理及 native 重试。
+- [reversible_value/managed/interleaving/history/lifecycle/observer.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/observer.rs)：可执行的观察调用／派发及收据边界合并。
+- [reversible_value/managed/interleaving/history/lifecycle/function.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs)：从实际返回前缀建立来源归属。
+- [reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs)：观察保持、终态槽位恢复及记录所有者的恢复闭合。
+- [reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs)：组合恢复入口。
+- [reversible_value/managed.rs](../crates/cordis-kernel/tests/managed_function.rs)：`observed_foreign_owner_restores_failed_prefix_before_native_retry` 使用两个真实所有者，覆盖失败调用前缀、typed 同值写入干扰、拒绝释放、外部清理及 native 重试。
 
 当前定向结果及复现命令见[交错恢复说明](r3-interleaved-recovery.zh-CN.md#审查与验证)。
 运行案例不等于建立组合证明的全部前提。集成验收仍需非空贯通证明调用者，以及遗漏派发、

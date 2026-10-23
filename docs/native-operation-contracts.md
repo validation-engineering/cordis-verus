@@ -66,14 +66,14 @@ still required. Ghost source histories and receipts erase from ordinary Rust.
 
 | Operation family and actual code | Reads and writes | Domain and recovery responsibility |
 | --- | --- | --- |
-| [Allocation and snapshots](../crates/cordis-kernel/src/reversible_value.rs): `new_in`, `snapshot`; [typed allocation](../crates/cordis-kernel/src/shared_payload.rs): `new_in`, `capture` | Allocate an object record in the actual Journal; snapshots read the object and its corresponding history under its lock. | Fresh scalar depth is zero. A snapshot describes its acquisition point, not a frozen future value. `new_in_following` also returns an authentic birth receipt after an earlier checkpoint. |
+| [Allocation and snapshots](../crates/cordis-kernel/src/reversible_value.rs): `new_in`, `snapshot`; [typed allocation](../crates/cordis-kernel/src/reversible_value/payload.rs): `new_in`, `capture` | Allocate an object record in the actual Journal; snapshots read the object and its corresponding history under its lock. | Fresh scalar depth is zero. A snapshot describes its acquisition point, not a frozen future value. `new_in_following` also returns an authentic birth receipt after an earlier checkpoint. |
 | [Scalar operations](../crates/cordis-kernel/src/reversible_value.rs): `apply`, `apply_pending_following` | Read and update the selected object's value/depth; issue the actual inverse and Journal entry. | Arithmetic and depth capacity are checked. The inverse is defined on the captured after-state. A raw inverse holder is responsible for restoring or registering that inverse. |
-| [Controlled managed scalar](../crates/cordis-kernel/src/controlled_effect.rs): `apply_controlled_effect`; [native selection](../crates/cordis-kernel/src/native_effect.rs): `apply_native_controlled` | Check declared selection and execution owner; execute the data instruction under the value lock; register its inverse in that owner's cleanup queue. | Closed acquisition rejects before a write. Other failures follow the actual primitive domain. A successful call cannot return with its inverse assigned to an invented target or queue. |
-| [Extensible computation](../crates/cordis-kernel/src/scalar_effect.rs): `prepare_effect`, `commit_calculation`; [native landing](../crates/cordis-kernel/src/native_effect.rs): `apply_native_effect` | Observe a retained object, run `ScalarEffect::compute`, then recheck and commit the captured input. | The return-value law and interference rejection are established. The trait does not prohibit extra shared writes inside `compute`; this path is rejected by the controlled replay gate. |
-| [Typed replacement and inverse](../crates/cordis-kernel/src/payload_inverse.rs): `apply_captured_following`, `restore_following`; [native capture](../crates/cordis-kernel/src/native_payload.rs): `capture_native_payload`, `land` | Retain the selected payload owner; check actual liveness/version/stack state; replace the retained value and record the real inverse. | Stale capture, retirement and capacity checks remain explicit. Restoration preserves the required semantic state while anti-stale revision can advance. `T` interiors and destructors need their own boundary contracts. |
-| [Slot replacement and aliases](../crates/cordis-kernel/src/value_slot.rs): `capture`, `replace`, `capture_binding` | Change a versioned slot's current object reference; retained captures keep their previous object. | [Alias projection](../crates/cordis-kernel/src/value_alias.rs) updates all names selecting an allocation. Literal single-port semantics requires its explicit single-binding condition. Different port names alone do not prove independence. |
-| [Publication](../crates/cordis-kernel/src/publication.rs) and [withdrawal](../crates/cordis-kernel/src/publication_cleanup.rs) | Change the owning Episode's service publication and cleanup obligations; consumers retain committed providers. | Publication, withdrawal, consumer retention and actual payload ownership must be composed. A publication being absent does not establish that all external resources are released. |
-| [Root interpretation](../crates/cordis-kernel/src/managed_root.rs): `run_managed_root`; [function execution](../crates/cordis-kernel/src/managed_function.rs): `run_function` | Resolve every declared port before the first effect; execute actual arguments, outcome-selected branches and successful-prefix inverse registration. | The finite stored body and branch indices are checked. Controlled admission examines even unvisited callback branches. Completing this path does not classify arbitrary callback effects as stuttering. |
+| [Controlled managed scalar](../crates/cordis-kernel/src/reversible_value/controlled.rs): `apply_controlled_effect`; [native selection](../crates/cordis-kernel/src/reversible_value/native_effect.rs): `apply_native_controlled` | Check declared selection and execution owner; execute the data instruction under the value lock; register its inverse in that owner's cleanup queue. | Closed acquisition rejects before a write. Other failures follow the actual primitive domain. A successful call cannot return with its inverse assigned to an invented target or queue. |
+| [Extensible computation](../crates/cordis-kernel/src/reversible_value/effect.rs): `prepare_effect`, `commit_calculation`; [native landing](../crates/cordis-kernel/src/reversible_value/native_effect.rs): `apply_native_effect` | Observe a retained object, run `ScalarEffect::compute`, then recheck and commit the captured input. | The return-value law and interference rejection are established. The trait does not prohibit extra shared writes inside `compute`; this path is rejected by the controlled replay gate. |
+| [Typed replacement and inverse](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs): `apply_captured_following`, `restore_following`; [native capture](../crates/cordis-kernel/src/reversible_value/native_payload.rs): `capture_native_payload`, `land` | Retain the selected payload owner; check actual liveness/version/stack state; replace the retained value and record the real inverse. | Stale capture, retirement and capacity checks remain explicit. Restoration preserves the required semantic state while anti-stale revision can advance. `T` interiors and destructors need their own boundary contracts. |
+| [Slot replacement and aliases](../crates/cordis-kernel/src/reversible_value/slot.rs): `capture`, `replace`, `capture_binding` | Change a versioned slot's current object reference; retained captures keep their previous object. | [Alias projection](../crates/cordis-kernel/src/reversible_value/alias.rs) updates all names selecting an allocation. Literal single-port semantics requires its explicit single-binding condition. Different port names alone do not prove independence. |
+| [Publication](../crates/cordis-kernel/src/publication.rs) and [withdrawal](../crates/cordis-kernel/src/publication/cleanup.rs) | Change the owning Episode's service publication and cleanup obligations; consumers retain committed providers. | Publication, withdrawal, consumer retention and actual payload ownership must be composed. A publication being absent does not establish that all external resources are released. |
+| [Root interpretation](../crates/cordis-kernel/src/reversible_value/managed/root.rs): `run_managed_root`; [function execution](../crates/cordis-kernel/src/reversible_value/managed.rs): `run_function` | Resolve every declared port before the first effect; execute actual arguments, outcome-selected branches and successful-prefix inverse registration. | The finite stored body and branch indices are checked. Controlled admission examines even unvisited callback branches. Completing this path does not classify arbitrary callback effects as stuttering. |
 | [Child ownership](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs) and [native registry](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs): `register_shared_child`, `retire_shared_child` | Modify birth/parent/registry records and the actual parent-owned cleanup obligation. | Registry admission has guards beyond the service table. Retirement, child terminal completion and registry removal are distinct. R04 still composes these with consumer and repeated-Episode recovery. |
 | [Cleanup and retries](../crates/cordis-kernel/src/cleanup_groups.rs): `dispatch`, `complete`, `retry`; [native cleanup](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs): `begin_cleanup`, `retry_managed_execution` | Issue a real action, retain blocked inverses, classify failures and match the current ticket before advancing. | Retryable failure retains the action; consumed `FnOnce` failure has a different contract. A successful host acknowledgement is a protocol fact, not a proof of arbitrary external restoration. |
 | [Async landing](../crates/cordis-kernel/src/cleanup_queue/landing.rs) and [poll/restart control](../crates/cordis-kernel/src/poll_control.rs) | Record actual owner, pending result, failure and restart state; accept or divert a result according to the current state. | Stale owner/ticket checks are safety conditions. Eventual Future completion and host scheduling are separate G04 conditions. |
@@ -112,7 +112,7 @@ source `Arc<T>`, and that distinction remains visible.
 
 ## Strict scalar transport and the recovery equation
 
-[The heap transport proof](../crates/cordis-kernel/src/managed_replay_heap.rs)
+[The heap transport proof](../crates/cordis-kernel/src/reversible_value/managed/replay/bank/heap.rs)
 uses this injective map to relate source and target scalar heaps. The relation
 includes missing entries and the complete `(value, depth)` observation.
 `Bank::scalar_contract` then proves the same forward definedness, result-selected
@@ -140,7 +140,7 @@ remain separate obligations; these lemmas do not equate them automatically.
 
 ## Checked source continuity and actual scalar observations
 
-[`continuity::check`](../crates/cordis-kernel/src/managed_replay_continuity.rs)
+[`continuity::check`](../crates/cordis-kernel/src/reversible_value/managed/replay/continuity.rs)
 checks the successful steps retained from actual inverse owners, in the supplied
 call order. The batch obtains that order from the existing authenticated source
 planner. For every repeated allocation, the next captured input must equal the
@@ -157,7 +157,7 @@ The check detects state discontinuity, not every omitted event: intervening
 operations which return to the same complete observation need the separate
 complete-history census.
 
-[`batch::run_checked_scalar`](../crates/cordis-kernel/src/managed_replay_batch.rs)
+[`batch::run_checked_scalar`](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs)
 connects this source check to actual scalar target execution:
 
 1. Inspect the complete retained functions, including unvisited branches. This
@@ -198,7 +198,7 @@ by the explicit replay captures.
 
 ## Actual provider and allocation selection
 
-[`check_scalar_replay`](../crates/cordis-kernel/src/managed_replay_selection.rs)
+[`check_scalar_replay`](../crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs)
 adds allocation correspondence to the state check. `run_checked_scalar` invokes
 it on each actual report before Finish. The evidence follows the production path:
 

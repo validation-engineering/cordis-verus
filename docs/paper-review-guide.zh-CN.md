@@ -85,7 +85,7 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
   `begin_cleanup`，恢复真实的资源日志，然后调用 `finish_cleanup`。其后置条件
   同时包含控制规则，以及将 `resource(id)` 恢复为 `initial(id)`。
 - [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) 和
-  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs)：公共 `unload` 在且仅在
+  [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs)：公共 `unload` 在且仅在
   `unload_enabled` 时成功，将 Kernel 清理许可与实际 journal 的 `restore_receipts`
   有定义性合取。`undo_one` 执行对应的 strict inverse，循环保持 restoring 并递减
   journal 长度。公共错误保持完整机器，内部草稿则可能已经恢复部分前缀。它将守卫
@@ -102,7 +102,7 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
   宿主报告是否真实、外部 inverse 的效果仍在证明之外。
 - [lifecycle_state.rs](../crates/cordis-kernel/src/lifecycle_state.rs)、
   [lifecycle_actions/resources.rs](../crates/cordis-kernel/src/lifecycle_actions/resources.rs) 与
-  [publication_cleanup.rs](../crates/cordis-kernel/src/publication_cleanup.rs)：
+  [publication/cleanup.rs](../crates/cordis-kernel/src/publication/cleanup.rs)：
   实际共享 owner 一起持有 Kernel/协议。受管 finish 检查 domain、凭据、资源来源和
   清单完整性；原子注册表批次先于 commitment 释放。拒绝保持 finish 输入，成功则
   清空该 episode 的受管资源并返回精确 slot。回调真实性、获取路由和值句柄删除仍在边界外。
@@ -123,7 +123,7 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
   一次；`complete` 原样保存传入的重试值，被拒绝时则原样返回。`retry` 要求值仍然
   保留；`is_empty` 排除遗漏的已保存或已交付工作。执行器返回哪个工厂及工厂实际
   做了什么，仍是宿主义务。
-- [runtime.rs](../crates/cordis/src/runtime.rs)：普通 Rust 中的
+- [runtime/poll.rs](../crates/cordis/src/runtime/poll.rs)：普通 Rust 中的
   `Runtime::poll_settle` 在执行宿主回调前后调用共享生命周期 Driver。
   这是实际的集成路径，不是对任意回调或 Future 行为的证明。
 
@@ -189,8 +189,8 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   则意味着确实存在引用。`unload` 调用 `ChildEpisode::finish_restore`；成功时
   保证 `ownership::child_unload` 且日志为空。
 - [mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs) 和
-  [fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs)：
-  [`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs)
+  [mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs)：
+  [`mixed_driver/recovery.rs`](../crates/cordis-kernel/src/mixed_driver/recovery.rs)
   将已表示的良构源状态中保留的 child 身份接到实际 receipts。
   `history_sound` 本身只保证当初落地时 inverse 有定义；retention 才给出当前事实。
   对已登记 actor 的 `unit_child_journal`，Unit 恒等操作与 Child retirement 均保持
@@ -205,7 +205,7 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   foreign replay 恢复方程；引理 57 和定理 73 仍为 partial。
 
 - [`provision_history.rs`](../crates/cordis-kernel/src/provision_history.rs) 与
-  [`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+  [`mixed_driver/provision_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/provision_recovery.rs)
   进一步覆盖真实 Unit/Child/Provision 日志。从 empty 的实际执行导出
   `live_provisions`：每条保留的 Provision 都对应 owner 中有值的槽，同一 owner
   活跃日志中的 Provision key 互异。外部 Xor 可修改 payload，但保持槽占用。
@@ -213,7 +213,7 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   Kernel 清理守卫；Mixed/Fresh 脚本和 bootstrap 返回值从真实历史建立该性质。
   下述更强结论也覆盖自身含 Xor 的日志。
 - [`operation_history.rs`](../crates/cordis-kernel/src/operation_history.rs) 与
-  [`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs)
+  [`mixed_driver/recovery_all.rs`](../crates/cordis-kernel/src/mixed_driver/recovery_all.rs)
   为全部四种具体 receipt 建立 `journal_recovery`。`live_operations` 导出当前仍
   解析到捕获的 provider、provider 与值保留，以及较后 Provision 不删除较早 operation
   所需槽的顺序条件。与 Provision 唯一性及 child retention 组合后，`restore_all`
@@ -224,7 +224,7 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   不包括任意 scalar 效果、宿主回调、一般 foreign replay 方程或全局终止；owner 表空
   结论由下述覆盖桥建立。
 - [`provision_coverage.rs`](../crates/cordis-kernel/src/provision_coverage.rs) 与
-  [`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs)
+  [`mixed_driver/owner_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/owner_recovery.rs)
   将推论 69 的 owner 表空结论接到真实恢复。`provided_journals` 用保留的 Provision
   逆记录覆盖每个当前 owner 槽，与保证每条已记录 Provision 的值仍存在形成反向对应。
   `owner_table_recovery_from_source` 把覆盖接到实际 receipts：若整个恢复有定义，
@@ -234,7 +234,7 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   保持合同。没有新增运行时清空操作或历史缓冲；Child inverse 仍只退休 child，不清空
   其独立表。一般 foreign replay 方程、任意宿主效果及全局进展仍是独立义务，推论 69
   继续保持 partial。
-- [`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs) 将终态值
+- [`mixed_driver/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/terminal_replay.rs) 将终态值
   方程接到实际 **Mixed** `ScriptReport` 输出。`transitions` 中匹配的 Begin、末条
   成功 owner Unload 及无中途 owner Unload 直接标识 episode。
   `terminal_recovery(bank)` 自动提供真实源执行、空 owner 表以及
@@ -248,7 +248,7 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts
   也不声称 registry 身份恢复。
 - [`fresh_recovery.rs`](../crates/cordis-kernel/src/fresh_recovery.rs) 沿每次 Fresh
   源 landing 的实际分配 choice 使用同一套 receipt 和值代数。
-  [`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs)
+  [`mixed_driver/fresh/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs)
   将该历史接到真实 Fresh `run_script` 的 `terminal_recovery(bank)` 后置条件。
   Begin/Unload 区间由日志导出，无须假设；foreign 清理使用实际捕获的 inverse
   journal，包括 Begin 前产生的记录。两项 Fresh 回归覆盖重复激活时不同 child

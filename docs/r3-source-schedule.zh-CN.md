@@ -24,12 +24,12 @@
 
 | 义务 | 可执行实现与合同 |
 | --- | --- |
-| 真实位置，不虚构序号 | [`lifecycle_state/native/runtime/recipes.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)、[`managed_replay.rs`](../crates/cordis-kernel/src/managed_replay.rs)：`Ledger::revision`、`Source::wf`、`run_replayable_root` |
-| 同一流、完整时间顺序置换 | [`managed_replay_order.rs`](../crates/cordis-kernel/src/managed_replay_order.rs)：`plan`、`prefix`、`chronological` |
-| 顺序计划驱动实际调用 | [`managed_replay_batch.rs`](../crates/cordis-kernel/src/managed_replay_batch.rs)：`run`、`actual_prefix` |
-| typed 源连续性 | [`managed_replay_payload_history.rs`](../crates/cordis-kernel/src/managed_replay_payload_history.rs)：`continues_payload` |
-| 原子输入守卫与实际逆操作 | [`payload_inverse.rs`](../crates/cordis-kernel/src/payload_inverse.rs)：`apply_captured_following` |
-| 实际服务选择与清理所有权 | [`native_payload.rs`](../crates/cordis-kernel/src/native_payload.rs)、[`payload_cleanup.rs`](../crates/cordis-kernel/src/payload_cleanup.rs)：`land`、`apply_payload_captured_following` |
+| 真实位置，不虚构序号 | [`lifecycle_state/native/runtime/recipes.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)、[`reversible_value/managed/replay.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay.rs)：`Ledger::revision`、`Source::wf`、`run_replayable_root` |
+| 同一流、完整时间顺序置换 | [`reversible_value/managed/replay/order.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/order.rs)：`plan`、`prefix`、`chronological` |
+| 顺序计划驱动实际调用 | [`reversible_value/managed/replay/batch.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs)：`run`、`actual_prefix` |
+| typed 源连续性 | [`reversible_value/managed/replay/inputs/payload_history.rs`](../crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs)：`continues_payload` |
+| 原子输入守卫与实际逆操作 | [`reversible_value/payload/restoration.rs`](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs)：`apply_captured_following` |
+| 实际服务选择与清理所有权 | [`reversible_value/native_payload.rs`](../crates/cordis-kernel/src/reversible_value/native_payload.rs)、[`cleanup_groups/payload.rs`](../crates/cordis-kernel/src/cleanup_groups/payload.rs)：`land`、`apply_payload_captured_following` |
 
 这些支持论文条目 68、69、79 对应的既有 recovery 工作包，不改变式 (55) 的审查解释与验收标准。batch 尚未把 typed 连续性和捕获落地接口自动组合为完整剩余生命周期调度器；跨调用标量／typed 状态模拟、动态绑定、owner publication、Child 和区间内部 Unload 仍需完成。[效果边界案例](r3-effect-boundary.zh-CN.md)还揭示了通用重放成功所需的接口决策。
 

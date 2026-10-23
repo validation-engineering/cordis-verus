@@ -51,10 +51,10 @@ implicitly retire that consumer. The example checks this distinction.
 | Obligation | Actual code and proof |
 | --- | --- |
 | An operation returns a value, outcome and a true partial inverse | [`Cell::forward`, `operation`, `primitive_theory`](../../crates/cordis-kernel/src/reversible_value.rs) implement and prove the scalar premise used by the dependent grammar for Definition 30 and Lemma 39 |
-| Results select the actual continuation | `Branch::select` and [`ReversibleValue::run_following`](../../crates/cordis-kernel/src/value_program.rs); no expected outcome is supplied by the host |
+| Results select the actual continuation | `Branch::select` and [`ReversibleValue::run_following`](../../crates/cordis-kernel/src/reversible_value/program.rs); no expected outcome is supplied by the host |
 | Every installed program root and continuation has Component membership | `Program::member` and `Program::component` instantiate the full finite strict carrier from [R1](../r1-semantics.md), rather than a successful-input-only carrier |
 | The observed value comes from the state that ran | The real `vstd::RwLock` holds `ValueState { value, depth }` and its ghost execution history; `snapshot` reads those actual fields while holding the lock |
-| The inverse is the one produced by the actual operation | [`Execution::apply_value` and `run_value_program`](../../crates/cordis-kernel/src/execution.rs) retain real inverse objects; the program implementation is in `value_program.rs` |
+| The inverse is the one produced by the actual operation | [`Execution::apply_value` and `run_value_program`](../../crates/cordis-kernel/src/execution.rs) retain real inverse objects; the program implementation is in `reversible_value/program.rs` |
 | Cleanup cannot substitute another inverse or simply report success | [`CleanupQueue::dispatch`](../../crates/cordis-kernel/src/cleanup_queue/completion.rs) selects, executes and acknowledges the actual stored inverse in one checked call |
 | Failed restoration preserves recovery data | A blocked inverse remains in its original cleanup slot; the queue is failed, and the existing checked retry protocol produces the next attempt |
 | A complete history corresponds to source steps | `history_interpretation` classifies every recorded write, successful inverse and rejected attempt; `ProgramReport::source_execution` constructs a contiguous dependent-grammar trace for the actual complete program or failing prefix |

@@ -91,7 +91,7 @@ flowchart TD
 | --- | --- | --- |
 | `cordis-kernel` | [lib.rs](../crates/cordis-kernel/src/lib.rs) | 具体 registry、声明、bindings、generation 与生命周期转换；同一源码经 Verus 和 Cargo 编译 |
 | 可逆资源与 episode | [resources.rs](../crates/cordis-kernel/src/resources.rs)、[episode.rs](../crates/cordis-kernel/src/episode.rs)、[ownership.rs](../crates/cordis-kernel/src/ownership.rs) | 实际 inverse、在途准入、Child retirement 与恢复协议 |
-| 闭合程序驱动 | [program.rs](../crates/cordis-kernel/src/program.rs)、[mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs)、[fresh_driver.rs](../crates/cordis-kernel/src/fresh_driver.rs) | 拥有 Kernel、程序与真实 journal；构造实际执行历史，不接受调用者伪造执行结果 |
+| 闭合程序驱动 | [program.rs](../crates/cordis-kernel/src/program.rs)、[mixed_driver.rs](../crates/cordis-kernel/src/mixed_driver.rs)、[mixed_driver/fresh.rs](../crates/cordis-kernel/src/mixed_driver/fresh.rs) | 拥有 Kernel、程序与真实 journal；构造实际执行历史，不接受调用者伪造执行结果 |
 | `cordis` | [lib.rs](../crates/cordis/src/lib.rs)、[runtime.rs](../crates/cordis/src/runtime.rs) | typed services、setup、异步 stage、取消和清理；普通 Rust 适配层 |
 | `cordis-driver` | [lib.rs](../crates/cordis-driver/src/lib.rs) | 不持 JS 值的 command/action/ticket/lease 驱动；公共控制已接入原 Runtime，宿主协议仍为普通 Rust |
 | `cordis-node` + JS facade | [Node 指南](node-compatibility.md) | Node-API、JS 对象表、同图 Rust factory SDK、原版语言层、导入入口；FFI 与 callback 属于宿主边界 |
@@ -126,6 +126,11 @@ landing 位于 [`cleanup_queue/`](../crates/cordis-kernel/src/cleanup_queue/)。
 [`runtime/cleanup.rs`](../crates/cordis/src/runtime/cleanup.rs)。这里的文件拆分保持
 原有合同和调用关系；宿主适配器仍是普通 Rust。
 
+其余内核文件也已按既有模块身份组织，包括 `reversible_value/`、`node_runtime/`
+和 `mixed_driver/`；不再通过 `#[path]` 在平铺文件之间跳转。普通宿主另拆出
+`runtime/setup.rs`、`runtime/services.rs` 和 `runtime/poll.rs`。完整职责分类和
+删减处置见[审查地图](review-map.zh-CN.md)（[English](review-map.md)）。
+
 以下按证明依赖导航；这些分组不是新的 crate 或隐式可信假设。
 
 | 主题 | 建议入口 | 已建立的连接 |
@@ -134,7 +139,7 @@ landing 位于 [`cleanup_queue/`](../crates/cordis-kernel/src/cleanup_queue/)。
 | 依赖类型与严格操作 | [contexts.rs](../crates/cordis-kernel/src/contexts.rs)、[dependent_grammar.rs](../crates/cordis-kernel/src/dependent_grammar.rs)、[partial_independence.rs](../crates/cordis-kernel/src/partial_independence.rs) | 每 key 值域、参数／outcome 族、真实部分函数域、操作独立性 |
 | 控制与完整状态 | [refinement.rs](../crates/cordis-kernel/src/refinement.rs)、[semantics.rs](../crates/cordis-kernel/src/semantics.rs)、[preservation.rs](../crates/cordis-kernel/src/preservation.rs) | 九规则、控制投影、表与 auxiliary 字段的安全性 |
 | 实际 grammar 历史 | [dependent_lift.rs](../crates/cordis-kernel/src/dependent_lift.rs)、[mixed_grammar.rs](../crates/cordis-kernel/src/mixed_grammar.rs)、[fresh_semantics.rs](../crates/cordis-kernel/src/fresh_semantics.rs) | arbitrary continuation、真实历史来源、Child 和 fresh 分配、空起点前缀安全 |
-| 程序到规则 | [program_trace.rs](../crates/cordis-kernel/src/program_trace.rs)、[admitted_script.rs](../crates/cordis-kernel/src/admitted_script.rs) | 从具体成功 API／脚本事件构造同一条合法源轨迹 |
+| 程序到规则 | [program_trace.rs](../crates/cordis-kernel/src/program_trace.rs)、[mixed_driver/fresh/admitted/script.rs](../crates/cordis-kernel/src/mixed_driver/fresh/admitted/script.rs) | 从具体成功 API／脚本事件构造同一条合法源轨迹 |
 | 混合恢复与删除 | [mixed_foreign_restore.rs](../crates/cordis-kernel/src/mixed_foreign_restore.rs)、[foreign_child_deletion.rs](../crates/cordis-kernel/src/foreign_child_deletion.rs) | 动态 registry、任意年龄 foreign Table／Child journal、合法 surviving execution 及最后 owner 恢复 |
 | 交换与有限正常化 | [mixed_orchestration.rs](../crates/cordis-kernel/src/mixed_orchestration.rs)、[causal_normalization.rs](../crates/cordis-kernel/src/causal_normalization.rs)、[rewrite_confluence.rs](../crates/cordis-kernel/src/rewrite_confluence.rs) | 实际局部 diamond、后缀运输、同一源轨迹的 guarded 重写正常形唯一性 |
 | 原文通用接口 | [paper_components.rs](../crates/cordis-kernel/src/paper_components.rs)、[paper_instantiation.rs](../crates/cordis-kernel/src/paper_instantiation.rs)、[paper_trace_independence.rs](../crates/cordis-kernel/src/paper_trace_independence.rs) | 原 Component／typed Child／全历史独立性的条件定义；不自动建立递归 Γ 或所有实现的 membership |

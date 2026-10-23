@@ -117,22 +117,22 @@ Unload、原始 Child 完成记录和 forward 登记清偿，在同一个真实 
 
 | 审查环节 | 代码 |
 | --- | --- |
-| 锁内取得真实恢复证据 | [payload_inverse.rs](../crates/cordis-kernel/src/payload_inverse.rs)、[payload_attempt.rs](../crates/cordis-kernel/src/payload_attempt.rs) |
-| 持久前缀合并与一致性 | [shared_value_sources.rs](../crates/cordis-kernel/src/shared_value_sources.rs) |
-| 函数／清理来源与值解码 | [managed_value_sources.rs](../crates/cordis-kernel/src/managed_value_sources.rs)、[cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs) |
-| 实际原始写入／恢复的自动捕获 | [managed_lifecycle_values.rs](../crates/cordis-kernel/src/managed_lifecycle_values.rs) |
-| 生产路径保持的顺序证据 | [managed_source_order.rs](../crates/cordis-kernel/src/managed_source_order.rs)、[managed_lifecycle_order.rs](../crates/cordis-kernel/src/managed_lifecycle_order.rs) |
-| 线性最后写入所有权与完整 allocation 投影 | [joint_owner_history.rs](../crates/cordis-kernel/src/joint_owner_history.rs)、[joint_execution.rs](../crates/cordis-kernel/src/joint_execution.rs) |
-| 实际 scalar 逆操作凭据、创建与唯一消费 | [scalar_ownership.rs](../crates/cordis-kernel/src/scalar_ownership.rs)、[reversible_value.rs](../crates/cordis-kernel/src/reversible_value.rs) |
-| typed 前驱、唯一恢复与退休来源 | [payload_semantic_history.rs](../crates/cordis-kernel/src/payload_semantic_history.rs)、[payload_source_history.rs](../crates/cordis-kernel/src/payload_source_history.rs) |
-| 宿主实际返回的统一生产者证书 | [managed_producer_sources.rs](../crates/cordis-kernel/src/managed_producer_sources.rs)、[managed_lifecycle_values.rs](../crates/cordis-kernel/src/managed_lifecycle_values.rs) |
-| 完整 Journal 清点及间隙／尾部推导 | [managed_source_coverage.rs](../crates/cordis-kernel/src/managed_source_coverage.rs) |
-| 从来源推出值连续 | [managed_source_link.rs](../crates/cordis-kernel/src/managed_source_link.rs) |
-| 从来源推出逆操作仍可用 | [managed_source_obligations.rs](../crates/cordis-kernel/src/managed_source_obligations.rs) |
-| 所有者不变式及恢复入口 | [managed_lifecycle_history.rs](../crates/cordis-kernel/src/managed_lifecycle_history.rs)、[managed_lifecycle_sources.rs](../crates/cordis-kernel/src/managed_lifecycle_sources.rs) |
-| 自动区间及区间前义务 | [managed_producer_interval.rs](../crates/cordis-kernel/src/managed_producer_interval.rs)、[managed_producer_event.rs](../crates/cordis-kernel/src/managed_producer_event.rs) |
-| 实际宿主捕获与 root／Child 恢复 | [managed_producer_capture.rs](../crates/cordis-kernel/src/managed_producer_capture.rs)、[managed_producer_recovery.rs](../crates/cordis-kernel/src/managed_producer_recovery.rs) |
-| 实际共同 native 截面 | [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs) |
+| 锁内取得真实恢复证据 | [reversible_value/payload/restoration.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration.rs)、[reversible_value/payload/restoration/attempt.rs](../crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs) |
+| 持久前缀合并与一致性 | [reversible_value/history/sources.rs](../crates/cordis-kernel/src/reversible_value/history/sources.rs) |
+| 函数／清理来源与值解码 | [reversible_value/managed/interleaving/sources.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources.rs)、[cleanup_groups/payload/recovery.rs](../crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs) |
+| 实际原始写入／恢复的自动捕获 | [reversible_value/managed/interleaving/history/lifecycle/values.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs) |
+| 生产路径保持的顺序证据 | [reversible_value/managed/interleaving/sources/order.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/order.rs)、[reversible_value/managed/interleaving/history/lifecycle/order.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/order.rs) |
+| 线性最后写入所有权与完整 allocation 投影 | [reversible_value/joint/ownership.rs](../crates/cordis-kernel/src/reversible_value/joint/ownership.rs)、[reversible_value/joint.rs](../crates/cordis-kernel/src/reversible_value/joint.rs) |
+| 实际 scalar 逆操作凭据、创建与唯一消费 | [reversible_value/ownership.rs](../crates/cordis-kernel/src/reversible_value/ownership.rs)、[reversible_value.rs](../crates/cordis-kernel/src/reversible_value.rs) |
+| typed 前驱、唯一恢复与退休来源 | [reversible_value/payload/semantic_history.rs](../crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs)、[reversible_value/payload/source.rs](../crates/cordis-kernel/src/reversible_value/payload/source.rs) |
+| 宿主实际返回的统一生产者证书 | [reversible_value/managed/interleaving/sources/producer.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/producer.rs)、[reversible_value/managed/interleaving/history/lifecycle/values.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs) |
+| 完整 Journal 清点及间隙／尾部推导 | [reversible_value/managed/interleaving/sources/coverage.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/coverage.rs) |
+| 从来源推出值连续 | [reversible_value/managed/interleaving/sources/link.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/link.rs) |
+| 从来源推出逆操作仍可用 | [reversible_value/managed/interleaving/sources/origins.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/origins.rs) |
+| 所有者不变式及恢复入口 | [reversible_value/managed/interleaving/history/lifecycle.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs)、[reversible_value/managed/interleaving/history/lifecycle/sources.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs) |
+| 自动区间及区间前义务 | [reversible_value/managed/interleaving/sources/interval.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/interval.rs)、[reversible_value/managed/interleaving/sources/produced.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/produced.rs) |
+| 实际宿主捕获与 root／Child 恢复 | [reversible_value/managed/interleaving/history/lifecycle/producer_capture.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_capture.rs)、[reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs) |
+| 实际共同 native 截面 | [reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs](../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs) |
 
 ## 历史区间验证与剩余边界
 
@@ -170,7 +170,7 @@ refinement 检查也通过；Cargo 检查使用 `--locked --offline`。
 其来源、恢复结论和阻断合同由 Verus 检查。
 
 新增回归 `producer_snapshots_cover_raw_calls_repeated_states_and_retirement` 位于
-[managed_function.rs](../crates/cordis-kernel/tests/managed_function.rs)，执行绕过 facade 的
+[reversible_value/managed.rs](../crates/cordis-kernel/tests/managed_function.rs)，执行绕过 facade 的
 原始调用、scalar 恢复失败与重试、重复 scalar 状态、重复 typed 内容、旧 typed 逆操作
 拒绝、替换、退休及重复读取退休来源，同时检查来源采集不额外保留用户 Arc 引用。
 运行时断言不检查已经擦除的来源证明，该保证由 Verus 检查。

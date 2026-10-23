@@ -160,52 +160,52 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/value_access.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/access.rs",
           "symbol": "apply_native_value",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/value_access.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/access.rs",
           "symbol": "primitive_theory",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "production",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "frame",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "source_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "failed_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/native_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
           "symbol": "capture_native_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/native_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
           "symbol": "apply_native_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
           "symbol": "prepare_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
           "symbol": "commit_calculation",
           "role": "execution"
         }
@@ -257,17 +257,17 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
           "symbol": "nontrivial_carrier",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
           "symbol": "reified_representation",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
           "symbol": "reified_insertion_domain",
           "role": "proof"
         }
@@ -336,7 +336,7 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_access.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/access.rs",
           "symbol": "footprint",
           "role": "contract"
         },
@@ -351,57 +351,57 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "production",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "frame",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "source_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "failed_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_alias.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
           "symbol": "single_key_refinement",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_alias.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
           "symbol": "other_alias_changes",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_alias.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
           "symbol": "allocation_independence",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_alias.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
           "symbol": "production_replace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_alias.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
           "symbol": "operation_agrees",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_composition.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_composition.rs",
           "symbol": "address_origin",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_composition.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_composition.rs",
           "symbol": "interpret_failure",
           "role": "proof"
         }
@@ -476,27 +476,27 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
           "symbol": "root_component",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/reified_context.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
           "symbol": "function_correspondence",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/inspected_run.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs",
           "symbol": "run_inspected",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/publication_values.rs",
+          "file": "crates/cordis-kernel/src/publication/values.rs",
           "symbol": "publish_checked",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/publication_projection.rs",
+          "file": "crates/cordis-kernel/src/publication/values/projection.rs",
           "symbol": "appended_value",
           "role": "proof"
         },
@@ -506,92 +506,92 @@
           "role": "host"
         },
         {
-          "file": "crates/cordis-kernel/src/value_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/function.rs",
           "symbol": "run_native_value_program",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/value_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/function.rs",
           "symbol": "production",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "component",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "run_service_program",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "production",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "frame",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "source_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_program.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/services.rs",
           "symbol": "failed_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_access.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/access.rs",
           "symbol": "apply_native_value_chained",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_execution.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
           "symbol": "join_causes",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/value_alias.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
           "symbol": "terminal_member",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/value_access.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/access.rs",
           "symbol": "general_semantics",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/native_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
           "symbol": "single_key_effect",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
           "symbol": "bind",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/service_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
           "symbol": "run_service_root",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/service_composition.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_composition.rs",
           "symbol": "resolved_member",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_composition.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_composition.rs",
           "symbol": "interpret_dynamic",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_stack.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_stack.rs",
           "symbol": "interpret_queue",
           "role": "proof"
         }
@@ -678,17 +678,17 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_driver.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh.rs",
           "symbol": "run_script",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/service_stack.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_stack.rs",
           "symbol": "recoverable",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/service_stack.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_stack.rs",
           "symbol": "next_queued_inverse",
           "role": "proof"
         },
@@ -698,17 +698,17 @@
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/episode_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/episode_replay.rs",
           "symbol": "recovery_history_witness",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/episode_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/episode_replay.rs",
           "symbol": "restored_observation_from_source",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_episode_replay.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/episode_replay.rs",
           "symbol": "establish_recovery_history",
           "role": "proof"
         },
@@ -718,32 +718,32 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/inspected_run.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs",
           "symbol": "run_inspected",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
           "symbol": "run_function",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/recovery.rs",
           "symbol": "establish_recovery",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery_word.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/recovery/word.rs",
           "symbol": "recover_retained",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/recovery.rs",
           "symbol": "establish_recovery",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/shared_value_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/history.rs",
           "symbol": "prefix",
           "role": "proof"
         },
@@ -753,57 +753,57 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_episode.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/episode.rs",
           "symbol": "after",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_root.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
           "symbol": "episode_interval",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_endpoint.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/episode/endpoint.rs",
           "symbol": "recover_observed",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_root_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/root/recovery.rs",
           "symbol": "endpoint_recovery",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_root_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/root/recovery.rs",
           "symbol": "recover_begin",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_semantic_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs",
           "symbol": "valid",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_semantic_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs",
           "symbol": "append",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_restored.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/recovery/restored.rs",
           "symbol": "between",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/recovery.rs",
           "symbol": "resumed_origin",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/script_deletion.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/deletion.rs",
           "symbol": "admissible",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/script_deletion.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/deletion.rs",
           "symbol": "delete_private_episode",
           "role": "proof"
         },
@@ -813,32 +813,32 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_recovery.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs",
           "symbol": "establish_recovery",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_recovery.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs",
           "symbol": "finished",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_recovery.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs",
           "symbol": "resumed_inverse",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_path.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/cleanup_path.rs",
           "symbol": "cleanup_attempts_succeed",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_path.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/cleanup_path.rs",
           "symbol": "cleanup_recovers_begin",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
           "symbol": "dispatch_payload_cleanup",
           "role": "execution"
         },
@@ -848,27 +848,27 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/recovery_obligations.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/obligations.rs",
           "symbol": "enabled_is_last",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/recovery_obligations.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/obligations.rs",
           "symbol": "consume",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_interleaving.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving.rs",
           "symbol": "interleaved_progress",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_interleaving_completion.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/completion.rs",
           "symbol": "drained",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_interleaving_endpoint.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/endpoint.rs",
           "symbol": "unload_recovers_begin",
           "role": "proof"
         },
@@ -888,7 +888,7 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_inverse.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
           "symbol": "restore_observed",
           "role": "execution"
         },
@@ -898,12 +898,12 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/group_release_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/groups/release.rs",
           "symbol": "drained_before_exit",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_release_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/episode/release.rs",
           "symbol": "completed_before_drain",
           "role": "proof"
         },
@@ -913,67 +913,67 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_recovery.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs",
           "symbol": "acknowledgement_records",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_release_path.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/release.rs",
           "symbol": "unload_recovers_from_cleanup",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_release_membership.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/release/membership.rs",
           "symbol": "before_seal",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_release_membership.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/release/membership.rs",
           "symbol": "unload_recovers_registered",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
           "symbol": "registration_facts",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs",
           "symbol": "dispatch_recorded",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs",
           "symbol": "retry_recorded",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs",
           "symbol": "accounted",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_history_release.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/release.rs",
           "symbol": "emitted_from_history",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_history_release.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/release.rs",
           "symbol": "unload_recovers_from_history",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_release_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/episode/release.rs",
           "symbol": "unique_consumption",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_execution.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
           "symbol": "compare",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
           "symbol": "queued_sources",
           "role": "contract"
         },
@@ -993,82 +993,82 @@
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_history_release.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/release.rs",
           "symbol": "unload_recovers_from_release",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs",
           "symbol": "dispatch",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_native.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs",
           "symbol": "run_recorded_root",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_native.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs",
           "symbol": "retry_native",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_owned_release.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery.rs",
           "symbol": "unload_recovers_from_owner",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs",
           "symbol": "extend",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_cleanup_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history.rs",
           "symbol": "host_turn",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs",
           "symbol": "enqueue_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs",
           "symbol": "register",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_callbacks.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/callbacks.rs",
           "symbol": "complete_future",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_work.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/work.rs",
           "symbol": "complete_request",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_work.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/work.rs",
           "symbol": "admit_scoped_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_work.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/work.rs",
           "symbol": "land_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_work.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/work.rs",
           "symbol": "retire_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_children.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs",
           "symbol": "enqueue_native_child",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "run_function",
           "role": "execution"
         },
@@ -1078,32 +1078,32 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle.rs",
           "symbol": "recovery_boundary_valid",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "close_call",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "covered_by",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "after_call_receipts",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "after_call",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "extend_boundary",
           "role": "proof"
         },
@@ -1113,17 +1113,17 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
           "symbol": "dispatch_payload_cleanup_following",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_recovery.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload/recovery.rs",
           "symbol": "follows_boundary",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs",
           "symbol": "before_cleanup",
           "role": "proof"
         },
@@ -1183,17 +1183,17 @@
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_children.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs",
           "symbol": "owned_child_retirement",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_children.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs",
           "symbol": "native_child_released",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_children.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs",
           "symbol": "native_child_unassigned",
           "role": "proof"
         },
@@ -1248,17 +1248,17 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_child_completion.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs",
           "symbol": "native_children_resolved",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_child_completion.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs",
           "symbol": "native_child_endpoint",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_child_completion.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs",
           "symbol": "retain_native_child_endpoints",
           "role": "proof"
         },
@@ -1298,112 +1298,112 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_child_cut.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion/cut.rs",
           "symbol": "native_children_at_cut",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery_cut.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs",
           "symbol": "observe_later",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery_cut.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs",
           "symbol": "unload_recovers_with_children",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_pending_cut.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/pending.rs",
           "symbol": "registered_pending_at_cut",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_observer.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/observer.rs",
           "symbol": "run_function_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_observer.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/observer.rs",
           "symbol": "dispatch_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_observer.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/observer.rs",
           "symbol": "join_boundary",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs",
           "symbol": "owns_forward",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs",
           "symbol": "observations_extend",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs",
           "symbol": "extend_dispatch_coverage",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs",
           "symbol": "drained_forward",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_foreign_closure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs",
           "symbol": "closed_from_owners",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery_cut.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs",
           "symbol": "unload_recovers_from_observed_owners",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/shared_value_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/history/sources.rs",
           "symbol": "agreement",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_value_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources.rs",
           "symbol": "retain_report",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_value_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources.rs",
           "symbol": "retain_dispatch",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_link.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/link.rs",
           "symbol": "linked_from_sources",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_obligations.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/origins.rs",
           "symbol": "available",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs",
           "symbol": "sources_for_history",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs",
           "symbol": "recover_recorded_prefix",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs",
           "symbol": "observe_payload_restore",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery_cut.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs",
           "symbol": "unload_recovers_from_source_history",
           "role": "proof"
         },
@@ -1418,327 +1418,327 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/closed_region_execution.rs",
+          "file": "crates/cordis-kernel/src/closed_region_deletion/execution.rs",
           "symbol": "step",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/closed_region_trace.rs",
+          "file": "crates/cordis-kernel/src/closed_region_deletion/trace.rs",
           "symbol": "from_source",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/closed_region_trace.rs",
+          "file": "crates/cordis-kernel/src/closed_region_deletion/trace.rs",
           "symbol": "closing_observation",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/closed_region_fresh_trace.rs",
+          "file": "crates/cordis-kernel/src/closed_region_deletion/fresh_trace.rs",
           "symbol": "from_source",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/script_deletion.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/deletion.rs",
           "symbol": "delete_closed_region",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_region_deletion.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/deletion.rs",
           "symbol": "delete_closed_region",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/closed_region_example.rs",
+          "file": "crates/cordis-kernel/src/closed_region_deletion/example.rs",
           "symbol": "nonempty",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/closed_region_example.rs",
+          "file": "crates/cordis-kernel/src/closed_region_deletion/example.rs",
           "symbol": "source_guards",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_allocation_history.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/allocation.rs",
           "symbol": "history",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_allocation_history.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/allocation.rs",
           "symbol": "payloads",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/allocation_names.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/names.rs",
           "symbol": "pair",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_compaction.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs",
           "symbol": "compact",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/allocation_origins.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/compaction/origins.rs",
           "symbol": "enabled",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_compaction_origins.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/compaction/execution_origins.rs",
           "symbol": "from_region",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_compaction_origins.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/compaction/execution_origins.rs",
           "symbol": "admission_complete",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_compaction_source.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/compaction/source.rs",
           "symbol": "source_execution",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_dispatch.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch.rs",
           "symbol": "command_enabled",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_dispatch_source.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/source.rs",
           "symbol": "source_command_admission",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_dispatch_step.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/forward.rs",
           "symbol": "source_step_admission",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_execution_shape.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/shape.rs",
           "symbol": "source_runtime_shape",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_execution_shape.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/shape.rs",
           "symbol": "deleted_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_execution_shape.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/shape.rs",
           "symbol": "renamed_trace",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_dispatch_exact.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/exact.rs",
           "symbol": "exact_successor",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_synchronous_transport.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/exact/transport.rs",
           "symbol": "deletion",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_runtime_metadata.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/dispatch/metadata.rs",
           "symbol": "metadata_progress",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_script_completeness.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/replay.rs",
           "symbol": "source_call_at",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_script_completeness.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/replay.rs",
           "symbol": "replays",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/fresh_compaction_source.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/compaction/source.rs",
           "symbol": "replay_result",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/recovery.rs",
           "symbol": "recorded_values",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_values.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs",
           "symbol": "apply_scalar_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_values.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs",
           "symbol": "apply_payload_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_values.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs",
           "symbol": "restore_scalar_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_values.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs",
           "symbol": "restore_payload_observed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_order.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/order.rs",
           "symbol": "source_order_extends",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_order.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/order.rs",
           "symbol": "append",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_coverage.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/coverage.rs",
           "symbol": "complete",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_coverage.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/coverage.rs",
           "symbol": "gaps_from_census",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_coverage.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/coverage.rs",
           "symbol": "tails_from_census",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_source_coverage.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/coverage.rs",
           "symbol": "missing",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs",
           "symbol": "recover_observer_censused_prefix",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/sources.rs",
           "symbol": "unload_from_observer_census",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_owner_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/ownership.rs",
           "role": "proof",
           "symbol": "allocation"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_execution.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
           "role": "execution",
           "symbol": "update_observing"
         },
         {
-          "file": "crates/cordis-kernel/src/scalar_ownership.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/ownership.rs",
           "role": "proof",
           "symbol": "restore_source"
         },
         {
-          "file": "crates/cordis-kernel/src/scalar_ownership.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/ownership.rs",
           "role": "contract",
           "symbol": "valid"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_semantic_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/semantic_history.rs",
           "role": "proof",
           "symbol": "unique_restore"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_source_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/source.rs",
           "role": "execution",
           "symbol": "source_snapshot"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_source_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/source.rs",
           "role": "contract",
           "symbol": "wf"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/producer.rs",
           "role": "proof",
           "symbol": "consumption_source"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_sources.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/producer.rs",
           "role": "proof",
           "symbol": "certify"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_values.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs",
           "role": "host",
           "symbol": "scalar_source_snapshot"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_values.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/values.rs",
           "role": "host",
           "symbol": "payload_source_snapshot"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_interval.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/interval.rs",
           "symbol": "initial",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_interval.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/interval.rs",
           "symbol": "origin",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_interval.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/interval.rs",
           "symbol": "check",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_event.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/produced.rs",
           "symbol": "facts",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_capture.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_capture.rs",
           "symbol": "capture_invocation_census",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_capture.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_capture.rs",
           "symbol": "capture_recovery_interval",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs",
           "symbol": "recorded_census",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/shared_value_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/history.rs",
           "symbol": "take",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_producer_matching.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/matching.rs",
           "symbol": "includes_restore",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_release_path.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/release.rs",
           "symbol": "restoration_before_unload",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_unload_census.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_census.rs",
           "symbol": "unload_census",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_unload_capture.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_capture.rs",
           "symbol": "capture_release_census",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_unload_client.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_client.rs",
           "symbol": "nonempty_unload_client",
           "role": "proof"
         },
@@ -1753,7 +1753,7 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_pending_recovery.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/pending_recovery.rs",
           "symbol": "normalize",
           "role": "proof"
         },
@@ -1773,12 +1773,12 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_host.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs",
           "symbol": "terminal_history",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_lifecycle_native.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs",
           "symbol": "release_controlled",
           "role": "execution"
         },
@@ -1838,7 +1838,7 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_deletion_capture.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs",
           "symbol": "with_deletion",
           "role": "execution"
         },
@@ -1868,27 +1868,27 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_erasure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/erasure.rs",
           "symbol": "restoration_sources",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_erasure.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/erasure.rs",
           "symbol": "pending_edge",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_erasure_reads.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/erasure/reads.rs",
           "symbol": "transport",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_erasure_client.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/erasure/client.rs",
           "symbol": "nonempty",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_deletion_capture.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/deletion_capture.rs",
           "symbol": "with_effects",
           "role": "execution"
         },
@@ -1913,52 +1913,52 @@
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/kernel_replay_names.rs",
+          "file": "crates/cordis-kernel/src/kernel_replay/names.rs",
           "symbol": "compact",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay.rs",
           "symbol": "instantiate",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_transport.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/transport.rs",
           "symbol": "pair_step",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_root.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
           "symbol": "managed_invocation_ready",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs",
           "symbol": "capture",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs",
           "symbol": "captured",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs",
           "symbol": "seed",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs",
           "symbol": "seeded_operation",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay.rs",
           "symbol": "seed_input",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_inputs.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs",
           "symbol": "initializes",
           "role": "contract"
         },
@@ -1968,57 +1968,57 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/joint_identity.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/identity.rs",
           "symbol": "same",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_bank.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs",
           "symbol": "bind",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs",
           "symbol": "run",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs",
           "symbol": "actual_prefix",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs",
           "symbol": "supported_namespace",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_scalar.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs",
           "symbol": "prepare_scalar",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_scalar.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs",
           "symbol": "land",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_scalar.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs",
           "symbol": "quiet_input",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_scalar.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs",
           "symbol": "unchanged",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_scalar.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs",
           "symbol": "read_witness",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/native_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
           "symbol": "prepare_at",
           "role": "execution"
         },
@@ -2028,67 +2028,67 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_order.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/order.rs",
           "symbol": "plan",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_order.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/order.rs",
           "symbol": "chronological",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_payload_history.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs",
           "symbol": "continues_payload",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_inverse.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
           "symbol": "apply_captured_following",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/native_payload.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/native_payload.rs",
           "symbol": "land",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+          "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
           "symbol": "apply_payload_captured_following",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
           "symbol": "evaluate",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/scalar_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
           "symbol": "commit_calculation",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/controlled_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/controlled.rs",
           "symbol": "apply_controlled_effect",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/native_effect.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
           "symbol": "apply_native_controlled",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
           "symbol": "controlled_execution",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay.rs",
           "symbol": "instantiate_controlled",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_replay_batch.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs",
           "symbol": "run_controlled",
           "role": "execution"
         }
@@ -2126,7 +2126,7 @@
       ],
       "reviewPath": [
         {
-          "file": "crates/cordis-kernel/src/fresh_run.rs",
+          "file": "crates/cordis-kernel/src/mixed_driver/fresh/runner.rs",
           "symbol": "run_until_blocked",
           "role": "execution"
         },
@@ -2250,32 +2250,32 @@
           "role": "host"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_identity.rs",
+          "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
           "symbol": "prepare_entry",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_identity.rs",
+          "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
           "symbol": "qualified_key_identity",
           "role": "proof"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_identity.rs",
+          "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
           "symbol": "insert_entry",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_selection.rs",
+          "file": "crates/cordis-kernel/src/configuration_tree/selection.rs",
           "symbol": "retire_into",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_reconstruction.rs",
+          "file": "crates/cordis-kernel/src/configuration_tree/reconstruction.rs",
           "symbol": "reconstruct",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_reconstruction.rs",
+          "file": "crates/cordis-kernel/src/configuration_tree/reconstruction.rs",
           "symbol": "chain",
           "role": "contract"
         },
@@ -2350,42 +2350,42 @@
           "role": "host"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "preflight_configurations",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "adopt_configurations",
           "role": "execution"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "ready",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "rejected",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "metadata_call",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "adopted",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "prefix",
           "role": "contract"
         },
         {
-          "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
           "symbol": "framed",
           "role": "contract"
         },
@@ -2430,7 +2430,7 @@
           "symbol": "snapshot"
         },
         {
-          "file": "crates/cordis-kernel/src/recipe_execution.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/joint/recipes.rs",
           "role": "contract",
           "symbol": "native_guard"
         },
@@ -2445,12 +2445,12 @@
           "symbol": "recipe_snapshot"
         },
         {
-          "file": "crates/cordis-kernel/src/value_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/function.rs",
           "role": "execution",
           "symbol": "run_value_root"
         },
         {
-          "file": "crates/cordis-kernel/src/service_function.rs",
+          "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
           "role": "execution",
           "symbol": "run_service_root"
         },
@@ -2569,12 +2569,12 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "nontrivial_carrier",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "reified_representation",
             "role": "proof"
           }
@@ -2614,12 +2614,12 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "root_component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "reified_insertion_domain",
             "role": "proof"
           },
@@ -2641,22 +2641,22 @@
         "decision": "Interpret executable root/current fields and retained journals as strict functions on arbitrary test states, including undefined inverse calls; do not substitute token equality or assert original Equation (54).",
         "reviewPath": [
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "interprets",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "function_correspondence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/reified_context.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/context.rs",
             "symbol": "value_correspondence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/inspected_run.rs",
+            "file": "crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs",
             "symbol": "run_inspected",
             "role": "execution"
           }
@@ -2675,22 +2675,22 @@
         "remaining": "JS object contents and Rust interior mutation are not interpreted by payload identity.",
         "reviewPath": [
           {
-            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "file": "crates/cordis-kernel/src/publication/values.rs",
             "symbol": "publish_checked",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "file": "crates/cordis-kernel/src/publication/values.rs",
             "symbol": "leased_value",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "file": "crates/cordis-kernel/src/publication/values.rs",
             "symbol": "finish_resources",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/publication_projection.rs",
+            "file": "crates/cordis-kernel/src/publication/values/projection.rs",
             "symbol": "appended_value",
             "role": "proof"
           },
@@ -2869,12 +2869,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "run_value_program",
             "role": "execution"
           },
@@ -2884,62 +2884,62 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "model",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "compute",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "primitive_theory",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "terminal_component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "prepare_effect",
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/setup.rs",
             "symbol": "update_reversible_with",
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "advance",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "begin_native_value_program",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_slot.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/slot.rs",
             "symbol": "read_reversible",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "trajectory",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "update",
             "role": "execution"
           },
@@ -2949,12 +2949,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "run",
             "role": "execution"
           },
@@ -2964,22 +2964,22 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "run_value_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "joint_steps",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "joint_rejection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "joint_steps",
             "role": "proof"
           },
@@ -2994,12 +2994,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/episode_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode.rs",
             "symbol": "work_step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/episode_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode.rs",
             "symbol": "cleanup_step",
             "role": "contract"
           },
@@ -3014,122 +3014,122 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_access.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/access.rs",
             "symbol": "apply_native_value",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_access.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/access.rs",
             "symbol": "observe_reversible",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_access.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/access.rs",
             "symbol": "interpret",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "production",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/services.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/services.rs",
             "symbol": "run_service_program",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/service_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/services.rs",
             "symbol": "production",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/services.rs",
             "symbol": "frame",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/services.rs",
             "symbol": "source_trace",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/services.rs",
             "symbol": "failed_trace",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/native_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
             "symbol": "capture_native_effect",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/native_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/native_effect.rs",
             "symbol": "apply_native_effect",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "prepare_observed",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "commit_calculation",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_alias.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
             "symbol": "single_key_refinement",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_alias.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
             "symbol": "other_alias_changes",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_alias.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
             "symbol": "allocation_independence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_alias.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
             "symbol": "production_replace",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_alias.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/alias.rs",
             "symbol": "operation_agrees",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "symbol": "bind",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "symbol": "run_service_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/service_composition.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_composition.rs",
             "symbol": "resolved_member",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_composition.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_composition.rs",
             "symbol": "interpret_dynamic",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_stack.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_stack.rs",
             "symbol": "interpret_queue",
             "role": "proof"
           },
@@ -3159,7 +3159,7 @@
             "symbol": "snapshot"
           },
           {
-            "file": "crates/cordis-kernel/src/recipe_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/recipes.rs",
             "role": "contract",
             "symbol": "native_guard"
           },
@@ -3174,7 +3174,7 @@
             "symbol": "recipe_snapshot"
           },
           {
-            "file": "crates/cordis-kernel/src/value_registration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/registration.rs",
             "symbol": "retain",
             "role": "proof"
           },
@@ -3184,12 +3184,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "execution_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "symbol": "execution_interval",
             "role": "proof"
           },
@@ -3264,7 +3264,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/configuration.rs",
             "symbol": "step",
             "role": "contract"
           },
@@ -3279,7 +3279,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/source_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/sources.rs",
             "symbol": "guard",
             "role": "contract"
           },
@@ -3294,77 +3294,77 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "pending_absent_later",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "unique_settlement",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_registration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/registration.rs",
             "symbol": "settled_through",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "local_inverses_registered",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "symbol": "local_inverses_registered",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "primitive_law",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "interpretation",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "roundtrip",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "apply_native_payload",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "pending_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "dispatch_payload_cleanup",
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/setup.rs",
             "symbol": "replace_service",
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "restore_following",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_attempt.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs",
             "symbol": "observe_storage",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "acknowledge_payload",
             "role": "execution"
           },
@@ -3374,67 +3374,67 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "custody_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "microsteps",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "completed_attempt_stays_closed",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/cleanup_interval.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs",
             "symbol": "issued_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/cleanup_interval.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs",
             "symbol": "checkpoint_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
             "symbol": "run_function",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
             "symbol": "explained",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "single_key_projection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "interpret_queue",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "recoverable",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_root.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
             "symbol": "run_managed_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "join_receipts",
             "role": "execution"
           },
@@ -3647,12 +3647,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "file": "crates/cordis-kernel/src/publication/values.rs",
             "symbol": "finish_resources",
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/poll.rs",
             "symbol": "poll_settle",
             "role": "host"
           },
@@ -3762,22 +3762,22 @@
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "wf",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "commit",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "apply_prepared_effect",
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/setup.rs",
             "symbol": "update_reversible_with",
             "role": "host"
           },
@@ -3787,7 +3787,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/publication_values.rs",
+            "file": "crates/cordis-kernel/src/publication/values.rs",
             "symbol": "leased_observation",
             "role": "execution"
           },
@@ -3802,17 +3802,17 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_admission.rs",
+            "file": "crates/cordis-kernel/src/availability/admission.rs",
             "symbol": "begin_setup",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_admission.rs",
+            "file": "crates/cordis-kernel/src/availability/admission.rs",
             "symbol": "finish",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_admission.rs",
+            "file": "crates/cordis-kernel/src/availability/admission.rs",
             "symbol": "value_provenance",
             "role": "proof"
           },
@@ -3822,42 +3822,42 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/shared_value_history.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/history.rs",
             "symbol": "extends",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "begin_value_program",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "advance_value_program",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_slot.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/slot.rs",
             "symbol": "replace",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_slot.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/slot.rs",
             "symbol": "refresh",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_heap.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/heap.rs",
             "symbol": "alias_changes",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "trajectory",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "update",
             "role": "execution"
           },
@@ -3867,12 +3867,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "run",
             "role": "execution"
           },
@@ -3882,22 +3882,22 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "run_value_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "joint_steps",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "joint_rejection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "joint_steps",
             "role": "proof"
           },
@@ -3912,12 +3912,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/episode_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode.rs",
             "symbol": "work_step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/episode_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode.rs",
             "symbol": "cleanup_step",
             "role": "contract"
           },
@@ -3962,7 +3962,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/history.rs",
             "symbol": "replacement_rejects_old_check",
             "role": "proof"
           },
@@ -3977,107 +3977,107 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/history.rs",
             "symbol": "admission_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/history.rs",
             "symbol": "admission_retained",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "begin_scope",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "finish_scope",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "scope_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "scope_block_has_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "publications",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "withdraw_publications",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "release_owned",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "release_owned_reservation",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "queue_released",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "drain_released",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "resolve",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "result",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "admission_leases_live",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "committed_read_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "restoring_read_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "committed_selection_retained",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "read_has_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "read_context_lift",
             "role": "proof"
           },
@@ -4087,67 +4087,67 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "interface_correspondence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "dynamic_correspondence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "mount_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "declaration_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "publish_service",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "reconcile_declarations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "reconciled_transfer",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_identity.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
             "symbol": "prepare_entry",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_identity.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
             "symbol": "qualified_key_identity",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_identity.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
             "symbol": "insert_entry",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_selection.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/selection.rs",
             "symbol": "retire_into",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_reconstruction.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/reconstruction.rs",
             "symbol": "reconstruct",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_reconstruction.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/reconstruction.rs",
             "symbol": "chain",
             "role": "contract"
           },
@@ -4222,42 +4222,42 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "preflight_configurations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "adopt_configurations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "ready",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "rejected",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "metadata_call",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "adopted",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "prefix",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "framed",
             "role": "contract"
           },
@@ -4302,7 +4302,7 @@
             "symbol": "snapshot"
           },
           {
-            "file": "crates/cordis-kernel/src/recipe_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/recipes.rs",
             "role": "contract",
             "symbol": "native_guard"
           },
@@ -4317,12 +4317,12 @@
             "symbol": "recipe_snapshot"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "role": "execution",
             "symbol": "run_service_root"
           },
           {
-            "file": "crates/cordis-kernel/src/value_registration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/registration.rs",
             "symbol": "retain",
             "role": "proof"
           },
@@ -4332,52 +4332,52 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "execution_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "symbol": "execution_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "configure_profile",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "mount",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "seal_declarations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "retry_notified",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "mount_trace",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "seal_trace",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "frozen_profile",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "notification_frame",
             "role": "proof"
           },
@@ -4387,42 +4387,42 @@
             "symbol": "start"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "execution",
             "symbol": "accept_saved_sources"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "execution",
             "symbol": "apply_sources"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "execution",
             "symbol": "load"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "contract",
             "symbol": "step"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "checkpoint_origin"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "advance_origin"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "save_frame"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "acknowledgement"
           },
@@ -4497,7 +4497,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/configuration.rs",
             "symbol": "step",
             "role": "contract"
           },
@@ -4512,7 +4512,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/source_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/sources.rs",
             "symbol": "guard",
             "role": "contract"
           },
@@ -4552,17 +4552,17 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scope_path.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/paths.rs",
             "symbol": "begin_invocation",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scope_path.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/paths.rs",
             "symbol": "check_invocation_wait",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scope_path.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/paths.rs",
             "symbol": "known_scope_origin",
             "role": "proof"
           },
@@ -4637,27 +4637,27 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/host_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/host.rs",
             "symbol": "history_progress",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/shared_payload.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload.rs",
             "symbol": "new_in",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/shared_payload.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload.rs",
             "symbol": "check_result",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/shared_payload.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload.rs",
             "symbol": "complete_projection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/payload.rs",
             "symbol": "complete_at",
             "role": "proof"
           },
@@ -4682,62 +4682,62 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/shared_payload.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload.rs",
             "symbol": "retire",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/payload.rs",
             "symbol": "retained",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "primitive_law",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "interpretation",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "roundtrip",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "apply_native_payload",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "pending_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "dispatch_payload_cleanup",
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/setup.rs",
             "symbol": "replace_service",
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "restore_following",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_attempt.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs",
             "symbol": "observe_storage",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "acknowledge_payload",
             "role": "execution"
           },
@@ -4747,67 +4747,67 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "custody_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "microsteps",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "completed_attempt_stays_closed",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/cleanup_interval.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs",
             "symbol": "issued_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/cleanup_interval.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs",
             "symbol": "checkpoint_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
             "symbol": "run_function",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
             "symbol": "explained",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "single_key_projection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "interpret_queue",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "recoverable",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_root.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
             "symbol": "run_managed_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "join_receipts",
             "role": "execution"
           },
@@ -4817,27 +4817,27 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
             "symbol": "begin_call",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
             "symbol": "remove",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
             "symbol": "snapshot",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
             "symbol": "selected",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "select",
             "role": "execution"
           },
@@ -4917,12 +4917,12 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_production.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/production.rs",
             "symbol": "production_step",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge/trace.rs",
             "symbol": "claim_origin",
             "role": "proof"
           },
@@ -5000,7 +5000,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/publication_projection.rs",
+            "file": "crates/cordis-kernel/src/publication/values/projection.rs",
             "symbol": "visible_frame",
             "role": "proof"
           },
@@ -5025,12 +5025,12 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "source_execution",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "run_following",
             "role": "execution"
           },
@@ -5095,17 +5095,17 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/scalar_effect.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/effect.rs",
             "symbol": "forward_interpretation",
             "role": "proof"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/setup.rs",
             "symbol": "update_reversible_with",
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_admission.rs",
+            "file": "crates/cordis-kernel/src/availability/admission.rs",
             "symbol": "ready_spec",
             "role": "contract"
           },
@@ -5120,32 +5120,32 @@
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "interpreted_trace",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_heap.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/heap.rs",
             "symbol": "history",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_heap.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/heap.rs",
             "symbol": "rebind",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "object_trace",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "trajectory",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "update",
             "role": "execution"
           },
@@ -5155,12 +5155,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "run",
             "role": "execution"
           },
@@ -5170,22 +5170,22 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/value_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/function.rs",
             "symbol": "run_value_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "joint_steps",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_program.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/program.rs",
             "symbol": "joint_rejection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/value_cursor.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/cursor.rs",
             "symbol": "joint_steps",
             "role": "proof"
           },
@@ -5200,12 +5200,12 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/episode_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode.rs",
             "symbol": "work_step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/episode_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode.rs",
             "symbol": "cleanup_step",
             "role": "contract"
           },
@@ -5220,127 +5220,127 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/history.rs",
             "symbol": "control_classified",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_episode.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/episode.rs",
             "symbol": "step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/history.rs",
             "symbol": "rejected_reply_preserves_episode",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/history.rs",
             "symbol": "release_has_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "scope_retained",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scopes.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/scopes.rs",
             "symbol": "finished_scope_stays_inactive",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "step",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "publication_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "restoring_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_resources.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/resources.rs",
             "symbol": "released_publication_has_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "added_has_source",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "removed_is_queued",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "payload_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "queued_handle_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "queued_until_drain",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_handles.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/handles.rs",
             "symbol": "delivered_handle_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "resolve",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "result",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "admission_leases_live",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "committed_read_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "restoring_read_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "committed_selection_retained",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "read_has_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_reads.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/reads.rs",
             "symbol": "read_context_lift",
             "role": "proof"
           },
@@ -5350,67 +5350,67 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "interface_correspondence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "dynamic_correspondence",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "mount_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "declaration_origin",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "publish_service",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "reconcile_declarations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_interfaces.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/interfaces.rs",
             "symbol": "reconciled_transfer",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_identity.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
             "symbol": "prepare_entry",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_identity.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
             "symbol": "qualified_key_identity",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_identity.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/identity.rs",
             "symbol": "insert_entry",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_selection.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/selection.rs",
             "symbol": "retire_into",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_reconstruction.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/reconstruction.rs",
             "symbol": "reconstruct",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_reconstruction.rs",
+            "file": "crates/cordis-kernel/src/configuration_tree/reconstruction.rs",
             "symbol": "chain",
             "role": "contract"
           },
@@ -5485,42 +5485,42 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "preflight_configurations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "adopt_configurations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "ready",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "rejected",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "metadata_call",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "adopted",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "prefix",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_adoption.rs",
+            "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
             "symbol": "framed",
             "role": "contract"
           },
@@ -5565,7 +5565,7 @@
             "symbol": "snapshot"
           },
           {
-            "file": "crates/cordis-kernel/src/recipe_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/recipes.rs",
             "role": "contract",
             "symbol": "native_guard"
           },
@@ -5580,47 +5580,47 @@
             "symbol": "recipe_snapshot"
           },
           {
-            "file": "crates/cordis-kernel/src/service_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/service_function.rs",
             "role": "execution",
             "symbol": "run_service_root"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "configure_profile",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "mount",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "seal_declarations",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "retry_notified",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "mount_trace",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "seal_trace",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "frozen_profile",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_policy.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/policy.rs",
             "symbol": "notification_frame",
             "role": "proof"
           },
@@ -5630,42 +5630,42 @@
             "symbol": "start"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "execution",
             "symbol": "accept_saved_sources"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "execution",
             "symbol": "apply_sources"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "execution",
             "symbol": "load"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "contract",
             "symbol": "step"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "checkpoint_origin"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "advance_origin"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "save_frame"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_source.rs",
+            "file": "crates/cordis-kernel/src/configuration_save/sources.rs",
             "role": "proof",
             "symbol": "acknowledgement"
           },
@@ -5740,7 +5740,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/configuration_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/configuration.rs",
             "symbol": "step",
             "role": "contract"
           },
@@ -5755,7 +5755,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/source_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/sources.rs",
             "symbol": "guard",
             "role": "contract"
           },
@@ -5795,17 +5795,17 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scope_path.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/paths.rs",
             "symbol": "begin_invocation",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scope_path.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/paths.rs",
             "symbol": "check_invocation_wait",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_scope_path.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/paths.rs",
             "symbol": "known_scope_origin",
             "role": "proof"
           },
@@ -5815,67 +5815,67 @@
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_classification.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/classification.rs",
             "symbol": "record_law",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_classification.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/classification.rs",
             "symbol": "classify_step",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_classification.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/classification.rs",
             "symbol": "interpreted_trajectory",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "primitive_law",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "interpretation",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "roundtrip",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "apply_native_payload",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "pending_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "dispatch_payload_cleanup",
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/setup.rs",
             "symbol": "replace_service",
             "role": "host"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_inverse.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration.rs",
             "symbol": "restore_following",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_attempt.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt.rs",
             "symbol": "observe_storage",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_cleanup.rs",
+            "file": "crates/cordis-kernel/src/cleanup_groups/payload.rs",
             "symbol": "acknowledge_payload",
             "role": "execution"
           },
@@ -5885,67 +5885,67 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "custody_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "microsteps",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/payload_restoration.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/protocol.rs",
             "symbol": "completed_attempt_stays_closed",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/cleanup_interval.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs",
             "symbol": "issued_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/cleanup_interval.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint/episode/interval.rs",
             "symbol": "checkpoint_interval",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
             "symbol": "run_function",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_function.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed.rs",
             "symbol": "explained",
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "component",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "single_key_projection",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "interpret_queue",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "recoverable",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_root.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
             "symbol": "run_managed_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/joint_execution.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
             "symbol": "join_receipts",
             "role": "execution"
           },
@@ -5960,12 +5960,12 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_production.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/production.rs",
             "symbol": "production_step",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge/trace.rs",
             "symbol": "claim_origin",
             "role": "proof"
           },
@@ -6014,22 +6014,22 @@
         ],
         "reviewPath": [
           {
-            "file": "crates/cordis-kernel/src/managed_root.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
             "symbol": "run_managed_root",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_semantics.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/semantics.rs",
             "symbol": "interpretation",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_trace.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/trace.rs",
             "symbol": "interpret_queue",
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/managed_root.rs",
+            "file": "crates/cordis-kernel/src/reversible_value/managed/root.rs",
             "symbol": "execution_interval",
             "role": "proof"
           }
@@ -6053,12 +6053,12 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
             "symbol": "snapshot",
             "role": "execution"
           },
           {
-            "file": "crates/cordis-kernel/src/node_bridge_history.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/bridge/trace.rs",
             "symbol": "production_trace",
             "role": "proof"
           }
@@ -6077,7 +6077,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-kernel/src/node_production.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/production.rs",
             "symbol": "production_trace",
             "role": "proof"
           },
@@ -6087,7 +6087,7 @@
             "role": "contract"
           },
           {
-            "file": "crates/cordis-kernel/src/node_production.rs",
+            "file": "crates/cordis-kernel/src/node_runtime/production.rs",
             "symbol": "classified",
             "role": "contract"
           }

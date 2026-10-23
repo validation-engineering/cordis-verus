@@ -5,12 +5,9 @@ use crate::configuration_runtime::Allocation;
 use std::ops::Deref;
 use std::sync::Arc;
 use vstd::prelude::*;
-#[path = "configuration_identity.rs"]
 pub mod identity;
 use identity::Origin;
-#[path = "configuration_reconstruction.rs"]
 pub mod reconstruction;
-#[path = "configuration_selection.rs"]
 pub mod selection;
 
 verus! {

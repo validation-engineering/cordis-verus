@@ -47,16 +47,16 @@ error behavior, rather than treating these summaries as independent axioms.
 | [`Kernel::check_insert` / `insert`](../crates/cordis-kernel/src/lib.rs) | Success iff `insert_enabled(parent, dependencies, provisions)`: identity capacity, a registered parent when supplied, distinct declarations and unreserved provision ports. | The actual O-Insert registration domain, with representation bounds stated separately from the paper predicate. |
 | [`Kernel::begin`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.begin_enabled(id)`: Inactive, target available, generation present and below `u64::MAX`. Success increments the generation and commits the actual target. | Executable admission for L-Begin, with the implementation's bounded generation counter retained explicitly. The counter is erased by the paper projection. |
 | [`Kernel::begin_cleanup`](../crates/cordis-kernel/src/lib.rs) | `result.is_ok() == old.cleanup_enabled(id)`: registered, Unloading, not already restoring, and no live committed dependent. | The executable start of guarded L-Unload. It preserves the paper state while enabling restoration; `finish_cleanup` performs the projected Unload. |
-| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::unload`](../crates/cordis-kernel/src/fresh_driver.rs) | Success iff `unload_enabled`: Kernel cleanup permission **and** `restore_receipts(journal(actor), primitive_state).is_some()`. For the complete concrete Unit/Child/Provision/Xor journal, `journal_recovery` derived from actual histories discharges the inverse condition. | Executes the actual finite LIFO restoration for L-Unload. The recovery fact is derived from represented histories, not arbitrary `wf()`. Public errors preserve the complete machine; internal draft errors need not. |
+| [`MixedDriver::unload`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::unload`](../crates/cordis-kernel/src/mixed_driver/fresh.rs) | Success iff `unload_enabled`: Kernel cleanup permission **and** `restore_receipts(journal(actor), primitive_state).is_some()`. For the complete concrete Unit/Child/Provision/Xor journal, `journal_recovery` derived from actual histories discharges the inverse condition. | Executes the actual finite LIFO restoration for L-Unload. The recovery fact is derived from represented histories, not arbitrary `wf()`. Public errors preserve the complete machine; internal draft errors need not. |
 | [`Kernel::check_iteration` / `finish`](../crates/cordis-kernel/src/lib.rs) | Success iff Loading and `coherent(id)`. `paper_coherence` and `paper_iteration_guard` prove that this is exactly the projected paper guard. | L-Iter admission and the control transition L-Finish. Provider identity is checked through existing uniqueness, typing and coverage invariants, independent of buffer order or duplicates. |
 | [`StageProtocol::admit`](../crates/cordis-kernel/src/episode.rs) | `accepted == (old.pending || (!old.settled && !old.cancelled && matching_target))`. `matching_target` means a present target with the same complete binding-identity set. An already admitted stage stays admitted across cancellation or target loss. The final settled/cancellation flags are specified exactly. | Admission and retention of an outstanding iteration. `land`/`end` supply the token-level accumulator transitions for Iter/Finish or late Divert. Explicit host cancellation is an extension, not evidence that the paper target changed. |
 | [`ChildEpisode::check_child` / `land_child`](../crates/cordis-kernel/src/ownership.rs), [`ChildDriver` wrappers](../crates/cordis-kernel/src/child_driver.rs) | Success iff `land_enabled`: pending, current captured identity/generation, and the current insertion domain. | Conditional Definition 52 registration and capture of the actual child inverse. Admission alone does not guarantee insertion. |
 | [`MixedDriver::insert`](../crates/cordis-kernel/src/mixed_driver.rs) | Success iff `insertion_enabled`: a valid blueprint index, validity of the required bank prefix and the real Kernel insertion domain. | The closed interpreter's registration boundary; an unused invalid bank entry is not made valid by `wf()`. |
-| [`FreshDriver::insert` / `begin` / `apply`](../crates/cordis-kernel/src/fresh_driver.rs), [`preparation_command`](../crates/cordis-kernel/src/fresh_preparation.rs) | For `Insert`, `Begin` and `Step`, success iff the current `preparation_enabled(command)`. Insert uses the full Mixed insertion domain; Begin also requires an empty retained journal and the Kernel Begin domain. | Connects the real setup dispatcher to exact local implementation domains. Other commands remain supported but are outside this domain equivalence. |
-| [`MixedDriver::step`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::step`](../crates/cordis-kernel/src/fresh_driver.rs) | Success iff `step_enabled`: a registered coherent Loading actor, a current instruction, its primitive domain and, for a terminal instruction, complete publication after that instruction. | Exact local acceptance for the synchronous L-Iter/L-Finish interpreter, relevant to Lemma 57 and Theorem 73(1). It is not whole-run termination. |
-| [`FreshDriver::admit` / `Admission::land`](../crates/cordis-kernel/src/admitted_fresh_driver.rs) | Admission succeeds iff `admission_enabled` (`ready`). Landing succeeds iff `land_enabled`: an unconsumed current ticket, the selected primitive's live domain and, only for a coherent terminal landing, `complete_after`. | Exact acceptance across checked intervening calls, including L-Divert after target loss. Admission does not reserve values or child provisions. |
-| [`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/fresh_run.rs) | Under `wf()`, calls real `step` until terminal publication or its first error. The committed-step count is bounded by the input program-position rank. No fuel or future-success premise is required. | A finite concrete execution of one installed actor; its source refinement extends a well-formed source already represented by the input. It does not establish global quiescence. |
-| [`run_from_empty`](../crates/cordis-kernel/src/fresh_bootstrap.rs) | Constructs a new machine, executes the actual setup script and runs one actor only if all setup calls succeed. Returns `SetupFailed`, `Blocked` or `Finished`. | Establishes one source execution from empty representing both the prepared and final machines, without an input source premise. Failed Insert/Begin/Step commands are disabled at the failure state; other command domains and global progress remain separate. |
+| [`FreshDriver::insert` / `begin` / `apply`](../crates/cordis-kernel/src/mixed_driver/fresh.rs), [`preparation_command`](../crates/cordis-kernel/src/mixed_driver/fresh/preparation.rs) | For `Insert`, `Begin` and `Step`, success iff the current `preparation_enabled(command)`. Insert uses the full Mixed insertion domain; Begin also requires an empty retained journal and the Kernel Begin domain. | Connects the real setup dispatcher to exact local implementation domains. Other commands remain supported but are outside this domain equivalence. |
+| [`MixedDriver::step`](../crates/cordis-kernel/src/mixed_driver.rs), [`FreshDriver::step`](../crates/cordis-kernel/src/mixed_driver/fresh.rs) | Success iff `step_enabled`: a registered coherent Loading actor, a current instruction, its primitive domain and, for a terminal instruction, complete publication after that instruction. | Exact local acceptance for the synchronous L-Iter/L-Finish interpreter, relevant to Lemma 57 and Theorem 73(1). It is not whole-run termination. |
+| [`FreshDriver::admit` / `Admission::land`](../crates/cordis-kernel/src/mixed_driver/fresh/admitted.rs) | Admission succeeds iff `admission_enabled` (`ready`). Landing succeeds iff `land_enabled`: an unconsumed current ticket, the selected primitive's live domain and, only for a coherent terminal landing, `complete_after`. | Exact acceptance across checked intervening calls, including L-Divert after target loss. Admission does not reserve values or child provisions. |
+| [`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/mixed_driver/fresh/runner.rs) | Under `wf()`, calls real `step` until terminal publication or its first error. The committed-step count is bounded by the input program-position rank. No fuel or future-success premise is required. | A finite concrete execution of one installed actor; its source refinement extends a well-formed source already represented by the input. It does not establish global quiescence. |
+| [`run_from_empty`](../crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs) | Constructs a new machine, executes the actual setup script and runs one actor only if all setup calls succeed. Returns `SetupFailed`, `Blocked` or `Finished`. | Establishes one source execution from empty representing both the prepared and final machines, without an input source premise. Failed Insert/Begin/Step commands are disabled at the failure state; other command domains and global progress remain separate. |
 
 A paper-enabled Begin can still be rejected when the implementation generation
 counter is exhausted; this bound is not a premise printed in Theorem 73.
@@ -240,7 +240,7 @@ with the terminal `complete_after` condition; `step_enabled` combines it with
 `ready`. The public `MixedDriver::step` returns success **iff** this predicate
 holds, rather than only proving safety conditional on success.
 
-[`FreshDriver::selected_instruction`](../crates/cordis-kernel/src/fresh_driver.rs)
+[`FreshDriver::selected_instruction`](../crates/cordis-kernel/src/mixed_driver/fresh.rs)
 instantiates a Child template with the allocator's current `next_id` for this
 call. Its `step_enabled` uses that instantiated instruction and the same effect
 and terminal checks. The real `FreshDriver::step` has the same success
@@ -265,7 +265,7 @@ of introducing a new lifecycle failure rule.
 
 ## An admitted stage rechecks its live landing domain
 
-The owning [`fresh::admitted::Admission`](../crates/cordis-kernel/src/admitted_fresh_driver.rs)
+The owning [`fresh::admitted::Admission`](../crates/cordis-kernel/src/mixed_driver/fresh/admitted.rs)
 session captures actor, generation, blueprint, program position and instruction
 template. `FreshDriver::admit` succeeds iff `admission_enabled(actor)`, which is the
 inner driver's `ready(actor)` predicate. This checks coherent Loading control
@@ -389,7 +389,7 @@ result, not a proof that every host run reaches global quiescence.
 
 ## Running one Fresh actor to a terminal result or the first error
 
-[`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/fresh_run.rs), in
+[`FreshDriver::run_until_blocked`](../crates/cordis-kernel/src/mixed_driver/fresh/runner.rs), in
 `mixed_driver::fresh::runner`, repeatedly calls the actual transactional `step`.
 It requires only the existing `wf()` invariant: no caller-supplied fuel, future
 success premise or source trace. The re-exported `RunReport` contains the
@@ -509,7 +509,7 @@ definedness.
 
 ## Defined restoration for actual Unit/Child journals
 
-In [`unit_child_recovery.rs`](../crates/cordis-kernel/src/unit_child_recovery.rs),
+In [`mixed_driver/recovery.rs`](../crates/cordis-kernel/src/mixed_driver/recovery.rs),
 the proof-only `unit_child_journal(actor)` classifies the **actual retained
 receipts** as `Inverse::Unit` or `Inverse::Child`. `unit_child_recovery()` states
 that, for every registered actor in this profile, interpreting its entire
@@ -569,7 +569,7 @@ inverse could make the earlier one undefined. Foreign Xor operations may change
 the value, but preserve the occupied slot. The invariant does not require that
 the current payload equal the originally provided payload.
 
-[`provision_recovery.rs`](../crates/cordis-kernel/src/provision_recovery.rs)
+[`mixed_driver/provision_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/provision_recovery.rs)
 connects that source invariant and child retention to the **actual receipts**.
 `unit_child_provision_journal(actor)` permits Unit, Child and Provision in the
 owner's current journal. `provision_recovery()` then states that every registered
@@ -616,7 +616,7 @@ rules in Definitions 53/54 to the value needed by the inverse. This argument
 complements Definition 52's child-name retention; it does not treat ownership as
 a service dependency.
 
-[`journal_recovery.rs`](../crates/cordis-kernel/src/journal_recovery.rs), exposed
+[`mixed_driver/recovery_all.rs`](../crates/cordis-kernel/src/mixed_driver/recovery_all.rs), exposed
 as `mixed_driver::recovery_all`, connects this source invariant to the **actual
 receipts** through `operations_from_source`. `restore_all` combines `live_xors`,
 Provision uniqueness and value presence, and retained child identities to prove
@@ -662,7 +662,7 @@ The induction follows actual successful source transitions, including dynamic
 children, foreign operations and cleanup. It does not assume that a future
 Unload will succeed.
 
-[`owner_table_recovery.rs`](../crates/cordis-kernel/src/owner_table_recovery.rs),
+[`mixed_driver/owner_recovery.rs`](../crates/cordis-kernel/src/mixed_driver/owner_recovery.rs),
 exposed as `mixed_driver::owner_recovery`, connects the source coverage theorem
 to the same table and receipts used by executable Unload.
 `owner_table_recovery_from_source` establishes `owner_table_recovery()`: for
@@ -694,7 +694,7 @@ child's independent value survives the parent's cleanup.
 
 ## Terminal Mixed scripts equal their foreign-only value replay
 
-[`terminal_replay.rs`](../crates/cordis-kernel/src/terminal_replay.rs), exposed
+[`mixed_driver/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/terminal_replay.rs), exposed
 as `mixed_driver::terminal_replay`, strengthens the actual **Mixed**
 `ScriptReport`. `terminal_episode(transitions, owner, begin)` selects a Begin
 in the successful transition log, requires that the last successful transition
@@ -753,7 +753,7 @@ execution. `actual_terminal_recovery` composes it with the actual final Unload
 and the owner-slot coverage theorem. Foreign Unloads retain their captured
 inverse journals, including receipts produced before the selected episode.
 
-[`fresh_terminal_replay.rs`](../crates/cordis-kernel/src/fresh_terminal_replay.rs),
+[`mixed_driver/fresh/terminal_replay.rs`](../crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs),
 exposed as `mixed_driver::fresh::terminal_replay`, connects that theorem to the
 real Fresh `ScriptReport`. Its `terminal_recovery(bank)` is an actual
 `run_script` postcondition. Matching Begin and final successful owner Unload
@@ -782,7 +782,7 @@ selected check is experimental evidence, not complete negative-regression accept
 
 ## From a new machine through setup and execution
 
-[`run_from_empty(blueprints, setup_commands, actor)`](../crates/cordis-kernel/src/fresh_bootstrap.rs)
+[`run_from_empty(blueprints, setup_commands, actor)`](../crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs)
 is an executable entry point reexported by `mixed_driver::fresh` with
 `FromEmptyReport` and `FromEmptyStatus`. It constructs a new machine, calls the
 actual `run_script`, then calls `run_until_blocked(actor)` only if every setup
@@ -816,7 +816,7 @@ are erased ghost data; the successful setup `Vec<Transition>` remains a runtime
 allocation.
 
 The setup domain is now exact for the
-[`preparation_command`](../crates/cordis-kernel/src/fresh_preparation.rs) profile:
+[`preparation_command`](../crates/cordis-kernel/src/mixed_driver/fresh/preparation.rs) profile:
 `Insert`, `Begin` and `Step`. These predicates are proof-only; the executable
 branches and error order are unchanged.
 

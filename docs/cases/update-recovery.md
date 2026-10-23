@@ -96,7 +96,7 @@ will eventually restore the required state.
 Sources: [chain proof](../../crates/cordis-kernel/src/lifecycle_state/cleanup/update.rs),
 [cleanup protocol](../../crates/cordis-kernel/src/lifecycle_state/cleanup.rs),
 [real work/queue release](../../crates/cordis-kernel/src/lifecycle_state/execution.rs),
-[managed acknowledgement boundary](../../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs),
+[managed acknowledgement boundary](../../crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/callbacks.rs),
 [native scenario](../../crates/cordis-kernel/examples/support/update_recovery.rs),
 [Runtime scenario](../../crates/cordis/examples/support/update_recovery.rs).
 Each scenario is shared by its runnable example and integration test.

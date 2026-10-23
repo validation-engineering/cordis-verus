@@ -1,7 +1,6 @@
 //! Constructive replay through the production Kernel, not a state installer.
 //! Native source adapters establish the private execution preconditions. Values,
 //! callback bodies and action-ledger tickets are not this control projection.
-#[path = "kernel_replay_names.rs"]
 pub mod names;
 #[cfg(verus_keep_ghost)]
 use crate::{alpha, Phase};

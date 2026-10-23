@@ -5,7 +5,7 @@
     {
       "name": "r3-host-skips-append-history",
       "mutation": {
-        "file": "managed_host.rs",
+        "file": "reversible_value/managed/interleaving/history/lifecycle/host.rs",
         "old": "history.extend(queue);\n            assert(history.current()==queue.slots());",
         "new": "assert(history.current()==queue.slots());"
       },
@@ -20,7 +20,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::appended",
           "module": "reversible_value::managed::interleaving::history::lifecycle::host",
-          "file": "managed_host.rs",
+          "file": "reversible_value/managed/interleaving/history/lifecycle/host.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(history.current()==queue.slots());"
         }
@@ -30,7 +30,7 @@
     {
       "name": "r3-host-drops-terminal-history",
       "mutation": {
-        "file": "managed_lifecycle_native.rs",
+        "file": "reversible_value/managed/interleaving/history/lifecycle/native.rs",
         "old": "self.terminal=Ghost(self.terminal@.union_prefer_right(out.2@.unwrap().queues()));\n                assert(self.terminal().dom()==self.histories().dom());",
         "new": "self.terminal=Ghost(self.terminal@);\n                assert(self.terminal().dom()==self.histories().dom());"
       },
@@ -45,7 +45,7 @@
         {
           "function": "cordis_negative::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution::release_controlled",
           "module": "reversible_value::managed::interleaving::history::lifecycle::native",
-          "file": "managed_lifecycle_native.rs",
+          "file": "reversible_value/managed/interleaving/history/lifecycle/native.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.terminal().dom()==self.histories().dom());"
         }

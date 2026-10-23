@@ -43,9 +43,9 @@ managed-production/v1 的完整效果载体。
 | 所有查询共享同一个真实源执行 | `ScriptReport::recovery_history_witness`；实际 Mixed／Fresh `run_script` 的建立路径调用 `establish_recovery_history` |
 | 公开检查入口的值、函数和恢复对应 | `run_inspected` 在 R1 解释证据之外传递 `recovery_history` |
 
-实现位于 [episode_replay.rs](../crates/cordis-kernel/src/episode_replay.rs)、
-[fresh_episode_replay.rs](../crates/cordis-kernel/src/fresh_episode_replay.rs) 和
-[inspected_run.rs](../crates/cordis-kernel/src/inspected_run.rs)。`recovery_source` 提取共同源证据；
+实现位于 [mixed_driver/episode_replay.rs](../crates/cordis-kernel/src/mixed_driver/episode_replay.rs)、
+[mixed_driver/fresh/episode_replay.rs](../crates/cordis-kernel/src/mixed_driver/fresh/episode_replay.rs) 和
+[mixed_driver/fresh/inspected.rs](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs)。`recovery_source` 提取共同源证据；
 `current_recovery` 提取该证据及当前真实 journal 的恢复等式。这些历史和查询都是编译时擦除的
 证明数据，不新增运行时历史缓冲或用户依赖。
 

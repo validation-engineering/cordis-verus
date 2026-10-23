@@ -55,10 +55,10 @@ continuation 只能指向程序体内后面的指令，或用 `None` 结束；�
 | 本地／外部／本地调用之间保留真实因果关系 | `Journal::join_receipts`、实际加锁观察和写入 | 同 Journal 中此前的写入与 inverse 登记都早于后续写入，即使中间经过外部 Journal；`execution_interval` 再将这些凭据连接到实际函数返回。 |
 | 返回真实失败，不丢失成功前缀 | 读取守卫、标量拒绝凭据及强类型加锁拒绝观察 | `Failure::explained` 区分类型／可用性、过期计算、容量及已退休载荷失败。标量拒绝保持完整记录状态和待登记义务。 |
 
-可执行解释器在 [managed_function.rs](../../crates/cordis-kernel/src/managed_function.rs)，
-通用操作／函数定律在 [managed_semantics.rs](../../crates/cordis-kernel/src/managed_semantics.rs)，
-实际队列与轨迹连接在 [managed_trace.rs](../../crates/cordis-kernel/src/managed_trace.rs)。
-[managed_root.rs](../../crates/cordis-kernel/src/managed_root.rs) 是普通 Rust 宿主经 driver
+可执行解释器在 [reversible_value/managed.rs](../../crates/cordis-kernel/src/reversible_value/managed.rs)，
+通用操作／函数定律在 [reversible_value/managed/semantics.rs](../../crates/cordis-kernel/src/reversible_value/managed/semantics.rs)，
+实际队列与轨迹连接在 [reversible_value/managed/trace.rs](../../crates/cordis-kernel/src/reversible_value/managed/trace.rs)。
+[reversible_value/managed/root.rs](../../crates/cordis-kernel/src/reversible_value/managed/root.rs) 是普通 Rust 宿主经 driver
 实际调用的入口。这些文件既是 Verus 输入，也是 Cargo 编译的生产代码，没有另设仅供证明的解释器。
 
 ## 准确的语义范围

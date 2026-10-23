@@ -31,12 +31,12 @@ runtime.mount(&context, None, plugin)?;
 
 | 关注点 | 实际实现与合同 |
 | --- | --- |
-| 存储的函数身份 | [value_function.rs](../crates/cordis-kernel/src/value_function.rs) 的 `Body::Services(Function)` 直接保存程序体 |
-| 声明与 realm 绑定 | [service_function.rs](../crates/cordis-kernel/src/service_function.rs) 的 `Function::bind` 从实际注册配方解析全部键，保持操作与分支；第一个登记匹配优先于继承别名 |
+| 存储的函数身份 | [reversible_value/function.rs](../crates/cordis-kernel/src/reversible_value/function.rs) 的 `Body::Services(Function)` 直接保存程序体 |
+| 声明与 realm 绑定 | [reversible_value/service_function.rs](../crates/cordis-kernel/src/reversible_value/service_function.rs) 的 `Function::bind` 从实际注册配方解析全部键，保持操作与分支；第一个登记匹配优先于继承别名 |
 | 准入与完成 | `NativeRuntime::run_service_root` 检查真实 owner、生命周期准入与当前配方，使用真实执行结果结算 root 的成功或失败 |
-| 实际调用 | [service_program.rs](../crates/cordis-kernel/src/service_program.rs) 的 `Execution::run_service_program` 逐条解析槽位、执行操作，登记 inverse 后才继续 |
-| 完整有限函数解释 | [service_composition.rs](../crates/cordis-kernel/src/service_composition.rs) 对每种解析安排证明语法成员关系，再把真实成功／失败报告接入实际选择的安排 |
-| 累积逆操作 | [service_stack.rs](../crates/cordis-kernel/src/service_stack.rs) 把语义逆序栈与真实清理队列后缀对应起来，覆盖失败前缀 |
+| 实际调用 | [reversible_value/services.rs](../crates/cordis-kernel/src/reversible_value/services.rs) 的 `Execution::run_service_program` 逐条解析槽位、执行操作，登记 inverse 后才继续 |
+| 完整有限函数解释 | [reversible_value/service_composition.rs](../crates/cordis-kernel/src/reversible_value/service_composition.rs) 对每种解析安排证明语法成员关系，再把真实成功／失败报告接入实际选择的安排 |
+| 累积逆操作 | [reversible_value/service_stack.rs](../crates/cordis-kernel/src/reversible_value/service_stack.rs) 把语义逆序栈与真实清理队列后缀对应起来，覆盖失败前缀 |
 | 用户入口 | [runtime.rs](../crates/cordis/src/runtime.rs) 的 `Plugin::native_service_program`、原生初始化及 Child 注册，经 [native.rs](../crates/cordis-driver/src/shared/native.rs) 调用检查内核 |
 
 缺少声明时，即使该指令不会被执行，也会在签发 root 前拒绝。错误 owner、已退役或已经
@@ -92,9 +92,9 @@ Service 失败保留实际被拒绝的调用；Value 报告保留完整对象观
 凭据由实际解释器收集，不由普通宿主回调提供。它们是持久的证明资源，映射表及
 Journal 引用都会从运行产物中擦除。实现复用已有的短 Journal 提交，不增加运行时效果日志。
 
-审查入口是 [value_registration.rs](../crates/cordis-kernel/src/value_registration.rs) 的
-`Evidence::retain`、[value_program.rs](../crates/cordis-kernel/src/value_program.rs) 和
-[service_program.rs](../crates/cordis-kernel/src/service_program.rs) 的真实生产路径，以及
+审查入口是 [reversible_value/registration.rs](../crates/cordis-kernel/src/reversible_value/registration.rs) 的
+`Evidence::retain`、[reversible_value/program.rs](../crates/cordis-kernel/src/reversible_value/program.rs) 和
+[reversible_value/services.rs](../crates/cordis-kernel/src/reversible_value/services.rs) 的真实生产路径，以及
 [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) 的 `record_recipes_following`。
 两个已登记 root 入口传入实际报告，并导出返回区间定理。这加强了定义 29–30 与实现
 之间的连接，不增加一般回调定律、原始载体上的 Component 定理或最终返回保证。

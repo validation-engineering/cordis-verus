@@ -73,7 +73,7 @@ Source entry points:
 [`static_host.rs`](../crates/cordis/src/runtime/static_host.rs),
 [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs),
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs),
-[`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs),
+[`reversible_value/effect.rs`](../crates/cordis-kernel/src/reversible_value/effect.rs),
 [`Node runtime`](../packages/compat-cordis/runtime.js),
 [`loader.rs`](../crates/cordis/src/loader.rs).
 
@@ -422,18 +422,18 @@ These 61 actual methods carry link-frame contracts. `retire_effect` removes only
 | --- | --- |
 | [`execution.rs`](../crates/cordis-kernel/src/execution.rs) | `attach_execution`, `take_effect`, `put_effect`, `activate_effect`, `retire_effect`, `withdraw`, `activate_external`, `seal_external`, `provide`, `issue_root`, `start_root`, `cancel_queued_root`, `complete_root`, `fail_root`, `abandon_root`, `take_child`, `take_group`, `complete_request`, `register`, `cancel`, `pop`, `complete_future`, `complete_failure`, `complete_result`, `retry`, `remove`, `enqueue_owned_child`, `enqueue_effect`, `admit_effect`, `land_effect`, `enqueue_native_child`, `apply_value`, `apply_value_following`, `dispatch_cleanup` |
 | [`lifecycle_state/native/managed.rs`](../crates/cordis-kernel/src/lifecycle_state/native/managed.rs) | `finish_managed_execution`, `release_managed_execution`, `withdraw_managed_execution`, `admit_managed_root`, `retry_managed_execution` |
-| [`native_effect.rs`](../crates/cordis-kernel/src/native_effect.rs) | `apply_native_effect` |
+| [`reversible_value/native_effect.rs`](../crates/cordis-kernel/src/reversible_value/native_effect.rs) | `apply_native_effect` |
 | [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | `finish_managed_execution`, `release_managed_execution`, `admit_managed_root`, `withdraw_managed_execution`, `retry_managed_execution` |
 | [`poll_control.rs`](../crates/cordis-kernel/src/poll_control.rs) | `retry_controlled_execution`, `release_controlled_execution` |
-| [`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs) | `apply_prepared_effect` |
-| [`service_function.rs`](../crates/cordis-kernel/src/service_function.rs) | `run_service_root` |
-| [`service_program.rs`](../crates/cordis-kernel/src/service_program.rs) | `run_service_program` |
+| [`reversible_value/effect.rs`](../crates/cordis-kernel/src/reversible_value/effect.rs) | `apply_prepared_effect` |
+| [`reversible_value/service_function.rs`](../crates/cordis-kernel/src/reversible_value/service_function.rs) | `run_service_root` |
+| [`reversible_value/services.rs`](../crates/cordis-kernel/src/reversible_value/services.rs) | `run_service_program` |
 | [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs) | `admit_scoped_effect`, `enqueue_native_effect` |
-| [`value_access.rs`](../crates/cordis-kernel/src/value_access.rs) | `apply_native_value`, `apply_native_value_chained` |
-| [`value_cursor.rs`](../crates/cordis-kernel/src/value_cursor.rs) | `advance_value_program` |
-| [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs) | `run`, `run_native_value_program`, `run_value_root` |
-| [`value_program.rs`](../crates/cordis-kernel/src/value_program.rs) | `run_value_program`, `run_value_program_following` |
-| [`value_registration.rs`](../crates/cordis-kernel/src/value_registration.rs) | `register_inverse` |
+| [`reversible_value/access.rs`](../crates/cordis-kernel/src/reversible_value/access.rs) | `apply_native_value`, `apply_native_value_chained` |
+| [`reversible_value/cursor.rs`](../crates/cordis-kernel/src/reversible_value/cursor.rs) | `advance_value_program` |
+| [`reversible_value/function.rs`](../crates/cordis-kernel/src/reversible_value/function.rs) | `run`, `run_native_value_program`, `run_value_root` |
+| [`reversible_value/program.rs`](../crates/cordis-kernel/src/reversible_value/program.rs) | `run_value_program`, `run_value_program_following` |
+| [`reversible_value/registration.rs`](../crates/cordis-kernel/src/reversible_value/registration.rs) | `register_inverse` |
 
 ## Complete recorded-carrier classification boundary
 

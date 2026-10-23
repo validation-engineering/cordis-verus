@@ -5,7 +5,7 @@
     {
       "name": "r3-scalar-landing-ignores-depth",
       "mutation": {
-        "file": "native_effect.rs",
+        "file": "reversible_value/native_effect.rs",
         "old": "if snapshot.value()!=expected.value || snapshot.depth()!=expected.depth {return Err(snapshot);}",
         "new": "if snapshot.value()!=expected.value {return Err(snapshot);}"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::reversible_value::native_effect::Capture::prepare_at",
           "module": "reversible_value::native_effect",
-          "file": "native_effect.rs",
+          "file": "reversible_value/native_effect.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(snapshot.state()==expected);"
         }

@@ -2605,8 +2605,6 @@ pub mod configuration_schema;
 
 pub mod configuration_module;
 
-#[path = "closed_region_deletion.rs"]
 pub mod closed_region_deletion;
 
-#[path = "kernel_replay.rs"]
 pub mod kernel_replay;

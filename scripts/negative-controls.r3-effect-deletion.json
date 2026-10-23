@@ -31,7 +31,7 @@
     {
       "name": "r3-effect-deletion-keeps-source-index",
       "mutation": {
-        "file": "joint_erasure.rs",
+        "file": "reversible_value/joint/erasure.rs",
         "old": "Change::RegisterInverse {write:self.rank(write)}",
         "new": "Change::RegisterInverse {write}"
       },
@@ -47,7 +47,7 @@
         {
           "function": "cordis_negative::reversible_value::joint::erasure::Plan::registration_position",
           "module": "reversible_value::joint::erasure",
-          "file": "joint_erasure.rs",
+          "file": "reversible_value/joint/erasure.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.event(source,i).change->RegisterInverse_write<self.rank(i)\n            && self.positions(i)[self.event(source,i).change->RegisterInverse_write as int]==source[i as int].event.change->RegisterInverse_write);"
         }

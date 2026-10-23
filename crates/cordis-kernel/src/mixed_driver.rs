@@ -2083,33 +2083,23 @@ proof fn append_source(bank:Seq<Blueprint>,states:Seq<mx::Configuration<u64,Inde
 
 }
 
-#[path = "unit_child_recovery.rs"]
 pub mod recovery;
 
-#[path = "provision_recovery.rs"]
 pub mod provision_recovery;
 
-#[path = "journal_recovery.rs"]
 pub mod recovery_all;
 
-#[path = "owner_table_recovery.rs"]
 pub mod owner_recovery;
 
-#[path = "terminal_replay.rs"]
 pub mod terminal_replay;
 
-#[path = "fresh_driver.rs"]
 pub mod fresh;
 
 #[cfg(all(test, not(verus_keep_ghost)))]
-#[path = "unload_tests.rs"]
 mod unload_tests;
 
-#[path = "reified_context.rs"]
 pub mod context;
 
-#[path = "episode_replay.rs"]
 pub mod episode_replay;
 
-#[path = "script_deletion.rs"]
 pub mod deletion;
