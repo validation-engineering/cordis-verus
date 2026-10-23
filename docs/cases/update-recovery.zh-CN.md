@@ -26,7 +26,7 @@ python3 -B scripts/reproduce-update-recovery.py --offline
 python3 -B scripts/reproduce-update-recovery.py --offline --proof
 
 # 对五处真实实现进行严格变异检查。
-python3 -B scripts/check-update-recovery-controls.py
+python3 -B scripts/check-profile-controls.py update-recovery
 ```
 
 依赖尚未下载时，可从 Cargo／复现命令中去掉 `--offline`。证明检查前使用
@@ -79,9 +79,9 @@ provider 提供可逆计数器。consumer 显式依赖计数器并提供 marker�
 的每一步必须满足生产 `cleanup_step` 关系；`execute_cleanup` 和 `run_cleanup`
 建立该关系。重试成功来自实际逆操作；没有假设任意干扰环境最终都会恢复所需状态。
 
-源码：[依赖链证明](../../crates/cordis-kernel/src/cleanup_update.rs)、
-[清理协议](../../crates/cordis-kernel/src/cleanup_protocol.rs)、
-[真实工作与队列释放](../../crates/cordis-kernel/src/execution_lifecycle.rs)、
+源码：[依赖链证明](../../crates/cordis-kernel/src/lifecycle_state/cleanup/update.rs)、
+[清理协议](../../crates/cordis-kernel/src/lifecycle_state/cleanup.rs)、
+[真实工作与队列释放](../../crates/cordis-kernel/src/lifecycle_state/execution.rs)、
 [受管确认边界](../../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs)、
 [原生案例](../../crates/cordis-kernel/examples/support/update_recovery.rs)、
 [Runtime 案例](../../crates/cordis/examples/support/update_recovery.rs)。每份案例实现由

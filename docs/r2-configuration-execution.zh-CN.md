@@ -220,7 +220,7 @@ panic 后的回滚，也不证明回调副作用、析构语义或任意替换�
 ## 共同执行历史中的真实登记配方
 
 生产原生 owner 现在保存擦除的
-[`recipe_history::History<R>`](../crates/cordis-kernel/src/recipe_history.rs)，
+[`recipe_history::History<R>`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)，
 记录准确的 `RegisteredPlugin<R>` 值。私有 ledger 与生命周期、对象写入、槽位、工作和
 清理共用同一个 Journal。[`Recipes` 记录](../crates/cordis-kernel/src/recipe_execution.rs)
 投影真实运行域、组件、父级、anchor、realm、声明和配方版本，不为任意回调函数体编造语义。
@@ -306,7 +306,7 @@ Node 对象／Fiber／HMR 解释、完整配置含义和跨宿主语义组合仍
 持有的 Runtime，或接收操作视图。这是未发布 API 的有意收紧。
 
 `Loader::execution_snapshot()` 调用受验证的
-[`NativeRuntime::configuration_snapshot`](../crates/cordis-kernel/src/native_configuration.rs)。
+[`NativeRuntime::configuration_snapshot`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs)。
 它在**同一次 Journal 读取期间**认证真实原生 member、配置 ledger 与源 ledger。
 当前原生控制／publication／Episode 归属观察，以及配置和源的完整带类型历史，绑定到
 同一份捕获序列。`Snapshot::complete_projection` 证明其中每个原生、配置、源记录

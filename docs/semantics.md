@@ -446,7 +446,7 @@ Restart／动态接口扩展。没有扩展的历史可推出严格的有限论�
 Finish 校验真实 episode 声明，Unload 在排空后只转移本实例的发布；其他实例、
 失败重试、压缩与 recipe 更新均保持对应。普通宿主不再单独传入服务表。
 
-`native_history.rs` 独立定义真实控制与保留发布表的联合步骤关系；
+`lifecycle_state/native/runtime/history.rs` 独立定义真实控制与保留发布表的联合步骤关系；
 `NativeRuntime::history_correspondence` 连接从空状态至当前观察的连续历史。
 没有 Restart 扩展时才推出严格论文控制执行。这里的发布值是实际共享槽，
 不是 `Arc` 内部状态或任意回调的数学含义；共享 episode mutex、Node 多版本发布

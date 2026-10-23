@@ -122,7 +122,7 @@ bounded Journal commit is reused; this does not add a runtime effect log.
 Review `Evidence::retain` in [value_registration.rs](../crates/cordis-kernel/src/value_registration.rs),
 the actual producers in [value_program.rs](../crates/cordis-kernel/src/value_program.rs)
 and [service_program.rs](../crates/cordis-kernel/src/service_program.rs), and
-`record_recipes_following` in [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs).
+`record_recipes_following` in [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs).
 The two registered root entry points supply those actual reports and expose the
 return interval theorem. This strengthens the implementation connection for
 Definitions 29–30; it does not add a general callback law, original-carrier

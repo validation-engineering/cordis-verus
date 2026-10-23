@@ -524,7 +524,7 @@ Review links: [effects](paper-refinement-map.md#effects),
 [components](paper-refinement-map.md#components);
 [`value_access.rs`](../crates/cordis-kernel/src/value_access.rs),
 [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs),
-[`native_slot_observation.rs`](../crates/cordis-kernel/src/native_slot_observation.rs).
+[`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs).
 That earlier batch advanced the function-field package from 10/15 to 11/15; it closes no
 canonical integration obligation. Its historical R2 estimate was **76% (72–82%)**.
 
@@ -601,8 +601,8 @@ acceptance remain open. Proof counts do not determine the completion estimate.
 Review: [`value_references.rs`](../crates/cordis-kernel/src/value_references.rs),
 [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs),
 [`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs),
-[`native_slot_observation.rs`](../crates/cordis-kernel/src/native_slot_observation.rs)
-and [`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs).
+[`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)
+and [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs).
 
 ## From the actual write to the actual inverse registration
 
@@ -814,11 +814,11 @@ acceptance were **not run**. Earlier evidence below is historical, not a substit
 for checks on these sources.
 
 Review: [`realm_context.rs`](../crates/cordis-kernel/src/realm_context.rs),
-[`plugin_registration.rs`](../crates/cordis-kernel/src/plugin_registration.rs),
-[`native_values.rs`](../crates/cordis-kernel/src/native_values.rs),
+[`lifecycle_state/registration.rs`](../crates/cordis-kernel/src/lifecycle_state/registration.rs),
+[`lifecycle_state/services.rs`](../crates/cordis-kernel/src/lifecycle_state/services.rs),
 [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs),
 [`effect_work.rs`](../crates/cordis-kernel/src/effect_work.rs),
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs),
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
 
 ## Shared Begin context and effect admission
@@ -885,10 +885,10 @@ Whole-kernel proofs, full development acceptance, the complete final-source Rust
 suite, full negative regression/calibration, Node runtime and release/platform
 acceptance were **not run**.
 
-Review: [`native_values.rs`](../crates/cordis-kernel/src/native_values.rs),
+Review: [`lifecycle_state/services.rs`](../crates/cordis-kernel/src/lifecycle_state/services.rs),
 [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs),
 [`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs),
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs),
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
 
 ## Episode association and actual polling control
@@ -954,7 +954,7 @@ results for that batch's source; current context-batch evidence is above.
 Review: [`poll_control.rs`](../crates/cordis-kernel/src/poll_control.rs),
 [`control_execution.rs`](../crates/cordis-kernel/src/control_execution.rs),
 [`host_status.rs`](../crates/cordis-kernel/src/host_status.rs),
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs),
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
 
 ## Actual shared handle status in the execution trajectory
@@ -1080,8 +1080,8 @@ fairness. At that batch the engineering estimate stayed at **75% (71–81%)** be
 R2 packages have not closed.
 
 Review: [`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs),
-[`native_slot_observation.rs`](../crates/cordis-kernel/src/native_slot_observation.rs),
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs),
+[`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs),
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs),
 [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs).
 
 ## Native publication and complete typed history
@@ -1149,8 +1149,8 @@ obligations. Finish/Unload preconditions still come from their existing checked
 execution protocol; the new read checkpoint is not a new global drain protocol.
 
 Review: [`native_execution.rs`](../crates/cordis-kernel/src/native_execution.rs),
-[`native_history.rs`](../crates/cordis-kernel/src/native_history.rs),
-[`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs),
+[`lifecycle_state/native/runtime/history.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs),
+[`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs),
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs).
 
 ## Live cleanup membership and guarded retirement
@@ -1254,7 +1254,7 @@ negative-regression, R2 integration and release acceptance were not run.
 
 Review: [`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs),
 [`value_restoration.rs`](../crates/cordis-kernel/src/value_restoration.rs),
-[`cleanup_completion.rs`](../crates/cordis-kernel/src/cleanup_completion.rs),
+[`cleanup_queue/completion.rs`](../crates/cordis-kernel/src/cleanup_queue/completion.rs),
 [`cleanup_journal.rs`](../crates/cordis-kernel/src/cleanup_journal.rs),
 [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs).
 
@@ -1392,7 +1392,7 @@ by this proof batch. Selected checks are not whole-kernel, whole-R2 or release
 acceptance.
 
 Review: [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)
-→ [`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs)
+→ [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)
 → [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)
 → `Plugin::native_value_program` / `Runtime::reversible_value` in
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
@@ -1594,11 +1594,11 @@ this observation. This strengthens the production projection without changing
 the R1 interpretation or asserting a full-context correspondence.
 
 Review the executable checks in
-[`native_owner.rs`](../crates/cordis-kernel/src/native_owner.rs),
-[`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs),
-[`plugin_registration.rs`](../crates/cordis-kernel/src/plugin_registration.rs) and
-[`native_host.rs`](../crates/cordis-kernel/src/native_host.rs), and the induction
-in [`native_history.rs`](../crates/cordis-kernel/src/native_history.rs).
+[`lifecycle_state/native/runtime/owner.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/owner.rs),
+[`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs),
+[`lifecycle_state/registration.rs`](../crates/cordis-kernel/src/lifecycle_state/registration.rs) and
+[`lifecycle_state/native.rs`](../crates/cordis-kernel/src/lifecycle_state/native.rs), and the induction
+in [`lifecycle_state/native/runtime/history.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs).
 The `native_host` and `native_runtime` integration tests exercise delayed calls,
 retirement, reused work domains, foreign executions and successful release.
 Named negative controls remove the corresponding guards and owner updates.
@@ -1654,7 +1654,7 @@ replacement and a fresh episode. It also checks exact `Arc` counts and rejects
 use of the closed old context. A second regression exercises the work-domain
 substitution guard at both Finish and Unload.
 
-Review path: `native_capture.rs::Capture` →
+Review path: `lifecycle_state/services/capture.rs::Capture` →
 `LifecycleState::capture_native_values` → `NativeEpisode::wf` →
 `Execution::capture_correspondence` → `NativeRuntime::{begin_managed_execution,
 finish_managed_execution,release_managed_execution}`. This strengthens the
@@ -1701,8 +1701,8 @@ not interpret `Arc` interiors, arbitrary callback bodies, the shared episode
 mutex state or Node's publication versions as one complete R1 context. The
 remaining R2 criteria are unchanged.
 
-Review path: `native_runtime.rs::{linked,wf,finish_managed_execution,
-release_managed_execution,history_correspondence}` → `native_history.rs::step`
+Review path: `lifecycle_state/native/runtime.rs::{linked,wf,finish_managed_execution,
+release_managed_execution,history_correspondence}` → `lifecycle_state/native/runtime/history.rs::step`
 → `cordis-driver/src/shared/native.rs` → `Runtime::poll_settle`.
 Aggregate regressions cover complete publication, colliding declarations,
 provider/consumer failure and retry, unrelated values, stale/foreign episodes,
@@ -1938,7 +1938,7 @@ Global uniqueness of domain and service-key allocators remains a host boundary.
 
 ## One shared Child for its actual request and inverse
 
-[`shared_child.rs`](../crates/cordis-kernel/src/shared_child.rs) closes the native
+[`lifecycle_state/registration/shared_child.rs`](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs) closes the native
 request/inverse aliasing and synchronization gap:
 
 - `enqueue_native_child` receives only the real request payload. It constructs
@@ -2026,7 +2026,7 @@ is not automatically a proof of every adapter.
 
 ## Native service values join admission, Finish and Unload
 
-`native_values.rs` now owns the native Runtime's actual publication registry and
+`lifecycle_state/services.rs` now owns the native Runtime's actual publication registry and
 its episode-local service slots. `begin_native_execution` performs the real
 Begin and creates the bound `SetupWork`, `CleanupGroups` and `NativeEpisode`
 together. There is no public constructor that recaptures a second value owner
@@ -2359,7 +2359,7 @@ cannot replace that state with a caller-supplied transcript.
 
 `control_history_correspondence` proves that the whole recorded sequence is
 continuous and each step satisfies the paper control rule, an observation-
-preserving internal step, or an explicit extension in `control_history.rs`.
+preserving internal step, or an explicit extension in `lifecycle_state/history.rs`.
 Ordinary incoherent withdrawal is L-Divert or L-Leave. Forced coherent withdrawal
 remains Restart. Dynamic provision insertion/removal and pending dependency
 configuration have exact interface frames; provision removal additionally
@@ -2671,7 +2671,7 @@ pending obligations; registration is not eventual inverse execution or success.
 
 Review [joint_classification.rs](../crates/cordis-kernel/src/joint_classification.rs),
 [the Journal producer](../crates/cordis-kernel/src/joint_execution.rs),
-[the native return producer](../crates/cordis-kernel/src/native_runtime.rs) and
+[the native return producer](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) and
 [Value](../crates/cordis-kernel/src/value_function.rs)/[Service](../crates/cordis-kernel/src/service_function.rs)
 reports. `classify_step` composes separate value, owner, framing, rejection and
 inverse-origin lemmas; it uses the existing solver limits.
@@ -2728,11 +2728,11 @@ that epoch; retirement returns `None` instead of fabricating a live value.
 The common Journal stores identity/version; it does not serialize arbitrary `T`.
 
 The real Runtime checkpoints call
-[`payload_service_snapshot` and `scoped_payload_service_episode_snapshot`](../crates/cordis-kernel/src/native_payload_runtime.rs).
+[`payload_service_snapshot` and `scoped_payload_service_episode_snapshot`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/payloads.rs).
 They collect payload and scalar slot receipts before the Journal read, then
 certify actual retained publications, Episode-owned values, captured imports,
 control, work, cleanup and setup scope together. The complete
-[`payloads::projection`](../crates/cordis-kernel/src/native_payload_observation.rs)
+[`payloads::projection`](../crates/cordis-kernel/src/lifecycle_state/services/payloads.rs)
 retains every service-map key and distinguishes scalar resolution, local payload
 identity/version, retired payloads and foreign owners. `project_replacement` and the real
 `Replacement::production_aliases` frame all unrelated service observations;

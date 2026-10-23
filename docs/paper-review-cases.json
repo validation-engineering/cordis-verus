@@ -133,7 +133,7 @@
           "kind": "struct"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_release.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_actions/resources.rs",
           "symbol": "finish_cleanup_resources",
           "kind": "fn"
         },
@@ -193,37 +193,37 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "execute_cleanup",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "run_cleanup",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "consumed_ticket_never_returns",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "binding_at",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "permission_origin",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "release_has_accepted_report",
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "failed_prefix_retains_dependencies",
           "kind": "fn"
         }

@@ -59,7 +59,7 @@ explicit boundary; an `Arc<T>` is not a deep snapshot of arbitrary user state.
 
 | Obligation | Executable implementation and contract |
 | --- | --- |
-| Actual position, no invented ordinal | [`recipe_history.rs`](../crates/cordis-kernel/src/recipe_history.rs), [`managed_replay.rs`](../crates/cordis-kernel/src/managed_replay.rs): `Ledger::revision`, `Source::wf`, `run_replayable_root` |
+| Actual position, no invented ordinal | [`lifecycle_state/native/runtime/recipes.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs), [`managed_replay.rs`](../crates/cordis-kernel/src/managed_replay.rs): `Ledger::revision`, `Source::wf`, `run_replayable_root` |
 | Same stream, complete chronological permutation | [`managed_replay_order.rs`](../crates/cordis-kernel/src/managed_replay_order.rs): `plan`, `prefix`, `chronological` |
 | Plan drives real calls | [`managed_replay_batch.rs`](../crates/cordis-kernel/src/managed_replay_batch.rs): `run`, `actual_prefix` |
 | Typed source continuity | [`managed_replay_payload_history.rs`](../crates/cordis-kernel/src/managed_replay_payload_history.rs): `continues_payload` |
@@ -78,7 +78,7 @@ exposes an additional interface decision needed for general replay success.
 
 ```sh
 cargo test -p cordis-kernel --test managed_replay --test replay_effect_boundary --locked --offline
-python3 -B scripts/check-r3-source-schedule-controls.py
+python3 -B scripts/check-profile-controls.py source-schedule
 bash scripts/check-r3-effect-boundary.sh
 ```
 

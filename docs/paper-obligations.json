@@ -1791,7 +1791,7 @@
           "symbol": "finish_cleanup_resources"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_release.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_actions/resources.rs",
           "symbol": "finish_cleanup_resources"
         },
         {
@@ -1839,31 +1839,31 @@
           "symbol": "is_empty"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "execute_cleanup"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "run_cleanup"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "consumed_ticket_never_returns"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "binding_at"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "permission_origin"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "release_has_accepted_report"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_protocol.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "failed_prefix_retains_dependencies"
         }
       ]

@@ -88,7 +88,7 @@ The runtime cases in
 branch/depth progression and cleanup, a same-value/different-depth rejection,
 interference followed by actual restoration and retry, unrelated writes, and
 wrong or withdrawn owners. The strict
-`scripts/check-r3-scalar-landing-controls.py` control removes the depth check:
+`scripts/check-profile-controls.py scalar-landing` control removes the depth check:
 the mutant must compile and fail at the designated input-equality assertion.
 Scoped evidence does not replace full development, full negative regression
 or release acceptance.

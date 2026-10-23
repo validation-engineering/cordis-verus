@@ -59,7 +59,7 @@ real successful prefix for cleanup.
 ```sh
 cargo test -p cordis-kernel --test managed_replay --test replay_effect_boundary --locked --offline
 bash scripts/check-r3-effect-boundary.sh
-python3 -B scripts/check-r3-controlled-effects-controls.py
+python3 -B scripts/check-profile-controls.py controlled-effects
 ```
 
 The cases cover mixed scalar/payload calls, out-of-order source input, real target

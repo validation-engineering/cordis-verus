@@ -76,14 +76,14 @@ separate results deliberately retain that distinction.
 | Birth and admission provenance | `Window::{births_closed, fresh}` and `Snapshot::deletion_source` preserve source birth constraints, allocation freshness and real commit identity. |
 | Equations (55)/(56) remain distinct from legal execution | `RecoveryCapture::with_deletion` combines the existing value result with this native result at one actual cut, without equating their conclusions. |
 
-Sources: [native deletion](../crates/cordis-kernel/src/native_episode_deletion.rs),
-[window construction](../crates/cordis-kernel/src/native_deletion_trace.rs),
+Sources: [native deletion](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs),
+[window construction](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/trace.rs),
 [combined capture](../crates/cordis-kernel/src/managed_deletion_capture.rs).
 The original paper ledger and R3 acceptance criteria are unchanged.
 
 ## Nonempty evidence
 
-The [proof client](../crates/cordis-kernel/src/native_deletion_client.rs) proves
+The [proof client](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/client.rs) proves
 its source path itself: 27 native steps contain earlier/later owner Episodes,
 a consumer, an owned Child, a cleanup-failure stutter and an independent
 provider. The constructor yields 11 legal steps, retaining the exact earlier
@@ -100,7 +100,7 @@ validate this fixture; they are not the proof of arbitrary callbacks.
 ```sh
 source scripts/toolchain-env.sh
 cargo test -p cordis-kernel --test native_runtime interior_episode_deletion --locked --offline
-python3 scripts/check-r3-deletion-controls.py
+python3 scripts/check-profile-controls.py deletion
 python3 scripts/record-development.py --offline
 ```
 

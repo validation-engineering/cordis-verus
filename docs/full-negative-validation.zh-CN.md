@@ -17,6 +17,8 @@
 运行 `python3 scripts/negative-shards.py plan --include-macos --include-macos-intel`
 可查看当前矩阵；下文既有测量表属于对应历史记录。
 
+定向 profile 统一使用 `python3 scripts/check-profile-controls.py PROFILE`，`--help` 列出选择。`--check` 只核对当前变异及诊断锚点，不执行证明。定向通过不等于全量负控通过。
+
 ## 执行与回收
 
 执行器默认使用一个 worker，总 CPU 预算不超过两个可用核心，并考虑进程 affinity 与
@@ -235,7 +237,7 @@ episode 回放谓词的内部展开。可执行转换、变异定义和求解资
 ## R3 Episode 恢复反例
 
 本批增加两条语义映射突变：丢弃真实 foreign 历史，以及在恢复观察中用空 journal 替换保留
-的收据序列。该批使 canonical 清单达到 320 项。`python3 scripts/check-r3-episode-controls.py`
+的收据序列。该批使 canonical 清单达到 320 项。`python3 scripts/check-profile-controls.py episode`
 只执行这两项新鲜局部正例、完整突变编译和精确合同拒绝，并保留源码／工具绑定及既有严格
 诊断规则。完整负控和 calibration 仍单独运行，报告明确标为 `not_run`。参见
 [R3 审查](r3-episode-recovery.zh-CN.md)。
@@ -244,32 +246,32 @@ episode 回放谓词的内部展开。可执行转换、变异定义和求解资
 
 新增两条负控：将真实对象变更误判为 quiet 间隔，以及放宽实际 typed head 守卫、允许已消费
 的逆操作再次通过。canonical 清单现为 322 项。运行
-`python3 scripts/check-r3-production-controls.py` 检查这一固定范围；复用上述匹配正例、完整
+`python3 scripts/check-profile-controls.py production` 检查这一固定范围；复用上述匹配正例、完整
 突变编译和精确诊断规则，完整负控与 calibration 仍单独运行。参见
 [生产恢复](r3-production-recovery.zh-CN.md)。
 
 ## R3 原生 Episode 删除负向控制
 
 第 4 包增加两个规范控制：错误保留应删除的生命周期动作，以及跳过 Child 出生闭合检查。
-当前规范清单共 330 项。`python3 scripts/check-r3-deletion-controls.py`
+当前规范清单共 330 项。`python3 scripts/check-profile-controls.py deletion`
 运行这两项局部控制，要求新的正向基线、完整变异编译及准确断言诊断。
 它独立于全量负向回归，不代表 R3 完成或发布验收。
 
 ## R3 完整 Journal 删除负向控制
 
 第 5 包增加跳过来源读检查、保留旧登记下标两项控制；规范清单现为 332 项。
-运行 `python3 scripts/check-r3-effect-deletion-controls.py`，要求新的匹配正例、
+运行 `python3 scripts/check-profile-controls.py effect-deletion`，要求新的匹配正例、
 完整变异编译和指定断言失败；与全量回归、R3／发布验收分开记录。
 
 ## R3 原 Kernel 重放负向控制
 
-控制重放这一批将规范清单扩展到 334 项。`r3-control-replay-keeps-source-allocation` 与 `r3-control-replay-skips-executable-begin` 分别检查沿用旧分配编号和跳过真实 Kernel 调用。运行 `python3 scripts/check-r3-control-replay-controls.py`；每项必须有匹配的正向证明、突变编译成功和指定语义断言拒绝。该定向检查独立于全量负向回归及 R3／发布验收。
+控制重放这一批将规范清单扩展到 334 项。`r3-control-replay-keeps-source-allocation` 与 `r3-control-replay-skips-executable-begin` 分别检查沿用旧分配编号和跳过真实 Kernel 调用。运行 `python3 scripts/check-profile-controls.py control-replay`；每项必须有匹配的正向证明、突变编译成功和指定语义断言拒绝。该定向检查独立于全量负向回归及 R3／发布验收。
 
 
 ## R3 自动来源链负向控制
 
-来源链这一批将规范清单扩展到 336 项。`python3 scripts/check-r3-source-chain-controls.py` 检查漏记实际命令和漏收真实 Unload 来源。每项都要求匹配正例、变异体完整编译及指定关联断言或完整覆盖前提失败；报告写入 `target/r3-source-chain-controls/report.json`。这些定向检查不替代完整负向回归、R3 验收或发布检查。
+来源链这一批将规范清单扩展到 336 项。`python3 scripts/check-profile-controls.py source-chain` 检查漏记实际命令和漏收真实 Unload 来源。每项都要求匹配正例、变异体完整编译及指定关联断言或完整覆盖前提失败；报告写入 `target/r3-source-chain-controls/report.json`。这些定向检查不替代完整负向回归、R3 验收或发布检查。
 
 ## R3 真实目标执行负向对照
 
-目标执行这一批将规范清单扩展到 338 项。`python3 scripts/check-r3-target-execution-controls.py` 检查跳过真实解释器和更改保留源操作的 key。每项要求匹配正例、变异体完整编译及指定语义合同拒绝。报告为 `target/r3-target-execution-controls/report.json`；该定向检查不代表完整负向回归。
+目标执行这一批将规范清单扩展到 338 项。`python3 scripts/check-profile-controls.py target-execution` 检查跳过真实解释器和更改保留源操作的 key。每项要求匹配正例、变异体完整编译及指定语义合同拒绝。报告为 `target/r3-target-execution-controls/report.json`；该定向检查不代表完整负向回归。

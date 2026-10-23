@@ -66,7 +66,7 @@ registration 和一般合法生命周期删去仍需组合。调度公平性及�
 - [cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs)：真实观察、
   严格定义域、剩余逆操作栈保持及重试组合。
 - [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs) 与
-  [cleanup_completion.rs](../crates/cordis-kernel/src/cleanup_completion.rs)：实际派发、
+  [cleanup_queue/completion.rs](../crates/cordis-kernel/src/cleanup_queue/completion.rs)：实际派发、
   擦除边界保留及后置条件传递。
 - [managed_cleanup_path.rs](../crates/cordis-kernel/src/managed_cleanup_path.rs)：
   从真实结果有限组合回到 registered Begin 值。

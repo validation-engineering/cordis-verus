@@ -82,7 +82,7 @@ observable values and cleanup behavior; it cannot inspect erased proof data.
 
 ```sh
 python3 scripts/record-development.py --offline
-python3 scripts/check-r3-host-controls.py
+python3 scripts/check-profile-controls.py host
 ```
 
 The [development record](development-report.json) binds the full development

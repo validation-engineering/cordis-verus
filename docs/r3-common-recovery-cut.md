@@ -98,9 +98,9 @@ original claims.
 
 | Source | Review entry |
 | --- | --- |
-| [native_lifetime.rs](../crates/cordis-kernel/src/native_lifetime.rs) | Actual allocation bounds, fresh insertions, terminal preservation and source indices |
-| [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs) | Invariant maintained by actual transitions; existing snapshot exports source coverage |
-| [native_child_cut.rs](../crates/cordis-kernel/src/native_child_cut.rs) | Each assigned Child's terminal state at the actual later checkpoint |
+| [lifecycle_state/native/runtime/history/lifetime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/lifetime.rs) | Actual allocation bounds, fresh insertions, terminal preservation and source indices |
+| [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | Invariant maintained by actual transitions; existing snapshot exports source coverage |
+| [lifecycle_state/native/runtime/child_history/cut.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/cut.rs) | Each assigned Child's terminal state at the actual later checkpoint |
 | [managed_child_cut.rs](../crates/cordis-kernel/src/managed_child_cut.rs) | All original native Child obligations use the same checkpoint |
 | [managed_pending_cut.rs](../crates/cordis-kernel/src/managed_pending_cut.rs) | Actual forward registrations stay settled at that checkpoint |
 | [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs) | Value decoding and the composed `unload_recovers_with_children` theorem |

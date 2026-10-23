@@ -68,13 +68,13 @@ let mut target = captured.source.instantiate(&mut target_runtime, Destination {
 | 义务 | 代码／证明入口 |
 | --- | --- |
 | 实际保存的函数及来源回执 | `managed_replay.rs`：`run_replayable_root`、`Source::wf` |
-| 完整来源切面 | `Source::bind_control`、`native_runtime.rs`：`publication_snapshot_following` |
+| 完整来源切面 | `Source::bind_control`、`lifecycle_state/native/runtime.rs`：`publication_snapshot_following` |
 | 新目标 work 确实进入解释器 | `registered_root_ready`、`root_ready`、`managed_invocation_ready`、`Source::instantiate` |
 | 输入捕获与目标资源初始化 | `managed_replay.rs`：`Source::seed_input`；`managed_replay_inputs.rs`：`capture`、`captured`、`initializes`、`seeded_operation` |
 | 标量与 typed 步骤的真实对应 | `managed_replay_transport.rs`：`derive`、`paired`、`TargetRun::pair_step` |
 | 目标逆操作及恢复 | 返回的 `RecordedExecution`、`capture_release_census` |
 
-运行用例覆盖源注销、目标 ID 偏移、不同资源、不同输入上的真实失败前缀、typed 清理干扰、新重试票据、最终恢复切面及执行前拒绝。`python3 scripts/check-r3-target-execution-controls.py` 单独检查跳过真实解释器或用空函数替换保留源函数时，指定证明合同必须拒绝。
+运行用例覆盖源注销、目标 ID 偏移、不同资源、不同输入上的真实失败前缀、typed 清理干扰、新重试票据、最终恢复切面及执行前拒绝。`python3 scripts/check-profile-controls.py target-execution` 单独检查跳过真实解释器或用空函数替换保留源函数时，指定证明合同必须拒绝。
 
 本轮输入捕获通过了**七个受影响模块的 206 项 Verus 检查**及**五个 managed replay 运行案例**，包含源清理后继续修改、由真实保留输入初始化目标并执行，以及拒绝伪造未恢复标量历史。此前的[开发验证记录](development-report.json)对应更早的源码快照；本轮尚未重跑完整开发验收、严格负控或发布验收，不能沿用旧快照的通过结论。
 

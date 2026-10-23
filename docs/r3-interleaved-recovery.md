@@ -409,11 +409,11 @@ conditions remain explicit.
 - [managed_lifecycle_children.rs](../crates/cordis-kernel/src/managed_lifecycle_children.rs):
   atomic Child admission, retained inverse obligations and the creating-episode
   relation to actual cancellation or Child release.
-- [native_child_recovery.rs](../crates/cordis-kernel/src/native_child_recovery.rs) and
-  [shared_child.rs](../crates/cordis-kernel/src/shared_child.rs): persistent slot
+- [lifecycle_state/native/runtime/child_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_recovery.rs) and
+  [lifecycle_state/registration/shared_child.rs](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs): persistent slot
   decisions, actual retirement/Unload composition and the ordinary Rust entry.
-- [native_child_history.rs](../crates/cordis-kernel/src/native_child_history.rs),
-  [native_child_completion.rs](../crates/cordis-kernel/src/native_child_completion.rs)
+- [lifecycle_state/native/runtime/child_history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history.rs),
+  [lifecycle_state/native/runtime/child_history/completion.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/completion.rs)
   and [managed_child_completion.rs](../crates/cordis-kernel/src/managed_child_completion.rs):
   automatic birth/retirement/Unload sources, committed-prefix coverage and
   completeness against the creating execution's original native inverses.
@@ -433,8 +433,8 @@ conditions remain explicit.
   real removal/seal guards and the earlier token completion they require.
 - [managed_interleaving_endpoint.rs](../crates/cordis-kernel/src/managed_interleaving_endpoint.rs):
   actual final-cut decoding, quiet tails and `unload_recovers_begin`.
-- [native_episode_origin.rs](../crates/cordis-kernel/src/native_episode_origin.rs)
-  and [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs): real
+- [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs)
+  and [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs): real
   successful release, indexed owner provenance and erased Unload evidence.
 - [recovery_obligations.rs](../crates/cordis-kernel/src/recovery_obligations.rs):
   depth bounds, derived per-allocation ordering and inverse removal.

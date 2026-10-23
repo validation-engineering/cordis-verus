@@ -95,7 +95,7 @@ Journal 引用都会从运行产物中擦除。实现复用已有的短 Journal 
 审查入口是 [value_registration.rs](../crates/cordis-kernel/src/value_registration.rs) 的
 `Evidence::retain`、[value_program.rs](../crates/cordis-kernel/src/value_program.rs) 和
 [service_program.rs](../crates/cordis-kernel/src/service_program.rs) 的真实生产路径，以及
-[native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs) 的 `record_recipes_following`。
+[lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) 的 `record_recipes_following`。
 两个已登记 root 入口传入实际报告，并导出返回区间定理。这加强了定义 29–30 与实现
 之间的连接，不增加一般回调定律、原始载体上的 Component 定理或最终返回保证。
 

@@ -2,13 +2,9 @@
 //! This preserves the exact typed publications and Episode owners of survivors.
 //! The `joint` module extends this projection to source-admitted Journal
 //! transport. Physical allocator and arbitrary callback replay remain separate.
-#[path = "native_deletion_client.rs"]
 pub mod client;
-#[path = "native_joint_deletion.rs"]
 pub mod joint;
-#[path = "native_deletion_replay.rs"]
 pub mod replay;
-#[path = "native_deletion_trace.rs"]
 pub mod trace;
 #[cfg(verus_keep_ghost)]
 use super::Observation;

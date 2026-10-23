@@ -316,5 +316,4 @@ pub proof fn failed_prefix_retains_dependencies(states:Seq<LifecycleState>,comma
 }
 }
 
-#[path = "cleanup_update.rs"]
 pub mod update;

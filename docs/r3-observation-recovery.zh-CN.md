@@ -80,12 +80,12 @@ Unload 和登记提交，随后推出来源闭合与三张表恢复；终点相�
 
 | 入口 | 审查内容 |
 | --- | --- |
-| [native_registry_recovery.rs](../crates/cordis-kernel/src/native_registry_recovery.rs) | 唯一创建来源、第一次消费 Unload、精确重建与恢复查询。 |
+| [lifecycle_state/native/runtime/history/registry_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/registry_recovery.rs) | 唯一创建来源、第一次消费 Unload、精确重建与恢复查询。 |
 | [joint_pending_recovery.rs](../crates/cordis-kernel/src/joint_pending_recovery.rs) | 中间 pending 完整记录、真实登记来源及唯一消费。 |
-| [native_observation_recovery.rs](../crates/cordis-kernel/src/native_observation_recovery.rs) | 原始截面定位、完整来源范围及组合观察恢复。 |
-| [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs) | 实际有序快照与恢复捕获。 |
+| [lifecycle_state/native/runtime/history/recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery.rs) | 原始截面定位、完整来源范围及组合观察恢复。 |
+| [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | 实际有序快照与恢复捕获。 |
 | [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs) | 与真实注册调用的值／Child 恢复共用截面。 |
-| [native_observation_client.rs](../crates/cordis-kernel/src/native_observation_client.rs) | 非空完整生命周期与登记微步骤。 |
+| [lifecycle_state/native/runtime/history/recovery/client.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery/client.rs) | 非空完整生命周期与登记微步骤。 |
 | [native_runtime.rs 测试](../crates/cordis-kernel/tests/native_runtime.rs) | 失败、重试、provider 释放阻塞、相同 Arc 再发布，以及保留快照时的 payload 回收。 |
 
 运行案例检查实际状态、payload 所有权和新 Episode 身份，不能读取擦除的诊断，也不
@@ -94,7 +94,7 @@ Unload 和登记提交，随后推出来源闭合与三张表恢复；终点相�
 
 ```bash
 python3 scripts/record-development.py --offline
-python3 scripts/check-r3-observation-controls.py
+python3 scripts/check-profile-controls.py observation
 ```
 
 准确的证明、运行及包检查结果以绑定源码的[开发记录](development-report.json)为准。

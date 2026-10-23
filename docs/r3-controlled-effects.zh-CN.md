@@ -37,7 +37,7 @@ ManagedInstruction::scalar / Effect::Kernel
 ```sh
 cargo test -p cordis-kernel --test managed_replay --test replay_effect_boundary --locked --offline
 bash scripts/check-r3-effect-boundary.sh
-python3 -B scripts/check-r3-controlled-effects-controls.py
+python3 -B scripts/check-profile-controls.py controlled-effects
 ```
 
 案例覆盖标量／payload 混合调用、乱序传入的源函数、真实目标清理恢复初态、成功前缀后的溢出，以及未执行的回调分支。同一个经过验证的回调反例会被受控入口拒绝；扩展入口仍可复现干扰。严格负例修改准入检查和真实计算输入，要求匹配的正向证明、可编译的错误实现及指定合同失败，不能把超时算作通过。

@@ -523,8 +523,6 @@ impl<T> CleanupQueue<T> {
 }
 }
 
-#[path = "cleanup_completion.rs"]
 pub mod completion;
 
-#[path = "stage_landing.rs"]
 pub mod landing;

@@ -21,9 +21,9 @@ physical reorganization; it does not change theorem or acceptance scopes.
 | Domain | Start here | Responsibility |
 | --- | --- | --- |
 | Lifecycle authority | [Kernel](src/lib.rs), [LifecycleState](src/lifecycle_state.rs) | Registry, committed providers, generations, checked transitions and action protocol |
-| Cleanup | [Protocol](src/cleanup_protocol.rs), [update chain](src/cleanup_update.rs), [queue](src/cleanup_queue.rs) | Requests, retained payloads, failure/retry receipts and release guards |
+| Cleanup | [Protocol](src/lifecycle_state/cleanup.rs), [update chain](src/lifecycle_state/cleanup/update.rs), [queue](src/cleanup_queue.rs) | Requests, retained payloads, failure/retry receipts and release guards |
 | Managed effects | [Reversible values](src/reversible_value.rs), [execution](src/execution.rs) | Actual mutations, captured inverses and owned execution histories |
-| Host state owners | [NativeRuntime](src/native_runtime.rs), [NodeRuntime](src/node_runtime.rs) | Host-specific state and its connection to common lifecycle contracts |
+| Host state owners | [NativeRuntime](src/lifecycle_state/native/runtime.rs), [NodeRuntime](src/node_runtime.rs) | Host-specific state and its connection to common lifecycle contracts |
 | Paper interpretation | [Refinement](src/refinement.rs), [semantics](src/semantics.rs), [foundations](src/foundations.rs) | Explicit models, effect laws and implementation bridges |
 
 Read complete `requires` and `ensures`, then follow the real caller. A mathematical

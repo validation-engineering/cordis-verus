@@ -80,7 +80,7 @@ partial／refuted 状态。单独 mutator 和 bootstrap 尚未
 ```sh
 source scripts/toolchain-env.sh
 cargo test -p cordis-kernel --test episode_replay --locked --offline
-python3 scripts/check-r3-episode-controls.py
+python3 scripts/check-profile-controls.py episode
 python3 scripts/record-development.py --offline
 ```
 

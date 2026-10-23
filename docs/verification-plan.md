@@ -4,10 +4,12 @@ English · [简体中文](verification-plan.zh-CN.md) · [Update recovery case](
 
 **Updated: 2026-10-24.** Refactoring proceeds on `main`, starting from the archive
 `codex/archive-before-refactor-2026-10-24` at `60bdd89`. The archive contains the
-implementation at `82145ca` and the preceding verification plan. Structure and
-navigation work has started; generated scenarios and paired test/proof mutation
-comparisons remain planned. Existing results retain their original source-bound
-reports and scopes.
+implementation at `82145ca` and the preceding verification plan. The shared Driver
+and lifecycle/cleanup module layout now follow their Rust
+module ownership, the ordinary host has a separate cleanup adapter, and scoped
+controls use one explicit profile command. Generated scenarios and paired
+test/proof mutation comparisons remain planned. Existing results retain their
+original source-bound reports and scopes.
 
 The goal is to make paper constraints useful in running software: a plugin author
 can update a provider, understand a blocked cleanup, retry safely and inspect the
@@ -106,7 +108,7 @@ publication and invocation responsibilities still require separate contracts.
 Current source paths are Rust `Runtime` → shared `NativeDriver` → `NativeRuntime`
 and Node facade → N-API adapter → `Driver` / `NodeDriver` → `NodeRuntime`.
 Both connect to the shared lifecycle state. See the
-[native owner](../crates/cordis-kernel/src/native_runtime.rs),
+[native owner](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs),
 [Node owner](../crates/cordis-kernel/src/node_runtime.rs) and
 [shared lifecycle state](../crates/cordis-kernel/src/lifecycle_state.rs).
 Pure Rust use continues to require no Node runtime. Structural work should first
@@ -130,7 +132,8 @@ comments and tests; they identify navigation problems, not proof redundancy.
 
 Keep the current crate boundaries initially. Within each crate, group files by
 state ownership and responsibility rather than the iteration that introduced them.
-The following is a target layout, not a claim that these directories already exist:
+The table describes the target; the completed structural batches below identify
+which parts are already in place:
 
 | Area | Intended organization | Review question |
 | --- | --- | --- |
@@ -169,11 +172,27 @@ solely to preserve the old layout. Public feature changes require updated suppor
 and migration documentation. No deletion may silently turn an open paper obligation
 into a completed one or weaken a current guarantee.
 
-The first pass shortens the kernel/package introductions and documentation entry,
-and moves the existing shared Native Driver to `src/shared/native.rs`, matching
-`shared::native` without an API shim. Later batches group one kernel domain at a
-time and split the host by responsibility. Do not combine mechanical moves,
-semantic changes and removal of unique evidence in an unreviewable bulk rewrite.
+### Completed structural batches
+
+| Previous organization / purpose | Current location or replacement | Scope and review |
+| --- | --- | --- |
+| Driver `src/native.rs`, the existing shared Native adapter | `crates/cordis-driver/src/shared/native.rs` | Same `shared::native` API and implementation; no compatibility shim |
+| 41 flat kernel files reached through `#[path]`, including `native_runtime.rs`, `cleanup_protocol.rs` and `cleanup_completion.rs` | `src/lifecycle_state/`, `src/lifecycle_actions/` and `src/cleanup_queue/` under `cordis-kernel`; each file follows its existing logical module name | Module identities, executable/proof bodies and contracts preserved; source links, review bindings and strict negative diagnostic paths migrated |
+| Seven cleanup/receipt/effect-poll methods in the ordinary host's `runtime.rs` | `crates/cordis/src/runtime/cleanup.rs` | Method bodies, lock/drop ordering and failure policy preserved; internal access only |
+| 15 script entry points selecting the same strict negative runner | `python3 scripts/check-profile-controls.py PROFILE` | Same fixed profile selections, fresh positives, compiling mutants and exact proof rejection; full and R2 validation scopes remain separate |
+
+`python3 scripts/check-profile-controls.py --help` lists the profiles.
+`python3 scripts/check-profile-controls.py update-recovery --check` checks the
+selection and current source anchors only; it does **not** run proofs or create a
+passing evidence report. Omitting `--check` runs that profile's strict checks.
+The [development record](development-report.json) identifies its own checked
+source; moving a file does not refresh an old pass. The original files and
+superseded wrappers remain in the fixed archive. No unique theorem, counterexample
+or evidence record was removed, and no paper obligation was closed by these moves.
+
+Further domain moves should remain separate from semantic changes and removal of
+unique evidence. The next feature batch is the seeded scenario generator/reducer
+below; reorganizing every research module is not a prerequisite for it.
 
 ### Archive and branch discipline
 

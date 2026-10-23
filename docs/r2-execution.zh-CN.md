@@ -392,7 +392,7 @@ Begin 中的 owned／imported 服务，核对声明端口并保留实际选中�
 [组件](paper-refinement-map.md#components)、
 [`value_access.rs`](../crates/cordis-kernel/src/value_access.rs)、
 [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)、
-[`native_slot_observation.rs`](../crates/cordis-kernel/src/native_slot_observation.rs)。
+[`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)。
 该较早批次把函数字段工作包从 10/15 推进到 11/15；没有正式集成义务因此关闭。
 该批次的历史 R2 工程估计为 **76%（72–82%）**。
 
@@ -450,8 +450,8 @@ imports 观察；既有并发生产检查点回归也通过。**七个严格可�
 审查入口：[`value_references.rs`](../crates/cordis-kernel/src/value_references.rs)、
 [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)、
 [`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs)、
-[`native_slot_observation.rs`](../crates/cordis-kernel/src/native_slot_observation.rs)
-及 [`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs)。
+[`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)
+及 [`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)。
 
 
 ## 从真实写入连接到真实逆操作登记
@@ -611,11 +611,11 @@ Begin、跨 Episode 的同编号 group scope，以及退休后的作用域失效
 及发版／平台验收。下方旧证据保留为历史记录，不能替代当前源码检查。
 
 审查入口：[`realm_context.rs`](../crates/cordis-kernel/src/realm_context.rs)、
-[`plugin_registration.rs`](../crates/cordis-kernel/src/plugin_registration.rs)、
-[`native_values.rs`](../crates/cordis-kernel/src/native_values.rs)、
+[`lifecycle_state/registration.rs`](../crates/cordis-kernel/src/lifecycle_state/registration.rs)、
+[`lifecycle_state/services.rs`](../crates/cordis-kernel/src/lifecycle_state/services.rs)、
 [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs)、
 [`effect_work.rs`](../crates/cordis-kernel/src/effect_work.rs)、
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs)、
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
 [`runtime.rs`](../crates/cordis/src/runtime.rs)。
 
 ## 共享 Begin 上下文与效果准入
@@ -663,10 +663,10 @@ Begin／work 身份连接到同一受认证时刻的实际 work 和清理成员�
 单独保留，不借用为最终源码验收。**未运行**整个内核证明、完整开发验收、最终源码的
 完整 Rust 测试集、全量负向回归／校准、Node 运行回归及发版／平台验收。
 
-审查入口：[`native_values.rs`](../crates/cordis-kernel/src/native_values.rs)、
+审查入口：[`lifecycle_state/services.rs`](../crates/cordis-kernel/src/lifecycle_state/services.rs)、
 [`setup_context.rs`](../crates/cordis-kernel/src/setup_context.rs)、
 [`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs)、
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs)、
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
 [`runtime.rs`](../crates/cordis/src/runtime.rs)。
 
 ## Episode 归属与真实轮询控制
@@ -716,7 +716,7 @@ owner、work、清理和受管理槽位。这些实现事件接到已有生命�
 审查入口：[`poll_control.rs`](../crates/cordis-kernel/src/poll_control.rs)、
 [`control_execution.rs`](../crates/cordis-kernel/src/control_execution.rs)、
 [`host_status.rs`](../crates/cordis-kernel/src/host_status.rs)、
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs)、
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
 [`runtime.rs`](../crates/cordis/src/runtime.rs)。
 
 ## 真实共享句柄状态接入执行轨迹
@@ -810,8 +810,8 @@ episode 对应操作遍历实际 owned 与 imports。完整性由真实表推出
 剩余 R2 工作包尚未关闭，该批次工程估算保持 **75%（71–81%）**。
 
 审查入口：[`value_slot.rs`](../crates/cordis-kernel/src/value_slot.rs)、
-[`native_slot_observation.rs`](../crates/cordis-kernel/src/native_slot_observation.rs)、
-[`native_slot_runtime.rs`](../crates/cordis-kernel/src/native_slot_runtime.rs)、
+[`lifecycle_state/services/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/services/slots.rs)、
+[`lifecycle_state/native/runtime/slots.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs)、
 [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)。
 
 ## 原生 publication 与完整类型化历史
@@ -857,8 +857,8 @@ publication 检查点。Journal 读锁内不运行回调、析构，也不获取
 由已有受验证执行协议建立；新读取检查点没有替代全局排空协议。
 
 审查入口：[`native_execution.rs`](../crates/cordis-kernel/src/native_execution.rs)、
-[`native_history.rs`](../crates/cordis-kernel/src/native_history.rs)、
-[`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs)、
+[`lifecycle_state/native/runtime/history.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs)、
+[`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs)。
 
 ## 存活清理组与受守卫约束的移除
@@ -935,7 +935,7 @@ owner 历史现已按上文合并；剩余包括共享宿主标志、一般回�
 
 审查入口：[`cleanup_interval.rs`](../crates/cordis-kernel/src/cleanup_interval.rs)、
 [`value_restoration.rs`](../crates/cordis-kernel/src/value_restoration.rs)、
-[`cleanup_completion.rs`](../crates/cordis-kernel/src/cleanup_completion.rs)、
+[`cleanup_queue/completion.rs`](../crates/cordis-kernel/src/cleanup_queue/completion.rs)、
 [`cleanup_journal.rs`](../crates/cordis-kernel/src/cleanup_journal.rs)、
 [`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)。
 
@@ -1037,7 +1037,7 @@ Journal 确实增加了同步操作。锁顺序为对象／槽位，再到 Journ
 完整 R2 或发布验收。
 
 审查路径：[`joint_execution.rs`](../crates/cordis-kernel/src/joint_execution.rs)
-→ [`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs)
+→ [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)
 → [`value_function.rs`](../crates/cordis-kernel/src/value_function.rs)
 → [`runtime.rs`](../crates/cordis/src/runtime.rs) 中的
 `Plugin::native_value_program` / `Runtime::reversible_value`。
@@ -1199,11 +1199,11 @@ Loading、Active、Unloading 插件恰有一个当前归属记录，Inactive 或
 不能替换它。归属变更附随已有 Begin／Unload 控制步，准入检查和拒绝保持该观察。
 这是生产执行投影的加强，不改变 R1 解释，也没有把它宣称为完整 context 对应。
 
-审查入口为 [`native_owner.rs`](../crates/cordis-kernel/src/native_owner.rs)、
-[`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs)、
-[`plugin_registration.rs`](../crates/cordis-kernel/src/plugin_registration.rs)、
-[`native_host.rs`](../crates/cordis-kernel/src/native_host.rs) 的实际检查，以及
-[`native_history.rs`](../crates/cordis-kernel/src/native_history.rs) 的归纳证明。
+审查入口为 [`lifecycle_state/native/runtime/owner.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/owner.rs)、
+[`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
+[`lifecycle_state/registration.rs`](../crates/cordis-kernel/src/lifecycle_state/registration.rs)、
+[`lifecycle_state/native.rs`](../crates/cordis-kernel/src/lifecycle_state/native.rs) 的实际检查，以及
+[`lifecycle_state/native/runtime/history.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs) 的归纳证明。
 `native_host` 与 `native_runtime` 集成测试覆盖延迟调用、退休、工作域复用、外来
 execution 与成功释放；命名负向控制删除相应守卫或归属更新。
 
@@ -1243,7 +1243,7 @@ Unload 返还最初捕获的 imports，并清空已关闭 owner；清理不会�
 执行，同时核对准确的 `Arc` 引用数以及旧上下文关闭后的拒绝行为。
 另一个回归分别在 Finish 和 Unload 检查工作域替换被拒绝。
 
-审查路径：`native_capture.rs::Capture` → `LifecycleState::capture_native_values`
+审查路径：`lifecycle_state/services/capture.rs::Capture` → `LifecycleState::capture_native_values`
 → `NativeEpisode::wf` → `Execution::capture_correspondence`
 → `NativeRuntime::{begin_managed_execution,finish_managed_execution,release_managed_execution}`。
 这加强了 committed dependency 与式 (46) 原生发布视图的实际对应，未缩小 R2 原有验收条件。
@@ -1278,8 +1278,8 @@ Finish 只增加该 provider 的表，Unload 只移除该表，其他控制步�
 它仍未把 `Arc` 内部值、任意回调函数体、共享 episode mutex 状态、Node 发布版本
 共同解释成完整 R1 context。R2 的剩余验收条件没有缩小。
 
-审查路径：`native_runtime.rs::{linked,wf,finish_managed_execution,
-release_managed_execution,history_correspondence}` → `native_history.rs::step`
+审查路径：`lifecycle_state/native/runtime.rs::{linked,wf,finish_managed_execution,
+release_managed_execution,history_correspondence}` → `lifecycle_state/native/runtime/history.rs::step`
 → `cordis-driver/src/shared/native.rs` → `Runtime::poll_settle`。
 聚合 owner 回归覆盖完整发布、冲突声明、provider／consumer 失败重试、
 其他实例的值、旧／外部 episode、recipe／宿主记录更新、退休、压缩以及具有空发布表的共享 Child。
@@ -1459,7 +1459,7 @@ Pending 槽改为 Cancelled，迟到的请求便不能创建失去清理者的�
 
 ## 真实请求与 inverse 共享同一个 Child
 
-[`shared_child.rs`](../crates/cordis-kernel/src/shared_child.rs) 补齐了原生 Child
+[`lifecycle_state/registration/shared_child.rs`](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs) 补齐了原生 Child
 请求／inverse 的别名对应与同步合同：
 
 - `enqueue_native_child` 只接收真实请求载荷，从实际 setup 动作构造一个
@@ -1524,7 +1524,7 @@ Begin、Finish、Unload 的合同连接到已有论文**控制投影**；它们�
 
 ## 原生服务值参与准入、Finish 与 Unload
 
-`native_values.rs` 现在持有原生 Runtime 的真实发布表与 episode 服务槽。
+`lifecycle_state/services.rs` 现在持有原生 Runtime 的真实发布表与 episode 服务槽。
 `begin_native_execution` 执行实际 Begin，同时创建绑定的 `SetupWork`、
 `CleanupGroups` 和 `NativeEpisode`。外部不能用已有工作票据再次构造值 owner。
 域检查及旧 publication 检查在 Begin 之前完成，拒绝时不改变控制状态。
@@ -1773,7 +1773,7 @@ include、更新体效果、生命周期动作及持久化结果仍需 R2-I 的�
 以当前真实控制状态结束；`record_control` 不能用调用方给出的预期轨迹替换它。
 
 `control_history_correspondence` 证明整条记录连续，每一步满足论文控制规则、
-保持控制观察的内部步骤，或 `control_history.rs` 中明确的扩展。普通失配退出
+保持控制观察的内部步骤，或 `lifecycle_state/history.rs` 中明确的扩展。普通失配退出
 对应 L-Divert／L-Leave，仍然 coherent 时的强制退出保留 Restart 分类。动态
 provision 增删和首次启动前的依赖配置具有精确的接口帧；删除 provision 还要求
 没有保留的 commitment 引用该端口。被拒绝的调用和存储压缩保持控制观察。
@@ -2005,7 +2005,7 @@ frame 同时保持其他每个记录的值及存在性。完整已记录状态�
 
 审查入口：[joint_classification.rs](../crates/cordis-kernel/src/joint_classification.rs)、
 [Journal 生产者](../crates/cordis-kernel/src/joint_execution.rs)、
-[原生返回生产者](../crates/cordis-kernel/src/native_runtime.rs)、
+[原生返回生产者](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
 [Value](../crates/cordis-kernel/src/value_function.rs)／[Service](../crates/cordis-kernel/src/service_function.rs)
 报告。`classify_step` 组合对象操作、所有者转换、frame、拒绝和 inverse 来源引理，
 使用现有求解器限额。
@@ -2048,10 +2048,10 @@ owner 仍存活且捕获版本仍为当前版本。换成相同值也会递增�
 共同 Journal 记录身份／版本，不序列化任意 `T`。
 
 真实 Runtime 检查点调用
-[`payload_service_snapshot` 与 `scoped_payload_service_episode_snapshot`](../crates/cordis-kernel/src/native_payload_runtime.rs)。
+[`payload_service_snapshot` 与 `scoped_payload_service_episode_snapshot`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/payloads.rs)。
 它们先收集载荷和标量槽的凭据，再在同一次 Journal 读取中认证真实保留的 publication、
 Episode 自有服务、已捕获 imports、control、work、清理和 setup scope。
-完整的 [`payloads::projection`](../crates/cordis-kernel/src/native_payload_observation.rs)
+完整的 [`payloads::projection`](../crates/cordis-kernel/src/lifecycle_state/services/payloads.rs)
 保留服务表的每个键，区分标量解析、本地载荷身份／版本、已退休载荷和外域 owner。
 `project_replacement` 与真实 `Replacement::production_aliases` 保持全部无关服务
 观察；指向被替换 owner 的当前别名均看到新版本。不同域保持独立，不制造共同历史。

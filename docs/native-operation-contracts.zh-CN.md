@@ -59,10 +59,10 @@ Journal 实例与分配键构成。服务端口是查找名称；多个端口可
 | [槽位替换与别名](../crates/cordis-kernel/src/value_slot.rs)：`capture`、`replace`、`capture_binding` | 修改版本化槽位当前对象，已有 capture 保留此前对象。 | [别名投影](../crates/cordis-kernel/src/value_alias.rs)同时更新指向同一对象的全部名称。字面单端口语义需要明确的单绑定条件；不同端口名不能推出独立性。 |
 | [发布](../crates/cordis-kernel/src/publication.rs)及[撤回](../crates/cordis-kernel/src/publication_cleanup.rs) | 修改所属 Episode 的服务发布与清理义务；consumer 保留已提交 provider。 | 需要组合发布、撤回、consumer 保留与真实载荷所有权。publication 消失不等于所有外部资源已释放。 |
 | [root 解释](../crates/cordis-kernel/src/managed_root.rs)：`run_managed_root`；[函数执行](../crates/cordis-kernel/src/managed_function.rs)：`run_function` | 首个效果前解析全部声明端口，执行真实参数、按真实结果选分支，并登记成功前缀的逆操作。 | 检查有限存储函数及分支下标；受控准入也检查未访问的回调分支。任意回调效果仍不能被当作完整观察不变。 |
-| [Child 所有权](../crates/cordis-kernel/src/shared_child.rs)及[原生注册](../crates/cordis-kernel/src/native_runtime.rs)：`register_shared_child`、`retire_shared_child` | 修改出生／父子／注册记录及真实父所有者的清理义务。 | 注册准入有服务表之外的守卫。retirement、Child 终态和注册删除不同。R04 仍需组合 consumer 和重复 Episode 恢复。 |
-| [清理与重试](../crates/cordis-kernel/src/cleanup_groups.rs)：`dispatch`、`complete`、`retry`；[原生清理](../crates/cordis-kernel/src/native_runtime.rs)：`begin_cleanup`、`retry_managed_execution` | 发出真实动作，保留被阻塞的逆操作，区分失败，并在推进前匹配当前票据。 | 可重试失败保留动作；已消耗的 `FnOnce` 失败合同不同。宿主成功确认是协议事实，不证明任意外部资源已恢复。 |
-| [异步落地](../crates/cordis-kernel/src/stage_landing.rs)及[轮询／重启控制](../crates/cordis-kernel/src/poll_control.rs) | 记录实际所有者、pending 结果、失败和重启状态，根据当前状态接收或转移结果。 | 旧所有者／票据检查是安全性条件。Future 最终完成及宿主调度属于独立的 G04 条件。 |
-| [配置执行](../crates/cordis-kernel/src/native_configuration.rs)及[普通宿主适配器](../crates/cordis/src/runtime.rs) | 将配置／来源记录与真实宿主调用连接到验证内核。 | 复用 R2 生产映射；文件持久性、任意 factory 和外部效果保留明确合同；C01 仍需证明适用的最终配置等价。 |
+| [Child 所有权](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs)及[原生注册](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`register_shared_child`、`retire_shared_child` | 修改出生／父子／注册记录及真实父所有者的清理义务。 | 注册准入有服务表之外的守卫。retirement、Child 终态和注册删除不同。R04 仍需组合 consumer 和重复 Episode 恢复。 |
+| [清理与重试](../crates/cordis-kernel/src/cleanup_groups.rs)：`dispatch`、`complete`、`retry`；[原生清理](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`begin_cleanup`、`retry_managed_execution` | 发出真实动作，保留被阻塞的逆操作，区分失败，并在推进前匹配当前票据。 | 可重试失败保留动作；已消耗的 `FnOnce` 失败合同不同。宿主成功确认是协议事实，不证明任意外部资源已恢复。 |
+| [异步落地](../crates/cordis-kernel/src/cleanup_queue/landing.rs)及[轮询／重启控制](../crates/cordis-kernel/src/poll_control.rs) | 记录实际所有者、pending 结果、失败和重启状态，根据当前状态接收或转移结果。 | 旧所有者／票据检查是安全性条件。Future 最终完成及宿主调度属于独立的 G04 条件。 |
+| [配置执行](../crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs)及[普通宿主适配器](../crates/cordis/src/runtime.rs) | 将配置／来源记录与真实宿主调用连接到验证内核。 | 复用 R2 生产映射；文件持久性、任意 factory 和外部效果保留明确合同；C01 仍需证明适用的最终配置等价。 |
 
 ## 本轮接通的身份关系
 

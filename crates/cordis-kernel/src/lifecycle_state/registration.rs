@@ -460,8 +460,6 @@ impl LifecycleState {
 
 }
 
-#[path = "child_slot.rs"]
 pub mod child;
 
-#[path = "shared_child.rs"]
 pub mod shared_child;

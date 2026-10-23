@@ -49,7 +49,7 @@ paper item or establish Corollary 69 for arbitrary callbacks.
 3. [Driver::complete](../crates/cordis-driver/src/lib.rs) records `Succeeded` or
    `Failed` for Node cleanup. Failure returns without releasing resources.
    Success calls the shared state's `finish_cleanup_resources`, implemented in
-   [cleanup_release.rs](../crates/cordis-kernel/src/cleanup_release.rs). It checks
+   [lifecycle_actions/resources.rs](../crates/cordis-kernel/src/lifecycle_actions/resources.rs). It checks
    the exact current cleanup receipt and registry domain, validates and executes
    the complete resource batch, then calls the actual guarded Kernel finish.
    The ordinary adapter subsequently removes the returned opaque value slots
@@ -70,7 +70,7 @@ an outstanding setup ticket: its result may still carry an inverse to collect.
 
 ## Composed safety of the real cleanup API
 
-[`cleanup_protocol.rs`](../crates/cordis-kernel/src/cleanup_protocol.rs) gives the
+[`lifecycle_state/cleanup.rs`](../crates/cordis-kernel/src/lifecycle_state/cleanup.rs) gives the
 shared production dispatcher a `cleanup_step` contract. `run_cleanup` calls that
 same dispatcher for every command and constructs its state history from those
 actual calls. The history is `Ghost` data erased by compilation; runtime retains

@@ -59,7 +59,7 @@
 ```sh
 cargo test -p cordis-kernel --test closed_replay --locked --offline
 cargo test -p cordis-kernel --test managed_replay --locked --offline
-python3 -B scripts/check-r01-exclusive-controls.py
+python3 -B scripts/check-profile-controls.py r01-exclusive
 python3 -B scripts/record-development.py --offline
 ```
 

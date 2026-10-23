@@ -92,7 +92,7 @@ let recovery = owner.capture_release_census(
 
 ```bash
 python3 scripts/record-development.py --offline
-python3 scripts/check-r3-final-cut-controls.py
+python3 scripts/check-profile-controls.py final-cut
 ```
 
 [开发记录](development-report.json) 将全内核证明、运行、文档和包检查绑定到准确的源码

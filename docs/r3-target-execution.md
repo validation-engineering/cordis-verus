@@ -128,7 +128,7 @@ always returns its real cleanup owner.
 | Obligation | Executable/proof path |
 | --- | --- |
 | Actual retained body and source receipt | `managed_replay.rs`: `run_replayable_root`, `Source::wf` |
-| Same complete source cut | `Source::bind_control`, `native_runtime.rs`: `publication_snapshot_following` |
+| Same complete source cut | `Source::bind_control`, `lifecycle_state/native/runtime.rs`: `publication_snapshot_following` |
 | Fresh target work really enters the interpreter | `registered_root_ready`, `root_ready`, `managed_invocation_ready`, `Source::instantiate` |
 | Captured operands and fresh resource initialization | `managed_replay.rs`: `Source::seed_input`; `managed_replay_inputs.rs`: `capture`, `captured`, `initializes`, `seeded_operation` |
 | Actual scalar/payload step transport | `managed_replay_transport.rs`: `derive`, `paired`, `TargetRun::pair_step` |
@@ -137,7 +137,7 @@ always returns its real cleanup owner.
 The runtime cases cover source removal, shifted target IDs, separate resources,
 failed-prefix execution on different inputs, real typed cleanup interference,
 fresh retry tickets, final recovery capture and pre-execution rejection.
-`python3 scripts/check-r3-target-execution-controls.py` separately checks that
+`python3 scripts/check-profile-controls.py target-execution` separately checks that
 skipping the actual interpreter or replacing the retained body with an empty one is
 rejected by the designated proof contract.
 

@@ -5,7 +5,7 @@
     {
       "name": "r3-source-chain-skips-command",
       "mutation": {
-        "file": "native_control_source.rs",
+        "file": "lifecycle_state/native/runtime/control_source.rs",
         "old": "let ghost before=self.commands@;self.commands.push(c);",
         "new": "let ghost before=self.commands@;let _=c;"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::control_source::Recorder::append",
           "module": "lifecycle_state::native::runtime::control_source",
-          "file": "native_control_source.rs",
+          "file": "lifecycle_state/native/runtime/control_source.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.commands.len()==next.labels.len());"
         }
@@ -31,7 +31,7 @@
     {
       "name": "r3-source-chain-skips-unload-source",
       "mutation": {
-        "file": "native_runtime.rs",
+        "file": "lifecycle_state/native/runtime.rs",
         "old": "self.children.borrow_mut().unload(end.duplicate(),before_collection.joint_events());",
         "new": "// Mutation: omit the actual Unload source collection."
       },
@@ -47,7 +47,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::release_managed_execution_following",
           "module": "lifecycle_state::native::runtime",
-          "file": "native_runtime.rs",
+          "file": "lifecycle_state/native/runtime.rs",
           "diagnosticKind": "precondition not satisfied",
           "uniqueSourceAnchor": "control_source::cleanup::unload_collected(prior.child_records(),self.child_records(),prior.execution_history(),prior.history_positions(),self.execution_history(),self.history_positions(),end,id);"
         }

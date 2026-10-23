@@ -120,14 +120,14 @@ consumer may temporarily disagree with its current target.
   for the contracts, reservation extension, retryable Rust inverses and the
   ordinary Rust host's `Drained` policy for consumed `FnOnce` failures. Host reports and external inverse effects remain outside the proof.
 - [lifecycle_state.rs](../crates/cordis-kernel/src/lifecycle_state.rs),
-  [cleanup_release.rs](../crates/cordis-kernel/src/cleanup_release.rs) and
+  [lifecycle_actions/resources.rs](../crates/cordis-kernel/src/lifecycle_actions/resources.rs) and
   [publication_cleanup.rs](../crates/cordis-kernel/src/publication_cleanup.rs):
   the actual shared owner keeps Kernel/protocol together. Managed finish checks
   domain, receipt, resource provenance and manifest completeness; an atomic
   registry batch precedes commitment release. Rejection preserves the finish
   input; success clears that episode's managed resources and returns exact slots.
   Host callback truth, acquisition routing and opaque value destruction remain external.
-- [cleanup_protocol.rs](../crates/cordis-kernel/src/cleanup_protocol.rs): production
+- [lifecycle_state/cleanup.rs](../crates/cordis-kernel/src/lifecycle_state/cleanup.rs): production
   `execute_cleanup` gives these actual calls one transition contract. `run_cleanup`
   constructs an erased history from the real loop. `consumed_ticket_never_returns`
   rejects all later replays; `binding_at` retains the actual provider until release;

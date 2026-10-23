@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check a fixed control profile; not full regression or acceptance."""
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -20,45 +21,59 @@ def module(name, filename):
     return loaded
 
 
-def main(profile='episode'):
-    selections = {
-        'update-recovery': ['cleanup-dispatch-promotes-failure', 'cleanup-dispatch-bypasses-receipt', 'cleanup-queue-discards-retained-payload', 'r2-value-ignores-inverse-depth', 'r2-shared-child-splits-request-inverse'],
-        'r01-exclusive': ['r01-exclusive-source-ignores-input', 'r01-exclusive-source-ignores-allocation', 'r01-typed-seed-ignores-inverse-debt', 'r01-typed-seed-ignores-revision', 'r01-typed-call-ignores-source-history'],
-        'episode': ['r3-replay-discards-foreign-history', 'r3-recovery-discards-stored-receipts'],
-        'production': ['r3-managed-gap-ignores-writes', 'r3-typed-restores-consumed-head'],
-        'final-cut': ['r3-final-cut-skips-foreign', 'r3-final-cut-skips-child'],
-        'controlled-effects': ['r3-controlled-replay-admits-callback', 'r3-controlled-evaluation-uses-wrong-input'],
-        'source-schedule': ['r3-source-call-fabricates-position', 'r3-typed-landing-skips-version'],
-        'scalar-landing': ['r3-scalar-landing-ignores-depth'],
-        'target-execution': ['r3-target-execution-skips-interpreter', 'r3-target-execution-drops-source-body'],
-        'source-chain': ['r3-source-chain-skips-command', 'r3-source-chain-skips-unload-source'],
-        'control-replay': ['r3-control-replay-keeps-source-allocation', 'r3-control-replay-skips-executable-begin'],
-        'effect-deletion': ['r3-effect-deletion-skips-read', 'r3-effect-deletion-keeps-source-index'],
-        'deletion': ['r3-deletion-retains-selected-actions', 'r3-deletion-skips-child-birth'],
-        'host': ['r3-host-skips-append-history', 'r3-host-drops-terminal-history'],
-        'observation': ['r3-observation-skips-publication', 'r3-observation-skips-pending'],
-    }
-    if profile not in selections:
-        raise ValueError('Unknown control profile')
+PROFILES = {
+    'update-recovery': ['cleanup-dispatch-promotes-failure', 'cleanup-dispatch-bypasses-receipt', 'cleanup-queue-discards-retained-payload', 'r2-value-ignores-inverse-depth', 'r2-shared-child-splits-request-inverse'],
+    'r01-exclusive': ['r01-exclusive-source-ignores-input', 'r01-exclusive-source-ignores-allocation', 'r01-typed-seed-ignores-inverse-debt', 'r01-typed-seed-ignores-revision', 'r01-typed-call-ignores-source-history'],
+    'episode': ['r3-replay-discards-foreign-history', 'r3-recovery-discards-stored-receipts'],
+    'production': ['r3-managed-gap-ignores-writes', 'r3-typed-restores-consumed-head'],
+    'final-cut': ['r3-final-cut-skips-foreign', 'r3-final-cut-skips-child'],
+    'controlled-effects': ['r3-controlled-replay-admits-callback', 'r3-controlled-evaluation-uses-wrong-input'],
+    'source-schedule': ['r3-source-call-fabricates-position', 'r3-typed-landing-skips-version'],
+    'scalar-landing': ['r3-scalar-landing-ignores-depth'],
+    'target-execution': ['r3-target-execution-skips-interpreter', 'r3-target-execution-drops-source-body'],
+    'source-chain': ['r3-source-chain-skips-command', 'r3-source-chain-skips-unload-source'],
+    'control-replay': ['r3-control-replay-keeps-source-allocation', 'r3-control-replay-skips-executable-begin'],
+    'effect-deletion': ['r3-effect-deletion-skips-read', 'r3-effect-deletion-keeps-source-index'],
+    'deletion': ['r3-deletion-retains-selected-actions', 'r3-deletion-skips-child-birth'],
+    'host': ['r3-host-skips-append-history', 'r3-host-drops-terminal-history'],
+    'observation': ['r3-observation-skips-publication', 'r3-observation-skips-pending'],
+}
+
+
+def load_profile(profile):
+    if profile not in PROFILES:
+        raise ValueError('Unknown control profile: ' + profile)
     stem = profile if profile in ('r01-exclusive', 'update-recovery') else f'r3-{profile}'
     manifest_path = ROOT / f'scripts/negative-controls.{stem}.json'
-    output = ROOT / f'target/{stem}-controls'
-    h = module('r3_scoped', 'check-negative-scoped.py')
-    canonical = module('r3_canonical', 'check-negative.py')
+    h = module('profile_scoped', 'check-negative-scoped.py')
+    canonical = module('profile_canonical', 'check-negative.py')
     manifest = h.load_json(manifest_path)
     h.validate_manifest(manifest)
-    cases = manifest['cases']
-    h.require([c['name'] for c in cases] == selections[profile], 'Control selection changed')
+    h.require([c['name'] for c in manifest['cases']] == PROFILES[profile], 'Control selection changed')
     mutations = {name: (file, old, new) for name, file, old, new in canonical.mutation_manifest()}
-    for case in cases:
+    for case in manifest['cases']:
         m = case['mutation']
         h.require(mutations.get(case['name']) == (m['file'], m['old'], m['new']),
                   'Mutation differs from the canonical control')
+    h.preflight(manifest, ROOT / 'crates/cordis-kernel/src')
+    return stem, manifest_path, manifest, mutations, h
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('profile', choices=PROFILES, help='fixed audited control selection')
+    parser.add_argument('--check', action='store_true',
+                        help='check selection, mutations and source anchors only; no proof execution')
+    args = parser.parse_args(argv)
+    stem, manifest_path, manifest, mutations, h = load_profile(args.profile)
+    cases = manifest['cases']
+    if args.check:
+        print(f'{args.profile}: {len(cases)} control anchors checked; proofs not run.')
+        return
+    output = ROOT / f'target/{stem}-controls'
     bound_files = [Path(__file__), manifest_path, ROOT / 'scripts/check-negative-scoped.py',
                    ROOT / 'scripts/check-negative.py', ROOT / 'toolchain.lock.json',
                    ROOT / 'scripts/install-verus.py']
-    if profile in ('update-recovery', 'r01-exclusive', 'production', 'final-cut', 'observation', 'host', 'deletion', 'effect-deletion', 'control-replay', 'source-chain', 'target-execution', 'scalar-landing', 'source-schedule', 'controlled-effects'):
-        bound_files.append(ROOT / f'scripts/check-{stem}-controls.py')
     digests = lambda: {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                        for p in bound_files}
     harness = digests()

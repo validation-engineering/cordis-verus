@@ -128,7 +128,7 @@ quiet，就能推出恢复成功。这些结论由实际 restore 与 typed 清�
 | 运行 admission 与报告保留 | [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs)、[managed_function.rs](../crates/cordis-kernel/src/managed_function.rs) |
 | Journal 间隔到实际 scalar／typed 状态衔接 | [managed_recovery.rs](../crates/cordis-kernel/src/managed_recovery.rs)：`linked_pair`、`establish_recovery` |
 | 混合逆序列及真实队列后缀 | [managed_recovery_word.rs](../crates/cordis-kernel/src/managed_recovery_word.rs)：`defined`、`recover_retained` |
-| 真实 Begin 及 registered 执行区间 | [native_episode_origin.rs](../crates/cordis-kernel/src/native_episode_origin.rs)、[managed_episode.rs](../crates/cordis-kernel/src/managed_episode.rs)、[managed_root.rs](../crates/cordis-kernel/src/managed_root.rs) |
+| 真实 Begin 及 registered 执行区间 | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs)、[managed_episode.rs](../crates/cordis-kernel/src/managed_episode.rs)、[managed_root.rs](../crates/cordis-kernel/src/managed_root.rs) |
 | 真实 Begin／返回值与保留队列恢复 | [managed_endpoint.rs](../crates/cordis-kernel/src/managed_endpoint.rs)、[managed_root_recovery.rs](../crates/cordis-kernel/src/managed_root_recovery.rs) |
 | typed 变更历史与已恢复干扰 | [payload_semantic_history.rs](../crates/cordis-kernel/src/payload_semantic_history.rs)、[managed_restored.rs](../crates/cordis-kernel/src/managed_restored.rs) |
 | typed 尝试、失败原因与严格定义域 | [payload_attempt.rs](../crates/cordis-kernel/src/payload_attempt.rs)、[payload_recovery.rs](../crates/cordis-kernel/src/payload_recovery.rs) |
@@ -140,7 +140,7 @@ LIFO 队列恢复原值；旧读取拒绝；重复恢复与退休对象恢复拒
 ```sh
 source scripts/toolchain-env.sh
 cargo test -p cordis-kernel --test managed_function --locked --offline
-python3 scripts/check-r3-production-controls.py
+python3 scripts/check-profile-controls.py production
 python3 scripts/record-development.py --offline
 ```
 

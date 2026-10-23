@@ -1,7 +1,6 @@
 //! Publication, Episode ownership and pending inverses at every actual cut.
 //! The source is the runtime's complete typed history and shared Journal, not
 //! a caller-supplied restored table or a value-only control projection.
-#[path = "native_observation_client.rs"]
 pub mod client;
 use super::{registry_recovery as registry, History, Observation, Snapshot};
 #[cfg(verus_keep_ghost)]

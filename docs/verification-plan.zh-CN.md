@@ -4,8 +4,9 @@
 
 **更新：2026-10-24。** 重构在 `main` 上推进，起点归档为
 `codex/archive-before-refactor-2026-10-24`，提交 `60bdd89`。
-归档包含 `82145ca` 的实现与上一版验证计划。结构和导航整理已经启动；生成场景与
-测试／证明负控对照仍为计划工作。已有成果继续使用其原有范围与绑定源码的报告。
+归档包含 `82145ca` 的实现与上一版验证计划。共享 Driver 与生命周期／清理文件已按
+已有 Rust 模块归属组织，普通宿主已拆出清理适配器，定向负控已统一为显式 profile 命令。
+生成场景与测试／证明负控对照仍为计划工作。已有成果继续使用其原有范围与绑定源码的报告。
 
 目标是让论文约束在真实运行中产生价值：插件作者可以更新 provider，理解清理为何
 受阻，安全重试，并审查行为背后的合同。首个交付范围继续为
@@ -89,7 +90,7 @@ JavaScript callback 或调度器最终完成。
 当前源码路径为 Rust `Runtime` → shared `NativeDriver` → `NativeRuntime`，
 以及 Node facade → N-API adapter → `Driver`／`NodeDriver` → `NodeRuntime`。
 两者连接共享生命周期状态。源码入口为
-[Native 所有者](../crates/cordis-kernel/src/native_runtime.rs)、
+[Native 所有者](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
 [Node 所有者](../crates/cordis-kernel/src/node_runtime.rs)及
 [共享生命周期状态](../crates/cordis-kernel/src/lifecycle_state.rs)。
 纯 Rust 使用继续不依赖 Node 运行时。结构调整先改善现有 crate 内的所有权划分与导航；
@@ -108,7 +109,7 @@ JavaScript callback 或调度器最终完成。
 ### 目标组织方式
 
 初期保留现有 crate 边界；crate 内按状态所有权和职责组织，不按引入它的开发轮次组织。
-下表是目标分区，不代表相关目录已经全部存在：
+下表描述目标分区；后面的已完成批次说明哪些部分已经落地：
 
 | 区域 | 目标组织 | 应帮助审查者回答的问题 |
 | --- | --- | --- |
@@ -141,10 +142,24 @@ JavaScript callback 或调度器最终完成。
 不为保留旧布局而维护无价值的实验兼容别名；公开功能变化要同步支持范围与迁移说明。
 删除不能悄悄把开放的论文义务变成完成，也不能削弱当前保证。
 
-首轮精简内核／包介绍和文档入口，将共享 Native Driver 移到 `src/shared/native.rs`，
-对应已有的 `shared::native`，不增加 API 兼容包装。后续一次归并一个内核领域，
-并按职责拆分宿主。机械移动、语义修改和独有证据删除分别形成可审查的改动，避免混为
-一次难以核查的大重写。
+### 已完成的结构批次
+
+| 原有组织／用途 | 当前路径或替代入口 | 范围与审查 |
+| --- | --- | --- |
+| Driver `src/native.rs`，已有的共享 Native 适配器 | `crates/cordis-driver/src/shared/native.rs` | 保持 `shared::native` API 与实现，不增加兼容包装 |
+| 41 个通过 `#[path]` 连接的平铺内核文件，包括 `native_runtime.rs`、`cleanup_protocol.rs`、`cleanup_completion.rs` | `cordis-kernel` 下的 `src/lifecycle_state/`、`src/lifecycle_actions/`、`src/cleanup_queue/`；文件逐一对应已有逻辑模块名 | 模块身份、可执行／证明函数体和合同保持不变；迁移源码链接、审查绑定及严格负控诊断路径 |
+| 普通宿主 `runtime.rs` 中的七个清理、回执与 effect 轮询方法 | `crates/cordis/src/runtime/cleanup.rs` | 保持函数体、锁／析构顺序与失败策略；只开放内部访问 |
+| 选择同一严格负控执行器的 15 个脚本入口 | `python3 scripts/check-profile-controls.py PROFILE` | 保持固定错误集合、新正向基线、变异编译与精确证明拒绝；全量和 R2 验收仍保留各自范围 |
+
+`python3 scripts/check-profile-controls.py --help` 列出可用 profile。
+`python3 scripts/check-profile-controls.py update-recovery --check` 只核对选择和当前
+源码锚点，**不运行证明，也不生成通过报告**。不加 `--check` 才运行对应严格检查。
+[开发记录](development-report.json) 标明它实际验证的源码；移动文件不会刷新旧通过。
+原始文件与被合并的包装脚本保留在固定归档中；本批未删除独有定理、反例或证据，
+也未通过目录调整关闭任何论文义务。
+
+后续目录归并继续与语义修改、独有证据删除分开。下一批功能工作是下面的带种子场景
+生成与缩减；不把整理完全部研究模块作为它的前置条件。
 
 ### 归档与分支约定
 

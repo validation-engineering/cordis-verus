@@ -86,7 +86,7 @@ moves from source index 15 to target index 5. The original partial restoration
 domain is preserved. A retained queued inverse is not mistaken for a drained queue.
 
 Two strict selected negative controls reject ignoring guard reads and retaining
-a stale registration index. Run `python3 scripts/check-r3-effect-deletion-controls.py`.
+a stale registration index. Run `python3 scripts/check-profile-controls.py effect-deletion`.
 The combined [development record](development-report.json) binds the source to
 whole-kernel proofs, existing real cleanup/failure/retry tests and package checks.
 Full negative regression is separate and remains `not_run` unless explicitly run.
@@ -95,7 +95,7 @@ Full negative regression is separate and remains `not_run` unless explicitly run
 
 | Connection | Source |
 | --- | --- |
-| Actual snapshot, source checks, obstruction, native transport | [native_joint_deletion.rs](../crates/cordis-kernel/src/native_joint_deletion.rs): `Selection::check`, `edge`, `endpoint`, `Snapshot::delete_effect_window` |
+| Actual snapshot, source checks, obstruction, native transport | [lifecycle_state/native/runtime/history/deletion/joint.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/joint.rs): `Selection::check`, `edge`, `endpoint`, `Snapshot::delete_effect_window` |
 | Event positions, pending conservation, inverse provenance | [joint_erasure.rs](../crates/cordis-kernel/src/joint_erasure.rs): `pending_edge`, `construct`, `restoration_sources` |
 | Exact reads of the production guards | [joint_erasure_reads.rs](../crates/cordis-kernel/src/joint_erasure_reads.rs): `same`, `transport` |
 | Nonempty source and surviving execution | [joint_erasure_client.rs](../crates/cordis-kernel/src/joint_erasure_client.rs): `source_valid`, `nonempty` |

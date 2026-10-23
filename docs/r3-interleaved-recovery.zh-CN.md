@@ -316,11 +316,11 @@ native member／父插件，遗漏退休或清理封闭前驱，拒绝后伪造�
   实际 work receipt、执行器借出／scope／落地及排空后的退休。
 - [managed_lifecycle_children.rs](../crates/cordis-kernel/src/managed_lifecycle_children.rs)：
   Child 原子准入、保留的逆操作义务，以及创建者 Episode 与实际取消／Child 释放的关联。
-- [native_child_recovery.rs](../crates/cordis-kernel/src/native_child_recovery.rs) 与
-  [shared_child.rs](../crates/cordis-kernel/src/shared_child.rs)：持久槽位决策、真实
+- [lifecycle_state/native/runtime/child_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_recovery.rs) 与
+  [lifecycle_state/registration/shared_child.rs](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs)：持久槽位决策、真实
   退休／Unload 组合及普通 Rust 入口。
-- [native_child_history.rs](../crates/cordis-kernel/src/native_child_history.rs)、
-  [native_child_completion.rs](../crates/cordis-kernel/src/native_child_completion.rs)
+- [lifecycle_state/native/runtime/child_history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history.rs)、
+  [lifecycle_state/native/runtime/child_history/completion.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/completion.rs)
   和 [managed_child_completion.rs](../crates/cordis-kernel/src/managed_child_completion.rs)：
   自动出生／退休／Unload 来源、已提交前缀覆盖及创建者原始 native 逆操作的完整性。
 - [managed_lifecycle_function.rs](../crates/cordis-kernel/src/managed_lifecycle_function.rs)：
@@ -342,8 +342,8 @@ native member／父插件，遗漏退休或清理封闭前驱，拒绝后伪造�
   真实移除／封闭守卫，以及由此定位的先前 token 完成事件。
 - [managed_interleaving_endpoint.rs](../crates/cordis-kernel/src/managed_interleaving_endpoint.rs)：
   真实终点解码、尾部无修改条件及 `unload_recovers_begin`。
-- [native_episode_origin.rs](../crates/cordis-kernel/src/native_episode_origin.rs) 与
-  [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs)：真实成功释放、索引
+- [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs) 与
+  [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：真实成功释放、索引
   owner 来源和擦除的 Unload 证据。
 - [recovery_obligations.rs](../crates/cordis-kernel/src/recovery_obligations.rs)：深度
   约束、从历史推出的单对象顺序及逆操作消费。

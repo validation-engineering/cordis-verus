@@ -3,25 +3,15 @@
 //! Its joint invariant covers real registry membership, episode generations,
 //! complete declared values and retention throughout restoration. Opaque host
 //! bookkeeping, escaped episode mutexes and slot interiors are separate bounds.
-#[path = "native_child_history.rs"]
 pub mod child_history;
-#[path = "native_child_recovery.rs"]
 pub mod child_recovery;
-#[path = "native_configuration.rs"]
 pub mod configuration;
-#[path = "native_control_source.rs"]
 pub mod control_source;
-#[path = "native_episode_origin.rs"]
 pub mod episode;
-#[path = "native_history.rs"]
 pub mod history;
-#[path = "native_owner.rs"]
 pub mod owner;
-#[path = "native_production.rs"]
 pub mod production;
-#[path = "recipe_history.rs"]
 pub mod recipes;
-#[path = "native_slot_runtime.rs"]
 pub mod slots;
 use super::{NativeEntry, NativeHost};
 use crate::action_ledger::ActionTicket;
@@ -1164,5 +1154,4 @@ impl<R,H,V,F> NativeRuntime<Body<R,F>,H,V> {
 
 }
 
-#[path = "native_payload_runtime.rs"]
 pub mod payloads;

@@ -596,5 +596,4 @@ impl LifecycleActions {
 
 }
 
-#[path = "cleanup_release.rs"]
 pub mod resources;

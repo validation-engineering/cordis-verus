@@ -111,7 +111,7 @@
       },
       "review": [
         {
-          "file": "crates/cordis-kernel/src/native_source_chain.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs",
           "symbol": "inverse_source"
         },
         {
@@ -207,7 +207,7 @@
           "symbol": "no_single_recovery_and_admission_relation"
         },
         {
-          "file": "crates/cordis-kernel/src/stage_landing.rs",
+          "file": "crates/cordis-kernel/src/cleanup_queue/landing.rs",
           "symbol": "land_result"
         }
       ]
@@ -255,7 +255,7 @@
           "symbol": "poll_apply"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "file": "crates/cordis-kernel/src/cleanup_queue/completion.rs",
           "symbol": "complete_future"
         }
       ]
@@ -1111,7 +1111,7 @@
           "symbol": "single_key_projection"
         },
         {
-          "file": "crates/cordis-kernel/src/native_history.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
           "symbol": "publication_retained"
         },
         {
@@ -1279,7 +1279,7 @@
           "symbol": "complete"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "file": "crates/cordis-kernel/src/cleanup_queue/completion.rs",
           "symbol": "complete_future"
         },
         {
@@ -1640,7 +1640,7 @@
           "symbol": "instantiate_controlled"
         },
         {
-          "file": "crates/cordis-kernel/src/native_source_cleanup.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs",
           "symbol": "unload_at"
         },
         {
@@ -1648,19 +1648,19 @@
           "symbol": "run_ordered"
         },
         {
-          "file": "crates/cordis-kernel/src/native_values.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/services.rs",
           "symbol": "finish_native_execution"
         },
         {
-          "file": "crates/cordis-kernel/src/native_host.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native.rs",
           "symbol": "finish_native_execution"
         },
         {
-          "file": "crates/cordis-kernel/src/managed_native.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/managed.rs",
           "symbol": "finish_managed_execution"
         },
         {
-          "file": "crates/cordis-kernel/src/native_runtime.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
           "symbol": "finish_managed_execution"
         },
         {
@@ -1959,7 +1959,7 @@
       },
       "review": [
         {
-          "file": "crates/cordis-kernel/src/stage_landing.rs",
+          "file": "crates/cordis-kernel/src/cleanup_queue/landing.rs",
           "symbol": "land_result"
         },
         {
@@ -1967,7 +1967,7 @@
           "symbol": "await_completion"
         },
         {
-          "file": "crates/cordis-kernel/src/cleanup_completion.rs",
+          "file": "crates/cordis-kernel/src/cleanup_queue/completion.rs",
           "symbol": "complete_future"
         }
       ],
@@ -2227,7 +2227,7 @@
       },
       "review": [
         {
-          "file": "crates/cordis-kernel/src/native_episode_deletion.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs",
           "symbol": "transport"
         },
         {
@@ -2310,7 +2310,7 @@
           "symbol": "run_script"
         },
         {
-          "file": "crates/cordis-kernel/src/native_history.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
           "symbol": "owner_retained"
         }
       ],
@@ -4784,11 +4784,11 @@
     "crates/cordis-kernel/src/causal_normalization.rs": "865013833416d6ce807ab7aec460f5fae853e503b252c452e48a8988244b4af1",
     "crates/cordis-kernel/src/child_driver.rs": "e2471a811c766b115c6b1eff12442f95d6b1fc1cbe0ff3ab8922a6c771b4928e",
     "crates/cordis-kernel/src/child_history.rs": "65fb3b5a81e0a2babef641de1506875b569f7a1415e645a3917522533e3c9dac",
-    "crates/cordis-kernel/src/cleanup_completion.rs": "5993ca0577e6dcd94c8ac05ee1e446ddc3e55700c557eb46106d1941c6cd6cd2",
+    "crates/cordis-kernel/src/cleanup_queue/completion.rs": "5993ca0577e6dcd94c8ac05ee1e446ddc3e55700c557eb46106d1941c6cd6cd2",
     "crates/cordis-kernel/src/cleanup_journal.rs": "64f20ed1b27e25a621b676792a4f226113ed4ea0b898d960c3b865946f41d340",
-    "crates/cordis-kernel/src/cleanup_protocol.rs": "0d2c47c4735845acedd6708fb8c932b508f433e72ac63a7273d5f0d1b566accd",
-    "crates/cordis-kernel/src/cleanup_queue.rs": "2b4e495d891e20ec382b94fff199c1fb83a2e25bfbe832857a2dbf4cfb2fa147",
-    "crates/cordis-kernel/src/cleanup_release.rs": "9d2fb72dfa5668240c35858556b63fc8918599cc6afe6bbe1aaaba37b2422c5e",
+    "crates/cordis-kernel/src/lifecycle_state/cleanup.rs": "5e6352bd6b9f7223f2411610bf0f917728b6db822a93399014871af82f83ba9f",
+    "crates/cordis-kernel/src/cleanup_queue.rs": "bdbc1dea53e79cfaf9c153d84a66363beaeac057ef3310fbd241c5548eb6409b",
+    "crates/cordis-kernel/src/lifecycle_actions/resources.rs": "9d2fb72dfa5668240c35858556b63fc8918599cc6afe6bbe1aaaba37b2422c5e",
     "crates/cordis-kernel/src/closed_region_execution.rs": "428d594c3314f0f2b7808acf2f6b9790d1d58bf93b588e408ebd7f20151044b6",
     "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
     "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
@@ -4860,14 +4860,14 @@
     "crates/cordis-kernel/src/kernel_replay.rs": "f083dcc354ec0ebc58369ae88abd832f8f006a55189f358b5c84ae53e4cea1fe",
     "crates/cordis-kernel/src/lib.rs": "c0e6c54261c22f7bd8776103b7d1b3b91955d8fe5a7ffbe1f498eb1d18f9dc25",
     "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
-    "crates/cordis-kernel/src/lifecycle_state.rs": "cf8078d280e3e9c2d89cbe56f8e198334ad1c9bc48eb80ee103b55fb075ec4f8",
+    "crates/cordis-kernel/src/lifecycle_state.rs": "97d68d5e0d3d48bed83fbeb96c4504ffe9766b74341aeabd1caeb9e4b5a2ef6a",
     "crates/cordis-kernel/src/managed_child_completion.rs": "e2110e13acd891174395acc4d54b7370c6ae2672d74636471568fff5b77bb144",
     "crates/cordis-kernel/src/managed_foreign_closure.rs": "ef877262e5d1e0bd32ee8a548bf716dcae225949673b5f8bf1b78b3fcd77295b",
     "crates/cordis-kernel/src/managed_function.rs": "e551de8eb2406bee155780928c6404a12c64bf5bc939bb697b854d8bd8a9591c",
     "crates/cordis-kernel/src/managed_host.rs": "61bd8e9fac340cf820506b6bb99b20fd86ec364e60deb07503d9ebcd4f7692ed",
     "crates/cordis-kernel/src/managed_lifecycle_function.rs": "2630b4e165f76ef3a5ab8c9ff456b3af4d9dc8b58fbf585f6195f8cd44ba4add",
     "crates/cordis-kernel/src/managed_lifecycle_native.rs": "5264076c9e0231fd2c6bad3156780e5312b470e0dcc938b1f4a033886639488b",
-    "crates/cordis-kernel/src/managed_native.rs": "de6f4710389d19f5d5391f73ce304aee9116eff2bb3a9950a1ea8af098236fee",
+    "crates/cordis-kernel/src/lifecycle_state/native/managed.rs": "de6f4710389d19f5d5391f73ce304aee9116eff2bb3a9950a1ea8af098236fee",
     "crates/cordis-kernel/src/managed_producer_recovery.rs": "26a9ea7a1e52b71c6e2defebf77df726db445a372f3be9dc0170c60ed7771e26",
     "crates/cordis-kernel/src/managed_recovery.rs": "24eeae5ddf5571d6c45549328b52d78eb113f073535bd461576befaef2c55744",
     "crates/cordis-kernel/src/managed_recovery_cut.rs": "31fd8e9000034696856eb9169cef74cffaf28d944dd4fb969f0e55a936339721",
@@ -4908,14 +4908,14 @@
     "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
     "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
     "crates/cordis-kernel/src/native_effect.rs": "9fd527c3e42711543033efd2c72f1ad77b29ac518684bb920d16b5be03f5725b",
-    "crates/cordis-kernel/src/native_episode_deletion.rs": "c43580de5f362e64c461960118b06cede0a64b5be38f3e6e8b01da0a3e1e5d7c",
-    "crates/cordis-kernel/src/native_history.rs": "49ebeb34934cac19e326278cb47a583f908321d2994f9824a2da26b3afce064b",
-    "crates/cordis-kernel/src/native_host.rs": "33566b2917571d9a37b8df6a5869854b92b6c8448e7f953d3468a2234fd0bae1",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs": "e53c268c70bf5135d3fc9135c18f7722d6194c712fe5800be384e48f4181ad87",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs": "2db73b7d1f35317e9397b77c267b39409d335fb19da22c333489244240f0be4b",
+    "crates/cordis-kernel/src/lifecycle_state/native.rs": "d75ac340a6a2ac6c0838a85d8b3a95ac3fabd162dd8bac7b23cdb47746449ff6",
     "crates/cordis-kernel/src/native_payload.rs": "9a65e0a382626d5e22018f06b646c12cebc0e3a9e4dad72146c36e2ed5378123",
-    "crates/cordis-kernel/src/native_runtime.rs": "607a7dcd058f782ebdff85fd429e599b01be2e5cf02904e2ec3929179aacef9c",
-    "crates/cordis-kernel/src/native_source_chain.rs": "c74c99fadc350e52eae3c7cb89abb6756be350da12a8b60b009218588f1bbd4c",
-    "crates/cordis-kernel/src/native_source_cleanup.rs": "0d20fac526af890518084174473823789dc348cef48276bf73a9160d20aa51f8",
-    "crates/cordis-kernel/src/native_values.rs": "35735a8f34879dcde10d27c88470d9595d120ed2657c6e556d715febbbbd4622",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs": "3e54d3d22224bdde732cc0937496720db0e41bb1c961cacc107858387f30c530",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs": "c74c99fadc350e52eae3c7cb89abb6756be350da12a8b60b009218588f1bbd4c",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs": "0d20fac526af890518084174473823789dc348cef48276bf73a9160d20aa51f8",
+    "crates/cordis-kernel/src/lifecycle_state/services.rs": "4b95be1a3a9456a847c58919166947c82bba0c1ec34875f2b623847043130e85",
     "crates/cordis-kernel/src/node_runtime.rs": "ea30701aac3915601318f685a56318502d14dd65d1d86b467ea646fcdc8191c1",
     "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
     "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
@@ -4984,7 +4984,7 @@
     "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
     "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
     "crates/cordis-kernel/src/shared_value_history.rs": "7550a29f9d9fad58a8e1d3df3f6dd0c9d5564d658498056e8233fe251eb740f4",
-    "crates/cordis-kernel/src/stage_landing.rs": "6bd9327b126fd13651df99b07cba3955a1359d850f107bdd3ce99d33d2aed1ba",
+    "crates/cordis-kernel/src/cleanup_queue/landing.rs": "6bd9327b126fd13651df99b07cba3955a1359d850f107bdd3ce99d33d2aed1ba",
     "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
     "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
     "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
@@ -5002,11 +5002,11 @@
     "crates/cordis-kernel/src/witnessed.rs": "fdbf689640871228463fb10af0fa97523f79272bdd942cca126334e41b57b8cd",
     "crates/cordis-kernel/src/xor_recovery_algebra.rs": "0a31cfb01f88a52dd5688fb9a9362d48d289b8ea099aa31e4cf299fc34ad47ec",
     "crates/cordis/src/loader.rs": "2a73818c8aa50c8f9e0bfdc67e191c9be06a0b0458f859b6d8aa3bb4fa948d44",
-    "docs/paper-obligations.json": "8ab0bbb44d4036a49cfcebdb3b2d9aff3514dd7e3792364f23d0a1f73d8cd60a",
-    "docs/paper-refinement-plan.json": "00ef6d1372a4c2f003172eff0de2a729490456b2547a7f0086ec93ceb748270c",
+    "docs/paper-obligations.json": "fa4e0efc232a04656c313150ff979ad04c30f9d7a7a887a2b21d0e55afef2b67",
+    "docs/paper-refinement-plan.json": "b12cefc899b3fff51ad620cd86cc02b934b0017869bcb298b7f86fd9089b9379",
     "docs/r1-semantics.md": "d4b48dea57fac2cb713324114004501abab5a20e57d8143f41a5385b79028056",
     "docs/r2-acceptance.md": "4d665043f3a3376fd0efd05e044a9476664eb6954fd300d03d02dc5af40f33c5",
-    "docs/r3-controlled-effects.md": "234a4ced84cbb4ceb9adae23be637ab9b6a0f5dcd384f8565fa5b324b7eb6074",
+    "docs/r3-controlled-effects.md": "8d7a19d89faf5bad1449d47217f04a489b11c082f763f9181fb9f4a306972a08",
     "docs/r3-remaining-work.md": "e74911207471639e9a4cf76b702b6f67e3e6fb7b10a0365f0c53b9344db2071e",
     "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418",
     "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750",

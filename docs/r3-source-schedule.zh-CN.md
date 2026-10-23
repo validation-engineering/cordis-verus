@@ -24,7 +24,7 @@
 
 | 义务 | 可执行实现与合同 |
 | --- | --- |
-| 真实位置，不虚构序号 | [`recipe_history.rs`](../crates/cordis-kernel/src/recipe_history.rs)、[`managed_replay.rs`](../crates/cordis-kernel/src/managed_replay.rs)：`Ledger::revision`、`Source::wf`、`run_replayable_root` |
+| 真实位置，不虚构序号 | [`lifecycle_state/native/runtime/recipes.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)、[`managed_replay.rs`](../crates/cordis-kernel/src/managed_replay.rs)：`Ledger::revision`、`Source::wf`、`run_replayable_root` |
 | 同一流、完整时间顺序置换 | [`managed_replay_order.rs`](../crates/cordis-kernel/src/managed_replay_order.rs)：`plan`、`prefix`、`chronological` |
 | 顺序计划驱动实际调用 | [`managed_replay_batch.rs`](../crates/cordis-kernel/src/managed_replay_batch.rs)：`run`、`actual_prefix` |
 | typed 源连续性 | [`managed_replay_payload_history.rs`](../crates/cordis-kernel/src/managed_replay_payload_history.rs)：`continues_payload` |
@@ -37,7 +37,7 @@
 
 ```sh
 cargo test -p cordis-kernel --test managed_replay --test replay_effect_boundary --locked --offline
-python3 -B scripts/check-r3-source-schedule-controls.py
+python3 -B scripts/check-profile-controls.py source-schedule
 bash scripts/check-r3-effect-boundary.sh
 ```
 

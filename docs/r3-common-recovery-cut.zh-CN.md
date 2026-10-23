@@ -77,9 +77,9 @@ publication 和 pending 效果恢复，完成普通宿主迁移，并构造删�
 
 | 源码 | 审查入口 |
 | --- | --- |
-| [native_lifetime.rs](../crates/cordis-kernel/src/native_lifetime.rs) | 实际分配上界、Insert 新鲜性、终态保持及来源索引 |
-| [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs) | 实际转换维护不变式，既有快照导出来源覆盖 |
-| [native_child_cut.rs](../crates/cordis-kernel/src/native_child_cut.rs) | 每个已分配 Child 在较晚真实检查点上的终态 |
+| [lifecycle_state/native/runtime/history/lifetime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/lifetime.rs) | 实际分配上界、Insert 新鲜性、终态保持及来源索引 |
+| [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | 实际转换维护不变式，既有快照导出来源覆盖 |
+| [lifecycle_state/native/runtime/child_history/cut.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/cut.rs) | 每个已分配 Child 在较晚真实检查点上的终态 |
 | [managed_child_cut.rs](../crates/cordis-kernel/src/managed_child_cut.rs) | 全部原始 native Child 义务使用同一检查点 |
 | [managed_pending_cut.rs](../crates/cordis-kernel/src/managed_pending_cut.rs) | 实际正向注册在检查点保持已完成 |
 | [managed_recovery_cut.rs](../crates/cordis-kernel/src/managed_recovery_cut.rs) | 值解码及组合定理 `unload_recovers_with_children` |

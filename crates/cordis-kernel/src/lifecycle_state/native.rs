@@ -1,9 +1,7 @@
 //! Own the real native registrations and lifecycle graph in one checked state.
 //! Mutable host bookkeeping is opaque, but cannot replace a registered recipe,
 //! move it to another identity, or bypass the real Insert/Remove transitions.
-#[path = "managed_native.rs"]
 pub mod managed;
-#[path = "native_runtime.rs"]
 pub mod runtime;
 use super::registration::child::ChildSlot;
 #[cfg(verus_keep_ghost)]

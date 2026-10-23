@@ -2,13 +2,9 @@
 //! This observation preserves retained publications while a provider unloads.
 //! It does not interpret slot interiors, outstanding episode programs or opaque
 //! callbacks as paper effect functions.
-#[path = "native_episode_deletion.rs"]
 pub mod deletion;
-#[path = "native_lifetime.rs"]
 pub mod lifetime;
-#[path = "native_observation_recovery.rs"]
 pub mod recovery;
-#[path = "native_registry_recovery.rs"]
 pub mod registry_recovery;
 use super::owner::EpisodeOwner;
 use crate::lifecycle_state::services::NativePublication;

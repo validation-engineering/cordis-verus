@@ -46,13 +46,13 @@ Commands now come automatically from successful production transitions and the a
 
 | Obligation | Executable/proof entry |
 | --- | --- |
-| Source window implies a runnable plan | [native_deletion_replay.rs](../crates/cordis-kernel/src/native_deletion_replay.rs): `executable_step`, `executable_path`, `replay_control_window` |
+| Source window implies a runnable plan | [lifecycle_state/native/runtime/history/deletion/replay.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/replay.rs): `executable_step`, `executable_path`, `replay_control_window` |
 | Preserve real insertion arguments | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs): `Command::from_registration` |
 | Consecutive allocations and consistent name transport | [kernel_replay_names.rs](../crates/cordis-kernel/src/kernel_replay_names.rs): `compact`, `prepare`; [allocation_names.rs](../crates/cordis-kernel/src/allocation_names.rs): `prefix_pairing` |
 | Source rules enable actual methods; actual successors are exact | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs): `replay_admission`, `unique`, `replay_one`, `execute` |
 | Actual generation accounting | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs): `generations`, `represented_generations` |
 
-Run `python3 scripts/check-r3-control-replay-controls.py` for two strict controls: leaving an allocation in its source slot and omitting the actual `Kernel::begin` call. Each requires a matching positive, a compiling mutant and rejection at the designated contract. Full negative regression remains a separate check.
+Run `python3 scripts/check-profile-controls.py control-replay` for two strict controls: leaving an allocation in its source slot and omitting the actual `Kernel::begin` call. Each requires a matching positive, a compiling mutant and rejection at the designated contract. Full negative regression remains a separate check.
 
 ## Remaining boundary
 

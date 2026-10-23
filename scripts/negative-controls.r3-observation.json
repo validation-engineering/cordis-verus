@@ -5,7 +5,7 @@
     {
       "name": "r3-observation-skips-publication",
       "mutation": {
-        "file": "native_observation_recovery.rs",
+        "file": "lifecycle_state/native/runtime/history/recovery.rs",
         "old": "if let Some(issue)=self.history().publication_registry().check(self.first,self.last(),scope.providers) {",
         "new": "if let Some(issue)=Option::<registry::Issue>::None {"
       },
@@ -20,7 +20,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::history::recovery::Interval::check",
           "module": "lifecycle_state::native::runtime::history::recovery",
-          "file": "native_observation_recovery.rs",
+          "file": "lifecycle_state/native/runtime/history/recovery.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.balanced(scope));"
         }
@@ -30,7 +30,7 @@
     {
       "name": "r3-observation-skips-pending",
       "mutation": {
-        "file": "native_observation_recovery.rs",
+        "file": "lifecycle_state/native/runtime/history/recovery.rs",
         "old": "if let Some(issue)=pending::check(self.frames(),self.start,self.end(),scope.objects) {",
         "new": "if let Some(issue)=Option::<pending::Issue>::None {"
       },
@@ -45,7 +45,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::history::recovery::Interval::check",
           "module": "lifecycle_state::native::runtime::history::recovery",
-          "file": "native_observation_recovery.rs",
+          "file": "lifecycle_state/native/runtime/history/recovery.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.balanced(scope));"
         }

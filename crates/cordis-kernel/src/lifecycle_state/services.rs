@@ -3,9 +3,7 @@
 //! them only after the real work and cleanup owners drain. Arc referents remain
 //! opaque: interior mutation, host mutexes and user availability predicates are
 //! outside these sequential contracts.
-#[path = "native_capture.rs"]
 pub mod capture;
-#[path = "native_slot_observation.rs"]
 pub mod slots;
 use super::{registration::RegisteredPlugin, LifecycleState};
 #[cfg(verus_keep_ghost)]
@@ -511,5 +509,4 @@ impl LifecycleState {
 }
 }
 
-#[path = "native_payload_observation.rs"]
 pub mod payloads;

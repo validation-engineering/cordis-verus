@@ -40,12 +40,12 @@ let capture = runtime.publication_snapshot()
 证明客户端从 **17 个来源提交**中推导合法性：两组交错写入及登记、一组失败清理和更新票据后的重试、成功恢复、本地槽位，以及之后仍未登记的写入。删除一组对象／队列的效果后留下 **7 个合法提交**。保留登记从来源写入下标 5 改为目标下标 2；最终 pending 来源从 15 改为 5。原部分逆操作的定义域保持有效；仍在队列中的逆操作不会被解释成队列已经排空。
 
 两项严格定向负向控制拒绝跳过守卫读检查以及保留旧登记下标：
-`python3 scripts/check-r3-effect-deletion-controls.py`。
+`python3 scripts/check-profile-controls.py effect-deletion`。
 [开发记录](development-report.json)将源码与全内核证明、已有真实失败／重试测试及独立打包检查绑定；全量负向回归单独记录，未运行时仍为 `not_run`。
 
 ## 审查路径与剩余边界
 
-- [native_joint_deletion.rs](../crates/cordis-kernel/src/native_joint_deletion.rs)：真实快照、来源阻断、native 转换及终点。
+- [lifecycle_state/native/runtime/history/deletion/joint.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/joint.rs)：真实快照、来源阻断、native 转换及终点。
 - [joint_erasure.rs](../crates/cordis-kernel/src/joint_erasure.rs)：压缩位置、pending 守恒、逆操作来源与唯一消费。
 - [joint_erasure_reads.rs](../crates/cordis-kernel/src/joint_erasure_reads.rs)：实际守卫所需的准确读取。
 - [joint_erasure_client.rs](../crates/cordis-kernel/src/joint_erasure_client.rs)：非空来源与剩余执行。

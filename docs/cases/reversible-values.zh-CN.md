@@ -51,7 +51,7 @@ cargo run -p cordis-verus --example reversible_values
 | 每个程序根和 continuation 都属于 Component | `Program::member`、`Program::component` 实例化 [R1](../r1-semantics.zh-CN.md) 的完整有限严格载体，不把载体缩成成功输入集合 |
 | 观察来自真实执行状态 | 真正的 `vstd::RwLock` 持有 `ValueState { value, depth }` 和 ghost 执行历史；`snapshot` 在锁内读取实际字段 |
 | 保存的 inverse 就是本次实际操作产生的那个 | [`Execution::apply_value`、`run_value_program`](../../crates/cordis-kernel/src/execution.rs) 保存真实 inverse 对象；程序部分实现在 `value_program.rs` |
-| 清理不能替换 inverse 或仅上报成功 | [`CleanupQueue::dispatch`](../../crates/cordis-kernel/src/cleanup_completion.rs) 在同一个受验证调用中选取、执行和确认实际槽位中的 inverse |
+| 清理不能替换 inverse 或仅上报成功 | [`CleanupQueue::dispatch`](../../crates/cordis-kernel/src/cleanup_queue/completion.rs) 在同一个受验证调用中选取、执行和确认实际槽位中的 inverse |
 | 恢复失败保留恢复信息 | 被阻塞的 inverse 留在原清理槽位，队列进入失败状态；既有受验证重试协议创建下一次尝试 |
 | 整段历史对应 source 步骤 | `history_interpretation` 分类每一次记录的写入、成功恢复和拒绝；`ProgramReport::source_execution` 为实际完整程序或失败前缀构造连续的 dependent-grammar 轨迹 |
 

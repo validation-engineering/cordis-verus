@@ -103,7 +103,7 @@ With the pinned toolchain and cached dependencies:
 ```sh
 source scripts/toolchain-env.sh
 cargo test -p cordis-kernel --test episode_replay --locked --offline
-python3 scripts/check-r3-episode-controls.py
+python3 scripts/check-profile-controls.py episode
 python3 scripts/record-development.py --offline
 ```
 

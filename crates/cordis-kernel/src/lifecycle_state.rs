@@ -11,7 +11,6 @@ use crate::publication::{LeaseId, PublicationId, PublicationRegistry, ReleasedPu
 use crate::Binding;
 use crate::{Error, Kernel, Phase, Port};
 use vstd::prelude::*;
-#[path = "control_history.rs"]
 pub mod history;
 use history::History;
 #[cfg(verus_keep_ghost)]
@@ -534,17 +533,12 @@ impl LifecycleState {
 }
 }
 
-#[path = "cleanup_protocol.rs"]
 pub mod cleanup;
 
-#[path = "execution_lifecycle.rs"]
 pub mod execution;
 
-#[path = "plugin_registration.rs"]
 pub mod registration;
 
-#[path = "native_values.rs"]
 pub mod services;
 
-#[path = "native_host.rs"]
 pub mod native;

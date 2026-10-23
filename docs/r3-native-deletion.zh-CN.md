@@ -64,14 +64,14 @@ publication／owner／pending 恢复**相同的实际切点**，起点是该调�
 | 出生与准入来源 | `Window::{births_closed, fresh}` 和 `Snapshot::deletion_source` 保留来源出生约束、分配新鲜性和真实提交身份。 |
 | 区分公式 (55)/(56) 与合法执行 | `RecoveryCapture::with_deletion` 在同一真实切点组合已有值结果和 native 结果，不混淆两者结论。 |
 
-代码见[原生删除](../crates/cordis-kernel/src/native_episode_deletion.rs)、
-[区间构造](../crates/cordis-kernel/src/native_deletion_trace.rs)、
+代码见[原生删除](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs)、
+[区间构造](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/trace.rs)、
 [共同捕获结果](../crates/cordis-kernel/src/managed_deletion_capture.rs)。
 本包不改变原论文账本或 R3 验收标准。
 
 ## 非空证据
 
-[证明案例](../crates/cordis-kernel/src/native_deletion_client.rs)首先证明源路径本身合法：
+[证明案例](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/client.rs)首先证明源路径本身合法：
 27 个 native 步骤包含 owner 更早／更晚的 Episode、consumer、一个 Child、
 清理失败的 stutter 和独立 provider。构造得到 11 个合法步骤，保留前后 Episode
 准确的带类型 owner／publication。遗漏 consumer、遗漏出生、在 Child Remove
@@ -84,7 +84,7 @@ owner 再次激活及独立 publication 保持。运行断言验证该案例，�
 ```sh
 source scripts/toolchain-env.sh
 cargo test -p cordis-kernel --test native_runtime interior_episode_deletion --locked --offline
-python3 scripts/check-r3-deletion-controls.py
+python3 scripts/check-profile-controls.py deletion
 python3 scripts/record-development.py --offline
 ```
 

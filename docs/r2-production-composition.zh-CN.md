@@ -46,11 +46,11 @@ bridge 与 core 的配对关系；引用历史和协议历史分别保持自身�
 
 | 论文连接 | 入口 |
 | --- | --- |
-| Definition 58／63，完整执行与控制步骤 | [native_production.rs](../crates/cordis-kernel/src/native_production.rs)、[node_production.rs](../crates/cordis-kernel/src/node_production.rs)：`production_step`、`production_trace` |
+| Definition 58／63，完整执行与控制步骤 | [lifecycle_state/native/runtime/production.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/production.rs)、[node_production.rs](../crates/cordis-kernel/src/node_production.rs)：`production_step`、`production_trace` |
 | Definition 29／式 (31)，真实值及 inverse 定义域 | [托管函数](r2-function-semantics.zh-CN.md)与现有类型化／标量证明继续关联真实回执；完整记录分类保留待登记义务。 |
 | Begin、回调分派、引用保留 | [node_bridge_history.rs](../crates/cordis-kernel/src/node_bridge_history.rs)：`step`、`object_origin`、`claim_origin`；[node_bridge.rs](../crates/cordis-kernel/src/node_bridge.rs)：实际修改入口与快照 |
-| Definition 81、group／Child 展开 | [configuration_runtime.rs](../crates/cordis-kernel/src/configuration_runtime.rs)：真实分配；[native_history.rs](../crates/cordis-kernel/src/native_history.rs)：`insertion_origin`；[configuration_tree.rs](../crates/cordis-kernel/src/configuration_tree.rs)：`elaboration` |
-| 配置／来源事务组合 | [native_configuration.rs](../crates/cordis-kernel/src/native_configuration.rs)：`production_trace`、`covered`、`source_reviewed`；[第 3 包](r2-configuration-semantics.zh-CN.md)：实际数据、模块与来源语义 |
+| Definition 81、group／Child 展开 | [configuration_runtime.rs](../crates/cordis-kernel/src/configuration_runtime.rs)：真实分配；[lifecycle_state/native/runtime/history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs)：`insertion_origin`；[configuration_tree.rs](../crates/cordis-kernel/src/configuration_tree.rs)：`elaboration` |
+| 配置／来源事务组合 | [lifecycle_state/native/runtime/configuration.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs)：`production_trace`、`covered`、`source_reviewed`；[第 3 包](r2-configuration-semantics.zh-CN.md)：实际数据、模块与来源语义 |
 
 ## 复现与验证边界
 

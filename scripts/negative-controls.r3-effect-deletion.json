@@ -5,7 +5,7 @@
     {
       "name": "r3-effect-deletion-skips-read",
       "mutation": {
-        "file": "native_joint_deletion.rs",
+        "file": "lifecycle_state/native/runtime/history/deletion/joint.rs",
         "old": "if exists|i:nat|i<self.frames().len() && !self.read(i) {",
         "new": "if false {"
       },
@@ -21,7 +21,7 @@
         {
           "function": "cordis_negative::lifecycle_state::native::runtime::history::deletion::joint::Selection::check",
           "module": "lifecycle_state::native::runtime::history::deletion::joint",
-          "file": "native_joint_deletion.rs",
+          "file": "lifecycle_state/native/runtime/history/deletion/joint.rs",
           "diagnosticKind": "assertion failed",
           "uniqueSourceAnchor": "assert(self.admissible());"
         }

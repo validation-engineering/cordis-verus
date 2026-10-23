@@ -29,7 +29,7 @@ python3 -B scripts/reproduce-update-recovery.py --offline
 python3 -B scripts/reproduce-update-recovery.py --offline --proof
 
 # Five strict mutations of production implementations.
-python3 -B scripts/check-update-recovery-controls.py
+python3 -B scripts/check-profile-controls.py update-recovery
 ```
 
 Omit `--offline` on the Cargo/reproduction commands if dependencies need fetching.
@@ -93,9 +93,9 @@ must satisfy the production `cleanup_step` relation; `execute_cleanup` and
 actual inverse; no theorem asserts that an arbitrary interfering environment
 will eventually restore the required state.
 
-Sources: [chain proof](../../crates/cordis-kernel/src/cleanup_update.rs),
-[cleanup protocol](../../crates/cordis-kernel/src/cleanup_protocol.rs),
-[real work/queue release](../../crates/cordis-kernel/src/execution_lifecycle.rs),
+Sources: [chain proof](../../crates/cordis-kernel/src/lifecycle_state/cleanup/update.rs),
+[cleanup protocol](../../crates/cordis-kernel/src/lifecycle_state/cleanup.rs),
+[real work/queue release](../../crates/cordis-kernel/src/lifecycle_state/execution.rs),
 [managed acknowledgement boundary](../../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs),
 [native scenario](../../crates/cordis-kernel/examples/support/update_recovery.rs),
 [Runtime scenario](../../crates/cordis/examples/support/update_recovery.rs).

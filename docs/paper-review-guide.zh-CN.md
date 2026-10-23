@@ -101,12 +101,12 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
   [清理协议审查](cleanup-protocol.zh-CN.md)。
   宿主报告是否真实、外部 inverse 的效果仍在证明之外。
 - [lifecycle_state.rs](../crates/cordis-kernel/src/lifecycle_state.rs)、
-  [cleanup_release.rs](../crates/cordis-kernel/src/cleanup_release.rs) 与
+  [lifecycle_actions/resources.rs](../crates/cordis-kernel/src/lifecycle_actions/resources.rs) 与
   [publication_cleanup.rs](../crates/cordis-kernel/src/publication_cleanup.rs)：
   实际共享 owner 一起持有 Kernel/协议。受管 finish 检查 domain、凭据、资源来源和
   清单完整性；原子注册表批次先于 commitment 释放。拒绝保持 finish 输入，成功则
   清空该 episode 的受管资源并返回精确 slot。回调真实性、获取路由和值句柄删除仍在边界外。
-- [cleanup_protocol.rs](../crates/cordis-kernel/src/cleanup_protocol.rs)：生产
+- [lifecycle_state/cleanup.rs](../crates/cordis-kernel/src/lifecycle_state/cleanup.rs)：生产
   `execute_cleanup` 为这些真实调用提供统一转换合同；`run_cleanup` 从实际循环
   构造可擦除历史。`consumed_ticket_never_returns` 拒绝之后所有重放；`binding_at`
   保留实际 provider 直到释放；`permission_origin` 与 `release_has_accepted_report`

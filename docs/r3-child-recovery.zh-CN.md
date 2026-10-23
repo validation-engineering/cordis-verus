@@ -104,13 +104,13 @@ Child Unload 推出终态。父插件的成功确认或 Unload 不能满足这�
 
 | 审查入口 | 作用 |
 | --- | --- |
-| [shared_child.rs](../crates/cordis-kernel/src/shared_child.rs)：`Decision`、`retain_decision`、`agrees` | 真实共享槽的持久凭据与终态一致性 |
-| [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs)：`retire_shared_child_observed`、`release_managed_execution_following` | 真实退休观察与具有因果顺序的释放 |
-| [native_child_recovery.rs](../crates/cordis-kernel/src/native_child_recovery.rs)：`Retirement`、`retire_and_release_child`、`release_retired_child` | 可执行组合、准确端点关系及推导的释放事实 |
-| [native_episode_origin.rs](../crates/cordis-kernel/src/native_episode_origin.rs)：`lifecycle_source`、`current_unload` | 真实 Unload 转换及前后投影 |
+| [lifecycle_state/registration/shared_child.rs](../crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs)：`Decision`、`retain_decision`、`agrees` | 真实共享槽的持久凭据与终态一致性 |
+| [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`retire_shared_child_observed`、`release_managed_execution_following` | 真实退休观察与具有因果顺序的释放 |
+| [lifecycle_state/native/runtime/child_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_recovery.rs)：`Retirement`、`retire_and_release_child`、`release_retired_child` | 可执行组合、准确端点关系及推导的释放事实 |
+| [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs)：`lifecycle_source`、`current_unload` | 真实 Unload 转换及前后投影 |
 | [managed_lifecycle_children.rs](../crates/cordis-kernel/src/managed_lifecycle_children.rs)：`owned_child_retirement`、`native_child_released`、`native_child_unassigned` | 与创建者 Episode 所保留逆操作的对应 |
-| [native_child_history.rs](../crates/cordis-kernel/src/native_child_history.rs)：`Birth`、`Ledger`、`child_birth`、`covered` | 实际 Insert／父 Episode 来源、自动收集及已提交前缀覆盖 |
-| [native_child_completion.rs](../crates/cordis-kernel/src/native_child_completion.rs)：`records`、`settle_retirement`、`settle_release` | 由来源推出取消、退休时无 Episode 或自身 Unload 完成 |
+| [lifecycle_state/native/runtime/child_history.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history.rs)：`Birth`、`Ledger`、`child_birth`、`covered` | 实际 Insert／父 Episode 来源、自动收集及已提交前缀覆盖 |
+| [lifecycle_state/native/runtime/child_history/completion.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/child_history/completion.rs)：`records`、`settle_retirement`、`settle_release` | 由来源推出取消、退休时无 Episode 或自身 Unload 完成 |
 | [managed_child_completion.rs](../crates/cordis-kernel/src/managed_child_completion.rs)：`native_children_resolved`、`native_child_endpoint` | 对保留原始逆操作的完整性检查及准确创建者身份 |
 
 ## 验证与剩余工作

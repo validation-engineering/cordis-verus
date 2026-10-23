@@ -99,12 +99,12 @@ and confluence are not discharged by this package.
 
 | Entry | What to inspect |
 | --- | --- |
-| [native_registry_recovery.rs](../crates/cordis-kernel/src/native_registry_recovery.rs) | Unique opening source, first consuming Unload, exact normalization and recovery query. |
+| [lifecycle_state/native/runtime/history/registry_recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/registry_recovery.rs) | Unique opening source, first consuming Unload, exact normalization and recovery query. |
 | [joint_pending_recovery.rs](../crates/cordis-kernel/src/joint_pending_recovery.rs) | Intermediate pending census, real registration source and unique consumption. |
-| [native_observation_recovery.rs](../crates/cordis-kernel/src/native_observation_recovery.rs) | Raw-cut indexing, complete source scope and combined observation recovery. |
-| [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs) | Executable ordered snapshot and recovery capture. |
+| [lifecycle_state/native/runtime/history/recovery.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery.rs) | Raw-cut indexing, complete source scope and combined observation recovery. |
+| [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | Executable ordered snapshot and recovery capture. |
 | [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs) | Same-cut composition with registered invocation value/Child recovery. |
-| [native_observation_client.rs](../crates/cordis-kernel/src/native_observation_client.rs) | Nonempty completed lifetimes and registration microsteps. |
+| [lifecycle_state/native/runtime/history/recovery/client.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery/client.rs) | Nonempty completed lifetimes and registration microsteps. |
 | [native_runtime.rs tests](../crates/cordis-kernel/tests/native_runtime.rs) | Failure, retry, blocked provider release, same-Arc republication and payload reclamation while snapshots survive. |
 
 The runtime scenario checks actual states, payload ownership and fresh Episode
@@ -114,7 +114,7 @@ capture with real scalar/typed writes and retained inverse registrations.
 
 ```bash
 python3 scripts/record-development.py --offline
-python3 scripts/check-r3-observation-controls.py
+python3 scripts/check-profile-controls.py observation
 ```
 
 The [development record](development-report.json) is authoritative for the exact

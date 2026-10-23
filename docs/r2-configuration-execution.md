@@ -307,7 +307,7 @@ acceptance, negative-control verification or release/platform acceptance.
 ## Registered recipes in the common execution history
 
 The production native owner now retains an erased
-[`recipe_history::History<R>`](../crates/cordis-kernel/src/recipe_history.rs)
+[`recipe_history::History<R>`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/recipes.rs)
 of the exact `RegisteredPlugin<R>` values. Its private ledger commits to the
 same Journal as lifecycle, value writes, slots, work and cleanup. The common
 [`Recipes` record](../crates/cordis-kernel/src/recipe_execution.rs) projects the
@@ -426,7 +426,7 @@ an unrestricted `&mut Runtime` must use an owned Runtime or accept the operation
 view instead. This is an intentional unreleased API restriction.
 
 `Loader::execution_snapshot()` reaches the checked
-[`NativeRuntime::configuration_snapshot`](../crates/cordis-kernel/src/native_configuration.rs).
+[`NativeRuntime::configuration_snapshot`](../crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs).
 Under **one Journal read epoch**, it authenticates the actual native member,
 configuration ledger and source ledger. The result binds the current native
 control/publication/episode-ownership observation and both exact typed histories to the

@@ -61,7 +61,7 @@
 
 源码入口：[`runtime.rs`](../crates/cordis/src/runtime.rs)、
 [`static_host.rs`](../crates/cordis/src/runtime/static_host.rs)、
-[`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs)、
+[`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)、
 [`execution.rs`](../crates/cordis-kernel/src/execution.rs)、
 [`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs)、
 [`Node runtime`](../packages/compat-cordis/runtime.js)、
@@ -324,9 +324,9 @@ Episode 票据与工作域。详见[配方历史审查](r2-configuration-executi
 | 内核文件 | 实际方法 |
 | --- | --- |
 | [`execution.rs`](../crates/cordis-kernel/src/execution.rs) | `attach_execution`, `take_effect`, `put_effect`, `activate_effect`, `retire_effect`, `withdraw`, `activate_external`, `seal_external`, `provide`, `issue_root`, `start_root`, `cancel_queued_root`, `complete_root`, `fail_root`, `abandon_root`, `take_child`, `take_group`, `complete_request`, `register`, `cancel`, `pop`, `complete_future`, `complete_failure`, `complete_result`, `retry`, `remove`, `enqueue_owned_child`, `enqueue_effect`, `admit_effect`, `land_effect`, `enqueue_native_child`, `apply_value`, `apply_value_following`, `dispatch_cleanup` |
-| [`managed_native.rs`](../crates/cordis-kernel/src/managed_native.rs) | `finish_managed_execution`, `release_managed_execution`, `withdraw_managed_execution`, `admit_managed_root`, `retry_managed_execution` |
+| [`lifecycle_state/native/managed.rs`](../crates/cordis-kernel/src/lifecycle_state/native/managed.rs) | `finish_managed_execution`, `release_managed_execution`, `withdraw_managed_execution`, `admit_managed_root`, `retry_managed_execution` |
 | [`native_effect.rs`](../crates/cordis-kernel/src/native_effect.rs) | `apply_native_effect` |
-| [`native_runtime.rs`](../crates/cordis-kernel/src/native_runtime.rs) | `finish_managed_execution`, `release_managed_execution`, `admit_managed_root`, `withdraw_managed_execution`, `retry_managed_execution` |
+| [`lifecycle_state/native/runtime.rs`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs) | `finish_managed_execution`, `release_managed_execution`, `admit_managed_root`, `withdraw_managed_execution`, `retry_managed_execution` |
 | [`poll_control.rs`](../crates/cordis-kernel/src/poll_control.rs) | `retry_controlled_execution`, `release_controlled_execution` |
 | [`scalar_effect.rs`](../crates/cordis-kernel/src/scalar_effect.rs) | `apply_prepared_effect` |
 | [`service_function.rs`](../crates/cordis-kernel/src/service_function.rs) | `run_service_root` |

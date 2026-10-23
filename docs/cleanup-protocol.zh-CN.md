@@ -42,7 +42,7 @@
 3. [Driver::complete](../crates/cordis-driver/src/lib.rs) 对 Node 清理记录
    `Succeeded` 或 `Failed`；失败返回时保留资源。成功调用共享状态的
    `finish_cleanup_resources`，其实现位于
-   [cleanup_release.rs](../crates/cordis-kernel/src/cleanup_release.rs)：检查当前清理
+   [lifecycle_actions/resources.rs](../crates/cordis-kernel/src/lifecycle_actions/resources.rs)：检查当前清理
    凭据和注册表所属域，完整检查并执行资源批次，然后调用实际 Kernel 的受保护 finish。
    普通宿主随后按返回的 slot 删除不透明值句柄，并更新自身记录。
 4. [Domain.dispatch / Fiber._cleanup](../packages/compat-cordis/runtime.js)
@@ -58,7 +58,7 @@
 
 ## 真实清理 API 的组合安全性
 
-[`cleanup_protocol.rs`](../crates/cordis-kernel/src/cleanup_protocol.rs) 为生产共享
+[`lifecycle_state/cleanup.rs`](../crates/cordis-kernel/src/lifecycle_state/cleanup.rs) 为生产共享
 dispatcher 提供 `cleanup_step` 合同。`run_cleanup` 对每条命令调用这个同一入口，
 并从实际调用构造状态历史。历史是编译时擦除的 `Ghost` 数据；运行时只保留命令结果。
 被拒绝的命令保持其入口状态，循环继续执行，保留此前成功命令的变化，不回滚整个批次。

@@ -87,7 +87,7 @@ retry remain separate obligations.
 - [cleanup_recovery.rs](../crates/cordis-kernel/src/cleanup_recovery.rs): actual
   observations, strict domains, remaining-stack preservation and retry composition.
 - [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs) and
-  [cleanup_completion.rs](../crates/cordis-kernel/src/cleanup_completion.rs):
+  [cleanup_queue/completion.rs](../crates/cordis-kernel/src/cleanup_queue/completion.rs):
   real dispatch, erased boundary retention and propagated postconditions.
 - [managed_cleanup_path.rs](../crates/cordis-kernel/src/managed_cleanup_path.rs):
   finite composition from real results back to registered Begin values.

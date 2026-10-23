@@ -36,16 +36,16 @@ The window and its deletion mask still require source admissibility. This API is
 
 | Obligation | Entry |
 | --- | --- |
-| Bounded source recording and immutable cut binding | [native_control_source.rs](../crates/cordis-kernel/src/native_control_source.rs): `Recorder::append`, `bind_control_source`, `Source::replay` |
-| Every actual transition participates | [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs): `transition`, `wf` |
-| Every Unload has its authentic cleanup source | [native_source_cleanup.rs](../crates/cordis-kernel/src/native_source_cleanup.rs): `complete`, `unload_collected`, `Source::unload_at` |
-| Commands, typed publications and inverse origins share the Journal | [native_source_chain.rs](../crates/cordis-kernel/src/native_source_chain.rs) |
+| Bounded source recording and immutable cut binding | [lifecycle_state/native/runtime/control_source.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source.rs): `Recorder::append`, `bind_control_source`, `Source::replay` |
+| Every actual transition participates | [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs): `transition`, `wf` |
+| Every Unload has its authentic cleanup source | [lifecycle_state/native/runtime/control_source/cleanup.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs): `complete`, `unload_collected`, `Source::unload_at` |
+| Commands, typed publications and inverse origins share the Journal | [lifecycle_state/native/runtime/control_source/chain.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs) |
 | Reuse the real managed recovery cut | [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs), [managed_deletion_capture.rs](../crates/cordis-kernel/src/managed_deletion_capture.rs) |
 | Ordinary Rust driver entry | [native.rs](../crates/cordis-driver/src/shared/native.rs): `NativeDriver::new_recorded` |
 
 Runtime regressions use automatic commands for the 24→13 control replay, resolved inherited declarations and anchors, disabled/zero/full capacity, failed-operation accounting and detached snapshots. The existing scalar/typed interference, failed cleanup, new retry ticket and later Child release scenario now replays controls from the same real recovery captures and checks that collection does not retain additional payload references.
 
-Run `python3 scripts/check-r3-source-chain-controls.py` for strict controls that omit command recording or Unload-source collection. Matching positives, whole-mutant compilation and designated semantic rejection are required. Full negative regression remains separately labelled `not_run`. See [development evidence](development-report.json) for source-bound integration results; neither scoped checks nor development acceptance claim release readiness or paper completion.
+Run `python3 scripts/check-profile-controls.py source-chain` for strict controls that omit command recording or Unload-source collection. Matching positives, whole-mutant compilation and designated semantic rejection are required. Full negative regression remains separately labelled `not_run`. See [development evidence](development-report.json) for source-bound integration results; neither scoped checks nor development acceptance claim release readiness or paper completion.
 
 ## Remaining R3 work
 

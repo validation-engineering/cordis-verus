@@ -68,7 +68,7 @@ static host 共享所有权协议，但不因此获得 native publication 语义
 
 ```sh
 python3 scripts/record-development.py --offline
-python3 scripts/check-r3-host-controls.py
+python3 scripts/check-profile-controls.py host
 ```
 
 [开发记录](development-report.json)将完整开发验收绑定到准确源码。`--check` 只查

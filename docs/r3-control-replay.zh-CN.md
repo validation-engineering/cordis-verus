@@ -46,13 +46,13 @@ let retained_kernel = replay.execution.kernel();
 
 | 义务 | 代码／证明入口 |
 | --- | --- |
-| 来源区间推出可运行计划 | [native_deletion_replay.rs](../crates/cordis-kernel/src/native_deletion_replay.rs)：`executable_step`、`executable_path`、`replay_control_window` |
+| 来源区间推出可运行计划 | [lifecycle_state/native/runtime/history/deletion/replay.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion/replay.rs)：`executable_step`、`executable_path`、`replay_control_window` |
 | 真实注册参数 | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs)：`Command::from_registration` |
 | 连续分配与身份转换 | [kernel_replay_names.rs](../crates/cordis-kernel/src/kernel_replay_names.rs)：`compact`、`prepare`；[allocation_names.rs](../crates/cordis-kernel/src/allocation_names.rs)：`prefix_pairing` |
 | 真实调用准入与准确后继 | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs)：`replay_admission`、`unique`、`replay_one`、`execute` |
 | 实际 generation 计数 | [kernel_replay.rs](../crates/cordis-kernel/src/kernel_replay.rs)：`generations`、`represented_generations` |
 
-`python3 scripts/check-r3-control-replay-controls.py` 检查两种错误实现：沿用出生的旧编号、跳过实际 `Kernel::begin`。每项要求匹配源码的正向证明、突变版本编译成功，以及指定合同明确拒绝。全量负向回归单独运行。
+`python3 scripts/check-profile-controls.py control-replay` 检查两种错误实现：沿用出生的旧编号、跳过实际 `Kernel::begin`。每项要求匹配源码的正向证明、突变版本编译成功，以及指定合同明确拒绝。全量负向回归单独运行。
 
 ## 剩余边界
 

@@ -109,7 +109,7 @@ Reproduce the integrated checks with the pinned toolchain:
 
 ```bash
 python3 scripts/record-development.py --offline
-python3 scripts/check-r3-final-cut-controls.py
+python3 scripts/check-profile-controls.py final-cut
 ```
 
 The [development record](development-report.json) binds whole-kernel proof,

@@ -1,9 +1,7 @@
 //! Opt-in, bounded commands recorded by the actual native transition boundary.
 //! A source is certified against one complete shared Journal cut; callers do
 //! not reconstruct labels, insertion arguments, IDs or command correspondence.
-#[path = "native_source_chain.rs"]
 pub mod chain;
-#[path = "native_source_cleanup.rs"]
 pub mod cleanup;
 use super::{
     history::{

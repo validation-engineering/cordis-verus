@@ -168,7 +168,7 @@ runs its inverse or that a scheduler eventually retries cleanup.
 | Runtime admission and report retention | [payload_cleanup.rs](../crates/cordis-kernel/src/payload_cleanup.rs), [managed_function.rs](../crates/cordis-kernel/src/managed_function.rs) |
 | Journal gaps to actual scalar/typed state composition | [managed_recovery.rs](../crates/cordis-kernel/src/managed_recovery.rs): `linked_pair`, `establish_recovery` |
 | Defined mixed word and actual queue suffix | [managed_recovery_word.rs](../crates/cordis-kernel/src/managed_recovery_word.rs): `defined`, `recover_retained` |
-| Actual Begin and registered execution interval | [native_episode_origin.rs](../crates/cordis-kernel/src/native_episode_origin.rs), [managed_episode.rs](../crates/cordis-kernel/src/managed_episode.rs), [managed_root.rs](../crates/cordis-kernel/src/managed_root.rs) |
+| Actual Begin and registered execution interval | [lifecycle_state/native/runtime/episode.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/episode.rs), [managed_episode.rs](../crates/cordis-kernel/src/managed_episode.rs), [managed_root.rs](../crates/cordis-kernel/src/managed_root.rs) |
 | Actual Begin/return values and retained queue recovery | [managed_endpoint.rs](../crates/cordis-kernel/src/managed_endpoint.rs), [managed_root_recovery.rs](../crates/cordis-kernel/src/managed_root_recovery.rs) |
 | Typed mutation history and restored interference | [payload_semantic_history.rs](../crates/cordis-kernel/src/payload_semantic_history.rs), [managed_restored.rs](../crates/cordis-kernel/src/managed_restored.rs) |
 | Real typed attempt, failure cause and strict domain | [payload_attempt.rs](../crates/cordis-kernel/src/payload_attempt.rs), [payload_recovery.rs](../crates/cordis-kernel/src/payload_recovery.rs) |
@@ -182,7 +182,7 @@ and refusal to repeat restoration or revive a retired allocation.
 ```sh
 source scripts/toolchain-env.sh
 cargo test -p cordis-kernel --test managed_function --locked --offline
-python3 scripts/check-r3-production-controls.py
+python3 scripts/check-profile-controls.py production
 python3 scripts/record-development.py --offline
 ```
 

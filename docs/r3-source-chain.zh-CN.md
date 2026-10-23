@@ -36,16 +36,16 @@ let replay = captured.source.replay(&captured.cut, &keep, Ghost(window))?;
 
 | 义务 | 入口 |
 | --- | --- |
-| 有界来源记录及不可替换的切面绑定 | [native_control_source.rs](../crates/cordis-kernel/src/native_control_source.rs)：`Recorder::append`、`bind_control_source`、`Source::replay` |
-| 每次真实转换参与记录 | [native_runtime.rs](../crates/cordis-kernel/src/native_runtime.rs)：`transition`、`wf` |
-| 每个 Unload 都有真实清理来源 | [native_source_cleanup.rs](../crates/cordis-kernel/src/native_source_cleanup.rs)：`complete`、`unload_collected`、`Source::unload_at` |
-| 命令、typed publication 与逆操作来源共用 Journal | [native_source_chain.rs](../crates/cordis-kernel/src/native_source_chain.rs) |
+| 有界来源记录及不可替换的切面绑定 | [lifecycle_state/native/runtime/control_source.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source.rs)：`Recorder::append`、`bind_control_source`、`Source::replay` |
+| 每次真实转换参与记录 | [lifecycle_state/native/runtime.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)：`transition`、`wf` |
+| 每个 Unload 都有真实清理来源 | [lifecycle_state/native/runtime/control_source/cleanup.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs)：`complete`、`unload_collected`、`Source::unload_at` |
+| 命令、typed publication 与逆操作来源共用 Journal | [lifecycle_state/native/runtime/control_source/chain.rs](../crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs) |
 | 复用真实 managed 恢复切面 | [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs)、[managed_deletion_capture.rs](../crates/cordis-kernel/src/managed_deletion_capture.rs) |
 | 普通 Rust driver 入口 | [native.rs](../crates/cordis-driver/src/shared/native.rs)：`NativeDriver::new_recorded` |
 
 运行回归改用自动命令完成 24→13 步控制重放，并覆盖继承声明和 anchor、关闭／零容量／耗尽、失败调用不记账和独立快照。已有的标量／typed 干扰、清理失败、新重试票据及 Child 后续释放场景，也从相同真实恢复快照重放控制，并检查捕获没有额外保留 payload 引用。
 
-`python3 scripts/check-r3-source-chain-controls.py` 检查漏记命令或漏收 Unload 来源的严格负向对照，要求匹配正例、变异体完整编译以及指定语义合同拒绝。完整负向回归仍单独标记 `not_run`。[开发验证记录](development-report.json)提供绑定源码的集成结果；定向检查和开发验收均不代表发布验收或整篇论文完成。
+`python3 scripts/check-profile-controls.py source-chain` 检查漏记命令或漏收 Unload 来源的严格负向对照，要求匹配正例、变异体完整编译以及指定语义合同拒绝。完整负向回归仍单独标记 `not_run`。[开发验证记录](development-report.json)提供绑定源码的集成结果；定向检查和开发验收均不代表发布验收或整篇论文完成。
 
 ## R3 剩余工作
 

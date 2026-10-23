@@ -1,8 +1,6 @@
 //! Erased source collection at the actual native mutation boundaries. Birth,
 //! retirement and Unload remain distinct events, including after parent release.
-#[path = "native_child_completion.rs"]
 pub mod completion;
-#[path = "native_child_cut.rs"]
 pub mod cut;
 use super::{child_recovery::Retirement, episode::Unload, owner::EpisodeOwner, NativeRuntime};
 #[cfg(verus_keep_ghost)]
