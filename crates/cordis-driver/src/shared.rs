@@ -622,5 +622,4 @@ fn coherent(kernel: &Kernel, id: usize, restart: bool) -> bool {
         && (kernel.phase(id) != Some(Phase::Loading) || kernel.check_iteration(id).is_ok())
 }
 
-#[path = "native.rs"]
 pub mod native;

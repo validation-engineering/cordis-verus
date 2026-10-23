@@ -2,10 +2,12 @@
 
 English · [简体中文](verification-plan.zh-CN.md) · [Update recovery case](cases/update-recovery.md) · [Remaining paper obligations](paper-mapping-inventory.md)
 
-**Planning baseline: 2026-10-23, implementation commit `82145ca`.** This document
-records the next work sequence. Generated scenarios, test/proof mutation comparisons
-and the proposed structural cleanup are planned work, not newly accepted results.
-Existing results retain their original source-bound reports and scopes.
+**Updated: 2026-10-24.** Refactoring proceeds on `main`, starting from the archive
+`codex/archive-before-refactor-2026-10-24` at `60bdd89`. The archive contains the
+implementation at `82145ca` and the preceding verification plan. Structure and
+navigation work has started; generated scenarios and paired test/proof mutation
+comparisons remain planned. Existing results retain their original source-bound
+reports and scopes.
 
 The goal is to make paper constraints useful in running software: a plugin author
 can update a provider, understand a blocked cleanup, retry safely and inspect the
@@ -111,19 +113,97 @@ Pure Rust use continues to require no Node runtime. Structural work should first
 improve ownership and navigation within the existing crates; adding crates,
 hosts or a temporal library is not a prerequisite for this iteration.
 
+## Structure and removal are part of the delivery
+
+The project should express one clear chain: useful behavior → actual implementation
+→ explicit contract → proof and reproducible evidence. Accumulated experiments,
+repeated wrappers and chronological progress notes should not obscure that chain.
+Reorganization starts before the next feature expansion, rather than waiting for
+the final acceptance step. The existing case and regressions provide the initial
+behavioral baseline; generated campaigns add coverage afterward.
+
+The archived kernel has 446 source files, all directly under `src/`. The ordinary
+Rust host's `runtime.rs` has 5,195 lines. These counts include contracts, proofs,
+comments and tests; they identify navigation problems, not proof redundancy.
+
+### Target organization
+
+Keep the current crate boundaries initially. Within each crate, group files by
+state ownership and responsibility rather than the iteration that introduced them.
+The following is a target layout, not a claim that these directories already exist:
+
+| Area | Intended organization | Review question |
+| --- | --- | --- |
+| `cordis-kernel` lifecycle | Control state, committed bindings, actions and cleanup in one discoverable domain | Who may advance or release this episode, and which checked call enforces it? |
+| `cordis-kernel` effects | Managed values, inverse payloads, journals and resource ownership | Which actual mutation produced this inverse, and what survives failure? |
+| `cordis-kernel` host state | Separate Native and Node state-owner domains using shared protocol contracts | Which host-specific premise is established here rather than assumed? |
+| `cordis-kernel` semantics and refinement | Paper definitions, actual implementation bridges and reusable lemmas with clear direction of dependency | Is this an original statement, revised contract, conditional theorem or connected production guarantee? |
+| `cordis-driver` | Shared scheduling policy and Native/Node adapters with matching physical and logical module paths | Where does ordinary Rust enter the verified owner? |
+| `cordis::runtime` | Separate service access, setup, cleanup and polling responsibilities; keep public exports deliberate | Can a reviewer trace one update without reading an unrelated subsystem? |
+| Node and optional plugin integration | Keep FFI, transport, compatibility policy and application adapters outside shared kernel authority | What requires Node, a foreign process or an application-specific policy? |
+| Documentation and checks | Short task-based entry points; current contracts/cases first, detailed research separately; one authoritative command for each acceptance scope | Which source, proof and reproduction support this advertised claim? |
+
+Executable functions retain their directly attached contracts. Moving a proof to
+a different domain must not create an unchecked implementation copy or an assumed
+bridge. General paper proofs needed by production contracts stay in the dependency
+closure. A research-only crate/directory is an option only after that closure is
+known and its explicit verification entry point is preserved. Merely being ghost
+code or lacking a runtime caller is not a reason to remove a proof.
+
+### Keep, consolidate, separate or remove
+
+| Material | Default decision | Evidence required before removal from `main` |
+| --- | --- | --- |
+| Production state, guards and direct proof bridges | Keep; clarify ownership and API | An equivalent replacement and migrated callers, with the same required guarantees |
+| Repeated wrappers, state projections and helper lemmas | Consolidate around one implementation/contract | Compare premises, outcomes and state frames; migrate runtime, proof and test callers |
+| Exploratory models and superseded replay variants | Classify separately; retain useful research | Check dependency closure, ledger references and unique counterexamples; retain an active verification target for still-claimed results |
+| Chronological progress prose and repeated module lists | Replace with current contracts and a focused research index | Preserve unique conclusions, unresolved obligations, paper corrections and source-bound evidence links |
+| Duplicate scripts, fixtures and obsolete experimental API aliases | Merge or remove when their role is covered | Preserve distinct failure cases, observation semantics and strict acceptance; update commands, CI and package inputs |
+| Frozen reports, refutations and unfavorable comparisons | Preserve as evidence with their original scope | Never rewrite a historical pass to match a new tree or delete a failure to improve apparent coverage |
+
+For each removal, the change description records the old path, its purpose,
+remaining callers/references, replacement or archive location, any supported-scope
+change and the checks run. Search references and inspect semantic differences;
+unused-code output alone is insufficient. We do not retain experimental aliases
+solely to preserve the old layout. Public feature changes require updated support
+and migration documentation. No deletion may silently turn an open paper obligation
+into a completed one or weaken a current guarantee.
+
+The first pass shortens the kernel/package introductions and documentation entry,
+and moves the existing shared Native Driver to `src/shared/native.rs`, matching
+`shared::native` without an API shim. Later batches group one kernel domain at a
+time and split the host by responsibility. Do not combine mechanical moves,
+semantic changes and removal of unique evidence in an unreviewable bulk rewrite.
+
+### Archive and branch discipline
+
+The archive is a local Git branch at the frozen snapshot above. Keep it fixed;
+continue new commits on `main` without rewriting the archived history. It includes
+tracked source and the prior plan, not ignored toolchains, upstream checkouts or
+`target` artifacts. Those inputs retain their locks and reproduction instructions.
+Branch creation does not publish a release or refresh verification evidence.
+
+Review old paths with `git show codex/archive-before-refactor-2026-10-24:<path>`.
+After committing a batch, compare it with the archive using
+`git diff codex/archive-before-refactor-2026-10-24..main`.
+Remote synchronization is separate from this local archive.
+
 ## Work sequence and exit criteria
 
-All five extensions below are **planned**. Existing case/proof results above
-remain the baseline. Dependencies identify the order of acceptance; they do not
-require rerunning the full suite after each small edit.
+The archive is complete and the first structural pass has started. The larger
+items remain open. Dependencies identify acceptance order, not a requirement to
+run the full suite after every edit. This sequence replaces the earlier ordering;
+it does not add another milestone taxonomy.
 
-| Order | Deliverable | Dependency | Exit criterion |
+| Order / state | Deliverable | Dependency | Exit criterion |
 | --- | --- | --- | --- |
-| 1. Freeze the guarantee and observations | Extend the existing case with a compact contract/evidence matrix: supported operations, API entry points, effect domain, observations, premises and exclusions | Existing case and paper review | Every advertised guarantee has an actual caller and proof/test distinction; unsupported behavior and legal success conditions are explicit |
-| 2. Generate and shrink real Native scenarios | A seeded lifecycle scenario format, runner and reducer using production APIs | 1 | Reproduce the existing failure/retry case, exercise the required scenario families below, retain replayable minimal failures and demonstrate shrinking with a known failing control |
-| 3. Compare the shared subset with Cordis | Node/native and pinned-upstream adapters for the same supported scenario description | 1; reuse 2's format and reducer | Run both implementations, retain raw traces, classify every outcome and report the denominator; no unexplained mismatch is accepted as compatibility |
-| 4. Compare test and proof detection | A report for the five existing implementation mutations using the same mutated source for each pair of checks | 2; 3 for controls that exercise Node behavior | Fresh baseline, valid mutant compilation, targeted proof rejection and separately recorded behavioral result for every applicable control |
-| 5. Consolidate contracts and review evidence | Factor repeated ownership/frame/source lemmas, clarify module responsibilities and update architecture navigation | 1–4 establish behavior and sensitivity baselines | Preserve supported behavior and public contract strength, update affected proof selectors and source links, then pass concentrated acceptance on the final source |
+| 0. Archive · complete | Frozen code and prior plan on the named branch; active work stays on `main` | Existing working tree | Archive resolves to `60bdd89`; tracked work is preserved and history is not rewritten |
+| 1. Scope and ownership · started | Contract/evidence matrix plus production/proof/research inventory and candidate removal decisions | Archive and existing case | Every guarantee has a real caller, exact observation and premise; every proposed removal has an accountable replacement or disposition |
+| 2. Structure and cleanup · started | Organize one domain at a time; consolidate repeated code and prose; separate research navigation | 1 for the affected domain; existing regressions | Clear ownership, no lost proof/negative anchors, migrated callers and packaging; preserved guarantees or an explicit scope change |
+| 3. Generate and shrink · planned | Seeded real Native lifecycle scenarios and reducer | 1 and the relevant stable interfaces from 2 | Existing failure/retry reproduced, required families covered and replayable reduced failures demonstrated with a known control |
+| 4. Compare with Cordis · planned | Node/native and pinned-upstream adapters for the supported common scenario subset | 1; reuse 3's format/reducer | Raw traces, complete outcome accounting and no unexplained difference accepted as compatibility |
+| 5. Test/proof detection · planned | Paired behavioral and proof results for the five existing implementation mutations | 3; 4 where a control exercises Node | Fresh baseline, valid mutant compilation, intended contract rejection and separately recorded behavioral result |
+| 6. Integrated review · pending | Final contract, source, scenario, mutation and architecture evidence | 1–5 | One final source passes the applicable concentrated acceptance; reviewers can reconstruct the full guarantee chain |
 
 ### Generated scenarios
 
@@ -214,7 +294,7 @@ reproduction. A maintainer-run clean installation is not external review or
 adoption. Proof obligation counts, random sample counts and compatibility ratios
 must not be combined into a paper-completion percentage.
 
-The iteration is complete when all five planned deliverables satisfy their exit
+The iteration is complete when all remaining work items satisfy their exit
 criteria for the declared scope and a reviewer can follow one continuous chain:
 paper clause → real API → executable contract → checked proof → failing and
 successful reproduction → rejected erroneous implementation. Release/platform

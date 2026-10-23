@@ -1788,7 +1788,7 @@
           "role": "execution"
         },
         {
-          "file": "crates/cordis-driver/src/native.rs",
+          "file": "crates/cordis-driver/src/shared/native.rs",
           "symbol": "run_recorded_root",
           "role": "host"
         },
@@ -3537,7 +3537,7 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis-driver/src/native.rs",
+            "file": "crates/cordis-driver/src/shared/native.rs",
             "symbol": "register_plugin",
             "role": "host"
           },

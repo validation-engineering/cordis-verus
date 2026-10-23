@@ -42,7 +42,7 @@ dispatch rejects this native-only body explicitly.
 | Actual calls | `Execution::run_service_program` in [service_program.rs](../crates/cordis-kernel/src/service_program.rs) resolves each slot, executes the actual operation and registers its inverse before continuing |
 | Whole finite interpretation | [service_composition.rs](../crates/cordis-kernel/src/service_composition.rs) proves grammar membership for every resolution schedule and relates the actual success/failure report to its selected schedule |
 | Accumulated inverse | [service_stack.rs](../crates/cordis-kernel/src/service_stack.rs) identifies the semantic reverse stack with the actual queue suffix, including failed prefixes |
-| User-visible path | `Plugin::native_service_program`, native initialization and Child registration in [runtime.rs](../crates/cordis/src/runtime.rs), through [native.rs](../crates/cordis-driver/src/native.rs) |
+| User-visible path | `Plugin::native_service_program`, native initialization and Child registration in [runtime.rs](../crates/cordis/src/runtime.rs), through [native.rs](../crates/cordis-driver/src/shared/native.rs) |
 
 Missing declarations, including those in unreachable instructions, are rejected
 before root issuance. Wrong owners and retired/already-issued roots do not run.

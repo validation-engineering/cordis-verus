@@ -37,7 +37,7 @@ runtime.mount(&context, None, plugin)?;
 | 实际调用 | [service_program.rs](../crates/cordis-kernel/src/service_program.rs) 的 `Execution::run_service_program` 逐条解析槽位、执行操作，登记 inverse 后才继续 |
 | 完整有限函数解释 | [service_composition.rs](../crates/cordis-kernel/src/service_composition.rs) 对每种解析安排证明语法成员关系，再把真实成功／失败报告接入实际选择的安排 |
 | 累积逆操作 | [service_stack.rs](../crates/cordis-kernel/src/service_stack.rs) 把语义逆序栈与真实清理队列后缀对应起来，覆盖失败前缀 |
-| 用户入口 | [runtime.rs](../crates/cordis/src/runtime.rs) 的 `Plugin::native_service_program`、原生初始化及 Child 注册，经 [native.rs](../crates/cordis-driver/src/native.rs) 调用检查内核 |
+| 用户入口 | [runtime.rs](../crates/cordis/src/runtime.rs) 的 `Plugin::native_service_program`、原生初始化及 Child 注册，经 [native.rs](../crates/cordis-driver/src/shared/native.rs) 调用检查内核 |
 
 缺少声明时，即使该指令不会被执行，也会在签发 root 前拒绝。错误 owner、已退役或已经
 签发的 root 也不会执行。准入成功后仍可能出现执行失败；此时 root 按失败结算，

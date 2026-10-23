@@ -10,7 +10,7 @@
 
 ## 当前受限迭代：可审查的更新与失败恢复
 
-近期执行顺序以[论文到代码的验证计划](verification-plan.zh-CN.md)（[English](verification-plan.md)）为准。在既有 `provider-consumer-one-child/v1` 案例上，依次固定保证与观察、生成并缩减真实 Native 场景、比较 Node/Cordis 共享子集、对照测试与证明的错误检测，最后整理公共合同和架构导航。这些扩展均为计划工作；已有案例和证明保留各自的源码绑定证据。
+近期执行顺序以[重构和验证计划](verification-plan.zh-CN.md)（[English](verification-plan.md)）为准。重构前快照已保存到 `codex/archive-before-refactor-2026-10-24`（`60bdd89`），后续在 `main` 推进。先围绕既有 `provider-consumer-one-child/v1` 明确保证、所有权和依赖，再按领域整理结构、合并重复内容、审查删除候选；在稳定接口上增加生成／缩减场景、Node/Cordis 对照和测试／证明负控，最后集中验收。首轮目录和导航整理已启动，生成场景等扩展仍为计划；已有证明保留原本的源码绑定范围。
 
 该顺序落实 A07/A08/A13/A15 与 F1/F4，不替换 R01 或整篇论文清单。受限 Native 验收与 Node 宿主扩展分别说明前提；一般恢复、全局终止与合流保留在长期依赖中。
 

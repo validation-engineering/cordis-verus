@@ -1280,7 +1280,7 @@ Finish 只增加该 provider 的表，Unload 只移除该表，其他控制步�
 
 审查路径：`native_runtime.rs::{linked,wf,finish_managed_execution,
 release_managed_execution,history_correspondence}` → `native_history.rs::step`
-→ `cordis-driver/src/native.rs` → `Runtime::poll_settle`。
+→ `cordis-driver/src/shared/native.rs` → `Runtime::poll_settle`。
 聚合 owner 回归覆盖完整发布、冲突声明、provider／consumer 失败重试、
 其他实例的值、旧／外部 episode、recipe／宿主记录更新、退休、压缩以及具有空发布表的共享 Child。
 三个负向控制分别移除声明守卫、丢弃其他实例发布和遗漏联合历史步骤；

@@ -5003,7 +5003,7 @@
     "crates/cordis-kernel/src/xor_recovery_algebra.rs": "0a31cfb01f88a52dd5688fb9a9362d48d289b8ea099aa31e4cf299fc34ad47ec",
     "crates/cordis/src/loader.rs": "2a73818c8aa50c8f9e0bfdc67e191c9be06a0b0458f859b6d8aa3bb4fa948d44",
     "docs/paper-obligations.json": "8ab0bbb44d4036a49cfcebdb3b2d9aff3514dd7e3792364f23d0a1f73d8cd60a",
-    "docs/paper-refinement-plan.json": "8cca34c566ccf3b7ebc743ff8845fc7fd8f0bbf69eec0db6c452bdd218ed32e6",
+    "docs/paper-refinement-plan.json": "00ef6d1372a4c2f003172eff0de2a729490456b2547a7f0086ec93ceb748270c",
     "docs/r1-semantics.md": "d4b48dea57fac2cb713324114004501abab5a20e57d8143f41a5385b79028056",
     "docs/r2-acceptance.md": "4d665043f3a3376fd0efd05e044a9476664eb6954fd300d03d02dc5af40f33c5",
     "docs/r3-controlled-effects.md": "234a4ced84cbb4ceb9adae23be637ab9b6a0f5dcd384f8565fa5b324b7eb6074",

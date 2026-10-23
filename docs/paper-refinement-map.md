@@ -495,7 +495,7 @@ Recovery and episode deletion — R3
 - proof: [terminal_history](../crates/cordis-kernel/src/managed_host.rs)
 - execution: [release_controlled](../crates/cordis-kernel/src/managed_lifecycle_native.rs)
 - execution: [release_controlled_execution_observed](../crates/cordis-kernel/src/poll_control.rs)
-- host: [run_recorded_root](../crates/cordis-driver/src/native.rs)
+- host: [run_recorded_root](../crates/cordis-driver/src/shared/native.rs)
 - host: [start](../crates/cordis/src/runtime.rs)
 - proof: [transport](../crates/cordis-kernel/src/native_episode_deletion.rs)
 - contract: [admissible](../crates/cordis-kernel/src/native_deletion_trace.rs)

@@ -1,42 +1,39 @@
 # cordis-driver
 
-Value-independent command/action/completion driver over `cordis-kernel`. The
-host executes callbacks only after the driver returns an action; it submits the
-opaque domain, episode and action ticket when the callback has completed. The
-driver never owns a JavaScript object or invokes user code.
+Ordinary Rust adapters between the hosts and the verified state owners in
+`cordis-kernel`. Shared scheduling policy chooses actions; the checked kernel
+decides whether their state changes are admissible. The adapter itself is tested
+ordinary Rust, not covered by a blanket Verus proof.
 
-This crate is ordinary Rust, with behavioral tests. It calls the verified
-`LifecycleActions` implementation for action admission, cleanup results, retries
-and permission to finish cleanup. Its scheduling adapter and JSON boundary
-are not covered by those Verus proofs. See the [cleanup protocol review](../../docs/cleanup-protocol.md). Dynamic publication
-uses the kernel publication ledger; availability filtering remains in this
-adapter. In particular, a port remains declared by its owner until registry
-removal, so replacing a revoked publication with a different still-registered
-owner is not yet supported.
+## Source entry points
 
-All protocol identities are decimal strings, including service and realm IDs.
-The host owns value handles; a handle's payload never crosses the protocol.
-Cleanup failure retains its episode and bindings, reporting a fault instead of
-claiming successful resource restoration. An explicit cleanup retry is required.
+| Path | Role |
+| --- | --- |
+| [shared.rs](src/shared.rs) | Shared scheduling decisions, domain allocation and lifecycle adapter |
+| [shared/native.rs](src/shared/native.rs) | `shared::native::NativeDriver`, used by the Rust Runtime; owns the verified `NativeRuntime` |
+| [node.rs](src/node.rs) | Internal Node adapter over the verified `NodeRuntime` |
+| [lib.rs](src/lib.rs) | External command/action interface used by the Node binding |
 
-The first ABI supports `mount`, `drive`, `complete`, `retire` (`dispose` alias),
-`restart`, `retry_cleanup`, `validate`, `publish`, `set`, `revoke`, `resolve`
-(`lookup` alias), and `snapshot`. `Drive` returns `actions` plus `released` value
-handles that the executor may remove from its object table. Setup and cleanup
-completions carry the exact emitted ticket. A canceled setup is still awaited;
-there is no forced timeout pretending that an inverse has been recovered.
+The Native module's physical path matches its existing Rust module path. Moving
+it does not introduce a second implementation or change its API.
 
-The logical epoch compares provider identities, not publication IDs. If one
-provider revokes and republishes the same port before the next pump, an existing
-consumer keeps its captured old slot without an unconditional restart. A new
-consumer captures the new publication. `set` updates the existing slot and hence
-is visible to its already committed consumers. All old leases must release
-before the owner's restoration can finish. Availability changes observed by a
-pump can still cause normal withdrawal and reactivation.
+## Protocol boundaries
 
-The current compatibility foundation intentionally does not implement profile
-specific retry policies, reserve/seal child observers, check callback actions,
-configuration transactions or module updates. An explicit `restart` clears a
-setup failure latch. It does not silently retry a failed cleanup; failed cleanup
-retains its dependency leases until the executor successfully completes a fresh
-`retry_cleanup` action. Hosts must decide whether retrying their disposer is safe.
+The external interface uses decimal strings for identities and opaque handles
+for host-owned values. Completion carries the emitted domain, episode and action
+ticket. Failed retryable cleanup retains its dependencies; a later attempt needs
+an explicit retry. A canceled setup is still awaited, and a timeout must not be
+reported as successful restoration.
+
+Provider identity, publication identity and value equality remain distinct.
+Committed consumers retain their captured binding through the episode; publication
+and lease guards control when old values can be released. The host executes the
+actual callbacks and reports their results. Its payload associations and callback
+effects remain explicit obligations.
+
+Start review with the [cleanup protocol](../../docs/cleanup-protocol.md) and the
+[provider/consumer/Child case](../../docs/cases/update-recovery.md). See
+[architecture](../../docs/architecture.md) for the actual Rust and Node paths, and
+[Node compatibility](../../docs/node-compatibility.md) for the supported external
+interface and policy differences. The [verification plan](../../docs/verification-plan.md)
+tracks structural cleanup and the retained paper-wide goals.

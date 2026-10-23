@@ -72,7 +72,7 @@ general legal deletion, global termination and confluence remain separate.
 | [managed_lifecycle_callbacks.rs](../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs) | Guarded host/Future acknowledgement and unchanged rejected result. |
 | [managed_lifecycle_native.rs](../crates/cordis-kernel/src/managed_lifecycle_native.rs) | Recorded root return, controlled retry and terminal release. |
 | [poll_control.rs](../crates/cordis-kernel/src/poll_control.rs) | The actual control identity checks and observed Unload. |
-| [native.rs](../crates/cordis-driver/src/native.rs) | Ordinary driver delegation to those same owners. |
+| [native.rs](../crates/cordis-driver/src/shared/native.rs) | Ordinary driver delegation to those same owners. |
 | [runtime.rs](../crates/cordis/src/runtime.rs) | Root/Child attachment, real cleanup dispatcher and scheduler calls. |
 | [managed_function.rs](../crates/cordis/tests/managed_function.rs) | Late scalar/payload writes, Child, failed callback, retained prefix, successful retry and stale-context rejection. |
 

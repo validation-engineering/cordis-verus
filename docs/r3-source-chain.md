@@ -41,7 +41,7 @@ The window and its deletion mask still require source admissibility. This API is
 | Every Unload has its authentic cleanup source | [native_source_cleanup.rs](../crates/cordis-kernel/src/native_source_cleanup.rs): `complete`, `unload_collected`, `Source::unload_at` |
 | Commands, typed publications and inverse origins share the Journal | [native_source_chain.rs](../crates/cordis-kernel/src/native_source_chain.rs) |
 | Reuse the real managed recovery cut | [managed_unload_capture.rs](../crates/cordis-kernel/src/managed_unload_capture.rs), [managed_deletion_capture.rs](../crates/cordis-kernel/src/managed_deletion_capture.rs) |
-| Ordinary Rust driver entry | [native.rs](../crates/cordis-driver/src/native.rs): `NativeDriver::new_recorded` |
+| Ordinary Rust driver entry | [native.rs](../crates/cordis-driver/src/shared/native.rs): `NativeDriver::new_recorded` |
 
 Runtime regressions use automatic commands for the 24→13 control replay, resolved inherited declarations and anchors, disabled/zero/full capacity, failed-operation accounting and detached snapshots. The existing scalar/typed interference, failed cleanup, new retry ticket and later Child release scenario now replays controls from the same real recovery captures and checks that collection does not retain additional payload references.
 

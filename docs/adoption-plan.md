@@ -16,10 +16,12 @@ This document does not change their statuses or the [release gate](releasing.md)
 
 The current bounded iteration is the [paper-to-code verification plan](verification-plan.md)
 ([简体中文](verification-plan.zh-CN.md)): extend `provider-consumer-one-child/v1`
-with explicit guarantee/observation boundaries, generated and reduced real
-scenarios, upstream comparisons, paired test/proof negative controls and shared
-contract cleanup. These extensions are planned under A07/A08/A13/A15 and F1/F4.
-The existing case is the baseline; R01 and whole-paper closure remain separately tracked.
+with explicit guarantee/observation boundaries and a simpler source/review structure.
+The pre-refactor snapshot is archived at `60bdd89`; `main` starts with ownership
+classification, module organization and justified removal/consolidation. Generated
+scenarios, upstream comparisons and paired test/proof controls follow on stable
+interfaces. This work sits under A07/A08/A13/A15 and F1/F4; the existing case is
+the baseline, while R01 and whole-paper closure remain separately tracked.
 
 ## Who the first milestone serves
 

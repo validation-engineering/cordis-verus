@@ -33,7 +33,9 @@ Node 兼容层由单独的 crate 和 JS 包组成，不是必须开启的 `cordi
 
 另一条可选路径是 [`ProcessPlugin`](process-plugins.md)：Rust 宿主通过有界 JSON-RPC 启动独立可执行文件。它可以使用其他语言，只需要该插件自身要求的运行环境；协议并不要求 Node，也不能直接把任意原版 Cordis 插件当作进程插件运行。
 
-Rust Runtime 与 Node facade 共用 [`LifecycleDriver`](../crates/cordis-driver/src/shared.rs) 的内核控制和已验证 `LifecycleActions` 协议；值、Future/JS callback 与 backend journal 留在各自宿主。生命周期内核决定可接受的转换，宿主执行 setup、回调与真实资源清理。这种分层让兼容工作集中在语言和宿主边界，同时保留独立的 Rust 使用路径。
+Rust Runtime 经 [`shared::native::NativeDriver`](../crates/cordis-driver/src/shared/native.rs) 调用验证内核的 [`NativeRuntime`](../crates/cordis-kernel/src/native_runtime.rs)；Node facade 经 Node-API、[`Driver`／`NodeDriver`](../crates/cordis-driver/src/node.rs) 调用 [`NodeRuntime`](../crates/cordis-kernel/src/node_runtime.rs)。两者复用 [`shared.rs`](../crates/cordis-driver/src/shared.rs) 的调度策略与 [`LifecycleState`](../crates/cordis-kernel/src/lifecycle_state.rs) 的控制和动作协议。NativeRuntime／NodeRuntime 是验证过的 Rust 状态所有者，不是两套语言引擎；载荷归属、受管值、publication 和调用状态分别接入各自合同。Future／JS callback 的实际执行仍在普通宿主。
+
+源码按这些职责逐步组织，当前归档、目标分层、删减标准与迁移顺序见[重构和验证计划](verification-plan.zh-CN.md)（[English](verification-plan.md)）。执行函数与合同保持直接对应，研究模型与生产依赖先分类再调整；纯 Rust 运行不增加 Node 依赖。
 
 共享 Driver 的真实清理入口为经过验证的 `LifecycleState::execute_cleanup`；受管资源 finish
 也满足同一个 `cleanup_step` 合同。实际有限命令循环构造可擦除历史，组合证明释放前必须

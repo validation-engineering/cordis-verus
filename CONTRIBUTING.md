@@ -1,7 +1,7 @@
 # Contributing
 
 Chinese and English issues, documentation, and pull requests are welcome. This
-is an experimental 0.1 project; open a short design discussion before a large API
+is an experimental project; open a short design discussion before a large API
 or semantic change. Small bug fixes can go directly to a pull request.
 
 ## Development setup
@@ -69,6 +69,17 @@ claims. Describe compatibility using a concrete observable behavior rather than
 claiming complete upstream parity. Update research/toolchain locks only in an
 intentional, reviewed change and rerun proofs, negative tests, and packaging.
 
+## Source organization and removals
+
+Follow the [current plan](docs/verification-plan.md) ([中文](docs/verification-plan.zh-CN.md)).
+Work continues on `main`; the fixed pre-refactor branch is
+`codex/archive-before-refactor-2026-10-24`. Group code by state ownership and
+responsibility, keeping executable operations and contracts directly connected.
+For a removal, record its purpose, remaining callers/proof references, replacement
+or archive location, scope changes and checks. Update source links, selectors, CI
+and package inputs together. Historical reports retain their original hashes;
+moving files does not refresh proof evidence.
+
 ## Evidence and paper reviews
 
 Start with the [evidence guide](docs/evidence-guide.md) and the five
@@ -85,15 +96,14 @@ independent reproductions.
 
 ## Version and support policy
 
-The five workspace Rust crates currently share unreleased version 0.1.0 and are developed together.
-During this unpublished development stage, prioritize Cordis behavior and paper
-semantics; update callers and documentation directly when an API changes rather
-than adding compatibility shims for earlier development snapshots. After publication, patch
-releases aim to fix behavior without intentional public API removal. Breaking
-API or documented semantic changes require a 0.x minor release with migration
-notes. Before 1.0, downstream users should expect changes and pin versions when
-reproducibility matters. Only the latest development revision and, once
-published, the latest 0.x release receive maintenance; no LTS commitment exists.
+The workspace crate versions are declared in `Cargo.toml` and developed together.
+Prioritize Cordis behavior and explicit paper contracts; update callers and
+documentation together when experimental APIs change. Do not add aliases solely
+to preserve an obsolete development layout. Published API removals or semantic
+changes need a 0.x minor version and migration notes; patch releases aim to fix
+behavior without intentional API removal. Before 1.0, pin versions when
+reproducibility matters. Maintenance targets the latest development revision and
+the latest released 0.x version; there is no LTS commitment.
 
 The supported Rust compiler is the pinned Rust 1.98.1, also declared as the
 minimum package version. Raising it requires a documented toolchain update and
@@ -105,26 +115,11 @@ By submitting a contribution, you license it under the project's MIT license.
 Preserve upstream attribution and keep the reference paper out of source/crate
 distributions. No CLA or transfer of copyright is required.
 
-
-Independent negative controls can run concurrently with
-`CORDIS_NEGATIVE_JOBS=2 python3 scripts/record-verification.py --offline`.
-The default remains one worker. Each worker gets an isolated kernel source tree;
-the default total Verus thread budget is at most two available CPUs, divided
-across workers. The unchanged baseline uses the same per-worker thread count. The
-subprocess wall-clock timeout defaults to 600 seconds. Set
-`CORDIS_NEGATIVE_TIMEOUT` (or use `check-negative.py --timeout`) when a slower
-machine needs more time. This wall-clock allowance does not change SMT resource
-limits. Timeout and cancellation reclaim the complete verifier/solver process
-group; partial output and stage timings are retained for diagnosis.
-See [full negative validation](docs/full-negative-validation.md) for explicit
-CPU budgets, CI shards and complete evidence collection.
-These settings are recorded in the evidence. They do not change proof contracts,
-solver resource limits, or the acceptance rule: every mutation must compile,
-verify the entire crate, and fail a concrete contract. A timeout, frontend error,
-partial verification or solver exhaustion alone is always inconclusive.
-The quality command also runs the Python evidence-gate regression tests.
-
-Release evidence must include every name in `check-negative.py::mutation_manifest`, in the canonical order. A minimum mutation count is insufficient: missing, duplicated, additional or reordered entries invalidate the record, as do incomplete positive or negative whole-crate statistics. The evidence-gate unit tests cover these cases.
+Full negative regression has its own runner and source-bound evidence; see
+[full negative validation](docs/full-negative-validation.md) for concurrency,
+timeouts and CI shards. Release recording does not implicitly run that suite.
+Preserve its exact mutation manifest and rejection criteria; a timeout, compiler
+failure or missing case is not a successful negative result.
 
 For archive transport, private-fork authentication and original toolchain provenance, see
 [toolchain archives](docs/toolchains/README.md).

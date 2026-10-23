@@ -1703,7 +1703,7 @@ remaining R2 criteria are unchanged.
 
 Review path: `native_runtime.rs::{linked,wf,finish_managed_execution,
 release_managed_execution,history_correspondence}` → `native_history.rs::step`
-→ `cordis-driver/src/native.rs` → `Runtime::poll_settle`.
+→ `cordis-driver/src/shared/native.rs` → `Runtime::poll_settle`.
 Aggregate regressions cover complete publication, colliding declarations,
 provider/consumer failure and retry, unrelated values, stale/foreign episodes,
 recipe/bookkeeping updates, retirement, compaction and a shared Child with an empty publication. Three negative controls

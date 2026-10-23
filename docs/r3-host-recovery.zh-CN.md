@@ -59,7 +59,7 @@ static host 共享所有权协议，但不因此获得 native publication 语义
 | [managed_lifecycle_callbacks.rs](../crates/cordis-kernel/src/managed_lifecycle_callbacks.rs) | 受守卫的回调／Future 确认与拒绝结果保留。 |
 | [managed_lifecycle_native.rs](../crates/cordis-kernel/src/managed_lifecycle_native.rs) | recorded root 返回、受控重试与终态释放。 |
 | [poll_control.rs](../crates/cordis-kernel/src/poll_control.rs) | 实际 control 身份检查及带来源的 Unload。 |
-| [native.rs](../crates/cordis-driver/src/native.rs) | 普通 driver 对同一所有者的调用。 |
+| [native.rs](../crates/cordis-driver/src/shared/native.rs) | 普通 driver 对同一所有者的调用。 |
 | [runtime.rs](../crates/cordis/src/runtime.rs) | root／Child 接入、实际清理派发和调度调用。 |
 | [managed_function.rs](../crates/cordis/tests/managed_function.rs) | 后续 scalar／typed 写入、Child、回调失败、前缀保留、重试成功及旧 context 拒绝。 |
 
