@@ -14,6 +14,13 @@ work. [Status](status.md), the [paper ledger](paper-obligations.json), and
 [source-bound reports](evidence-guide.md) remain the sources of current results.
 This document does not change their statuses or the [release gate](releasing.md).
 
+The current bounded iteration is the [paper-to-code verification plan](verification-plan.md)
+([简体中文](verification-plan.zh-CN.md)): extend `provider-consumer-one-child/v1`
+with explicit guarantee/observation boundaries, generated and reduced real
+scenarios, upstream comparisons, paired test/proof negative controls and shared
+contract cleanup. These extensions are planned under A07/A08/A13/A15 and F1/F4.
+The existing case is the baseline; R01 and whole-paper closure remain separately tracked.
+
 ## Who the first milestone serves
 
 The first users are Cordis/Harness plugin maintainers and application developers
@@ -94,7 +101,7 @@ resource release satisfies the same transition relation. The
 premises and host assumptions. Invocation/landing, arbitrary callback effects and
 the rest of F1 remain separate; this milestone does not close a paper-wide obligation.
 
-## Current stage: auditable lifecycle wait admission
+## Earlier host milestone: auditable lifecycle wait admission
 
 Under A07/A08/A13 and F1, implement a checked decision for a live callback waiting
 on its own lifecycle or a retained provider subtree. The current delivery places
