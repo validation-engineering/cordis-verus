@@ -2,14 +2,15 @@
 
 English · [简体中文](verification-plan.zh-CN.md) · [Update recovery case](cases/update-recovery.md) · [Remaining paper obligations](paper-mapping-inventory.md)
 
-**Updated: 2026-10-24.** Work continues on `main`; the fixed pre-refactor archive
+**Updated: 2026-10-25.** Work continues on `main`; the fixed pre-refactor archive
 is `codex/archive-before-refactor-2026-10-24` at `60bdd89`. The bounded iteration's
 code, ownership map, module layout, generator, reducer, upstream comparison and
 paired-control runner are implemented. The final-source gate is
 `python3 -B scripts/check-lifecycle-campaign.py accept`; only a passing record for
 the current sources constitutes integrated acceptance. See the
 [review map](review-map.md) and [reproduction guide](cases/generated-lifecycle.md).
-The whole-paper target remains open.
+The whole-paper target remains open. This revision adds the remaining structural
+work below; it does not report a new implementation or verification run.
 
 The goal is to make paper constraints useful in running software: a plugin author
 can update a provider, understand a blocked cleanup, retry safely and inspect the
@@ -124,6 +125,13 @@ Reorganization starts before the next feature expansion, rather than waiting for
 the final acceptance step. The existing case and regressions provide the initial
 behavioral baseline; generated campaigns add coverage afterward.
 
+Structural maintenance is a continuing workstream alongside paper-to-code
+verification. The completed file moves improve navigation; the remaining work
+must make mutation authority, proof dependencies and host boundaries easier to
+inspect and change. A folder split alone does not meet those goals. Each further
+behavior change should include the structural work needed by its affected path,
+without requiring a repository-wide rewrite first.
+
 The archived kernel has 446 source files, all directly under `src/`. The ordinary
 Rust host's `runtime.rs` has 5,195 lines. These counts include contracts, proofs,
 comments and tests; they identify navigation problems, not proof redundancy.
@@ -201,6 +209,51 @@ The [generated lifecycle case](cases/generated-lifecycle.md) is the implementati
 and reproduction entry for steps 3–6 below. It records intentional cleanup-policy
 differences without calling them upstream agreement.
 
+### Remaining structural work
+
+The following packages are **planned, not yet accepted**. The existing review map
+is the starting point; it is not a complete field-level mutation inventory or a
+transitive proof-dependency audit. These packages extend maintenance work after
+the first bounded iteration; they do not reopen its historical acceptance or
+replace the paper-obligation inventory.
+
+| Priority / package | Concrete work and location | Purpose and exit criterion |
+| --- | --- | --- |
+| First: mutation and proof dependency inventory | Follow the five guarantee paths through `cordis::runtime`, `cordis-driver`, `LifecycleState`, `NativeRuntime`, `NodeRuntime`, cleanup ledgers and managed values. Record authoritative fields, all mutation entries for the selected state, projections/caches, host premises and required definitions/lemmas. | A reviewer can identify who changes each relevant state, where each premise is established and the code/proof dependencies of one change. Separate runtime/build dependencies from verification dependencies; unresolved edges remain explicit. |
+| Next: shared protocol and contract boundaries | Audit the existing lifecycle, action and cleanup APIs. Keep each state under one authoritative owner; route any duplicate decisions through the appropriate checked entry. Consolidate wrappers, projections or preservation lemmas only after comparing premises, results and unchanged state. | Native and Node establish their own premises and reuse the applicable shared authority. No bypassing a guard through another entry, unaccounted cache or weaker replacement contract. Preserve target versus committed provider, attempt identity and retained cleanup state. |
+| Next: ordinary-host responsibility boundaries | Build on the existing setup/service/cleanup/poll modules. Review the remaining `Episode`, `SharedEpisode`, effect/Child handles and cleanup state in `cordis/src/runtime.rs`; group types and their methods by owner, with narrow internal interfaces. Apply the same review to driver policy, command decoding and host associations. | A change to one cleanup or handle rule has a local implementation and explicit integration points. Preserve lock/drop order, callback/error behavior and supported APIs; new public abstractions need a caller and a concrete purpose. |
+| Then: proof organization and redundant material | Use the dependency inventory to organize paper definitions, executable contracts, actual-history bridges and reusable lemmas. Review duplicate projections, replay variants, wrappers and chronological notes; keep unique research outside the primary reading route with active verification entries. | Each advertised guarantee has one maintained review route. Every consolidation records semantic equivalence and migrated callers; every removal records its disposition. Production proof dependencies, unique counterexamples and open paper obligations remain accounted for. |
+| Throughout: optional dependencies and review checks | Document the actual crate/feature/build dependencies for pure Rust, Node compatibility and other adapters. Keep Harness and language/transport concerns outside shared authority. Reuse existing documentation, packaging and validation entry points; add a narrow dependency guard only for an established boundary. | Pure Rust remains usable without Node. Every affected guarantee names its code, proof, reproduction and applicable validation command. A new host does not introduce another copy of lifecycle policy or require a new acceptance framework. |
+
+The first inventory is limited to the existing provider/consumer/one-Child
+failure-and-retry path. After it, shared-protocol and ordinary-host changes can
+proceed in separate bounded batches. Semantic consolidation depends on the
+relevant dependency audit and contract comparison. Optional-dependency checks and
+review links accompany every affected batch. This does not require completing
+general replay, arbitrary host semantics or global liveness first.
+
+**Next implementation batch:** expand the existing review map for
+`execute_cleanup`, managed release and retry. Follow the ordinary-host and Node
+callers into the shared protocol, including failed inverses, the actual Child
+identity and rejected old replies. Record, for each relevant state, its owner,
+mutation entries, preserved invariant, premise source, proof dependencies and
+existing acceptance case. If a host premise is only tested or trusted, label it
+as such. Then make the first justified ownership/API consolidation, or retain
+the current boundary with its rationale if the audit finds no duplication.
+
+For each structural batch, assess maintenance by the review route and change
+impact: which modules and public interfaces a representative change touches,
+which invariants and premises it must preserve, and which checks it needs. Record
+the before/after result and any remaining coupling. Fewer lines/files or a shorter
+proof are not acceptance criteria by themselves. Improve local naming, formatting
+and invariant comments where they clarify the contract; avoid unrelated churn.
+
+Implement related code and proof changes together, using compilation and targeted
+verification to resolve blockers. Preserve existing regressions; add tests only
+for an uncovered behavior or boundary, then concentrate the affected scenarios,
+controls and full development acceptance at the integration boundary. Follow the
+acceptance policy below rather than running the full workflow after each move.
+
 ### Archive and branch discipline
 
 The archive is a local Git branch at the frozen snapshot above. Keep it fixed;
@@ -220,12 +273,15 @@ The bounded deliverables below have implementation and review entry points. Acce
 is source-bound: the final audit requires fresh development, scenario, comparison
 and paired-control records together. Dependencies do not require full-suite runs
 after each edit; these items do not introduce another paper milestone taxonomy.
+This table records the **first bounded iteration**. Its completed structural row
+covers the layout and entry-point changes described above; the remaining ownership,
+dependency and simplification work is tracked separately in the structural packages.
 
 | Order / state | Deliverable | Dependency | Exit criterion |
 | --- | --- | --- | --- |
 | 0. Archive · complete | Frozen code and prior plan on the named branch; active work stays on `main` | Existing working tree | Archive resolves to `60bdd89`; tracked work is preserved and history is not rewritten |
 | 1. Scope and ownership · implemented | Contract/evidence matrix plus production/proof/research inventory and candidate removal decisions | Archive and existing case | Every guarantee has a real caller, exact observation and premise; every proposed removal has an accountable replacement or disposition |
-| 2. Structure and cleanup · implemented | Organize one domain at a time; consolidate repeated code and prose; separate research navigation | 1 for the affected domain; existing regressions | Clear ownership, no lost proof/negative anchors, migrated callers and packaging; preserved guarantees or an explicit scope change |
+| 2. Initial structure and entry points · implemented | Match physical/logical module paths, extract host responsibilities, consolidate control wrappers and organize review navigation | 1 for the affected domain; existing regressions | Preserved implementation/contracts, no lost proof/negative anchors, migrated callers and packaging; remaining structural work recorded above |
 | 3. Generate and shrink · implemented | Seeded real Native lifecycle scenarios and reducer | 1 and the relevant stable interfaces from 2 | Existing failure/retry reproduced, required families covered and replayable reduced failures demonstrated with a known control |
 | 4. Compare with Cordis · implemented | Node/native and pinned-upstream adapters for the supported common scenario subset | 1; reuse 3's format/reducer | Raw traces, complete outcome accounting and no unexplained difference accepted as compatibility |
 | 5. Test/proof detection · implemented | Paired behavioral and proof results for the five existing implementation mutations | 3; 4 where a control exercises Node | Fresh baseline, valid mutant compilation, intended contract rejection and separately recorded behavioral result |

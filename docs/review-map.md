@@ -6,6 +6,10 @@ Start with the state an operation owns. The production function and its Verus
 contract remain together. The tables classify responsibilities and review paths;
 they do not declare every function in a directory to be a production caller.
 
+For the next field-level ownership and dependency audit, follow the
+[remaining structural work](verification-plan.md#remaining-structural-work).
+The layout changes recorded here do not complete that follow-up audit.
+
 ## Five guarantees, five review paths
 
 | Guarantee / paper basis | State owner and mutation entry | Real caller and observation | Evidence / boundary |
