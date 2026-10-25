@@ -638,15 +638,10 @@ impl StaticCleanupFuture {
         self.finished = true;
         Poll::Ready(Err(error))
     }
-    fn complete_reply(
-        &mut self,
-        reply: CleanupReply,
-        retry: Option<RetryCleanup>,
-    ) -> CallbackResult {
+    fn complete_reply(&mut self, completion: CleanupCompletion) -> CallbackResult {
         let completed = lock(&self.episode.setup.state).cleanups.complete_reply(
             0,
-            reply,
-            retry,
+            completion,
             CleanupPolicy::RetainFailure,
         );
         let report = match completed {
@@ -762,18 +757,15 @@ impl Future for StaticCleanupFuture {
                     CleanupAction::Value(_) => {
                         unreachable!("value inverse runs inside the checked dispatcher")
                     }
-                    CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
-                        Ok(future) => self.running = Some(future),
-                        Err(failure) => {
-                            let error = self
-                                .complete_reply(
-                                    CleanupReply::Failed(failure.ticket, failure.message),
-                                    failure.retry,
-                                )
-                                .unwrap_err();
-                            return self.fail(error);
+                    CleanupAction::Callback(cleanup) => {
+                        match RunningCleanup::start(ticket, cleanup) {
+                            Ok(future) => self.running = Some(future),
+                            Err(failure) => {
+                                let error = self.complete_reply(failure).unwrap_err();
+                                return self.fail(error);
+                            }
                         }
-                    },
+                    }
                     CleanupAction::Native(_) => {
                         self.complete_callback(ticket, Err("NativeChildInStaticHost".into()), None)
                             .unwrap_err();
@@ -795,13 +787,15 @@ impl Future for StaticCleanupFuture {
                     }
                 }
             }
-            match poll_cleanup_callback(self.running.as_mut().unwrap(), cx) {
+            match self.running.as_mut().unwrap().poll(cx) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(result) => {
                     let attempt = self.running.take().unwrap();
-                    if let Err(error) = self.complete_reply(result, attempt.retry) {
+                    if let Err(error) = self.complete_reply(result) {
                         return self.fail(error);
                     }
+                    // Retain the Future until completion and error handling unlock.
+                    drop(attempt);
                 }
             }
         }

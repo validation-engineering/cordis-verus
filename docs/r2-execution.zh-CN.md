@@ -1295,8 +1295,8 @@ release_managed_execution,history_correspondence}` → `lifecycle_state/native/r
 | 替换保留 publication 身份并返回真实旧值 | `replace_checked` 和 `ValueCell::replace`；拒绝时原样返还新值 | `Driver::set`、Rust `ServiceSlot::replace` |
 | 旧清理租约仍读取自己保留的值 | `leased_value` 从真实租约记录中取得 publication 身份与载荷 | `Driver::read` |
 | 只有生命周期和完整资源清单检查通过，才能转移实际载荷 | `finish_resources` 将已有票据／租约协议与载荷转移组合；拒绝时三者均保持原状 | `LifecycleDriver::finish_cleanup_values` |
-| 在轮询 Future 前，用实际参数调用工厂 | `RegisteredPlugin::call` 直接调用保存的原生 `FnMut`；`invoke_future` 保留清理工厂实际返回的 Future | Rust `Runtime::start`、`initialize_cleanup`、`Runtime::poll_groups` |
-| 异步清理消费其 Future 实际返回的结果 | `Awaiting::complete`／`await_completion` 用 Verus 原生 Future 语义保存来源与实际结果；`complete_future` 据此判定成功、失败或消耗 | Rust `initialize_cleanup`、`Runtime::finish_reply`、`StaticCleanupFuture::complete_reply` |
+| 在轮询 Future 前，用实际参数调用工厂 | `RegisteredPlugin::call` 直接调用保存的原生 `FnMut`；`invoke_future` 保留清理工厂实际返回的 Future | Rust `Runtime::start`、[`RunningCleanup::start`](../crates/cordis/src/runtime/cleanup/attempt.rs)、`Runtime::poll_groups` |
+| 异步清理消费其 Future 实际返回的结果 | `Awaiting::complete`／`await_completion` 用 Verus 原生 Future 语义保存来源与实际结果；`complete_future` 据此判定成功、失败或消耗 | Rust [`RunningCleanup::start`](../crates/cordis/src/runtime/cleanup/attempt.rs)、`Runtime::finish_reply`、`StaticCleanupFuture::complete_reply` |
 | 先保存实际返回的 inverse，再决定是否继续 | `CleanupQueue::land_result` 自行分配 token、保存实际 inverse，并根据结果和取消状态选择后续动作 | `Runtime::poll_groups` |
 | 不能因为一个组为空就关闭仍有其他工作的 episode | `CleanupGroups` 持有全部清理队列；`remove`、`seal` 检查未落地 stage、已交付凭据、保留失败和实际载荷，然后关闭注册入口 | `Runtime::poll_groups`、`Runtime::poll_settle`、`StaticCleanupFuture::poll` |
 | 整体重试遇到不可重试失败时，不能先推进其他组 | `retry_execution` 先检查绑定的工作状态和全部队列，再一起推进生命周期与 inverse 的重试票据 | `Runtime::retry_cleanup` |

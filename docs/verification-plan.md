@@ -2,15 +2,16 @@
 
 English · [简体中文](verification-plan.zh-CN.md) · [Update recovery case](cases/update-recovery.md) · [Remaining paper obligations](paper-mapping-inventory.md)
 
-**Updated: 2026-10-25.** Work continues on `main`; the fixed pre-refactor archive
+**Updated: 2026-10-26.** Work continues on `main`; the fixed pre-refactor archive
 is `codex/archive-before-refactor-2026-10-24` at `60bdd89`. The bounded iteration's
 code, ownership map, module layout, generator, reducer, upstream comparison and
 paired-control runner are implemented. The final-source gate is
 `python3 -B scripts/check-lifecycle-campaign.py accept`; only a passing record for
 the current sources constitutes integrated acceptance. See the
 [review map](review-map.md) and [reproduction guide](cases/generated-lifecycle.md).
-The whole-paper target remains open. This revision adds the remaining structural
-work below; it does not report a new implementation or verification run.
+The whole-paper target remains open. The cleanup ownership audit and first host
+attempt consolidation are implemented; the structural follow-up remains open.
+Verification results are recorded separately for the source actually checked.
 
 The goal is to make paper constraints useful in running software: a plugin author
 can update a provider, understand a blocked cleanup, retry safely and inspect the
@@ -200,10 +201,16 @@ or evidence record was removed, and no paper obligation was closed by these move
 
 The second layout batch moves 212 further kernel files to their existing logical
 module paths and removes the remaining 214 path attributes. Setup, service-handle
-methods and polling now have separate ordinary-host modules; `runtime.rs` is
-3,139 lines. Function bodies and contracts are preserved. The
+methods and polling have separate ordinary-host modules; `runtime.rs` was
+3,139 lines at the end of that layout batch. Function bodies and contracts were preserved. The
 [review map](review-map.md) records the ownership classification and disposition;
 unique research results and frozen evidence remain retained.
+
+The first ownership batch adds a [cleanup-path audit](review-map.md#cleanup-ownership-audit)
+and consolidates ordinary callback attempts into `runtime/cleanup/attempt.rs`.
+Both Rust hosts now pass an opaque completion containing the result and its own
+retry factory, while preserving their policies, lock/drop order and checked queue
+calls. This changes an internal ownership API; the kernel contracts remain unchanged.
 
 The [generated lifecycle case](cases/generated-lifecycle.md) is the implementation
 and reproduction entry for steps 3–6 below. It records intentional cleanup-policy
@@ -211,8 +218,9 @@ differences without calling them upstream agreement.
 
 ### Remaining structural work
 
-The following packages are **planned, not yet accepted**. The existing review map
-is the starting point; it is not a complete field-level mutation inventory or a
+The following packages remain **open beyond the delivered cleanup slice**. The
+review map now audits that path's state and contract dependencies and records the
+first ownership consolidation. It is not a repository-wide mutation inventory or
 transitive proof-dependency audit. These packages extend maintenance work after
 the first bounded iteration; they do not reopen its historical acceptance or
 replace the paper-obligation inventory.
@@ -232,14 +240,18 @@ relevant dependency audit and contract comparison. Optional-dependency checks an
 review links accompany every affected batch. This does not require completing
 general replay, arbitrary host semantics or global liveness first.
 
-**Next implementation batch:** expand the existing review map for
-`execute_cleanup`, managed release and retry. Follow the ordinary-host and Node
-callers into the shared protocol, including failed inverses, the actual Child
-identity and rejected old replies. Record, for each relevant state, its owner,
-mutation entries, preserved invariant, premise source, proof dependencies and
-existing acceptance case. If a host premise is only tested or trusted, label it
-as such. Then make the first justified ownership/API consolidation, or retain
-the current boundary with its rationale if the audit finds no duplication.
+**Delivered slice:** the review map follows `execute_cleanup`, managed release
+and retry, including failed inverses, actual Child identity, stale replies and
+Node resource release. It records owners, mutation families, required contracts,
+premise boundaries and existing cases. Callback attempts now have one private
+owner; the review retains distinct ledgers and policies with their rationale.
+
+**Next implementation batch:** audit the remaining `Episode`/`SharedEpisode`
+association and effect-handle transitions. List every writer of the selected
+identity, status and wakeup state, then group its types/methods behind the smallest
+useful internal API. Preserve lock order, actual execution identity and the
+host-versus-verified boundary. Expand beyond this slice only after its dependency
+review; the initial audit does not authorize deleting general proof support.
 
 For each structural batch, assess maintenance by the review route and change
 impact: which modules and public interfaces a representative change touches,

@@ -2718,8 +2718,18 @@
             "role": "execution"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
-            "symbol": "initialize_cleanup",
+            "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
+            "symbol": "start",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
+            "symbol": "poll",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
+            "symbol": "complete_reply",
             "role": "host"
           },
           {

@@ -16,9 +16,9 @@ use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, S
 use crate::future_support::poll_catching_unwind;
 use crate::service_error::{ServiceReadError, ServiceReadFailure};
 use crate::CallbackError;
+use cleanup::attempt::{CleanupCompletion, RunningCleanup};
 use cordis_driver::shared::native::NativeDriver;
 use cordis_driver::shared::Decision;
-use cordis_kernel::async_completion::{invoke_future, Completion};
 use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
 use cordis_kernel::cleanup_queue::completion::{
     CleanupDispatch, CleanupPolicy, CleanupReport, ValueCleanupReport,
@@ -492,25 +492,6 @@ impl Cleanups {
             retry.map(HostAction::Retryable),
             policy,
         )
-    }
-    fn complete_reply(
-        &mut self,
-        group: usize,
-        reply: CleanupReply,
-        retry: Option<RetryCleanup>,
-        policy: CleanupPolicy,
-    ) -> Result<CleanupReport<CallbackError, CleanupAction>, RejectedCleanup> {
-        let retry = retry.map(HostAction::Retryable);
-        match reply {
-            CleanupReply::Awaited(completion) => self
-                .protocol
-                .complete_future(group, completion, retry, policy)
-                .map_err(|(completion, retry)| RejectedCleanup::Awaited(completion, retry)),
-            CleanupReply::Failed(ticket, error) => self
-                .protocol
-                .complete_failure(group, ticket, error, retry, policy)
-                .map_err(|(ticket, error, retry)| RejectedCleanup::Failed(ticket, error, retry)),
-        }
     }
     fn can_retry(&self, group: usize) -> bool {
         self.protocol
@@ -1336,84 +1317,6 @@ fn initialize_reply(
         }
     }
 }
-type CompletionFuture =
-    Pin<Box<dyn Future<Output = Completion<RestoreTicket, CallbackResult>> + Send>>;
-enum CleanupReply {
-    Awaited(Completion<RestoreTicket, CallbackResult>),
-    Failed(RestoreTicket, CallbackError),
-}
-enum RejectedCleanup {
-    Awaited(
-        Completion<RestoreTicket, CallbackResult>,
-        Option<CleanupAction>,
-    ),
-    Failed(RestoreTicket, CallbackError, Option<CleanupAction>),
-}
-impl RejectedCleanup {
-    fn discard(self) {
-        match self {
-            Self::Awaited(completion, retry) => drop((completion, retry)),
-            Self::Failed(ticket, error, retry) => drop((ticket, error, retry)),
-        }
-    }
-}
-struct RunningCleanup {
-    ticket: RestoreTicket,
-    future: CompletionFuture,
-    retry: Option<RetryCleanup>,
-}
-struct CleanupFailure {
-    ticket: RestoreTicket,
-    message: CallbackError,
-    retry: Option<RetryCleanup>,
-}
-fn initialize_cleanup(
-    ticket: RestoreTicket,
-    cleanup: CleanupCallback,
-) -> Result<RunningCleanup, CleanupFailure> {
-    let (result, retry) = match cleanup {
-        CleanupCallback::Payload { .. } => {
-            unreachable!("typed inverse runs inside the checked dispatcher")
-        }
-        CleanupCallback::Once(cleanup) => (
-            catch_unwind(AssertUnwindSafe(|| {
-                invoke_future(ticket, (), |()| cleanup())
-            })),
-            None,
-        ),
-        CleanupCallback::Retryable(mut cleanup) => {
-            let result = catch_unwind(AssertUnwindSafe(|| {
-                invoke_future(ticket, (), |()| cleanup())
-            }));
-            (result, Some(cleanup))
-        }
-    };
-    match result {
-        Ok(future) => Ok(RunningCleanup {
-            ticket,
-            future: Box::pin(future.complete()),
-            retry,
-        }),
-        Err(panic) => Err(CleanupFailure {
-            ticket,
-            retry,
-            message: CallbackError::panic(panic_message(panic)),
-        }),
-    }
-}
-fn poll_cleanup_callback(
-    attempt: &mut RunningCleanup,
-    cx: &mut TaskContext<'_>,
-) -> Poll<CleanupReply> {
-    match normalize_poll(poll_catching_unwind(attempt.future.as_mut(), cx), |panic| {
-        CallbackError::panic(panic_message(panic))
-    }) {
-        Poll::Pending => Poll::Pending,
-        Poll::Ready(Ok(completion)) => Poll::Ready(CleanupReply::Awaited(completion)),
-        Poll::Ready(Err(error)) => Poll::Ready(CleanupReply::Failed(attempt.ticket, error)),
-    }
-}
-
 struct Mounted {
     next_config_update: Option<Option<ConfigUpdateCallback>>,
     service: Option<EffectHandle>,

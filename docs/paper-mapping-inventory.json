@@ -257,6 +257,14 @@
         {
           "file": "crates/cordis-kernel/src/cleanup_queue/completion.rs",
           "symbol": "complete_future"
+        },
+        {
+          "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
+          "symbol": "start"
+        },
+        {
+          "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
+          "symbol": "poll"
         }
       ]
     },
@@ -4771,6 +4779,13 @@
         "en": "Initial complete allocation of 81 numbered items, four integration obligations and the required unnumbered execution surfaces; original and milestone statuses unchanged.",
         "zh-CN": "首次完整分配 81 个编号条目、四项整体连接义务及必需无编号执行范围；不改变原文和里程碑状态。"
       }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: reviewed cleanup attempt ownership and moved the R2 awaited-results host path to the opaque attempt module. Added its actual factory/poll entry points to M09 while retaining the environment premise and every obligation/milestone status. Updated only the reviewed plan and new host source fingerprints; this is not new proof evidence.",
+        "zh-CN": "2026-10-26：审查清理尝试所有权，将 R2 awaited-results 宿主路径迁至私有尝试模块；M09 增加实际工厂／轮询入口，保留环境前提及所有义务／里程碑状态。仅更新已审查计划与新增宿主源码绑定，不构成新的证明证据。"
+      }
     }
   ],
   "reviewInputSha256": {
@@ -5003,7 +5018,7 @@
     "crates/cordis-kernel/src/xor_recovery_algebra.rs": "0a31cfb01f88a52dd5688fb9a9362d48d289b8ea099aa31e4cf299fc34ad47ec",
     "crates/cordis/src/loader.rs": "2a73818c8aa50c8f9e0bfdc67e191c9be06a0b0458f859b6d8aa3bb4fa948d44",
     "docs/paper-obligations.json": "9ad461bd7af8fc9339419ecc7153f091105e0e78713a64e10c2345078c7203f4",
-    "docs/paper-refinement-plan.json": "3313e510c6905fbc8c5d037c92595c327dc25a7bb8e426c99561aebb9f068308",
+    "docs/paper-refinement-plan.json": "b5019785b61e884f2facd31f941596034f28c6cc2cc943c3ddbdbe5c04ceaea2",
     "docs/r1-semantics.md": "e40596b8c80820c4f8bb193b108419719030b7d30e1c840534eb1ad17f35542e",
     "docs/r2-acceptance.md": "4d665043f3a3376fd0efd05e044a9476664eb6954fd300d03d02dc5af40f33c5",
     "docs/r3-controlled-effects.md": "1a1d9d19d53d0e1b84557c5899928b03c9146c5edb6a1091449e309e213d691d",
@@ -5011,6 +5026,7 @@
     "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418",
     "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750",
     "crates/cordis-kernel/src/reversible_value/managed/replay/typed_tracker.rs": "c9164555670a4225ea262f508686e31e08e86ab2ddd339e9bf50c93f49098482",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs": "220d7bad00c98c28b2bda14488206f2a19f737d1a4e4463108c1b7aefa6ecd11"
+    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs": "220d7bad00c98c28b2bda14488206f2a19f737d1a4e4463108c1b7aefa6ecd11",
+    "crates/cordis/src/runtime/cleanup/attempt.rs": "64cf308b177ec460d8931666856354907d20a2e53a8e60d6fb87c8ae4f4a21eb"
   }
 }

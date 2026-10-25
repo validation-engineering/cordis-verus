@@ -3,6 +3,7 @@
 //! The verified queue owns admission and receipt validation. This adapter
 //! polls user code and drops returned payloads outside bookkeeping locks.
 //! Callback completion and scheduler progress remain host responsibilities.
+pub(super) mod attempt;
 use super::*;
 
 impl Runtime {
@@ -73,8 +74,7 @@ impl Runtime {
         id: PluginId,
         group: usize,
         handle: Option<&EffectHandle>,
-        reply: CleanupReply,
-        retry: Option<RetryCleanup>,
+        completion: CleanupCompletion,
     ) {
         let episode = self
             .kernel
@@ -86,8 +86,7 @@ impl Runtime {
             .clone();
         let completed = lock(&episode.state).cleanups.complete_reply(
             group,
-            reply,
-            retry,
+            completion,
             CleanupPolicy::DrainConsumed,
         );
         // Both discarded and rejected user payloads leave the bookkeeping lock.
@@ -215,26 +214,24 @@ impl Runtime {
                         Err("ExternalChildInNativeRuntime".into()),
                         None,
                     ),
-                    CleanupAction::Callback(cleanup) => match initialize_cleanup(ticket, cleanup) {
-                        Ok(future) => *running = Some(future),
-                        Err(failure) => self.finish_reply(
-                            id,
-                            group,
-                            handle,
-                            CleanupReply::Failed(failure.ticket, failure.message),
-                            failure.retry,
-                        ),
-                    },
+                    CleanupAction::Callback(cleanup) => {
+                        match RunningCleanup::start(ticket, cleanup) {
+                            Ok(future) => *running = Some(future),
+                            Err(failure) => self.finish_reply(id, group, handle, failure),
+                        }
+                    }
                 }
             }
         }
         if let Some(attempt) = running.as_mut() {
-            match poll_cleanup_callback(attempt, cx) {
+            match attempt.poll(cx) {
                 Poll::Pending => return (progress, true),
                 Poll::Ready(result) => {
                     let attempt = running.take().unwrap();
-                    self.finish_reply(id, group, handle, result, attempt.retry);
+                    self.finish_reply(id, group, handle, result);
                     progress = true;
+                    // A user Future is dropped after acknowledgement and unlocking.
+                    drop(attempt);
                 }
             }
         }
