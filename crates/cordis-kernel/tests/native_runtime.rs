@@ -1463,8 +1463,13 @@ fn scoped_dispatch_rejects_another_episode_and_revokes_retired_group() {
     arun = rejected.0;
     assert_eq!(arun.get(), "first");
     let (mut arun, reply) = arun
-        .call_scoped((ascope, "argument"), |payload, (scope, arg)| {
-            assert_eq!(scope, ascope);
+        .call_scoped((ascope.clone(), "argument"), |payload, (scope, arg)| {
+            assert_eq!(scope.group(), ascope.group());
+            assert!(scope.belongs(&a));
+            assert!(std::sync::Arc::ptr_eq(
+                scope.binding_identity().unwrap(),
+                ascope.binding_identity().unwrap()
+            ));
             assert_eq!(arg, "argument");
             (payload, EffectOutput::<String, String>::Ready(Ok(None)))
         })
@@ -1480,6 +1485,17 @@ fn scoped_dispatch_rejects_another_episode_and_revokes_retired_group() {
     assert!(b.put_effect(brun).is_ok());
 }
 
+fn assert_same_target(
+    left: &cordis_kernel::configuration_runtime::Target,
+    right: &cordis_kernel::configuration_runtime::Target,
+) {
+    assert_eq!(
+        (left.id(), left.generation(), left.revision()),
+        (right.id(), right.generation(), right.revision())
+    );
+    assert!(Arc::ptr_eq(left.native_identity(), right.native_identity()));
+}
+
 #[test]
 fn configuration_targets_bind_domain_activation_and_recipe_revision() {
     let mut world = World::new(3900);
@@ -1489,7 +1505,7 @@ fn configuration_targets_bind_domain_activation_and_recipe_revision() {
     let target = world.configuration_target(id).unwrap();
     assert_eq!(target.id(), id);
     assert_eq!(target.revision(), 0);
-    assert!(world.configuration_target_is_current(target));
+    assert!(world.configuration_target_is_current(&target));
 
     let mut foreign = World::new(3910);
     let other = register(&mut foreign, 1, vec![]);
@@ -1499,38 +1515,38 @@ fn configuration_targets_bind_domain_activation_and_recipe_revision() {
         foreign.configuration_target(other).unwrap().generation(),
         target.generation()
     );
-    assert!(!foreign.configuration_target_is_current(target));
+    assert!(!foreign.configuration_target_is_current(&target));
     assert!(matches!(
-        foreign.replace_configuration(target, setup as Callback),
+        foreign.replace_configuration(&target, setup as Callback),
         Err((Error::InvalidState, _))
     ));
 
     world
-        .replace_configuration(target, setup as Callback)
+        .replace_configuration(&target, setup as Callback)
         .ok()
         .unwrap();
     let revised = world.configuration_target(id).unwrap();
     assert_eq!(revised.revision(), 1);
     assert_eq!(revised.generation(), target.generation());
-    assert!(!world.configuration_target_is_current(target));
+    assert!(!world.configuration_target_is_current(&target));
     assert!(matches!(
-        world.replace_configuration(target, setup as Callback),
+        world.replace_configuration(&target, setup as Callback),
         Err((Error::InvalidState, _))
     ));
     assert_eq!(world.registration(id).unwrap().revision(), 1);
 
     withdraw(&mut world, id, &mut episode);
-    assert!(!world.configuration_target_is_current(revised));
+    assert!(!world.configuration_target_is_current(&revised));
     world.begin_cleanup(id).unwrap();
     world.release_managed_execution(id, &mut episode).unwrap();
     let (mut next, _) = activate(&mut world, id, 1, 3902);
     assert!(world.configuration_target(id).unwrap().generation() > revised.generation());
-    assert!(!world.configuration_target_is_current(revised));
+    assert!(!world.configuration_target_is_current(&revised));
     let active = world.configuration_target(id).unwrap();
     world
         .withdraw_managed_execution(id, &mut next, true)
         .unwrap();
-    assert!(!world.configuration_target_is_current(active));
+    assert!(!world.configuration_target_is_current(&active));
 }
 
 #[test]
@@ -1545,7 +1561,7 @@ fn configuration_batch_rejects_late_stale_or_duplicate_targets_before_any_swap()
     let a = world.configuration_target(left).unwrap();
     let stale = world.configuration_target(right).unwrap();
     world
-        .replace_configuration(stale, setup as Callback)
+        .replace_configuration(&stale, setup as Callback)
         .ok()
         .unwrap();
     let b = world.configuration_target(right).unwrap();
@@ -1554,12 +1570,15 @@ fn configuration_batch_rejects_late_stale_or_duplicate_targets_before_any_swap()
         calls.fetch_add(1, Ordering::SeqCst);
         std::mem::replace(host, next)
     };
-    for (targets, cause) in [([a, stale], Cause::Target), ([a, a], Cause::Duplicate)] {
+    for (targets, cause) in [
+        ([a.clone(), stale], Cause::Target),
+        ([a.clone(), a.clone()], Cause::Duplicate),
+    ] {
         let changes = targets
             .iter()
             .enumerate()
             .map(|(i, target)| Change {
-                target: *target,
+                target: target.clone(),
                 recipe: setup as Callback,
                 metadata: format!("candidate {i}"),
             })
@@ -1571,13 +1590,13 @@ fn configuration_batch_rejects_late_stale_or_duplicate_targets_before_any_swap()
         assert_eq!((rejected.failure.index, rejected.failure.cause), (1, cause));
         assert_eq!(rejected.changes.len(), 2);
         for (i, change) in rejected.changes.iter().enumerate() {
-            assert_eq!(change.target, targets[i]);
+            assert_same_target(&change.target, &targets[i]);
             assert_eq!(change.metadata, format!("candidate {i}"));
             assert_eq!((change.recipe)(i), Ok(()));
         }
         assert_eq!(calls.load(Ordering::SeqCst), 0);
-        assert_eq!(world.configuration_target(left), Some(a));
-        assert_eq!(world.configuration_target(right), Some(b));
+        assert_same_target(&world.configuration_target(left).unwrap(), &a);
+        assert_same_target(&world.configuration_target(right).unwrap(), &b);
         assert_eq!(world.host(left).unwrap(), "host 1");
         assert_eq!(world.host(right).unwrap(), "host 2");
         assert!(Arc::ptr_eq(
@@ -1611,12 +1630,12 @@ fn configuration_batch_adopts_exact_order_and_payloads_without_restarting_live_e
         .adopt_configurations(
             vec![
                 Change {
-                    target: b,
+                    target: b.clone(),
                     recipe: second as Callback,
                     metadata: "next right".to_owned(),
                 },
                 Change {
-                    target: a,
+                    target: a.clone(),
                     recipe: first as Callback,
                     metadata: "next left".to_owned(),
                 },
@@ -1626,7 +1645,8 @@ fn configuration_batch_adopts_exact_order_and_payloads_without_restarting_live_e
         .ok()
         .unwrap();
     assert_eq!(previous.len(), 2);
-    assert_eq!((previous[0].target, previous[1].target), (b, a));
+    assert_same_target(&previous[0].target, &b);
+    assert_same_target(&previous[1].target, &a);
     assert_eq!(
         (&*previous[0].metadata, &*previous[1].metadata),
         ("host 2", "host 1")
@@ -1645,7 +1665,7 @@ fn configuration_batch_adopts_exact_order_and_payloads_without_restarting_live_e
         let after = world.configuration_target(id).unwrap();
         assert_eq!(after.generation(), before.generation());
         assert_eq!(after.revision(), before.revision() + 1);
-        assert!(!world.configuration_target_is_current(before));
+        assert!(!world.configuration_target_is_current(&before));
         assert_eq!(world.kernel().phase(id), Some(Phase::Active));
     }
     assert_eq!(world.host(left).unwrap(), "next left");

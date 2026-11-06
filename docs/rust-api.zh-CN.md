@@ -396,3 +396,58 @@ let after = setup.observe_reversible(counter)?.value();
 仍恢复旧对象。帧证明使用对象分配身份；更强的端口帧条件明确需要别名闭包前提。
 这些受管调用没有证明外围回调体。`update_reversible_with` 仍使用既有的无锁用户
 计算／受验证落地合同。见[声明调用合同](r2-execution.zh-CN.md#声明访问与生产函数步骤)。
+
+### 低层 Native 来源检查
+
+`NativeDriver::owns_execution` 检查实际 Journal 和当前 Episode；
+`owns_setup_scope` 还检查保留的活队列分配。Driver 的 root、生命周期及作用域快照
+入口在派发前使用这些检查。`NativeDriver::configuration_snapshot` 返回 `Option`，
+拒绝外来配置 Journal；Loader 私有保留两个所有者，因此 `Loader::execution_snapshot`
+继续使用不可失败 API。`SetupScope` 是可克隆句柄，跨消费型调用保留时使用
+`clone()`；`belongs` 检查数字选择，Driver 再检查实际分配。
+完整合同和剩余边界见[审查地图](review-map.zh-CN.md#执行配置与作用域来源)。
+
+### 当前动作票据
+
+`LifecycleDriver::pending_action` 返回自有 `Option<ActionTicket>`，与 Native／
+Node Driver 一致。直接保留返回值即可，无需再调用 `.cloned()`。每次查询读取权威
+账本；旧值可以保留，但回复时必须匹配当前动作。`None` 表示没有在途回复，不代表
+失败清理可以释放。详见[当前票据审计](review-map.zh-CN.md#当前动作票据观察)。
+
+### 调用与配置目标句柄
+
+Native root admission 返回绑定实际 Native 分配的 `RegisteredInvocation`。
+`call_root` 和 `call_opaque_root` 在执行 recipe 前拒绝外来或独立路径的票据，
+并在拒绝时返回原票据。来源真实的票据仍须通过所有者、Episode 和版本检查。
+
+配置 `Target` 保留相同分配，实现 `Clone`，不再实现 `Copy`、`Debug` 或相等比较 trait。
+调用 `configuration_target_is_current`、`replace_configuration` 时传入 `&target`；
+需要在拥有目标的批次之外保留句柄时用 `clone()`。克隆不会刷新目标。
+批次拒绝发生在任何替换和 metadata 回调前，返回全部原始变更。
+见[所有权与证明边界](review-map.zh-CN.md#调用与配置目标的来源)。
+
+### Child 句柄与清理来源
+
+使用真实 Native／recorded `enqueue_native_child` 返回的 `SharedChild`；
+已在本地注册的 Child 则使用 `NativeDriver::registered_child(id)`。
+后者对缺失 ID 或 root 返回 `None`，记录实际分配而非赋予 Unload 权限；
+已经退休但仍保留的注册也可以观察。`Runtime::mount` 指定父插件时使用该工厂，
+父插件尚未 Begin 或已经 Active 都保留同一个清理对象。
+
+`NativeDriver` 在注册／退休前拒绝外来或未绑定句柄。
+`SharedChild::from_identity` 有意保留为未绑定的原始包装，仍可由原始 `NativeHost`
+使用，调用者继续承担来源前提。数字 ID 相等不会使该包装绑定到 Driver。
+`owns_shared_child` 只检查 Journal 关联；Episode、阶段及终态守卫仍须满足。
+克隆保留相同决策及 Journal 元数据，直到最后一次销毁；这一关联不保留 Native
+recipe／宿主载荷。完整边界见[审查路径](review-map.zh-CN.md#child-请求与清理来源)。
+
+### 历史 Native 观察
+
+低层 Driver 的 `publication_snapshot()` 返回 Native 历史快照。将 `&snapshot`
+传给 `recovery_snapshot`，外来 Native 所有者的快照返回 `None`，即使数字 ID 全部
+相同。本地快照可在更新、失败清理、重试、Unload 及新 Episode 后继续观察。
+配置快照通过 `native_snapshot()` 借用同一截面的 Native 部分。
+
+`Some(Capture)` 表示观察来源被接纳，不表示清理成功，也不执行回滚。恢复诊断
+属于擦除的证明证据。原始 Journal 投影不能传给这个 typed Driver 入口；面向证明的
+原始内核 API 仍可在明确前提下使用。见[快照所有权与成本审查](review-map.zh-CN.md#native-历史快照)。

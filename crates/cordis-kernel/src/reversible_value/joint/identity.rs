@@ -19,7 +19,7 @@ impl AllocationIdentity {
     pub closed spec fn number_spec(&self)->Option<u64> {match self.name {Some(n)=>Some(n.value()),None=>None}}
     pub open spec fn namespace(&self)->vstd::resource::Loc {self.address().journal.identity_namespace()}
     pub closed spec fn wf(&self)->bool {
-        self.allocation@.id()==self.address().journal.inner.pred().names
+        self.allocation@.id()==self.address().journal.inner.lock.pred().names
             && self.allocation@.key()==self.address().key && self.allocation@.value()==self.number_spec()
             && (self.name.is_some() ==> self.name.unwrap().wf()
                 && self.name.unwrap().source()==self.namespace() && self.name.unwrap().meaning()==Some(self.address()))
@@ -51,7 +51,7 @@ impl AllocationIdentity {
     }
 }
 pub(super) fn allocate(issuer:&ValueIssuer<Option<Address>>,Ghost(address):Ghost<Address>,Tracked(names):Tracked<&mut GhostMapAuth<nat,Option<u64>>>)->(out:Arc<AllocationIdentity>)
-    requires issuer.source()==address.journal.inner.pred().issuer,old(names).id()==address.journal.inner.pred().names,!old(names)@.contains_key(address.key),
+    requires issuer.source()==address.journal.inner.lock.pred().issuer,old(names).id()==address.journal.inner.lock.pred().names,!old(names)@.contains_key(address.key),
     ensures out.wf(),out.address()==address,final(names).id()==old(names).id(),
         final(names)@==old(names)@.insert(address.key,out.number_spec()),
 {

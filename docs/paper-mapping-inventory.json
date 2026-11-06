@@ -265,6 +265,30 @@
         {
           "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
           "symbol": "poll"
+        },
+        {
+          "file": "crates/cordis/src/runtime/effect_handle.rs",
+          "symbol": "poll_driver"
+        },
+        {
+          "file": "crates/cordis/src/runtime/child/external.rs",
+          "symbol": "poll_retired"
+        },
+        {
+          "file": "crates/cordis/src/runtime/root.rs",
+          "symbol": "poll"
+        },
+        {
+          "file": "crates/cordis/src/runtime/static_host/progress.rs",
+          "symbol": "start_cleanup"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "observe_decision"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared.rs",
+          "symbol": "decision"
         }
       ]
     },
@@ -287,6 +311,558 @@
         {
           "file": "crates/cordis-kernel/src/cleanup_queue.rs",
           "symbol": "complete"
+        },
+        {
+          "file": "crates/cordis/src/runtime/episode.rs",
+          "symbol": "checked_lock"
+        },
+        {
+          "file": "crates/cordis/src/runtime/effect_handle.rs",
+          "symbol": "finish_service"
+        },
+        {
+          "file": "crates/cordis/src/runtime/child/external.rs",
+          "symbol": "complete_mount"
+        },
+        {
+          "file": "crates/cordis/src/runtime/child/external.rs",
+          "symbol": "removed"
+        },
+        {
+          "file": "crates/cordis/src/runtime/child.rs",
+          "symbol": "mount_request"
+        },
+        {
+          "file": "crates/cordis/src/runtime/episode.rs",
+          "symbol": "seal_external"
+        },
+        {
+          "file": "crates/cordis/src/runtime/control.rs",
+          "symbol": "bind_control"
+        },
+        {
+          "file": "crates/cordis/src/runtime/control.rs",
+          "symbol": "with_control"
+        },
+        {
+          "file": "crates/cordis-kernel/src/poll_control.rs",
+          "symbol": "binding_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/poll_control.rs",
+          "symbol": "binding_correspondence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+          "symbol": "poll_control_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+          "symbol": "rejected_release"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+          "symbol": "identity_ref"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_poll_control"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/control_tests.rs",
+          "symbol": "foreign_control_cannot_observe_begin_or_clear_failure_with_reused_numbers"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/control_tests.rs",
+          "symbol": "foreign_control_cannot_retry_or_release_an_identically_numbered_episode"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/control_tests.rs",
+          "symbol": "foreign_control_cannot_certify_or_finish_a_recorded_owner"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+          "symbol": "runtime_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+          "symbol": "identity_correspondence"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+          "symbol": "domain_ref"
+        },
+        {
+          "file": "crates/cordis-kernel/src/execution.rs",
+          "symbol": "execution_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "allocation_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/setup_context.rs",
+          "symbol": "binding_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/setup_context.rs",
+          "symbol": "linked_to"
+        },
+        {
+          "file": "crates/cordis-kernel/src/setup_context.rs",
+          "symbol": "scope_for_group"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_history.rs",
+          "symbol": "domain_ref"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_recorded.rs",
+          "symbol": "execution_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+          "symbol": "execution_domain"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "same_journal"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_execution"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_configuration"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_setup_scope"
+        },
+        {
+          "file": "crates/cordis/src/loader.rs",
+          "symbol": "execution_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/provenance_tests.rs",
+          "symbol": "foreign_execution_cannot_consume_root_publish_or_release_with_reused_numbers"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/provenance_tests.rs",
+          "symbol": "recorded_foreign_execution_preserves_failure_and_both_ready_release_owners"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/provenance_tests.rs",
+          "symbol": "scopes_authenticate_the_live_queue_and_do_not_retain_the_journal"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/provenance_tests.rs",
+          "symbol": "configuration_checkpoints_require_the_actual_journal_not_equal_contents"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/provenance_tests.rs",
+          "symbol": "typed_root_rejection_returns_the_owner_without_consuming_admission"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/test_support.rs",
+          "symbol": "world"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/joint/identity.rs",
+          "symbol": "wf"
+        },
+        {
+          "file": "crates/cordis/src/runtime.rs",
+          "symbol": "configuration_snapshot"
+        },
+        {
+          "file": "crates/cordis-kernel/tests/native_runtime.rs",
+          "symbol": "scoped_dispatch_rejects_another_episode_and_revokes_retired_group"
+        },
+        {
+          "file": "crates/cordis-kernel/src/action_ledger.rs",
+          "symbol": "pending"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "symbol": "pending"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "symbol": "pending_matches"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state.rs",
+          "symbol": "pending"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared.rs",
+          "symbol": "pending_action"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared.rs",
+          "symbol": "host_ticket"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared.rs",
+          "symbol": "kernel_ticket"
+        },
+        {
+          "file": "crates/cordis-driver/tests/pending_actions.rs",
+          "symbol": "execution_views_follow_real_failure_retry_release_and_next_generation"
+        },
+        {
+          "file": "crates/cordis-driver/tests/pending_actions.rs",
+          "symbol": "failed_finish_can_settle_the_ticket_without_activating_the_episode"
+        },
+        {
+          "file": "crates/cordis-driver/tests/pending_actions.rs",
+          "symbol": "native_publication_views_follow_actual_setup_and_release"
+        },
+        {
+          "file": "crates/cordis-driver/tests/pending_actions.rs",
+          "symbol": "checked_admission_views_survive_rejection_and_end_after_resource_release"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration.rs",
+          "symbol": "bind_native"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration.rs",
+          "symbol": "bound_to"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration.rs",
+          "symbol": "native_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+          "symbol": "admit_managed_root"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs",
+          "symbol": "admit_root"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+          "symbol": "configuration_target"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+          "symbol": "native_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+          "symbol": "bound_to"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+          "symbol": "configuration_target_is_current"
+        },
+        {
+          "file": "crates/cordis-kernel/src/configuration_runtime/adoption.rs",
+          "symbol": "preflight_configurations"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_invocation"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_configuration_target"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "adopt_configurations"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "foreign_invocation_is_returned_before_callback_and_its_owner_can_still_use_it"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "opaque_invocation_uses_the_same_provenance_guard"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "unbound_invocation_is_not_a_native_capability_even_with_matching_numbers"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "authentic_invocations_still_require_the_current_owner_recipe_and_loading_state"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "targets_bind_allocation_without_retaining_host_or_journal_payloads"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "invocation_binding_does_not_retain_its_host_or_journal"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/authority_tests.rs",
+          "symbol": "batch_preflight_merges_foreign_stale_and_duplicate_failures_before_any_swap"
+        },
+        {
+          "file": "crates/cordis/src/runtime.rs",
+          "symbol": "start"
+        },
+        {
+          "file": "crates/cordis-kernel/src/setup_work.rs",
+          "symbol": "execution_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+          "symbol": "execution_journal"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+          "symbol": "execution_domain"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+          "symbol": "from_work"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+          "symbol": "registered_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/execution.rs",
+          "symbol": "enqueue_native_child"
+        },
+        {
+          "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs",
+          "symbol": "enqueue_native_child"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "owns_shared_child"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "registered_child"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "register_shared_child"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native.rs",
+          "symbol": "retire_shared_child"
+        },
+        {
+          "file": "crates/cordis/src/runtime.rs",
+          "symbol": "mount_inner"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "foreign_pending_child_cannot_allocate_or_cancel_and_returns_original_payloads"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "assigned_child_rejects_foreign_retirement_and_local_removal_stays_idempotent"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "numeric_identity_wrappers_are_unbound_but_local_registration_factory_is_usable"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "unlinked_raw_child_keeps_raw_host_contract_but_cannot_enter_native_driver"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "cancelled_child_stays_terminal_across_a_real_parent_restart"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "recorded_request_handle_and_inverse_keep_the_same_bound_decision"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/child_tests.rs",
+          "symbol": "escaped_child_retains_only_domain_metadata_and_releases_it_with_the_last_clone"
+        },
+        {
+          "file": "crates/cordis/tests/runtime.rs",
+          "symbol": "owned_children_are_retired_and_removed_with_their_parent"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
+          "symbol": "native_source"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
+          "symbol": "bound_to"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
+          "symbol": "native_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery.rs",
+          "symbol": "describes"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+          "symbol": "recovery_snapshot_from"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs",
+          "symbol": "native_snapshot"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs",
+          "symbol": "service_snapshot"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/payloads.rs",
+          "symbol": "payload_service_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "owns_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "control_source_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "execution_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "recipe_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "publication_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "episode_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "configuration_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "service_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "service_episode_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "scoped_service_episode_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "controlled_service_episode_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "payload_service_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "scoped_payload_service_episode_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+          "symbol": "recovery_snapshot"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshot_tests.rs",
+          "symbol": "foreign_historical_cut_is_rejected_with_identical_numeric_selectors"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshot_tests.rs",
+          "symbol": "historical_observation_survives_failure_retry_unload_and_a_new_episode"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshot_tests.rs",
+          "symbol": "configuration_cut_borrows_its_native_source_without_renewing_it"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshot_tests.rs",
+          "symbol": "all_specialized_native_factories_retain_the_same_actual_allocation"
+        },
+        {
+          "file": "crates/cordis-driver/src/shared/native/snapshot_tests.rs",
+          "symbol": "snapshots_keep_only_metadata_and_projection_releases_native_identity"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+          "symbol": "finish_index"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+          "symbol": "finish_cleanup"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+          "symbol": "check_resource_finish"
+        },
+        {
+          "file": "crates/cordis/src/runtime/cleanup.rs",
+          "symbol": "record_cleanup_report"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "owned_publication"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "check_replacement"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "replace_admitted"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "replace_service"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "revoke_service"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "reclaim_service"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "ownership"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "service_replaced"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "service_revoked"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "service_reclaimed"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
+          "symbol": "replace_service"
+        },
+        {
+          "file": "crates/cordis-driver/src/services.rs",
+          "symbol": "set"
+        },
+        {
+          "file": "crates/cordis-driver/src/objects.rs",
+          "symbol": "set_host_object"
         }
       ]
     },
@@ -4786,12 +5362,100 @@
         "en": "2026-10-26: reviewed cleanup attempt ownership and moved the R2 awaited-results host path to the opaque attempt module. Added its actual factory/poll entry points to M09 while retaining the environment premise and every obligation/milestone status. Updated only the reviewed plan and new host source fingerprints; this is not new proof evidence.",
         "zh-CN": "2026-10-26：审查清理尝试所有权，将 R2 awaited-results 宿主路径迁至私有尝试模块；M09 增加实际工厂／轮询入口，保留环境前提及所有义务／里程碑状态。仅更新已审查计划与新增宿主源码绑定，不构成新的证明证据。"
       }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: audited Episode association and handle status/notification ownership. Added the actual private host modules to R2 review paths and the M09/M10 environment-premise review; ordinary host privacy does not discharge scheduler or external-report truth. All obligation and milestone statuses are unchanged. Refreshed only the reviewed plan and these two new input fingerprints, not historical proof evidence.",
+        "zh-CN": "2026-10-26：审查 Episode 关联及句柄状态／通知所有权；R2 审查路径和 M09／M10 环境前提接入实际私有宿主模块。普通宿主隐私约束不消除调度或外部报告真实性前提；所有义务及里程碑状态不变，仅刷新已审查计划与这两个新增输入的源码绑定，不改写历史证明证据。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: audited actual Child admission, assignment/rejection, retirement/removal and retained external failures. R2 review paths now include the private Child request/control owners; M09/M10 point to external waiting and report acceptance. The original native SharedChild contracts and all obligation/milestone statuses remain unchanged. Refreshed the reviewed plan and Episode input, and added the two Child source fingerprints; historical proof evidence is unchanged.",
+        "zh-CN": "2026-10-26：审查真实 Child 准入、分配／拒绝、退休／移除及保留的外部失败。R2 审查路径接入私有 Child 请求／控制器所有者，M09／M10 指向外部等待与报告接受入口；Native SharedChild 原有合同及所有义务／里程碑状态保持不变。刷新已审查计划和 Episode 输入，新增两个 Child 源码指纹，不改写历史证明证据。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: audited private Episode capability/notification state, actual root Future/ticket ownership and static setup/cleanup progress. R2 and M09/M10 review paths now name their owners; initialization points to the moved root implementation. Fixed closed-native driver retention and locked destruction of an overridden plugin error, with regressions rejecting old behavior. Kernel contracts and all obligation/milestone statuses are unchanged. Updated only affected reviewed source fingerprints; historical proof evidence is unchanged.",
+        "zh-CN": "2026-10-26：审查私有 Episode 能力／通知状态、真实 root Future／票据所有权及静态 setup／cleanup 进度。R2 与 M09／M10 审查路径接入相应所有者，初始化引用迁移到 root 实现。修复关闭后保留 Native driver 及覆盖插件错误时锁内析构，两项回归拒绝旧行为。内核合同及所有义务／里程碑状态不变；仅更新受影响审查输入的指纹，不改写历史证明证据。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: audited native scheduling observations and actual PollControl ownership. One private Runtime owner now binds and lends the original control at Begin/retry/release/restart; Native Driver owns the preserved lazy availability policy. A real failed/restarted/retired consumer regression rejects eager predicate execution. Review paths explicitly retain the lower-level native/Journal provenance premise; numeric owner equality does not discharge bound(native). Kernel contracts and obligation/milestone statuses are unchanged. Refreshed the reviewed plan and added three current host input fingerprints; historical proof evidence is unchanged.",
+        "zh-CN": "2026-10-26：审查 Native 调度观察和真实 PollControl 所有权；私有 Runtime 所有者统一绑定及 Begin／重试／释放／重启借出流程，Native Driver 集中原有惰性可用性策略。真实失败／重启／退休 consumer 回归拒绝提前执行谓词。审查路径明确保留低层 Native／Journal 工厂来源前提，数值 owner 相等不消除 bound(native)。内核合同与义务／里程碑状态不变；刷新已审查计划并新增三个当前宿主输入指纹，不改写历史证明证据。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: tied PollControl to the actual Native allocation with verified Journal/key meaning and guarded every control-bearing Driver entry using Arc identity. Same-number cross-Runtime recovery/checkpoint regressions and scoped factory/guard mutations cover the boundary. Arc pointer equality and other host/execution premises remain explicit; all obligation and milestone statuses and historical evidence are unchanged. Updated current reviewed source bindings only.",
+        "zh-CN": "2026-10-26：PollControl 保留真实 Native 分配，其 Journal／key 含义由合同验证；所有含控制对象的 Driver 入口检查 Arc 身份。同编号跨 Runtime 恢复／快照回归和工厂／守卫定向变异覆盖该边界。Arc 指针相等及其他宿主／执行前提仍明确保留；所有义务／里程碑状态和历史证据不变，仅更新当前审查源码绑定。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-26: connected borrowed Native/execution/configuration Journal identities and retained Scope queue identities to all corresponding NativeDriver entries. Added exact factory/clone contracts, same-number regressions and scoped factory/guard mutations. Journal/queue pointer comparison remains an ordinary Rust boundary; raw contracts, other token families and all general obligation/milestone statuses remain unchanged. Updated current reviewed source bindings only.",
+        "zh-CN": "2026-10-26：借用 Native／执行／配置的真实 Journal 身份，并保留 Scope 的实际队列身份，接入对应 NativeDriver 入口；增加精确工厂／clone 合同、同编号回归和工厂／守卫定向变异。Journal／队列指针比较仍是普通 Rust 边界；原始合同、其他票据族及一般义务／里程碑状态不变，仅更新当前审查源码绑定。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-27: removed the standalone pending_views cache and its 16 synchronization writes. Driver observations now read the authoritative ledger, with exact membership contracts used by the real matching path. Reviewed owned ticket API, linear lookup tradeoff, partial Finish, actual failure/retry/publication/resource paths and ordinary wire conversion. All general obligation/milestone statuses and historical evidence are unchanged; current reviewed source bindings only.",
+        "zh-CN": "2026-10-27：删除独立 pending_views 缓存和 16 处同步写入，Driver 直接观察权威账本；精确成员关系合同由真实匹配路径使用。审查自有票据 API、线性查询取舍、部分成功的 Finish、实际失败／重试／发布／资源路径和普通线格式转换。一般义务／里程碑状态及历史证据不变，仅更新当前审查源码绑定。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-29: bound Native/recorded invocation admission and configuration targets to the actual Native allocation. Reviewed exact factory/clone contracts, both callback guards, borrowed target APIs, complete batch preflight/error precedence, seven provenance regressions and scoped negative controls. General obligation/milestone statuses and historical evidence remain unchanged; current reviewed source bindings only.",
+        "zh-CN": "2026-10-29：Native／recorded 调用签发及配置目标绑定真实 Native 分配；审查精确工厂／克隆合同、两种回调守卫、借用目标 API、整批预检与错误顺序、七项来源回归及局部负控。一般义务／里程碑状态和历史证据不变，仅更新当前审查源码绑定。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-29: retained the creating work or local Native Journal in shared Child factories, propagated exact request/inverse contracts and guarded Driver registration/retirement. Runtime now retains the original cleanup object across Begin. Reviewed seven regressions, active/inactive-parent mounting, metadata lifetime and scoped proof/runtime controls. General obligation/milestone statuses and historical evidence remain unchanged; current reviewed source bindings only.",
+        "zh-CN": "2026-10-29：共享 Child 工厂保留创建 work 或本地 Native 的 Journal，传播精确请求／逆操作合同，Driver 在注册／退休前检查来源。Runtime 跨 Begin 保留原清理对象。审查七项回归、父插件激活前后挂载、元数据寿命及局部证明／运行负控。一般义务／里程碑状态和历史证据不变，仅更新当前审查源码绑定。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-10-31: retained actual Native allocation identity in historical snapshots and all composite factories; typed recovery derives its Native-record premise and preserves the exact earlier cut. Grouped 13 Driver observation methods, reviewed foreign rejection, failure/retry/restart, configuration borrowing, eight factory paths and metadata lifetime. Consolidated plan summaries by owner. General closure statuses and historical evidence are unchanged.",
+        "zh-CN": "2026-10-31：历史快照及组合工厂保留实际 Native 分配，typed 恢复推导 Native 记录前提并保持精确早期截面。集中 13 个 Driver 观察方法，审查外来拒绝、失败／重试／重启、配置借用、八条工厂路径及元数据寿命；按所有者合并计划叙述。一般关闭状态与历史证据不变。"
+      }
+    },
+    {
+      "baseline": "2026-10-20.v1",
+      "reason": {
+        "en": "2026-11-02: consolidated lifecycle, reservation and resource-preflight receipt checks into one executable gate, preserving all three public contracts. Audited the complete cleanup-record write inventory and required ledger, Kernel, publication and refinement dependencies; consolidated ordinary-host report handling without changing acknowledgement, lock/drop order or failure policy. General closure statuses and historical evidence remain unchanged.",
+        "zh-CN": "2026-11-02：生命周期、reservation 和资源预检共用一个可执行回执守卫，保持三个公开合同；审查完整清理记录写入清单及 ledger、Kernel、publication、refinement 依赖；合并普通宿主报告处理，保持确认、锁／析构顺序和失败策略。一般关闭状态与历史证据不变。"
+      }
     }
   ],
   "reviewInputSha256": {
+    "crates/cordis-driver/src/objects.rs": "e2085cc7dba86754d020b4227903e18b6d25f93da31ea0aac6cc25b87ac5d840",
+    "crates/cordis-driver/src/services.rs": "854674a0398edd4f679f01ec99728f12286acbad68506643270e0ac845498995",
+    "crates/cordis-driver/src/shared.rs": "3ffe766f63d4fcf5e638f394d9b96760d03df746a3bf376dd9312843484b112f",
+    "crates/cordis-driver/src/shared/native.rs": "9f6401d926fa35a91c682046f46271ff59b40a0423ef500825443dfab76d8a0e",
+    "crates/cordis-driver/src/shared/native/authority_tests.rs": "9ec121b6b5ead47d03108cbf0cdd19d55ae6e4c6dd78b84a35691aedf44701dd",
+    "crates/cordis-driver/src/shared/native/child_tests.rs": "a20dbb6a5cb6d4d339076174d6363fd06adca93d826a2040b1d9cbb097e6712d",
+    "crates/cordis-driver/src/shared/native/control_tests.rs": "f442348205860dfc4b946b8a1a9b83b6761cca0aa5d53d548fb1a827b312610c",
+    "crates/cordis-driver/src/shared/native/provenance_tests.rs": "fb1c209822007b15d37859067282c69b593390c6f40d267fc2d78889bfd0509e",
+    "crates/cordis-driver/src/shared/native/snapshot_tests.rs": "6e729b451fef5d2d84c9da819d1f11b483dbd04fb8496c46489f8ce4aaa5f224",
+    "crates/cordis-driver/src/shared/native/snapshots.rs": "585168176116a3dd0e10417b9f717da1d3651207b8aa7769688917445c7f6bac",
+    "crates/cordis-driver/src/shared/native/test_support.rs": "79ea7a31d7b1a445e913a2055b63da120e594c815798feb07332336c6e5c05a3",
+    "crates/cordis-driver/tests/pending_actions.rs": "b59a3a6f4d442e1ae0f43f36fdc1313bdef12d880649fce63ad1964a96334804",
+    "crates/cordis-kernel/src/action_ledger.rs": "f45a873f7b816f40e12baf03f537758cdf07962b6e95f33e692254e5fda0264c",
     "crates/cordis-kernel/src/administrative_orchestration.rs": "6793dc4b8d003f29862d7df8696555639467c1fe44339e380534838c0aca2a50",
-    "crates/cordis-kernel/src/mixed_driver/fresh/admitted.rs": "9657ea7f703b5fdd027a2318703f6d8b142183a046a4f7601041c57b453a3ac6",
-    "crates/cordis-kernel/src/mixed_driver/fresh/admitted/script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
     "crates/cordis-kernel/src/allocation_inputs.rs": "b3a25966f428ae318b4fd7a42122de6179b901c41757c38146c8f90608ca5b55",
     "crates/cordis-kernel/src/alpha.rs": "f453c4b6b3ee72e09763193c3be749242bc906f70f2d3921f737a2f7ce3a89dc",
     "crates/cordis-kernel/src/async_completion.rs": "d82ef5d08d211240ceef40a1ed711be2fc0ed7a1691280774d50279678bb4b0a",
@@ -4799,19 +5463,21 @@
     "crates/cordis-kernel/src/causal_normalization.rs": "865013833416d6ce807ab7aec460f5fae853e503b252c452e48a8988244b4af1",
     "crates/cordis-kernel/src/child_driver.rs": "e2471a811c766b115c6b1eff12442f95d6b1fc1cbe0ff3ab8922a6c771b4928e",
     "crates/cordis-kernel/src/child_history.rs": "65fb3b5a81e0a2babef641de1506875b569f7a1415e645a3917522533e3c9dac",
-    "crates/cordis-kernel/src/cleanup_queue/completion.rs": "5993ca0577e6dcd94c8ac05ee1e446ddc3e55700c557eb46106d1941c6cd6cd2",
+    "crates/cordis-kernel/src/cleanup_groups/payload.rs": "58fa2bfda0ad9e1c70f4af371d887caba04d195eaa6bf4e50f727bd85c14d0e1",
     "crates/cordis-kernel/src/cleanup_journal.rs": "64f20ed1b27e25a621b676792a4f226113ed4ea0b898d960c3b865946f41d340",
-    "crates/cordis-kernel/src/lifecycle_state/cleanup.rs": "5e6352bd6b9f7223f2411610bf0f917728b6db822a93399014871af82f83ba9f",
-    "crates/cordis-kernel/src/cleanup_queue.rs": "bdbc1dea53e79cfaf9c153d84a66363beaeac057ef3310fbd241c5548eb6409b",
-    "crates/cordis-kernel/src/lifecycle_actions/resources.rs": "9d2fb72dfa5668240c35858556b63fc8918599cc6afe6bbe1aaaba37b2422c5e",
+    "crates/cordis-kernel/src/cleanup_queue.rs": "fea3c9814de87ce793ae6a73c29c443892f92f7d816fb91ef85d4aa483a2fe02",
+    "crates/cordis-kernel/src/cleanup_queue/completion.rs": "bcec3c21b62fed102749738acde484f93567d77f69136711bbad53b413fe1d35",
+    "crates/cordis-kernel/src/cleanup_queue/landing.rs": "6bd9327b126fd13651df99b07cba3955a1359d850f107bdd3ce99d33d2aed1ba",
     "crates/cordis-kernel/src/closed_region_deletion/execution.rs": "428d594c3314f0f2b7808acf2f6b9790d1d58bf93b588e408ebd7f20151044b6",
     "crates/cordis-kernel/src/coeffects.rs": "7c9a3e89c736ef6e6fce952e5181ee3cf7d81a357fe40f8c3c47870b5304431e",
     "crates/cordis-kernel/src/configuration_entry.rs": "b1fe55e61907ecf2f2fa10494ee71b871d45b1120aa616e4f4097ca0e2444449",
     "crates/cordis-kernel/src/configuration_future.rs": "928bf664cd944573be28b0379d40ee157470c0ba54f189f0415a82c2e61c3f4c",
-    "crates/cordis-kernel/src/configuration_runtime.rs": "a9a0226b4d21ca54e7fff6759528344d639c25e5532edd65ae31171d4f15dcf6",
+    "crates/cordis-kernel/src/configuration_history.rs": "33d73f6a77116513bc01b7dee7972bf170e004121d4c5e01bee9891bb7d76ab5",
+    "crates/cordis-kernel/src/configuration_recorded.rs": "40005e12945dc28883c4b3783d402a4b270280d5807c0cebea293aa24d03ada0",
+    "crates/cordis-kernel/src/configuration_runtime.rs": "84241acd990db206375c6b705d29ae1557ae3e50de15a820b0fca04f29dcddb4",
+    "crates/cordis-kernel/src/configuration_runtime/adoption.rs": "f36a33cfe073047a9017e77e7041a92f242a5b3358786a9b5bde13a05d5fda7c",
     "crates/cordis-kernel/src/configuration_source_history.rs": "4c07204f66d6f0ddc4edac844901e01b5d699cff283c7c52ff577153a0db1857",
     "crates/cordis-kernel/src/contexts.rs": "72c32f067433e1a64e7e4196cb12c0ba5f7eed0d4d9f77255e57d58c7032aec8",
-    "crates/cordis-kernel/src/reversible_value/controlled.rs": "802f5cda28ed064cfdd020637b8e754680a4819969e35cd6969729e0c80f0813",
     "crates/cordis-kernel/src/deletion.rs": "1c44e19ce407f69e7411bb7ac2fc29940471c350020e60bb1bce462a0d9cbae3",
     "crates/cordis-kernel/src/dependent_grammar.rs": "89016e4db79a21cff12b24aa73b1c3d03852cd931c4460e35e98914b0988629d",
     "crates/cordis-kernel/src/dependent_independence.rs": "bf4fa296cef98066b9e3903b36455598fb7bd47201d5f62b496dc9b139d788bd",
@@ -4825,8 +5491,7 @@
     "crates/cordis-kernel/src/entangled.rs": "ff5e821b638bb9153c34b2357f7614f7a8d4254a674bb74cfdecbcdd1b252080",
     "crates/cordis-kernel/src/entangled_loading.rs": "9a0585f2be02be2c09b6c4faabced9448ec1ffddde7616d066ca78de20578ed6",
     "crates/cordis-kernel/src/episode.rs": "d1e8140788859404158d56bd903a8d3936df74f80cbb17c9ef8815467f87d90c",
-    "crates/cordis-kernel/src/mixed_driver/episode_replay.rs": "234b104b7e7c32f932bc74baad7ecc21d261fabb389387313e6e837284bdae32",
-    "crates/cordis-kernel/src/execution.rs": "0997d76ca0bd87d6f50b436d9419f5c73dbee89415a0aa79ff86d55a47eaa8b5",
+    "crates/cordis-kernel/src/execution.rs": "07290919579163aa769d69f1dda1deb0fe79765bcae816eb932be1b1428d7d7c",
     "crates/cordis-kernel/src/external_inputs.rs": "a7491019af25e1d647220f5f9f0d649d197541d6336cb44072151d2a1425ebfb",
     "crates/cordis-kernel/src/foreign_child_deletion.rs": "86e1977d590da9778254d77fc77444464068cb0f14e7ebe230893a8d58aae356",
     "crates/cordis-kernel/src/foreign_child_deletion_example.rs": "ee63634237c5eb4996c594a792823222f5cc6b6137f898987322f1cd50426cbb",
@@ -4835,18 +5500,10 @@
     "crates/cordis-kernel/src/foreign_provision_transport.rs": "5b837c2c97458a940e52d0717bd7509fa296c3d29083f72773a0b5fbfc5357b4",
     "crates/cordis-kernel/src/foreign_unload.rs": "c1e07e10f8eabc5fa48750c5249528be377bb68ef25d6a3264cacac5ef7e003f",
     "crates/cordis-kernel/src/foundations.rs": "0b19e7afb7855da5312dc63a4303e26f6716159e57b41bd62ffa511c7aeb316d",
-    "crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs": "0cbc7e28adecba197f496bd7d20fe4fee2b4172600d4611d884f9704244dd319",
-    "crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs": "2b29f5618cb8ab23c34f2d9f967bf9e97034bb4a31cf5d805cbab23b52337329",
-    "crates/cordis-kernel/src/mixed_driver/fresh.rs": "f248ae6ceaeb101b6d95fc9237b6db2b3b06e24923fcce8181062f19a55a4c43",
-    "crates/cordis-kernel/src/mixed_driver/fresh/episode_replay.rs": "a37604edf07db325bbaad7718f6fb7f8b4a945fed5efaf6d16926fa1a05d24c6",
     "crates/cordis-kernel/src/fresh_equivariance.rs": "e9074e2b56d1d130948d2af396bbb50b3e85e81e719c7b866c9456d223315227",
     "crates/cordis-kernel/src/fresh_grammar.rs": "cce7d43aa00a054a75dca28403c03f8891bee70f9d7a346d79575e103627fce4",
-    "crates/cordis-kernel/src/mixed_driver/fresh/preparation.rs": "9f611b3e96d2c829c5f40cd9521e5030c3bdb6e33e33a37e4c6f9d75beef62d7",
     "crates/cordis-kernel/src/fresh_recovery.rs": "39212ace0e75f8d8d57f52c65452e8994fff03d3973ac09dadd598a327294335",
-    "crates/cordis-kernel/src/mixed_driver/fresh/runner.rs": "ea66d7937d30f5fcc951d925cb7aab551e442f9199dbbb7aca850657b124cdb8",
-    "crates/cordis-kernel/src/mixed_driver/fresh/replay.rs": "f694ea454b4037893e9914575f7d86502298fac96639c53dc26ac19b1f493567",
     "crates/cordis-kernel/src/fresh_semantics.rs": "6a62efe07402fb5c31f88878d27299eb3b476bd0b223a28b115d7ebbbf0cd9d8",
-    "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs": "f113d47290376a7dafcf4556a1767e28c8e6a9884153742ea491373e291791f4",
     "crates/cordis-kernel/src/functional_quotient.rs": "199e21e4e1150a8d9684ccb9f15a50f64eae119eb3c8077effe81ea380c87cf5",
     "crates/cordis-kernel/src/generalized_table_deletion.rs": "1ccf02bd650dc5af48622dae412a2eb854270665a8c2a57cf35d0cc8ba55f945",
     "crates/cordis-kernel/src/generalized_table_deletion_example.rs": "159dd24027cb18adeea3d0bcc9026e282f8f87a87aa308349ea23d25635f3f91",
@@ -4858,7 +5515,6 @@
     "crates/cordis-kernel/src/guarded_components.rs": "b2b7297a2869f3a90ae12ae9de2451b318edfeefddf7a8201209ec41819f0f00",
     "crates/cordis-kernel/src/history.rs": "c20f5087d8634e76fdeeeb222a352cec64d61d948dce8b998645df8768aa462d",
     "crates/cordis-kernel/src/indexed_ordering.rs": "f9e8e23f48fb471f858909d6581ac536708af88cc41aa2da730956d67d98306e",
-    "crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs": "c8add9425fe97d33ff610d787a82aba895b1d0915f8878c02e75d19c90b88c88",
     "crates/cordis-kernel/src/interface_observation.rs": "4e97e34839281d27aee6ee463cfbb4bb9aa0474c4faa470eae1bdefe04d21a07",
     "crates/cordis-kernel/src/interface_observation_example.rs": "e663ec059cbcf0450f4d527ed70194cec2b400ac3252b2b5218caf15b43a3e88",
     "crates/cordis-kernel/src/internal_old_unload.rs": "0f396eebd5d0c7c87966f7d2d39b6c4f698454873414f2a2cc20acf09d38a10b",
@@ -4869,46 +5525,50 @@
     "crates/cordis-kernel/src/iterator_bridge.rs": "3521e908dcc6a47c54470e8b8b8d967693a151c78061a8b3ffaa5e88c0554ac3",
     "crates/cordis-kernel/src/iterator_independence.rs": "95c2c384036c43048b29023d26d076a0113c4cfa1cd778b5a63fb04c3d8e57dd",
     "crates/cordis-kernel/src/iterators.rs": "1c3bc0cee83d69e2140354e51613ce6033d53171fc71b912ad682b234118f92d",
-    "crates/cordis-kernel/src/reversible_value/joint/classification.rs": "fef0c24b0de7fc6c498e76f7674ad9fc1cdf8a70c2ea91b329aee6c954447dc9",
-    "crates/cordis-kernel/src/reversible_value/joint.rs": "72f69e2e452229ba7eb2e43b421472c9e21f48d4008e8b98556754c433d98260",
-    "crates/cordis-kernel/src/mixed_driver/recovery_all.rs": "d3a786a94ed64b8491522e31421544c083d03f1151ba0b1b726b558cc4933da7",
     "crates/cordis-kernel/src/kernel_replay.rs": "ead2b5b55e6f9baf0e36a3a1c2f23936e687de53c15186ee64f87b1420a09e53",
     "crates/cordis-kernel/src/lib.rs": "e200f0ef1b2272fb65f22a23a13ff618db8a191c20a2dd127e24f1cd86e7aa0d",
+    "crates/cordis-kernel/src/lifecycle_actions.rs": "581f9233b7bd3ee4a72cafd85740d5a04ae880844a39c394ad67a57fd5e0563f",
+    "crates/cordis-kernel/src/lifecycle_actions/finish.rs": "82c8a47eabae8ec4c4e0e79b2ccb1daef40854870b25c7cfd46f50e861f4a616",
+    "crates/cordis-kernel/src/lifecycle_actions/resources.rs": "a9dbb752897b5eb159230c1075ce5ae3b631f4e9d659f0c634e0c27c1833fdfc",
     "crates/cordis-kernel/src/lifecycle_ordering.rs": "7d47fcb44150d491e1656e4321bc28b1d13c8fa203bbd3cf5e5e79d384d5bacc",
-    "crates/cordis-kernel/src/lifecycle_state.rs": "97d68d5e0d3d48bed83fbeb96c4504ffe9766b74341aeabd1caeb9e4b5a2ef6a",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs": "e05916d7083a76030dc8b2f1c28b56e6e98b59989fab757944f9f487fc8c3821",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs": "ef877262e5d1e0bd32ee8a548bf716dcae225949673b5f8bf1b78b3fcd77295b",
-    "crates/cordis-kernel/src/reversible_value/managed.rs": "25b3ed0dee85142d3982c9afa4b9cddff4c0f3fd3865a3577b2896baf97d7088",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs": "61bd8e9fac340cf820506b6bb99b20fd86ec364e60deb07503d9ebcd4f7692ed",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs": "2630b4e165f76ef3a5ab8c9ff456b3af4d9dc8b58fbf585f6195f8cd44ba4add",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs": "5264076c9e0231fd2c6bad3156780e5312b470e0dcc938b1f4a033886639488b",
+    "crates/cordis-kernel/src/lifecycle_state.rs": "2ac3bb47c6e4c4f5b27559fc7a494fad592e959c3cbcb5d1240b14a768594855",
+    "crates/cordis-kernel/src/lifecycle_state/cleanup.rs": "5e6352bd6b9f7223f2411610bf0f917728b6db822a93399014871af82f83ba9f",
+    "crates/cordis-kernel/src/lifecycle_state/native.rs": "d75ac340a6a2ac6c0838a85d8b3a95ac3fabd162dd8bac7b23cdb47746449ff6",
     "crates/cordis-kernel/src/lifecycle_state/native/managed.rs": "de6f4710389d19f5d5391f73ce304aee9116eff2bb3a9950a1ea8af098236fee",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs": "26a9ea7a1e52b71c6e2defebf77df726db445a372f3be9dc0170c60ed7771e26",
-    "crates/cordis-kernel/src/reversible_value/managed/recovery.rs": "9e9cb6e99a1a7950d9df33b68ac10d3a91c21355ab860579386162ba55b41b00",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs": "7b24f808baebd7a687c470fb26baab25c5c405320acf6119c6127861e8ec5bbe",
-    "crates/cordis-kernel/src/reversible_value/managed/recovery/word.rs": "2b3c7eab78daea3f19834f305d291c960076f0db00e129d6d37933b4ffd98341",
-    "crates/cordis-kernel/src/reversible_value/managed/replay.rs": "7332f5ee5f5017302ef6a4b3ad29b8c10bea092f618fbc69697812b4ac582c42",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs": "fd3620319e0fa324efa1b07f14119a626f4fb306e987e64ed75c0be2a59c0e38",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs": "7658c1e4e9500d0c2dd0d16e476227664dccd3c6f433734a9c12d9b30df3aba3",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/binding.rs": "35e5d76051bca567bb7ec81df212dc6f696fd773d37005e5783786c77be42f3c",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/continuity.rs": "58272819ecfdd57c298a97c7f581646af57c93c9aefe5210400f2f8d4370cf0e",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/bank/heap.rs": "e4a98717ec991aeabbd574b6ff4e945f382fb0aba1c12008e12218e03b7bdd01",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs": "717f2292cb6beebde70f5c7108aafc65f72c3e90f72ea57ee8122ac5131bdb61",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/observation.rs": "9b5ea9274cbd577bdbe12c48f3a864c8d893a42f3ce236cae82c7b2e64917fa9",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs": "aa10970c5a22430f190a25b91a3faa0031de441b622488154c02db916fe79b8f",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/protected.rs": "8946dfd1489b59f41e4244868e58ebc5cbde7f724f6728d9fed1ed05fb4b4ce4",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs": "8410b30ca09b313c13a7f6a40899109a3e7d2a195f04b01c865d28b2be5603c3",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs": "b247bec8fb9409bb8ce616629dd06d800ab97750a13d1dab2333066aece7886a",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/transport.rs": "bf3ee1fa7bfd212fcafa7bd7fc4b6d96190bc6b56a88260fa3fa8eb66c5f7a4d",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/typed.rs": "17088ce94d5eb85df9ea6ea8333f6d02b53a28957699666f4085af2adeb9d2d7",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_protected.rs": "70f3da42a132033885638dcfa73595dd29bc0e835d0b5023f4395192f0f2c2b7",
-    "crates/cordis-kernel/src/reversible_value/managed/semantics.rs": "a1efa6a929335bb47a1d9ecd69cb730385c80f81e09b815b7a04659c6f2597e9",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/origins.rs": "c36f5d6d28be83dd1a16b4746d2b8fce8ec6c978de34ef9906a9b5d900c9dd52",
-    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_census.rs": "e0ac3eb60ca0aff0874ff48c043dc2d86732e1f6a5afb4d2d9300338810df77c",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs": "8cc79236d638448fc21918992af5c242fe0b63be743fc07ca331d0176b4a0190",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs": "f7925a19f4a60b0cb140ffceb51018810415aec705f0e6b1fd2ebd712635abbb",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs": "c74c99fadc350e52eae3c7cb89abb6756be350da12a8b60b009218588f1bbd4c",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs": "0d20fac526af890518084174473823789dc348cef48276bf73a9160d20aa51f8",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs": "3779a9fd4e34cd101495c4f6909b896458b167d9536b4fc573d27eee050f2036",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs": "e53c268c70bf5135d3fc9135c18f7722d6194c712fe5800be384e48f4181ad87",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery.rs": "c19b432206fa5a9485ebeadb4b69dbbec2425aeaa7444f8a86c90aaa5c566a8b",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/payloads.rs": "35acf86ef91106356e4b6344dc408b2a8c4a5090427ca682b04909d204cc0682",
+    "crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs": "9a9fa1e832eeee712b2bdc481714af8ce556ac150596d110936720203b73112f",
+    "crates/cordis-kernel/src/lifecycle_state/registration.rs": "4bee90954147525ccf9e697e02db1a5bf59d2bfa3895447fddaa4f97452ae77f",
+    "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs": "5ab07dea31a6f0a482d0d1f81484124c77b2e9eea8a8800b1423c52d372c2b78",
+    "crates/cordis-kernel/src/lifecycle_state/services.rs": "4b95be1a3a9456a847c58919166947c82bba0c1ec34875f2b623847043130e85",
     "crates/cordis-kernel/src/mediated.rs": "c63d88166e35070b1f14d99b12f32b39daa4c714ae7ac500227dd0a8aa948f67",
     "crates/cordis-kernel/src/mixed_age_unload.rs": "ed6c4ce0129d4a6081f8b5e87abc75b32e5e88c4d09771a2e8ead0eb05135fe7",
     "crates/cordis-kernel/src/mixed_age_unload_example.rs": "c04c9fe655c154e8f107e04b6ed76f149685b0e1b10b13d8f7f728fabd1c4e43",
     "crates/cordis-kernel/src/mixed_driver.rs": "59ae744b0ba3fd09ed69b57a338a7186a913d1679ce1b0178c272fed4479fd6a",
+    "crates/cordis-kernel/src/mixed_driver/context.rs": "b74f49f0058b44f614290deee2704521e8f43820531ebeffd19a774f10d1781f",
+    "crates/cordis-kernel/src/mixed_driver/episode_replay.rs": "234b104b7e7c32f932bc74baad7ecc21d261fabb389387313e6e837284bdae32",
+    "crates/cordis-kernel/src/mixed_driver/fresh.rs": "f248ae6ceaeb101b6d95fc9237b6db2b3b06e24923fcce8181062f19a55a4c43",
+    "crates/cordis-kernel/src/mixed_driver/fresh/admitted.rs": "9657ea7f703b5fdd027a2318703f6d8b142183a046a4f7601041c57b453a3ac6",
+    "crates/cordis-kernel/src/mixed_driver/fresh/admitted/script.rs": "417c6f6e43e59ac946a7b4de59743af01717ad94cfc8d63b2de1f91372ed3e71",
+    "crates/cordis-kernel/src/mixed_driver/fresh/bootstrap.rs": "0cbc7e28adecba197f496bd7d20fe4fee2b4172600d4611d884f9704244dd319",
+    "crates/cordis-kernel/src/mixed_driver/fresh/compaction.rs": "2b29f5618cb8ab23c34f2d9f967bf9e97034bb4a31cf5d805cbab23b52337329",
+    "crates/cordis-kernel/src/mixed_driver/fresh/episode_replay.rs": "a37604edf07db325bbaad7718f6fb7f8b4a945fed5efaf6d16926fa1a05d24c6",
+    "crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs": "c8add9425fe97d33ff610d787a82aba895b1d0915f8878c02e75d19c90b88c88",
+    "crates/cordis-kernel/src/mixed_driver/fresh/preparation.rs": "9f611b3e96d2c829c5f40cd9521e5030c3bdb6e33e33a37e4c6f9d75beef62d7",
+    "crates/cordis-kernel/src/mixed_driver/fresh/replay.rs": "f694ea454b4037893e9914575f7d86502298fac96639c53dc26ac19b1f493567",
+    "crates/cordis-kernel/src/mixed_driver/fresh/runner.rs": "ea66d7937d30f5fcc951d925cb7aab551e442f9199dbbb7aca850657b124cdb8",
+    "crates/cordis-kernel/src/mixed_driver/fresh/terminal_replay.rs": "f113d47290376a7dafcf4556a1767e28c8e6a9884153742ea491373e291791f4",
+    "crates/cordis-kernel/src/mixed_driver/owner_recovery.rs": "76cb07c99d45682e5ebb03721ebcbd0c05e013ee38d995b6a72ee426c464b840",
+    "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs": "237127393bea388193bbb5372a6f9029856290f442906a523aa40e2925c7d289",
+    "crates/cordis-kernel/src/mixed_driver/recovery.rs": "b2b2b35fc08004dcfedb6139f3f104291fd3ba082fc559af07a23a9960d57e15",
+    "crates/cordis-kernel/src/mixed_driver/recovery_all.rs": "d3a786a94ed64b8491522e31421544c083d03f1151ba0b1b726b558cc4933da7",
+    "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs": "9d6900ee0630ff24dfdde21eefa8bdc79d452741689e4fa6f9b6d7133d9d5ac2",
     "crates/cordis-kernel/src/mixed_examples.rs": "fb19be7079d61a17d8492fc4da3db25c983d9cb0de8005aa7f34acab7b2763e2",
     "crates/cordis-kernel/src/mixed_foreign_restore.rs": "0d340140fb1fa1476740772d5a82b5f3c35b84da30e760812790f5309d9e68e8",
     "crates/cordis-kernel/src/mixed_grammar.rs": "3b376446197662fed016e1b04b492c644087e6cfe9f1ab8c755663de48d547ce",
@@ -4922,16 +5582,9 @@
     "crates/cordis-kernel/src/mixed_transport.rs": "f0b6fe307377fac26e96f6a738ff09206856e8914c5cce52d84e721342a7eb1a",
     "crates/cordis-kernel/src/mixed_transposition.rs": "8919a711105a3971e2e5cb1c4db75e5f96d5234933f2d07309666d2ea43d0f7f",
     "crates/cordis-kernel/src/monoid.rs": "f9cc9765e31d1411d51fbbf8b9e5979516423705fe81cb57ee99326d32dca693",
-    "crates/cordis-kernel/src/reversible_value/native_effect.rs": "9fd527c3e42711543033efd2c72f1ad77b29ac518684bb920d16b5be03f5725b",
-    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/deletion.rs": "e53c268c70bf5135d3fc9135c18f7722d6194c712fe5800be384e48f4181ad87",
-    "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs": "2db73b7d1f35317e9397b77c267b39409d335fb19da22c333489244240f0be4b",
-    "crates/cordis-kernel/src/lifecycle_state/native.rs": "d75ac340a6a2ac6c0838a85d8b3a95ac3fabd162dd8bac7b23cdb47746449ff6",
-    "crates/cordis-kernel/src/reversible_value/native_payload.rs": "9a65e0a382626d5e22018f06b646c12cebc0e3a9e4dad72146c36e2ed5378123",
-    "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs": "3e54d3d22224bdde732cc0937496720db0e41bb1c961cacc107858387f30c530",
-    "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/chain.rs": "c74c99fadc350e52eae3c7cb89abb6756be350da12a8b60b009218588f1bbd4c",
-    "crates/cordis-kernel/src/lifecycle_state/native/runtime/control_source/cleanup.rs": "0d20fac526af890518084174473823789dc348cef48276bf73a9160d20aa51f8",
-    "crates/cordis-kernel/src/lifecycle_state/services.rs": "4b95be1a3a9456a847c58919166947c82bba0c1ec34875f2b623847043130e85",
-    "crates/cordis-kernel/src/node_runtime.rs": "e2759650f0a05d6d6f687ae82fa2e11498164a78b7a282e8ae474a2ba311aa28",
+    "crates/cordis-kernel/src/node_runtime.rs": "8065e9789cbec1ebe7467846a8e2cd698b2204e97ff70a4c1ee6ce39e16e5406",
+    "crates/cordis-kernel/src/node_runtime/bridge.rs": "ecb0cd422dc8f27f7865b7500847f40fa41a76dad9e36b971b5c5ad2b5008753",
+    "crates/cordis-kernel/src/node_runtime/services.rs": "82a1c0e2c8cc7173f7c403d7bf2699bce25e53c7f1a8f78bcf972d6f84efbb00",
     "crates/cordis-kernel/src/observation.rs": "8f4f0035e67e8a706b6b3ed93a598b18087a39d08f7e24bfe23f267e3dff57ba",
     "crates/cordis-kernel/src/observational_algebra.rs": "4ea39d2f7f4347aeaafe973a594bd66614a5c81ef63ad1466b285615101f2e5c",
     "crates/cordis-kernel/src/observational_examples.rs": "212fba2609c8823aa12c9c1484aa7e877f38654bf879d4d3823d736aa27952db",
@@ -4951,7 +5604,6 @@
     "crates/cordis-kernel/src/old_receipt_support.rs": "400dbfce63c0c1c56c7422c2d7b57d7378b50945f584cf4d480443dde535a3e8",
     "crates/cordis-kernel/src/operation_history.rs": "ab9985edbf759643e02b39ab35632ef09a161a381d611fea87459c087f5d97b6",
     "crates/cordis-kernel/src/orchestration_support_cycle.rs": "16406acf722db08876eec71084f45723eae6a8db754dd14c69a3f53d59d58d47",
-    "crates/cordis-kernel/src/mixed_driver/owner_recovery.rs": "76cb07c99d45682e5ebb03721ebcbd0c05e013ee38d995b6a72ee426c464b840",
     "crates/cordis-kernel/src/ownership.rs": "577d5eae9ba3aad0568a6476aeb6d70668c9747c2e70dccc67a8d212eb385303",
     "crates/cordis-kernel/src/paper_components.rs": "39d2bc1c7419a582aa40348ae278785264dbf27f24d67ed54550df5a54a1b45c",
     "crates/cordis-kernel/src/paper_confinement.rs": "13fd2a182c446945cac1b756ec08852ae63f3b01426aac1231bca58741513887",
@@ -4963,43 +5615,80 @@
     "crates/cordis-kernel/src/paper_typed_context.rs": "0e6f50d6073c7125967559d3d9cc4c562eb1c8b674dfaa71f54677458625444f",
     "crates/cordis-kernel/src/partial_domains.rs": "0f88ff591367886d93e0cbb3c41ee0ecf98bdf664610bbcba2844d9d8c8bfa8c",
     "crates/cordis-kernel/src/partial_independence.rs": "62a65b3a4afc82fb09f77f4f132023737bbb994fc8a2d3981e7d4528d609f596",
-    "crates/cordis-kernel/src/cleanup_groups/payload.rs": "58fa2bfda0ad9e1c70f4af371d887caba04d195eaa6bf4e50f727bd85c14d0e1",
-    "crates/cordis-kernel/src/reversible_value/payload/restoration.rs": "6c009d0a3428b97e8b98895a2eecf7cf021039bc35e9aacb74145c7e480d9cb7",
-    "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/recovery.rs": "8075ba061df0ec549af8491d23c43c6a476430b5f90f6963e347d5f6e5534ac5",
     "crates/cordis-kernel/src/permutation.rs": "484a6976b16420a050c69388ef8cffba65e7771f1bf844da5dc377f844b32f19",
+    "crates/cordis-kernel/src/poll_control.rs": "04c6a8cfbe50921811d1af9c8816c3cd89ea10afe2cfe571238524b0cb0878bc",
     "crates/cordis-kernel/src/preservation.rs": "e15e6c12384c80ac100bf8812f35f01cd14285e3f561bfe737be2dcbf37e4b4d",
     "crates/cordis-kernel/src/program.rs": "c20f9fdee4d01ce2b51eb0d84ad31fb6faf4c7265c4a8704b5bd9d55bffc76d3",
     "crates/cordis-kernel/src/program_normal_form.rs": "d6c5bfbf6ac588080370d76950a563bbf3d60e11fda0ef8ae51b02c69a223cb1",
     "crates/cordis-kernel/src/program_trace.rs": "750603b3ebb7bc52b5a0ce2d0dc4e1ae2712e9431e008811dfe8106e66e048a1",
     "crates/cordis-kernel/src/projection.rs": "2d35fff9e3280069cd60198fc86dcd2583baddd8b4b17f831ddd5a4c1d377b8b",
-    "crates/cordis-kernel/src/reversible_value/managed/protected.rs": "7923223b642c178b5fd4f6ffc97fadb91a9f547644394d8e30dd5717409d6dca",
-    "crates/cordis-kernel/src/reversible_value/payload/protected.rs": "6ce3b5930fb89bd0e491cba06eb531ab0d6e8cc3a31237426b40c7c680dc713d",
-    "crates/cordis-kernel/src/reversible_value/slot/protected.rs": "a51f447ef14294a7add17bf5eb4da4f310a9cee507344c4c4d9fd30969b41ab5",
-    "crates/cordis-kernel/src/reversible_value/managed/protected_typed.rs": "379ad69205c4eaed564b60b8002ea370c7d9ed4da45b946837466a9f514064c1",
-    "crates/cordis-kernel/src/reversible_value/protected.rs": "a865f5e6d839bb6ed65d840e5eafd88827db937d500de2059661d5604f8f7622",
     "crates/cordis-kernel/src/providing_owner_examples.rs": "9a834d887a3f471eae7af212da017ace137171e26a23e832da80c1820f789440",
     "crates/cordis-kernel/src/providing_owner_execution.rs": "4b04784b13630dbaa5267601e44bc5d6268e60d8f4c49a076c9dbb0386063b6e",
     "crates/cordis-kernel/src/provision_coverage.rs": "ec2cf7aeac71e3ddf1a7b7fb7be7ec9d37c3ee5569df79c0522982b48642bc66",
     "crates/cordis-kernel/src/provision_history.rs": "b61e377e73456d5ac35292f0286514fe9b08c4c4a42398cf37438d5d9b7f4645",
-    "crates/cordis-kernel/src/mixed_driver/provision_recovery.rs": "237127393bea388193bbb5372a6f9029856290f442906a523aa40e2925c7d289",
     "crates/cordis-kernel/src/publication/cleanup.rs": "96f0edc47f8cab27a2b3bc04051f297a94284b63182054864b7d96336f8875c9",
     "crates/cordis-kernel/src/quotient.rs": "295f0fa31f3ff1c7e18145ae8141c043dfcb5d4d90508073e72444dc6040b3d1",
     "crates/cordis-kernel/src/recovery_examples.rs": "9414a8b078f0b9e616b363dd6d411d091b55d1915554b058cc30b016ccc0884e",
     "crates/cordis-kernel/src/recursive_context.rs": "a032537ab661dce5392226e43a3174ad83f660008198084beb7d84f46cf955bc",
     "crates/cordis-kernel/src/refinement.rs": "eee4ba6d36a662498723f05068462073ce0a8da34df5f4409067aae5e5726b26",
-    "crates/cordis-kernel/src/mixed_driver/context.rs": "b74f49f0058b44f614290deee2704521e8f43820531ebeffd19a774f10d1781f",
     "crates/cordis-kernel/src/resolution_completion_counterexample.rs": "c7449f9259095cd1b9232e75c849e0e797cd109d0fac95f255fc7550bc8c3281",
     "crates/cordis-kernel/src/reversible_value.rs": "8ce8af65727c36bc9559672900b0e57f2f9eab55015c69d4765eb9f4030badb7",
+    "crates/cordis-kernel/src/reversible_value/controlled.rs": "802f5cda28ed064cfdd020637b8e754680a4819969e35cd6969729e0c80f0813",
+    "crates/cordis-kernel/src/reversible_value/effect.rs": "d490e120f64e8536726a01ae21a928fb1894742677e17a347609d337e8956699",
+    "crates/cordis-kernel/src/reversible_value/history.rs": "01dd9401956ade729b3b4579742b555e02b7c55ca03ba9432b9caa4eb9837c77",
+    "crates/cordis-kernel/src/reversible_value/joint.rs": "4cc2ae87a629c3e9269532b3dd7b5622a02f00162816c85eab2cf531fe8d5a31",
+    "crates/cordis-kernel/src/reversible_value/joint/classification.rs": "fef0c24b0de7fc6c498e76f7674ad9fc1cdf8a70c2ea91b329aee6c954447dc9",
+    "crates/cordis-kernel/src/reversible_value/joint/identity.rs": "a127d8e7762bf6cb6bf09fa3a4a88a83ee6f4081a8b972031f4b123091984738",
+    "crates/cordis-kernel/src/reversible_value/managed.rs": "25b3ed0dee85142d3982c9afa4b9cddff4c0f3fd3865a3577b2896baf97d7088",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs": "d8c026d3488f9e2f80a1afee951e397991449f82928753c13589652ce03306bb",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children/completion.rs": "e05916d7083a76030dc8b2f1c28b56e6e98b59989fab757944f9f487fc8c3821",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/function.rs": "2630b4e165f76ef3a5ab8c9ff456b3af4d9dc8b58fbf585f6195f8cd44ba4add",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs": "704cdee8d6599d4693c4a58022250d0f6c69e46e67b5bd5136cf752410e0dfbd",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/native.rs": "5264076c9e0231fd2c6bad3156780e5312b470e0dcc938b1f4a033886639488b",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/producer_recovery.rs": "26a9ea7a1e52b71c6e2defebf77df726db445a372f3be9dc0170c60ed7771e26",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut.rs": "7b24f808baebd7a687c470fb26baab25c5c405320acf6119c6127861e8ec5bbe",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/recovery/cut/foreign.rs": "ef877262e5d1e0bd32ee8a548bf716dcae225949673b5f8bf1b78b3fcd77295b",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/unload_census.rs": "e0ac3eb60ca0aff0874ff48c043dc2d86732e1f6a5afb4d2d9300338810df77c",
+    "crates/cordis-kernel/src/reversible_value/managed/interleaving/sources/origins.rs": "c36f5d6d28be83dd1a16b4746d2b8fce8ec6c978de34ef9906a9b5d900c9dd52",
+    "crates/cordis-kernel/src/reversible_value/managed/protected.rs": "7923223b642c178b5fd4f6ffc97fadb91a9f547644394d8e30dd5717409d6dca",
+    "crates/cordis-kernel/src/reversible_value/managed/protected_typed.rs": "379ad69205c4eaed564b60b8002ea370c7d9ed4da45b946837466a9f514064c1",
+    "crates/cordis-kernel/src/reversible_value/managed/recovery.rs": "9e9cb6e99a1a7950d9df33b68ac10d3a91c21355ab860579386162ba55b41b00",
+    "crates/cordis-kernel/src/reversible_value/managed/recovery/word.rs": "2b3c7eab78daea3f19834f305d291c960076f0db00e129d6d37933b4ffd98341",
+    "crates/cordis-kernel/src/reversible_value/managed/replay.rs": "7332f5ee5f5017302ef6a4b3ad29b8c10bea092f618fbc69697812b4ac582c42",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/bank.rs": "fd3620319e0fa324efa1b07f14119a626f4fb306e987e64ed75c0be2a59c0e38",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/bank/heap.rs": "e4a98717ec991aeabbd574b6ff4e945f382fb0aba1c12008e12218e03b7bdd01",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/batch.rs": "7658c1e4e9500d0c2dd0d16e476227664dccd3c6f433734a9c12d9b30df3aba3",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/binding.rs": "35e5d76051bca567bb7ec81df212dc6f696fd773d37005e5783786c77be42f3c",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/continuity.rs": "58272819ecfdd57c298a97c7f581646af57c93c9aefe5210400f2f8d4370cf0e",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/inputs.rs": "717f2292cb6beebde70f5c7108aafc65f72c3e90f72ea57ee8122ac5131bdb61",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/inputs/payload_history.rs": "aa10970c5a22430f190a25b91a3faa0031de441b622488154c02db916fe79b8f",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/observation.rs": "9b5ea9274cbd577bdbe12c48f3a864c8d893a42f3ce236cae82c7b2e64917fa9",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/protected.rs": "8946dfd1489b59f41e4244868e58ebc5cbde7f724f6728d9fed1ed05fb4b4ce4",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/scalar.rs": "8410b30ca09b313c13a7f6a40899109a3e7d2a195f04b01c865d28b2be5603c3",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/selection.rs": "b247bec8fb9409bb8ce616629dd06d800ab97750a13d1dab2333066aece7886a",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/transport.rs": "bf3ee1fa7bfd212fcafa7bd7fc4b6d96190bc6b56a88260fa3fa8eb66c5f7a4d",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/typed.rs": "17088ce94d5eb85df9ea6ea8333f6d02b53a28957699666f4085af2adeb9d2d7",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs": "220d7bad00c98c28b2bda14488206f2a19f737d1a4e4463108c1b7aefa6ecd11",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_protected.rs": "70f3da42a132033885638dcfa73595dd29bc0e835d0b5023f4395192f0f2c2b7",
+    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_tracker.rs": "c9164555670a4225ea262f508686e31e08e86ab2ddd339e9bf50c93f49098482",
+    "crates/cordis-kernel/src/reversible_value/managed/semantics.rs": "a1efa6a929335bb47a1d9ecd69cb730385c80f81e09b815b7a04659c6f2597e9",
+    "crates/cordis-kernel/src/reversible_value/native_effect.rs": "9fd527c3e42711543033efd2c72f1ad77b29ac518684bb920d16b5be03f5725b",
+    "crates/cordis-kernel/src/reversible_value/native_payload.rs": "9a65e0a382626d5e22018f06b646c12cebc0e3a9e4dad72146c36e2ed5378123",
+    "crates/cordis-kernel/src/reversible_value/payload.rs": "70a7eef003388d32cd31a4ce2d9a6018d53193e2a46c1f90cff1678e387dcaca",
+    "crates/cordis-kernel/src/reversible_value/payload/protected.rs": "6ce3b5930fb89bd0e491cba06eb531ab0d6e8cc3a31237426b40c7c680dc713d",
+    "crates/cordis-kernel/src/reversible_value/payload/restoration.rs": "6c009d0a3428b97e8b98895a2eecf7cf021039bc35e9aacb74145c7e480d9cb7",
+    "crates/cordis-kernel/src/reversible_value/payload/restoration/attempt/recovery.rs": "8075ba061df0ec549af8491d23c43c6a476430b5f90f6963e347d5f6e5534ac5",
+    "crates/cordis-kernel/src/reversible_value/protected.rs": "a865f5e6d839bb6ed65d840e5eafd88827db937d500de2059661d5604f8f7622",
+    "crates/cordis-kernel/src/reversible_value/slot.rs": "aa6e007b0ec5fddb32c102e87aff40d97a29a43fbe1212eb3acfa869ef57f272",
+    "crates/cordis-kernel/src/reversible_value/slot/protected.rs": "a51f447ef14294a7add17bf5eb4da4f310a9cee507344c4c4d9fd30969b41ab5",
     "crates/cordis-kernel/src/rewrite_confluence.rs": "cc51dc14ef4973968f9a5c5ac6df2c7cc88b73f9ecb38bd784680108dd4433e4",
     "crates/cordis-kernel/src/rule_frames.rs": "e34f0f98702955cc99775c106e04c6b0ba12066a1ffe1106d3ffabdf5f7b6055",
-    "crates/cordis-kernel/src/reversible_value/effect.rs": "d490e120f64e8536726a01ae21a928fb1894742677e17a347609d337e8956699",
     "crates/cordis-kernel/src/semantics.rs": "5f8435c400d8272af930db537a3ae9d21adb027baf1cb9cf9397cd0ae4cee423",
+    "crates/cordis-kernel/src/setup_context.rs": "c31829bf54cbf66679704e390e666c682e2191e424996759dd2dc2d9ad46f4bb",
+    "crates/cordis-kernel/src/setup_work.rs": "6deb309138ba29cb47215ca745fface5c1af2a10337ceab86464e245c7c0ad8d",
     "crates/cordis-kernel/src/shared_execution.rs": "588d136e940b1d31a94593b10eeb76a6b0869f9492ad241e7ff64379fd55af1a",
-    "crates/cordis-kernel/src/reversible_value/payload.rs": "70a7eef003388d32cd31a4ce2d9a6018d53193e2a46c1f90cff1678e387dcaca",
     "crates/cordis-kernel/src/shared_replay.rs": "0f0cd03fe00a2ecddb91ede1ad702777d005518da556127741cc74c70e6ef1bf",
     "crates/cordis-kernel/src/shared_unload_execution.rs": "3d4d93b4a42058826b776c7e20b4c2da687704d99330006238ed93ab08e4a9db",
-    "crates/cordis-kernel/src/reversible_value/history.rs": "01dd9401956ade729b3b4579742b555e02b7c55ca03ba9432b9caa4eb9837c77",
-    "crates/cordis-kernel/src/cleanup_queue/landing.rs": "6bd9327b126fd13651df99b07cba3955a1359d850f107bdd3ce99d33d2aed1ba",
     "crates/cordis-kernel/src/strict_batch_recovery.rs": "5991a57f6f413ea01cc78aa2de387f0f2b1f6734b7b565578e33c1434d4d55de",
     "crates/cordis-kernel/src/strict_journal.rs": "0cca01476c7cd81aafd33810336a9879b511340de821eaa331d51e52ff47a56f",
     "crates/cordis-kernel/src/strict_partial_quotient.rs": "ce1b493cf6fa549531c3db0fa2f681ddee2fde01028d81d056c1eb7f2bdad32e",
@@ -5008,25 +5697,31 @@
     "crates/cordis-kernel/src/strict_partial_quotient_per.rs": "8f057c24cc527ba518aeb8539a5b68dcfdd8290ecf9e854eb7d6f93eb3c896a8",
     "crates/cordis-kernel/src/strict_partial_quotient_reflexive.rs": "ebe8a3e72554a588d36ece0fa6448e645d8b2828f8568e12458d5b4f4dbbe421",
     "crates/cordis-kernel/src/terminal_episode.rs": "946135efb881cb19d16be3bcd66b9dd80d4253097426f05775b41e1005bdf0e9",
-    "crates/cordis-kernel/src/mixed_driver/terminal_replay.rs": "9d6900ee0630ff24dfdde21eefa8bdc79d452741689e4fa6f9b6d7133d9d5ac2",
     "crates/cordis-kernel/src/termination.rs": "584437e136782e356eb6b4e959e33772e9248e5c3464bb42d1530e1b860f8e5e",
     "crates/cordis-kernel/src/typed_child_domain.rs": "6f790f0aa427820969968c90f4878783a91b4c450d94114762902a91c7fa4347",
-    "crates/cordis-kernel/src/mixed_driver/recovery.rs": "b2b2b35fc08004dcfedb6139f3f104291fd3ba082fc559af07a23a9960d57e15",
     "crates/cordis-kernel/src/unload_orchestration.rs": "c8e88175be5dc775aa3e767aff586317247356979194b6cba9dbc31d0b4715de",
-    "crates/cordis-kernel/src/reversible_value/slot.rs": "aa6e007b0ec5fddb32c102e87aff40d97a29a43fbe1212eb3acfa869ef57f272",
     "crates/cordis-kernel/src/witnessed.rs": "fdbf689640871228463fb10af0fa97523f79272bdd942cca126334e41b57b8cd",
     "crates/cordis-kernel/src/xor_recovery_algebra.rs": "0a31cfb01f88a52dd5688fb9a9362d48d289b8ea099aa31e4cf299fc34ad47ec",
-    "crates/cordis/src/loader.rs": "2a73818c8aa50c8f9e0bfdc67e191c9be06a0b0458f859b6d8aa3bb4fa948d44",
+    "crates/cordis-kernel/tests/native_runtime.rs": "d79bd2b3b7430ff166ce5d78f0ffccd03d6889667dbd24793e39c3a84b6edfd7",
+    "crates/cordis/src/loader.rs": "e806223761a695b593f5295c81dda8f31aed2059aae422ae3364d478bb329702",
+    "crates/cordis/src/runtime.rs": "7765a874c12ac763e887751badd3c8c7c4d331d419baf1417aab876b719974f2",
+    "crates/cordis/src/runtime/child.rs": "7baa4dcdc8fd52e2e0e4f5cbbc93386376ce7d83053fc0845c740b12bf50dc3c",
+    "crates/cordis/src/runtime/child/external.rs": "a053be518e35a56416fae447be796092e72359e39ec8ea313a72762e90b305b4",
+    "crates/cordis/src/runtime/cleanup.rs": "e6a8e8da658ac766e7769775abd67efca47b6b2a0e66982f567ae26760d0cd47",
+    "crates/cordis/src/runtime/cleanup/attempt.rs": "12d2c09c2038db9ae3638843511e3de410b01804aeaf2b0597f5683405638b17",
+    "crates/cordis/src/runtime/control.rs": "051d68b8520e146777283e485efd3a7cc43d8720bec7ccf83098223d1b33fa6b",
+    "crates/cordis/src/runtime/effect_handle.rs": "dc55e08c879401db45c58c9ab18401599e9b8a98c9d6c9a9c21f152edda94bda",
+    "crates/cordis/src/runtime/episode.rs": "e0e81904816d60cb72720a0a249f2db44417aac5f7bcbfc46ec84b5d3a58a888",
+    "crates/cordis/src/runtime/root.rs": "1efbf26bd282af3bf56a2fba33a52c9ac40e07e31e84d957233de92774f34101",
+    "crates/cordis/src/runtime/static_host/progress.rs": "f216c10203b770a2a72b6330ed5ea3c35eca3e7ced74ee6fba83b88995be9958",
+    "crates/cordis/tests/runtime.rs": "e981255fbd6637ddb3e535673521ffd3adb77b8b8ce9a4faaf1c695e29ec3af7",
     "docs/paper-obligations.json": "9ad461bd7af8fc9339419ecc7153f091105e0e78713a64e10c2345078c7203f4",
-    "docs/paper-refinement-plan.json": "b5019785b61e884f2facd31f941596034f28c6cc2cc943c3ddbdbe5c04ceaea2",
+    "docs/paper-refinement-plan.json": "4e41252a012163c3ee426ee6bee12c93c04152aa90e9c24953c13061dc88b1ff",
     "docs/r1-semantics.md": "e40596b8c80820c4f8bb193b108419719030b7d30e1c840534eb1ad17f35542e",
     "docs/r2-acceptance.md": "4d665043f3a3376fd0efd05e044a9476664eb6954fd300d03d02dc5af40f33c5",
     "docs/r3-controlled-effects.md": "1a1d9d19d53d0e1b84557c5899928b03c9146c5edb6a1091449e309e213d691d",
     "docs/r3-remaining-work.md": "e74911207471639e9a4cf76b702b6f67e3e6fb7b10a0365f0c53b9344db2071e",
     "toolchain.lock.json": "cf35968f83c264e656799309576e4bc13cb7834b217562b7a82e2e03fb783418",
-    "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_tracker.rs": "c9164555670a4225ea262f508686e31e08e86ab2ddd339e9bf50c93f49098482",
-    "crates/cordis-kernel/src/reversible_value/managed/replay/typed_correspondence.rs": "220d7bad00c98c28b2bda14488206f2a19f737d1a4e4463108c1b7aefa6ecd11",
-    "crates/cordis/src/runtime/cleanup/attempt.rs": "64cf308b177ec460d8931666856354907d20a2e53a8e60d6fb87c8ae4f4a21eb"
+    "upstream.lock.json": "f38ed41418b7c54e626f2a42d782360f80e3c75b2947023b5f7e5286ca928750"
   }
 }

@@ -22,7 +22,7 @@ fn snapshot(driver: &LifecycleDriver, ids: &[usize]) -> Vec<Snapshot> {
             restoring: driver.cleanup_started(id),
             committed: driver.committed(id),
             target: driver.target(id),
-            pending: driver.pending_action(id).cloned(),
+            pending: driver.pending_action(id),
         })
         .collect()
 }
@@ -52,7 +52,7 @@ fn failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds() {
     assert_eq!(committed.len(), 1);
     assert_eq!(committed[0].provider, provider);
     driver.begin_cleanup(consumer).unwrap();
-    let failed = driver.pending_action(consumer).unwrap().clone();
+    let failed = driver.pending_action(consumer).unwrap();
     assert_eq!(driver.retry_cleanup(consumer), Err(Error::InvalidState));
     driver
         .complete_cleanup(&failed, CleanupOutcome::Failed)
@@ -121,7 +121,7 @@ fn failed_cleanup_retains_provider_until_an_exact_fresh_retry_succeeds() {
     assert_eq!(driver.phase(consumer), Some(Phase::Inactive));
     driver.remove(consumer).unwrap();
     driver.begin_cleanup(provider).unwrap();
-    let cleanup = driver.pending_action(provider).unwrap().clone();
+    let cleanup = driver.pending_action(provider).unwrap();
     driver
         .complete_cleanup(&cleanup, CleanupOutcome::Succeeded)
         .unwrap();
@@ -134,7 +134,7 @@ fn setup_completion_and_direct_finish_cannot_bypass_cleanup_results() {
     let mut driver = LifecycleDriver::new().unwrap();
     let id = driver.insert(None, vec![], vec![]).unwrap();
     driver.begin(id).unwrap();
-    let setup = driver.pending_action(id).unwrap().clone();
+    let setup = driver.pending_action(id).unwrap();
     let before = snapshot(&driver, &[id]);
     assert!(driver
         .complete_cleanup(&setup, CleanupOutcome::Succeeded)
@@ -149,7 +149,7 @@ fn setup_completion_and_direct_finish_cannot_bypass_cleanup_results() {
     assert_eq!(snapshot(&driver, &[id]), unfinished);
 
     driver.begin_cleanup(id).unwrap();
-    let cleanup = driver.pending_action(id).unwrap().clone();
+    let cleanup = driver.pending_action(id).unwrap();
     let pending = snapshot(&driver, &[id]);
     assert!(driver.complete_action(&cleanup).is_err());
     let mut forged_setup = cleanup.clone();
@@ -179,7 +179,7 @@ fn reservation_failure_requires_retry_and_explicit_finish_before_removal() {
         Err(Error::InvalidState)
     );
     driver.begin_reservation_cleanup(id).unwrap();
-    let failed = driver.pending_action(id).unwrap().clone();
+    let failed = driver.pending_action(id).unwrap();
     assert_eq!(failed.kind, ActionKind::Cleanup);
     assert_eq!(failed.generation, 0);
     let pending = snapshot(&driver, &[id]);
@@ -233,7 +233,7 @@ fn explicitly_drained_cleanup_can_finish_and_release_the_committed_provider() {
     let (mut driver, provider, consumer) = unloading_pair();
     let committed = driver.committed(consumer);
     driver.begin_cleanup(consumer).unwrap();
-    let cleanup = driver.pending_action(consumer).unwrap().clone();
+    let cleanup = driver.pending_action(consumer).unwrap();
     driver
         .complete_cleanup(&cleanup, CleanupOutcome::Drained)
         .unwrap();
@@ -243,7 +243,7 @@ fn explicitly_drained_cleanup_can_finish_and_release_the_committed_provider() {
     assert!(driver.committed(consumer).is_empty());
     driver.remove(consumer).unwrap();
     driver.begin_cleanup(provider).unwrap();
-    let cleanup = driver.pending_action(provider).unwrap().clone();
+    let cleanup = driver.pending_action(provider).unwrap();
     driver
         .complete_cleanup(&cleanup, CleanupOutcome::Drained)
         .unwrap();

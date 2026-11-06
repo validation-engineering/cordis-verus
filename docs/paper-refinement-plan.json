@@ -501,7 +501,7 @@
           "role": "proof"
         },
         {
-          "file": "crates/cordis-driver/src/lib.rs",
+          "file": "crates/cordis-driver/src/services.rs",
           "symbol": "publish",
           "role": "host"
         },
@@ -2695,7 +2695,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-driver/src/lib.rs",
+            "file": "crates/cordis-driver/src/services.rs",
             "symbol": "publish",
             "role": "host"
           }
@@ -2729,7 +2729,7 @@
           },
           {
             "file": "crates/cordis/src/runtime/cleanup/attempt.rs",
-            "symbol": "complete_reply",
+            "symbol": "acknowledge",
             "role": "host"
           },
           {
@@ -2763,6 +2763,31 @@
           {
             "file": "crates/cordis/src/runtime/cleanup.rs",
             "symbol": "poll_groups",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/effect_handle.rs",
+            "symbol": "effect",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/effect_handle.rs",
+            "symbol": "matches_episode",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/effect_handle.rs",
+            "symbol": "initialize_effect",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/effect_handle.rs",
+            "symbol": "retire_effect",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/root.rs",
+            "symbol": "poll",
             "role": "host"
           }
         ]
@@ -2859,7 +2884,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis/src/runtime.rs",
+            "file": "crates/cordis/src/runtime/root.rs",
             "symbol": "initialize_callback",
             "role": "host"
           },
@@ -3451,6 +3476,11 @@
           {
             "file": "crates/cordis/src/runtime.rs",
             "symbol": "native_function",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/root.rs",
+            "symbol": "initialize_reply",
             "role": "host"
           }
         ]
@@ -4092,7 +4122,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-driver/src/lib.rs",
+            "file": "crates/cordis-driver/src/services.rs",
             "symbol": "resolve",
             "role": "host"
           },
@@ -4950,6 +4980,576 @@
             "file": "crates/cordis-kernel/src/configuration_runtime.rs",
             "symbol": "configuration_allocation",
             "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime/episode.rs",
+            "symbol": "native",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/episode.rs",
+            "symbol": "external",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/episode.rs",
+            "symbol": "checked_lock",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/child.rs",
+            "symbol": "mount_request",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/child.rs",
+            "symbol": "apply_child_request",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/child/external.rs",
+            "symbol": "complete_mount",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/child/external.rs",
+            "symbol": "cleanup_failed",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/child/external.rs",
+            "symbol": "removed",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/episode.rs",
+            "symbol": "require_feature",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/episode.rs",
+            "symbol": "seal_external",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/static_host/progress.rs",
+            "symbol": "start_cleanup",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "bind_control",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "with_control",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "begin_controlled",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "release_controlled",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "retry_cleanup",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "restart",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "observe_decision",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/poll_control.rs",
+            "symbol": "binding_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/poll_control.rs",
+            "symbol": "binding_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+            "symbol": "poll_control_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+            "symbol": "rejected_release",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+            "symbol": "identity_ref",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_poll_control",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+            "symbol": "runtime_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+            "symbol": "identity_correspondence",
+            "role": "proof"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/joint.rs",
+            "symbol": "domain_ref",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "execution_domain",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+            "symbol": "allocation_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_context.rs",
+            "symbol": "binding_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_context.rs",
+            "symbol": "linked_to",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_context.rs",
+            "symbol": "scope_for_group",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/configuration_history.rs",
+            "symbol": "domain_ref",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/configuration_recorded.rs",
+            "symbol": "execution_domain",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+            "symbol": "execution_domain",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "same_journal",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_execution",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_configuration",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_setup_scope",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/joint/identity.rs",
+            "symbol": "wf",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "configuration_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/action_ledger.rs",
+            "symbol": "pending",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+            "symbol": "pending",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+            "symbol": "pending_matches",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state.rs",
+            "symbol": "pending",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared.rs",
+            "symbol": "pending_action",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared.rs",
+            "symbol": "host_ticket",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared.rs",
+            "symbol": "kernel_ticket",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration.rs",
+            "symbol": "bind_native",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration.rs",
+            "symbol": "bound_to",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration.rs",
+            "symbol": "native_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+            "symbol": "admit_managed_root",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/host.rs",
+            "symbol": "admit_root",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+            "symbol": "configuration_target",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+            "symbol": "native_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+            "symbol": "bound_to",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/configuration_runtime.rs",
+            "symbol": "configuration_target_is_current",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_invocation",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_configuration_target",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "adopt_configurations",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis/src/runtime.rs",
+            "symbol": "start",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/setup_work.rs",
+            "symbol": "execution_domain",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+            "symbol": "execution_journal",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+            "symbol": "execution_domain",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+            "symbol": "from_work",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/registration/shared_child.rs",
+            "symbol": "registered_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/execution.rs",
+            "symbol": "enqueue_native_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/reversible_value/managed/interleaving/history/lifecycle/children.rs",
+            "symbol": "enqueue_native_child",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "owns_shared_child",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "registered_child",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "register_shared_child",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native.rs",
+            "symbol": "retire_shared_child",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
+            "symbol": "native_source",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
+            "symbol": "bound_to",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history.rs",
+            "symbol": "native_identity",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/history/recovery.rs",
+            "symbol": "describes",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime.rs",
+            "symbol": "recovery_snapshot_from",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/configuration.rs",
+            "symbol": "native_snapshot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/slots.rs",
+            "symbol": "service_snapshot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_state/native/runtime/payloads.rs",
+            "symbol": "payload_service_snapshot",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "owns_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "control_source_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "execution_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "recipe_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "publication_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "episode_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "configuration_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "service_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "service_episode_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "scoped_service_episode_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "controlled_service_episode_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "payload_service_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "scoped_payload_service_episode_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/shared/native/snapshots.rs",
+            "symbol": "recovery_snapshot",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+            "symbol": "finish_index",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+            "symbol": "finish_cleanup",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+            "symbol": "check_resource_finish",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime/cleanup.rs",
+            "symbol": "record_cleanup_report",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+            "symbol": "reply_pending",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+            "symbol": "complete_following",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime/episode.rs",
+            "symbol": "register_cleanup",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "owned_publication",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "check_replacement",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "replace_admitted",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "replace_service",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "revoke_service",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "reclaim_service",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "ownership",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "service_replaced",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "service_revoked",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+            "symbol": "service_reclaimed",
+            "role": "contract"
+          },
+          {
+            "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
+            "symbol": "replace_service",
+            "role": "execution"
+          },
+          {
+            "file": "crates/cordis-driver/src/services.rs",
+            "symbol": "set",
+            "role": "host"
+          },
+          {
+            "file": "crates/cordis-driver/src/objects.rs",
+            "symbol": "set_host_object",
+            "role": "host"
           }
         ]
       },
@@ -5355,7 +5955,7 @@
             "role": "proof"
           },
           {
-            "file": "crates/cordis-driver/src/lib.rs",
+            "file": "crates/cordis-driver/src/services.rs",
             "symbol": "resolve",
             "role": "host"
           },
@@ -5993,6 +6593,11 @@
             "file": "crates/cordis-kernel/src/configuration_runtime.rs",
             "symbol": "configuration_allocation",
             "role": "execution"
+          },
+          {
+            "file": "crates/cordis/src/runtime/control.rs",
+            "symbol": "decision",
+            "role": "host"
           }
         ]
       }

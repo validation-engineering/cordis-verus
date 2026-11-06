@@ -2,11 +2,11 @@
 
 [简体中文](r3-observation-recovery.zh-CN.md) · [Final value/Child recovery](r3-final-recovery.md) · [Milestones](paper-refinement-roadmap.md)
 
-This completes the second remaining R3 package for the native production
-observation: exact typed publications, Episode owners and managed writes awaiting
-inverse registration. Every intermediate cut comes from the actual shared Journal,
-including cuts during loading, failed cleanup and retry. **R3 remains in progress.**
-[Package 3](r3-host-recovery.md) completes ordinary Rust host ownership migration; legal surviving production execution remains separate work.
+This page describes the native production observation: exact typed publications,
+Episode owners and managed writes awaiting inverse registration. Intermediate
+cuts come from the actual shared Journal, including loading, failed cleanup and
+retry. [Ordinary host ownership](r3-host-recovery.md) connects real callers;
+general surviving execution and whole-paper recovery remain separate obligations.
 
 ## The guarantee
 
@@ -77,14 +77,24 @@ This also covers the microsteps hidden by a function-return-only observation.
 
 ## Production boundary and cost
 
-These are verification-facing APIs. Callers establish the earlier snapshot's same
-Journal/native source; the runtime's read lock establishes chronological extension.
-Historical typed observations come from the current native owner's maintained
-complete history. The query does not compare independently supplied typed histories.
+The raw `NativeRuntime::recovery_snapshot` above remains verification-facing:
+callers establish the earlier cut's same Journal and Native record. The typed
+`recovery_snapshot_from` derives the record premise from a certified Native cut.
+Ordinary `NativeDriver::recovery_snapshot(&native_cut)` checks its retained Native
+allocation and returns `Option<Capture<V>>`; use `driver.publication_snapshot()`
+or a configuration's `native_snapshot()` as input. `None` rejects a foreign cut;
+`Some` is not the erased query's balance result. Old local observations remain
+valid after subsequent lifecycle changes. See the [source audit](review-map.md#native-historical-snapshots).
+
+The real read lock establishes chronological extension. Typed observations come
+from the current owner's maintained complete history, not independently supplied
+histories. `Capture::describes` states the same exact-cut observation contract for
+the raw and typed kernel entries.
 
 `interval`, `issue`, `observations` and `observation_issue` are `Ghost` evidence,
 erased from ordinary Rust. They are not runtime recovery status fields. Capture
-reads the existing Journal lock and retains no payload Arc or runtime event log.
+reads the existing Journal lock and retains Journal/Native identity metadata,
+with no payload Arc or runtime event log.
 It observes execution; it does not perform rollback or schedule cleanup.
 
 The restored projection here is the native publication/owner tables and the

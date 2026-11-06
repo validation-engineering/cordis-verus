@@ -1,0 +1,58 @@
+{
+  "schema": "cordis-verus.scoped-negative-manifest/v2",
+  "negativeMode": "scoped-negative",
+  "cases": [
+    {
+      "name": "node-service-ignores-publication-owner",
+      "mutation": {
+        "file": "node_runtime/services.rs",
+        "old": "if p.owner!=owner || p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {",
+        "new": "if p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::services",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication",
+          "module": "node_runtime::services",
+          "file": "node_runtime/services.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==ownership(self.observation(),owner,generation,id),"
+        }
+      ],
+      "selectionRationale": "The actual Node service command path must reject a foreign owner and an old current episode before changing a publication. Require the current positive, complete mutant compilation, and exactly the ownership postcondition rejection. This does not prove JS object interiors or whole-paper recovery."
+    },
+    {
+      "name": "node-service-ignores-current-generation",
+      "mutation": {
+        "file": "node_runtime/services.rs",
+        "old": "if p.owner!=owner || p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {",
+        "new": "if p.owner!=owner || p.generation!=generation {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::services",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication",
+          "module": "node_runtime::services",
+          "file": "node_runtime/services.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==ownership(self.observation(),owner,generation,id),"
+        }
+      ],
+      "selectionRationale": "The actual Node service command path must reject a foreign owner and an old current episode before changing a publication. Require the current positive, complete mutant compilation, and exactly the ownership postcondition rejection. This does not prove JS object interiors or whole-paper recovery."
+    }
+  ]
+}

@@ -72,6 +72,8 @@ impl LifecycleState {
     pub fn pending(&self,id:usize)->(out:Option<ActionTicket>)
         ensures out.is_some() ==> self.protocol().recorded(out.unwrap()) && out.unwrap().id==id,
             out.is_none()==!self.protocol().outstanding(id),
+            self.wf() ==> (forall|ticket:ActionTicket| (out == Some(ticket))
+                == (#[trigger] self.protocol().recorded(ticket) && ticket.id == id)),
     {self.actions.pending(id)}
 
     pub fn check_capacity(&self,count:u64)->(out:Result<(),ActionError>)

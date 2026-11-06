@@ -35,7 +35,7 @@ fn fixture() -> Fixture {
     driver.leave(consumer).unwrap();
     registry.revoke(publication).unwrap();
     driver.begin_cleanup(consumer).unwrap();
-    let ticket = driver.pending_action(consumer).unwrap().clone();
+    let ticket = driver.pending_action(consumer).unwrap();
     Fixture {
         driver,
         registry,
@@ -266,7 +266,7 @@ fn reservation_cleanup_releases_generation_zero_only_after_a_successful_retry() 
     driver.retire(owner).unwrap();
     registry.revoke(publication).unwrap();
     driver.begin_reservation_cleanup(owner).unwrap();
-    let ticket = driver.pending_action(owner).unwrap().clone();
+    let ticket = driver.pending_action(owner).unwrap();
     driver
         .complete_cleanup(&ticket, CleanupOutcome::Failed)
         .unwrap();

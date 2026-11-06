@@ -1,11 +1,13 @@
 //! Compose the real cleanup receipt gate, publication batch and L-Unload.
 //! Callback reports remain host input. This function proves release authority
 //! and mutation order for a checked resource manifest, not arbitrary effects.
-use super::{CleanupOutcome, LifecycleActions};
+use super::LifecycleActions;
 use crate::publication::{
     LeaseId, LeaseOwner, PublicationError, PublicationId, PublicationRegistry, ReleasedPublication,
 };
-use crate::{Error, Kernel, Phase};
+#[cfg(verus_keep_ghost)]
+use crate::Phase;
+use crate::{Error, Kernel};
 use vstd::prelude::*;
 
 verus! {
@@ -13,35 +15,6 @@ verus! {
 pub enum CleanupReleaseError { Lifecycle(Error), Publication(PublicationError) }
 
 impl LifecycleActions {
-    pub open spec fn resource_finish_enabled(&self,kernel:&Kernel,id:usize,reservation:bool)->bool {
-        if reservation {self.reservation_finish_enabled(kernel,id)} else {self.finish_enabled(kernel,id)}
-    }
-
-    /// Read-only guard: Failed, absent, stale and still-Pending reports never
-    /// authorize a resource mutation. Drained retains its explicit host policy.
-    pub fn check_resource_finish(&self,kernel:&Kernel,id:usize,reservation:bool)->(out:Result<u64,Error>)
-        requires self.wf(),kernel.wf(),
-        ensures out.is_ok()==self.resource_finish_enabled(kernel,id,reservation),
-            out.is_ok() ==> kernel.generation_of(id)==Some(out.unwrap()),
-    {
-        proof {
-            reveal(LifecycleActions::wf);reveal(LifecycleActions::finish_enabled);
-            reveal(LifecycleActions::reservation_finish_enabled);reveal(LifecycleActions::reservation);
-            reveal(LifecycleActions::eligible);reveal(LifecycleActions::has_cleanup);
-        }
-        let generation=match kernel.episode_generation(id) {Some(g)=>g,None=>return Err(Error::InvalidState)};
-        let i=match self.cleanup_index(id) {Some(i)=>i,None=>return Err(Error::InvalidState)};
-        let record=self.cleanups[i];
-        if record.ticket.generation!=generation || record.outcome.is_none()
-            || record.outcome==Some(CleanupOutcome::Failed) {return Err(Error::InvalidState);}
-        if reservation {
-            if kernel.phase(id)!=Some(Phase::Inactive) || !kernel.retired(id) || generation!=0 {
-                return Err(Error::InvalidState);
-            }
-        } else if !kernel.cleanup_started(id) {return Err(Error::InvalidState);}
-        Ok(generation)
-    }
-
     /// The actual resource batch must succeed before committed bindings are
     /// released. Rejected batches retain the receipt and entire prior state.
     pub fn finish_cleanup_resources(&mut self,kernel:&mut Kernel,registry:&mut PublicationRegistry,

@@ -91,9 +91,13 @@ impl ActionLedger {
         if count > u64::MAX - self.next { Err(ActionError::Capacity) } else { Ok(()) }
     }
 
+    /// The exact current ticket, including its absence. Under the ledger
+    /// invariant, this is equivalent to membership for every candidate ticket.
     pub fn pending(&self, id: usize) -> (out: Option<ActionTicket>)
         ensures out.is_some() ==> self.recorded(out.unwrap()) && out.unwrap().id == id,
             out.is_none() == !self.outstanding(id),
+            self.wf() ==> (forall|ticket:ActionTicket| (out == Some(ticket))
+                == (#[trigger] self.recorded(ticket) && ticket.id == id)),
     {
         let mut i = 0;
         while i < self.entries.len()
@@ -101,7 +105,16 @@ impl ActionLedger {
                 forall|j: int| 0 <= j < i ==> self.entries[j].id != id,
             decreases self.entries.len() - i,
         {
-            if self.entries[i].id == id { return Some(self.entries[i]); }
+            if self.entries[i].id == id {
+                let ticket=self.entries[i];
+                proof {
+                    if self.wf() {
+                        assert forall|other:ActionTicket| self.recorded(other) && other.id==id
+                            implies other==ticket by {self.recorded_owner_unique(other,ticket);}
+                    }
+                }
+                return Some(ticket);
+            }
             i += 1;
         }
         None

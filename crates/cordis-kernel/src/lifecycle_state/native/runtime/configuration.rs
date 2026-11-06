@@ -1,11 +1,14 @@
 //! One checkpoint for the actual native lifecycle, configuration and sources.
-//! Only the shared Journal handle remains at runtime; typed histories erase.
+//! Journal and Native allocation handles remain at runtime; typed histories erase.
 use super::{history, NativeRuntime};
 use crate::configuration_recorded::Recorded;
 #[cfg(verus_keep_ghost)]
 use crate::configuration_save::sources;
 use crate::configuration_source_history as source_history;
 use crate::reversible_value::joint;
+#[cfg(verus_keep_ghost)]
+use crate::reversible_value::service_composition::Address;
+use std::sync::Arc;
 use vstd::prelude::*;
 verus! {
 #[allow(dead_code)]
@@ -24,14 +27,15 @@ impl<S,C,K,U,P,T,V> Snapshot<S,C,K,U,P,T,V> {
         ensures self.native().certified(),self.sources().certified(),self.joint_spec().certified(),
             self.sources().joint_spec()==self.joint_spec(),
     {self.native.valid_history();}
-    fn new(sources:source_history::Snapshot<S,C,K,U,P,T>,Ghost(history):Ghost<history::History<V>>,Ghost(positions):Ghost<Seq<nat>>,Ghost(key):Ghost<nat>)->(out:Self)
-        requires sources.certified(),sources.joint_spec().certified(),history.valid(),history.fresh_insertions(),history.indexed(positions,sources.joint_spec().events(),key),
+    fn new(sources:source_history::Snapshot<S,C,K,U,P,T>,native:Arc<joint::identity::AllocationIdentity>,Ghost(history):Ghost<history::History<V>>,Ghost(positions):Ghost<Seq<nat>>,Ghost(key):Ghost<nat>)->(out:Self)
+        requires native.wf(),native.address()==(Address {journal:sources.joint_spec().journal_spec(),key}),
+            sources.certified(),sources.joint_spec().certified(),history.valid(),history.fresh_insertions(),history.indexed(positions,sources.joint_spec().events(),key),
             sources.joint_spec().last().contains_pair(key,joint::Record::Native {state:history.states.last().project(history.labels.len())}),
         ensures out.certified(),out.sources()==sources,out.native().history()==history,out.native().positions()==positions,out.native().key()==key,
             out.joint_spec()==sources.joint_spec(),out.interpreted(),
     {
         let ghost original=sources;
-        let native=history::Snapshot::new(sources.into_joint(),Ghost(history),Ghost(positions),Ghost(key));
+        let native=history::Snapshot::new(sources.into_joint(),native,Ghost(history),Ghost(positions),Ghost(key));
         let out=Self {native,sources:Ghost(original)};proof {out.production_trace();}out
     }
     /// Completeness of both typed projections uses the same captured frames,
@@ -97,6 +101,10 @@ impl<S,C,K,U,P,T,V> Snapshot<S,C,K,U,P,T,V> {
             let at=self.sources().accepted_configuration(i);
         }
     }
+    /// Borrow the Native observation at this exact configuration/source cut.
+    pub fn native_snapshot(&self)->(out:&history::Snapshot<V>)
+        ensures *out==self.native(),self.certified() ==> out.certified(),
+    {&self.native}
     pub fn joint(&self)->(out:&joint::Snapshot) ensures *out==self.joint_spec(), {self.native.joint()}
     pub fn into_joint(self)->(out:joint::Snapshot)
         requires self.certified(),ensures out==self.joint_spec(),self.interpreted(),
@@ -121,7 +129,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     {
         let sources=configuration.source_snapshot_with(&self.joint);
         proof {self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),sources.joint_spec().events(),self.joint_key());}
-        Snapshot::new(sources,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
+        Snapshot::new(sources,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
     }
 }
 }

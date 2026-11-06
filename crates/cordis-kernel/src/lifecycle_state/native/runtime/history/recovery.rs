@@ -202,4 +202,16 @@ impl<V> Snapshot<V> {
 }
 /// The snapshot is real; normalization and historical payloads are erased.
 pub struct Capture<V> {pub cut:Snapshot<V>,pub interval:Ghost<Interval<V>>,pub issue:Ghost<Option<Issue>>}
+impl<V> Capture<V> {
+    /// Observation normalization at the caller's actual cut, not rollback or a
+    /// runtime success flag. The issue and interval are erased evidence.
+    pub open spec fn describes(&self,earlier:joint::Snapshot,native:nat)->bool {
+        &&& self.cut.certified() && self.cut.key()==native && self.cut.joint_spec().extends(&earlier)
+        &&& self.interval@.wf() && self.interval@.source==self.cut
+        &&& self.interval@.start==earlier.events().len() && self.interval@.normalized()
+        &&& self.issue@.is_none()==self.interval@.balanced(self.interval@.scope())
+        &&& (self.issue@.is_none() ==> self.interval@.recovered_all())
+        &&& (self.issue@.is_some() ==> self.interval@.diagnosed(self.interval@.scope(),self.issue@.unwrap()))
+    }
+}
 }

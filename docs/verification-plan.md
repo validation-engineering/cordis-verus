@@ -2,15 +2,16 @@
 
 English · [简体中文](verification-plan.zh-CN.md) · [Update recovery case](cases/update-recovery.md) · [Remaining paper obligations](paper-mapping-inventory.md)
 
-**Updated: 2026-10-26.** Work continues on `main`; the fixed pre-refactor archive
+**Updated: 2026-11-05.** Work continues on `main`; the fixed pre-refactor archive
 is `codex/archive-before-refactor-2026-10-24` at `60bdd89`. The bounded iteration's
 code, ownership map, module layout, generator, reducer, upstream comparison and
 paired-control runner are implemented. The final-source gate is
 `python3 -B scripts/check-lifecycle-campaign.py accept`; only a passing record for
 the current sources constitutes integrated acceptance. See the
 [review map](review-map.md) and [reproduction guide](cases/generated-lifecycle.md).
-The whole-paper target remains open. The cleanup ownership audit and first host
-attempt consolidation are implemented; the structural follow-up remains open.
+The whole-paper target remains open. The cleanup/receipt ownership audit and
+Node publication command composition are implemented; first activation, adoption,
+remaining Node dispatch and general recovery structure remain separate work.
 Verification results are recorded separately for the source actually checked.
 
 The goal is to make paper constraints useful in running software: a plugin author
@@ -218,9 +219,9 @@ differences without calling them upstream agreement.
 
 ### Remaining structural work
 
-The following packages remain **open beyond the delivered cleanup slice**. The
+The following packages remain **open beyond the delivered cleanup, handle, Child, Episode/root and native control slices**. The
 review map now audits that path's state and contract dependencies and records the
-first ownership consolidation. It is not a repository-wide mutation inventory or
+cleanup, handle, Child, Episode/root and native control ownership consolidations. It is not a repository-wide mutation inventory or
 transitive proof-dependency audit. These packages extend maintenance work after
 the first bounded iteration; they do not reopen its historical acceptance or
 replace the paper-obligation inventory.
@@ -229,7 +230,7 @@ replace the paper-obligation inventory.
 | --- | --- | --- |
 | First: mutation and proof dependency inventory | Follow the five guarantee paths through `cordis::runtime`, `cordis-driver`, `LifecycleState`, `NativeRuntime`, `NodeRuntime`, cleanup ledgers and managed values. Record authoritative fields, all mutation entries for the selected state, projections/caches, host premises and required definitions/lemmas. | A reviewer can identify who changes each relevant state, where each premise is established and the code/proof dependencies of one change. Separate runtime/build dependencies from verification dependencies; unresolved edges remain explicit. |
 | Next: shared protocol and contract boundaries | Audit the existing lifecycle, action and cleanup APIs. Keep each state under one authoritative owner; route any duplicate decisions through the appropriate checked entry. Consolidate wrappers, projections or preservation lemmas only after comparing premises, results and unchanged state. | Native and Node establish their own premises and reuse the applicable shared authority. No bypassing a guard through another entry, unaccounted cache or weaker replacement contract. Preserve target versus committed provider, attempt identity and retained cleanup state. |
-| Next: ordinary-host responsibility boundaries | Build on the existing setup/service/cleanup/poll modules. Review the remaining `Episode`, `SharedEpisode`, effect/Child handles and cleanup state in `cordis/src/runtime.rs`; group types and their methods by owner, with narrow internal interfaces. Apply the same review to driver policy, command decoding and host associations. | A change to one cleanup or handle rule has a local implementation and explicit integration points. Preserve lock/drop order, callback/error behavior and supported APIs; new public abstractions need a caller and a concrete purpose. |
+| Next: ordinary-host responsibility boundaries | Build on the existing setup/service/cleanup/poll modules. Review state owners under `cordis/src/runtime/` and the remaining Child/cleanup state in `runtime.rs`; group types and their methods by owner, with narrow internal interfaces. Apply the same review to driver policy, command decoding and host associations. | A change to one cleanup or handle rule has a local implementation and explicit integration points. Preserve lock/drop order, callback/error behavior and supported APIs; new public abstractions need a caller and a concrete purpose. |
 | Then: proof organization and redundant material | Use the dependency inventory to organize paper definitions, executable contracts, actual-history bridges and reusable lemmas. Review duplicate projections, replay variants, wrappers and chronological notes; keep unique research outside the primary reading route with active verification entries. | Each advertised guarantee has one maintained review route. Every consolidation records semantic equivalence and migrated callers; every removal records its disposition. Production proof dependencies, unique counterexamples and open paper obligations remain accounted for. |
 | Throughout: optional dependencies and review checks | Document the actual crate/feature/build dependencies for pure Rust, Node compatibility and other adapters. Keep Harness and language/transport concerns outside shared authority. Reuse existing documentation, packaging and validation entry points; add a narrow dependency guard only for an established boundary. | Pure Rust remains usable without Node. Every affected guarantee names its code, proof, reproduction and applicable validation command. A new host does not introduce another copy of lifecycle policy or require a new acceptance framework. |
 
@@ -240,18 +241,40 @@ relevant dependency audit and contract comparison. Optional-dependency checks an
 review links accompany every affected batch. This does not require completing
 general replay, arbitrary host semantics or global liveness first.
 
-**Delivered slice:** the review map follows `execute_cleanup`, managed release
-and retry, including failed inverses, actual Child identity, stale replies and
-Node resource release. It records owners, mutation families, required contracts,
-premise boundaries and existing cases. Callback attempts now have one private
-owner; the review retains distinct ledgers and policies with their rationale.
+### Current ownership coverage
 
-**Next implementation batch:** audit the remaining `Episode`/`SharedEpisode`
-association and effect-handle transitions. List every writer of the selected
-identity, status and wakeup state, then group its types/methods behind the smallest
-useful internal API. Preserve lock order, actual execution identity and the
-host-versus-verified boundary. Expand beyond this slice only after its dependency
-review; the initial audit does not authorize deleting general proof support.
+The following selected paths are implemented. Detailed contracts, source checks,
+costs and remaining premises live in the review map rather than a second progress
+narrative. None closes a general paper obligation or the wider structural packages.
+
+| Area | Current organization / guarantee | Review |
+| --- | --- | --- |
+| Cleanup and pending tickets | Shared callback-attempt/report owners; current tickets read the actual ledger; lifecycle, reservation and resource finish share one verified receipt gate | [Cleanup](review-map.md#cleanup-ownership-audit), [release gate](review-map.md#one-receipt-gate-for-release), [tickets](review-map.md#pending-action-observations) |
+| Episode, handles and Child admission | Private associations/notifications, original request/handle/inverse pairing and retained external controls | [Handles](review-map.md#episode-and-handle-ownership), [Child](review-map.md#child-request-and-completion-ownership) |
+| Root and Native decisions | Root Futures/tickets stay with their owner; poll/retry/release use retained control provenance | [Root](review-map.md#episode-notifications-and-root-progress), [control](review-map.md#native-decisions-and-control-ownership) |
+| Execution, configuration and scope | Actual Journal and live queue association checked before dispatch and observation | [Provenance](review-map.md#execution-configuration-and-scope-provenance) |
+| Invocation and current configuration targets | Actual Native allocation, preserved payloads, borrowed target APIs and complete batch preflight | [Current capabilities](review-map.md#invocation-and-configuration-target-provenance) |
+| Native Child cleanup | Work/local-registration Journal retained across creation, Begin and retirement; no numeric cleanup reconstruction | [Child provenance](review-map.md#child-request-and-cleanup-provenance) |
+| Native historical observations | Snapshot factories retain their actual Native allocation; a typed recovery input supplies the Native-record premise; observation interfaces are grouped in the Driver | [Historical snapshots](review-map.md#native-historical-snapshots) |
+| Node publication commands | Shared verified ownership/admission for metadata and actual object-table writes; reclaim composes check removal and dynamic declaration reconciliation | [Node service ownership](review-map.md#node-publication-command-ownership) |
+
+**Integration boundary:** the cleanup/receipt ownership work and the Node
+publication command composition are implemented. The
+[review map](review-map.md#node-publication-command-ownership) records actual
+mutation entries, preserved policies and the object-table call path. The Node
+batch also requires the `node-services` strict control profile. Freeze code and
+review inputs, then run
+one development record, generated scenarios, upstream comparison, paired controls
+and the final acceptance audit. This batch closes only when all records match
+the same final sources; earlier passes do not count.
+
+The next structural scope is first-activation/adoption orchestration, the remaining
+Node dispatch boundaries and the general-recovery proof dependency graph. It does
+not block this bounded
+provider/consumer/one-Child delivery and does not change the remaining paper
+obligations. Existing pure Rust package builds and the no-default-features check
+continue to exercise the optional-host boundary; no parallel validation framework
+is introduced.
 
 For each structural batch, assess maintenance by the review route and change
 impact: which modules and public interfaces a representative change touches,

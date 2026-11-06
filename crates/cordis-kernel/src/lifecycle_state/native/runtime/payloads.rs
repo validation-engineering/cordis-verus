@@ -22,7 +22,7 @@ impl<R,H,T:?Sized,M> NativeRuntime<R,H,ServiceSlot<SharedPayload<T>,M>> {
         proof {self.services.payloads_certified(payloads,view.journal_spec(),view.state());self.services.slots_certified(evidence,view.journal_spec(),view.state());}
         let joint=view.finish();
         proof {self.services.project_observations(&joint);self.services.project_payloads(&joint);self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
+        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
     }
     /// The actual poll owner, committed slots and shared Episode at one epoch.
     pub fn scoped_payload_service_episode_snapshot<C,G,I,E>(&self,id:usize,execution:&Execution<ServiceSlot<SharedPayload<T>,M>,C,G,I>,control:&crate::poll_control::PollControl<E>,scope:&crate::setup_context::SetupScope)->(out:Option<history::Snapshot<ServiceSlot<SharedPayload<T>,M>>>)
@@ -53,7 +53,7 @@ impl<R,H,T:?Sized,M> NativeRuntime<R,H,ServiceSlot<SharedPayload<T>,M>> {
         proof {self.services.payloads_certified(payloads,view.journal_spec(),view.state());self.services.slots_certified(evidence,view.journal_spec(),view.state());values.slots_certified(evidence,view.journal_spec(),view.state());values.payloads_certified(payloads,view.journal_spec(),view.state());}
         let joint=view.finish();
         proof {self.services.project_observations(&joint);self.services.project_payloads(&joint);values.project_observations(&joint);values.project_payloads(&joint);execution.context_correspondence(&joint);scope.observed(execution,&joint);self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        Some(history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
+        Some(history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
     }
 }
 }

@@ -385,23 +385,33 @@ fn restart_unloads_dependents_before_running_new_setup() {
 
 #[test]
 fn owned_children_are_retired_and_removed_with_their_parent() {
-    let mut runtime = Runtime::new();
-    let context = Context::new();
-    let root = runtime
-        .mount(&context, None, Plugin::new("root", |_| Ok(())))
-        .unwrap();
-    let child = runtime
-        .mount(&context, Some(root), Plugin::new("child", |_| Ok(())))
-        .unwrap();
-    let grandchild = runtime
-        .mount(&context, Some(child), Plugin::new("grandchild", |_| Ok(())))
-        .unwrap();
-    block_on(runtime.settle()).unwrap();
-    runtime.dispose(root).unwrap();
-    block_on(runtime.settle()).unwrap();
-    assert!(!runtime.contains(root));
-    assert!(!runtime.contains(child));
-    assert!(!runtime.contains(grandchild));
+    for active_before_mount in [false, true] {
+        let mut runtime = Runtime::new();
+        let context = Context::new();
+        let root = runtime
+            .mount(&context, None, Plugin::new("root", |_| Ok(())))
+            .unwrap();
+        if active_before_mount {
+            block_on(runtime.settle()).unwrap();
+            assert_eq!(runtime.phase(root), Some(Phase::Active));
+        }
+        let child = runtime
+            .mount(&context, Some(root), Plugin::new("child", |_| Ok(())))
+            .unwrap();
+        if active_before_mount {
+            block_on(runtime.settle()).unwrap();
+            assert_eq!(runtime.phase(child), Some(Phase::Active));
+        }
+        let grandchild = runtime
+            .mount(&context, Some(child), Plugin::new("grandchild", |_| Ok(())))
+            .unwrap();
+        block_on(runtime.settle()).unwrap();
+        runtime.dispose(root).unwrap();
+        block_on(runtime.settle()).unwrap();
+        assert!(!runtime.contains(root));
+        assert!(!runtime.contains(child));
+        assert!(!runtime.contains(grandchild));
+    }
 }
 
 #[test]

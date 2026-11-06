@@ -305,3 +305,72 @@ fn shared_handle_observations_do_not_complete_a_pending_stage_or_inverse() {
         let _ = before.refresh();
     });
 }
+
+#[test]
+fn closed_native_episode_releases_driver_even_when_context_escapes() {
+    bounded(|| {
+        struct EpisodeWake {
+            setup: cordis::AsyncSetup,
+            drops: Arc<AtomicUsize>,
+        }
+        impl Wake for EpisodeWake {
+            fn wake(self: Arc<Self>) {
+                // The retained driver belongs to the withdrawing Episode.
+                assert!(self.setup.is_cancelled());
+            }
+        }
+        impl Drop for EpisodeWake {
+            fn drop(&mut self) {
+                // Reenter the actual Episode. Closing under its lock would
+                // deadlock; retaining the waker would leave this cycle alive.
+                assert!(self.setup.is_cancelled());
+                self.drops.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        let captured = Arc::new(Mutex::new(None));
+        let output = captured.clone();
+        let cleanup_gate = Arc::new(AtomicBool::new(false));
+        let gate = cleanup_gate.clone();
+        let mut runtime = Runtime::new();
+        let owner = runtime
+            .mount(
+                &Context::new(),
+                None,
+                Plugin::new("retained-driver", move |setup| {
+                    *output.lock().unwrap() = Some(setup.to_async());
+                    let gate = gate.clone();
+                    setup.on_cleanup_async(move || async move {
+                        wait(gate).await;
+                        Ok(())
+                    });
+                    Ok(())
+                }),
+            )
+            .unwrap();
+        assert_eq!(drive(&mut runtime), Poll::Ready(Ok(())));
+        let setup = captured.lock().unwrap().take().unwrap();
+        let drops = Arc::new(AtomicUsize::new(0));
+        let observer = Arc::new(EpisodeWake {
+            setup: setup.clone(),
+            drops: drops.clone(),
+        });
+        let weak = Arc::downgrade(&observer);
+        let waker = Waker::from(observer);
+        runtime.dispose(owner).unwrap();
+        assert_eq!(
+            Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(&waker)),
+            Poll::Pending
+        );
+        assert!(weak.strong_count() > 1);
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        cleanup_gate.store(true, Ordering::SeqCst);
+        assert_eq!(
+            Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(&waker)),
+            Poll::Ready(Ok(()))
+        );
+        drop(waker);
+        assert_eq!(weak.strong_count(), 0);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert!(setup.ensure_active().is_err());
+    });
+}

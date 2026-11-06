@@ -8,7 +8,8 @@
 
 ## 实际执行及保留证据
 
-Rust 宿主通过 `Cleanups::pop` 调用 `Execution::dispatch_payload_cleanup`。
+Rust 宿主经自身持有的 `RecordedExecution::dispatch` 派发，在受检载荷清理路径
+外保留实际执行历史。
 同一段已验证队列实现选择实际动作、执行带守卫的恢复、确认真实结果并返回 completion。
 普通回调和 Child 清理保持独立分支。
 

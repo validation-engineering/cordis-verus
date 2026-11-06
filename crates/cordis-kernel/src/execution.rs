@@ -61,6 +61,12 @@ impl<V,C,G,I> Execution<V,C,G,I> {
     pub open spec fn execution_journal(&self)->Option<crate::reversible_value::joint::Journal> {
         self.cleanup_state().execution_journal()
     }
+    /// The actual Journal retained by this work/cleanup owner, if attached.
+    pub fn execution_domain(&self)->(out:Option<&crate::reversible_value::joint::Journal>)
+        ensures out.is_some()==self.execution_journal().is_some(),
+            out.is_some() ==> *out.unwrap()==self.execution_journal().unwrap(),
+    {self.groups.execution_domain()}
+
     /// Create actual typed storage in this Episode's authoritative execution
     /// domain. Standalone/static executions allocate their own explicit domain.
     pub fn new_payload<T:?Sized>(&self,value:Arc<T>)->(out:crate::reversible_value::payload::SharedPayload<T>)
@@ -655,6 +661,7 @@ impl<V,N,X,G,C,E> Execution<V,ChildDispatch<N,X>,G,ChildCleanup<C,E>> {
                 &&& old(self).cleanup_state().live(group) && child.wf() && old(self).origin().is_some()
                 &&& child.domain_id()==old(self).origin().unwrap().domain && child.owner()==old(self).origin().unwrap().id
                 &&& child.episode()==Some(old(self).origin().unwrap().generation)
+                &&& child.execution_journal()==old(self).execution_journal()
                 &&& final(self).work_state().child_requests().last().value() is Native
                 &&& final(self).work_state().child_requests().last().value()->Native_0.payload()==payload
                 &&& final(self).work_state().child_requests().last().value()->Native_0.child()==child

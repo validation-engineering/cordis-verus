@@ -27,7 +27,9 @@ pub struct HostStatus {
     pub restart: bool,
 }
 
-/// The next control transition; it never invokes executor code.
+/// A candidate transition from current observations, not a mutation capability.
+/// The caller must still use the checked lifecycle entry. This value never
+/// invokes executor code or proves the truth of a supplied host observation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Decision {
     Withdraw,
@@ -42,8 +44,6 @@ pub enum Decision {
 /// mutable access that could bypass the cleanup-result protocol.
 pub struct LifecycleDriver {
     state: LifecycleState,
-    // Serialization views only; the verified protocol authorizes transitions.
-    pending_views: BTreeMap<usize, ActionTicket>,
 }
 impl Deref for LifecycleDriver {
     type Target = Kernel;
@@ -56,7 +56,6 @@ impl LifecycleDriver {
         let domain = allocate_domain()?;
         Ok(Self {
             state: LifecycleState::new(domain),
-            pending_views: BTreeMap::new(),
         })
     }
     pub fn domain(&self) -> u64 {
@@ -150,9 +149,7 @@ impl LifecycleDriver {
     }
     /// Admit setup and register its ownership before any executor sees it.
     pub fn begin(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self.state.begin(id)?;
-        self.pending_views.insert(id, host_ticket(ticket));
-        Ok(())
+        self.state.begin(id).map(|_| ())
     }
     /// Admit Node setup and its actual publication leases in one checked call.
     pub fn begin_checked(
@@ -172,8 +169,6 @@ impl LifecycleDriver {
                 AdmissionError::Lifecycle(error) => error.into(),
                 AdmissionError::Publication(error) => error.into(),
             })?;
-        self.pending_views
-            .insert(id, host_ticket(admission.ticket()));
         Ok(admission)
     }
     /// Admit a native episode together with its bound work and cleanup owners.
@@ -189,13 +184,7 @@ impl LifecycleDriver {
         ),
         Error,
     > {
-        let owners = self.state.begin_execution(id, cleanup_domain)?;
-        let ticket = owners
-            .0
-            .lifecycle_ticket()
-            .expect("admitted episode origin");
-        self.pending_views.insert(id, host_ticket(ticket));
-        Ok(owners)
+        self.state.begin_execution(id, cleanup_domain)
     }
     pub fn settle_execution<C, G, T>(
         &mut self,
@@ -203,9 +192,7 @@ impl LifecycleDriver {
         work: &cordis_kernel::setup_work::SetupWork<C, G>,
         groups: &cordis_kernel::cleanup_groups::CleanupGroups<T>,
     ) -> Result<(), Error> {
-        self.state.settle_execution(id, work, groups)?;
-        self.pending_views.remove(&id);
-        Ok(())
+        self.state.settle_execution(id, work, groups)
     }
     pub fn finish_execution<C, G, T>(
         &mut self,
@@ -213,11 +200,7 @@ impl LifecycleDriver {
         work: &cordis_kernel::setup_work::SetupWork<C, G>,
         groups: &cordis_kernel::cleanup_groups::CleanupGroups<T>,
     ) -> Result<(), Error> {
-        let result = self.state.finish_execution(id, work, groups);
-        if self.state.pending(id).is_none() {
-            self.pending_views.remove(&id);
-        }
-        result
+        self.state.finish_execution(id, work, groups)
     }
     pub fn fail_execution<C, G, T>(
         &mut self,
@@ -225,9 +208,7 @@ impl LifecycleDriver {
         work: &cordis_kernel::setup_work::SetupWork<C, G>,
         groups: &cordis_kernel::cleanup_groups::CleanupGroups<T>,
     ) -> Result<(), Error> {
-        self.state.fail_execution(id, work, groups)?;
-        self.pending_views.remove(&id);
-        Ok(())
+        self.state.fail_execution(id, work, groups)
     }
     pub fn retry_execution<C, G, T>(
         &mut self,
@@ -235,9 +216,9 @@ impl LifecycleDriver {
         work: &cordis_kernel::setup_work::SetupWork<C, G>,
         groups: &mut cordis_kernel::cleanup_groups::CleanupGroups<T>,
     ) -> Result<ActionTicket, Error> {
-        let ticket = host_ticket(self.state.retry_execution(id, work, groups)?);
-        self.pending_views.insert(id, ticket.clone());
-        Ok(ticket)
+        self.state
+            .retry_execution(id, work, groups)
+            .map(host_ticket)
     }
     pub fn release_execution<C, G, T>(
         &mut self,
@@ -245,9 +226,7 @@ impl LifecycleDriver {
         work: &mut cordis_kernel::setup_work::SetupWork<C, G>,
         groups: &mut cordis_kernel::cleanup_groups::CleanupGroups<T>,
     ) -> Result<CleanupOutcome, Error> {
-        let outcome = self.state.release_execution(id, work, groups)?;
-        self.pending_views.remove(&id);
-        Ok(outcome)
+        self.state.release_execution(id, work, groups)
     }
     #[allow(clippy::type_complexity)]
     pub fn begin_native_execution<T, C, G, I, R>(
@@ -263,12 +242,8 @@ impl LifecycleDriver {
         ),
         Error,
     > {
-        let owners = self
-            .state
-            .begin_native_execution(store, registration, cleanup_domain)?;
-        self.pending_views
-            .insert(registration.id(), host_ticket(owners.2.ticket()));
-        Ok(owners)
+        self.state
+            .begin_native_execution(store, registration, cleanup_domain)
     }
     pub fn native_value<'a, T>(
         &self,
@@ -285,13 +260,8 @@ impl LifecycleDriver {
         work: &cordis_kernel::setup_work::SetupWork<C, G>,
         groups: &cordis_kernel::cleanup_groups::CleanupGroups<I>,
     ) -> Result<(), Error> {
-        let result = self
-            .state
-            .finish_native_execution(id, store, values, work, groups);
-        if self.state.pending(id).is_none() {
-            self.pending_views.remove(&id);
-        }
-        result
+        self.state
+            .finish_native_execution(id, store, values, work, groups)
     }
     pub fn release_native_execution<T, C, G, I>(
         &mut self,
@@ -307,14 +277,13 @@ impl LifecycleDriver {
         ),
         Error,
     > {
-        let result = self
-            .state
-            .release_native_execution(id, store, values, work, groups)?;
-        self.pending_views.remove(&id);
-        Ok(result)
+        self.state
+            .release_native_execution(id, store, values, work, groups)
     }
-    pub fn pending_action(&self, id: usize) -> Option<&ActionTicket> {
-        self.pending_views.get(&id)
+    /// Derive an owned wire view from the authoritative ledger at this call.
+    /// A retained ticket is an observation; completion revalidates it.
+    pub fn pending_action(&self, id: usize) -> Option<ActionTicket> {
+        self.state.pending(id).map(host_ticket)
     }
     /// Consume a setup result exactly once. Cleanup requires an explicit outcome;
     /// this setup-only entry point cannot authorize dependency release.
@@ -325,7 +294,6 @@ impl LifecycleDriver {
                 ticket: kernel_ticket(ticket),
             })
             .map_err(cleanup_completion_error)?;
-        self.pending_views.remove(&ticket.id);
         Ok(())
     }
     /// Record an exact cleanup attempt's outcome. Failed attempts retain a
@@ -342,7 +310,6 @@ impl LifecycleDriver {
                 outcome,
             })
             .map_err(cleanup_completion_error)?;
-        self.pending_views.remove(&ticket.id);
         Ok(())
     }
     /// Rust executors retain the action in this driver while polling their
@@ -375,30 +342,24 @@ impl LifecycleDriver {
             .map_err(cleanup_control_error)
     }
     pub fn begin_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self
-            .state
+        self.state
             .execute_cleanup(CleanupCommand::Request {
                 id,
                 reservation: false,
             })
-            .map_err(cleanup_control_error)?
-            .expect("cleanup request issues a ticket");
-        self.pending_views.insert(id, host_ticket(ticket));
-        Ok(())
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     /// Restore host resources registered while a fiber was reserved, before
     /// its first kernel episode. This is a host extension, not a paper Step.
     pub fn begin_reservation_cleanup(&mut self, id: usize) -> Result<(), Error> {
-        let ticket = self
-            .state
+        self.state
             .execute_cleanup(CleanupCommand::Request {
                 id,
                 reservation: true,
             })
-            .map_err(cleanup_control_error)?
-            .expect("reservation cleanup issues a ticket");
-        self.pending_views.insert(id, host_ticket(ticket));
-        Ok(())
+            .map(|_| ())
+            .map_err(cleanup_control_error)
     }
     pub fn retry_cleanup(&mut self, id: usize) -> Result<ActionTicket, Error> {
         let ticket = host_ticket(
@@ -407,7 +368,6 @@ impl LifecycleDriver {
                 .map_err(cleanup_control_error)?
                 .expect("cleanup retry issues a ticket"),
         );
-        self.pending_views.insert(id, ticket.clone());
         Ok(ticket)
     }
     pub fn finish_cleanup(&mut self, id: usize) -> Result<(), Error> {

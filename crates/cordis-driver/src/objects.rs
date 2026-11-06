@@ -127,13 +127,8 @@ impl Driver {
         publication: usize,
         key: ObjectKey,
     ) -> Result<(), DriverError> {
-        self.validate(id, generation)?;
-        let entry = self.owned_publication(id, generation, publication)?;
-        if !entry.visible {
-            return Err(PublicationError::Revoked.into());
-        }
         bridge
-            .replace(
+            .replace_service(
                 &mut self.kernel.core,
                 id,
                 generation,
@@ -141,7 +136,7 @@ impl Driver {
                 key,
             )
             .map_err(bridge_error)?
-            .map_err(|rejected| DriverError::from(rejected.error))?;
+            .map_err(crate::services::service_error)?;
         Ok(())
     }
     pub fn resolve_host_object<'a, T>(

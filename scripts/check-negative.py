@@ -680,7 +680,7 @@ def mutation_manifest():
         ('r2-config-recovery-with-pending-inverse', 'configuration_batch.rs', '{self.actions.is_empty()}', '{self.completed==0}'),
         ('r2-config-inverse-before-forward', 'configuration_future.rs', 'if matches!(self.poll_apply(forward),Poll::Pending) {return Poll::Pending;}', 'let _unused_forward=forward;'),
         ('r2-config-failed-inverse-reports-drained', 'configuration_batch.rs', 'Poll::Ready(Err(error))=>Poll::Ready(Err(error)),', 'Poll::Ready(Err(_error))=>Poll::Ready(Ok(true)),'),
-        ('r2-config-update-discards-identity', 'configuration_runtime.rs', 'self.configuration_target(target.id)==Some(target)', 'self.configuration_target(target.id).is_some()'),
+        ('r2-config-update-discards-identity', 'configuration_runtime.rs', 'target.domain==self.lifecycle().domain() && target.generation==generation && target.revision==recipe.revision()', 'true'),
 
         (
             "provider-lifetime-guard", "lib.rs",
@@ -1730,6 +1730,16 @@ def mutation_manifest():
         ('r2-node-confuses-control-stutter', 'node_runtime/production.rs', 'if b.same(a) {Kind::Internal}', 'if a.control.control().paper()==b.control.control().paper() {Kind::Internal}'),
         ('r2-host-finishes-pending-claim', 'node_runtime/bridge.rs', 'if node.state().pending_matches(call.ticket) {return Err(BridgeError::Busy);}', 'if false {return Err(BridgeError::Busy);}'),
         ('r2-config-substitutes-insert-origin', 'configuration_runtime.rs', 'insertion=self.history_positions()[at+1];', 'insertion=self.history_positions()[at];'),
+        ('native-invocation-uses-recipe-allocation', 'lifecycle_state/native/runtime.rs', 'Ok(invocation)=>Ok(invocation.bind_native(self.joint.identity())),', 'Ok(invocation)=>Ok(invocation.bind_native(self.recipe_identity())),'),
+        ('native-target-uses-recipe-allocation', 'configuration_runtime.rs', 'native:self.poll_control_identity().clone()', 'native:self.recipe_identity()'),
+        ('shared-child-drops-work-journal', 'lifecycle_state/registration/shared_child.rs', 'let execution=match work.execution_domain() {Some(journal)=>Some(journal.clone()),None=>None};', 'let execution:Option<Journal>=None;'),
+        ('registered-child-drops-native-journal', 'lifecycle_state/registration/shared_child.rs', 'ChildOrigin {domain:child.domain,parent:child.parent,generation:None},Some(self.execution_journal())))', 'ChildOrigin {domain:child.domain,parent:child.parent,generation:None},None))'),
+        ('native-history-uses-recipe-allocation', 'lifecycle_state/native/runtime.rs', '        let joint=self.joint.observe();\n        proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}\n        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))', '        let joint=self.joint.observe();\n        proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}\n        history::Snapshot::new(joint,self.recipe_identity(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))'),
+        ('native-recovery-discards-earlier-cut', 'lifecycle_state/native/runtime.rs', 'self.recovery_snapshot(earlier.joint())', 'self.recovery_snapshot(self.publication_snapshot().joint())'),
+        ('cleanup-release-accepts-failed-report', 'lifecycle_actions/finish.rs', '|| record.outcome==Some(CleanupOutcome::Failed) {return Err(Error::InvalidState);}', '|| false {return Err(Error::InvalidState);}'),
+        ('cleanup-release-ignores-generation', 'lifecycle_actions/finish.rs', 'if record.ticket.generation!=generation || record.outcome.is_none()', 'if record.outcome.is_none()'),
+        ('node-service-ignores-publication-owner', 'node_runtime/services.rs', 'if p.owner!=owner || p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {', 'if p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {'),
+        ('node-service-ignores-current-generation', 'node_runtime/services.rs', 'if p.owner!=owner || p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {', 'if p.owner!=owner || p.generation!=generation {'),
     ]
 
 

@@ -85,6 +85,7 @@ impl<N,Y,G,A,R,T:?Sized,M,X> RecordedExecution<ChildDispatch<N,Y>,G,A,R,T,M,X> {
                 &&& child.wf() && old(self).core().origin().is_some()
                 &&& child.domain_id()==old(self).core().origin().unwrap().domain && child.owner()==old(self).core().origin().unwrap().id
                 &&& child.episode()==Some(old(self).core().origin().unwrap().generation)
+                &&& child.execution_journal()==old(self).core().execution_journal()
                 &&& final(self).core().work_state().child_requests().last().value() is Native
                 &&& final(self).core().work_state().child_requests().last().value()->Native_0.payload()==payload
                 &&& final(self).core().work_state().child_requests().last().value()->Native_0.child()==child

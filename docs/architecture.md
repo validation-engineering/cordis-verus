@@ -31,6 +31,14 @@ flowchart TD
 
 Node 兼容层由单独的 crate 和 JS 包组成，不是必须开启的 `cordis` Cargo feature。[workspace 默认成员](../Cargo.toml)只有 `cordis-kernel`、`cordis-driver` 和 `cordis`，不包含 `cordis-node`。纯 Rust 应用中的 typed 插件通常随应用编译；使用 Rust 编写插件本身不意味着需要 C ABI 或 Node。原版 TS 插件需要先编译为 JS，兼容注册入口不是 TS 编译器。
 
+运行依赖与验证依赖分别审查：`cordis` 的默认 feature 为空，`tokio` 为可选；
+`cordis-kernel` 使用锁定的 `vstd` 提供 Verus/Rust 支持，普通应用无需运行 Verus 或
+SMT 求解器。复核证明时才需要锁定的 Verus、Rust 和求解器工具链。`napi`／
+`napi-build` 属于 `cordis-node` 的运行绑定／构建依赖；Node、npm 和 TypeScript
+用于 JS 兼容层及其验收，不进入纯 Rust 入口。既有开发流程检查
+`cordis-verus --no-default-features`，并独立解包、测试、构建 Rust 产物；验证全部
+workspace 功能时需要 Node，不代表使用 Rust 库也需要它。
+
 另一条可选路径是 [`ProcessPlugin`](process-plugins.md)：Rust 宿主通过有界 JSON-RPC 启动独立可执行文件。它可以使用其他语言，只需要该插件自身要求的运行环境；协议并不要求 Node，也不能直接把任意原版 Cordis 插件当作进程插件运行。
 
 Rust Runtime 经 [`shared::native::NativeDriver`](../crates/cordis-driver/src/shared/native.rs) 调用验证内核的 [`NativeRuntime`](../crates/cordis-kernel/src/lifecycle_state/native/runtime.rs)；Node facade 经 Node-API、[`Driver`／`NodeDriver`](../crates/cordis-driver/src/node.rs) 调用 [`NodeRuntime`](../crates/cordis-kernel/src/node_runtime.rs)。两者复用 [`shared.rs`](../crates/cordis-driver/src/shared.rs) 的调度策略与 [`LifecycleState`](../crates/cordis-kernel/src/lifecycle_state.rs) 的控制和动作协议。NativeRuntime／NodeRuntime 是验证过的 Rust 状态所有者，不是两套语言引擎；载荷归属、受管值、publication 和调用状态分别接入各自合同。Future／JS callback 的实际执行仍在普通宿主。
@@ -43,6 +51,12 @@ Rust Runtime 经 [`shared::native::NativeDriver`](../crates/cordis-driver/src/sh
 效果、调用执行与最终排空仍有独立边界。
 
 `LifecycleActions` 在真实执行路径中检查清理结果和重试票据：失败结果阻止完成卸载，成功结果才允许 Node 路径释放 episode 的依赖。Rust Runtime 和静态 typed 宿主使用经过验证的 `CleanupJournal` 保留失败操作和重试凭据，实际回调载荷由 `CleanupQueue<T>` 与日志一起拥有，验证精确槽位移动与失败载荷保留；显式 `FnMut` 工厂支持新的清理尝试。普通 Rust Runtime 对已消耗的 `FnOnce` 失败使用 `Drained`，不代表所有回调成功；静态 typed 宿主的此类失败继续阻塞。合同和验证边界见[清理协议](cleanup-protocol.zh-CN.md)（[English](cleanup-protocol.md)）。
+
+Native Driver 的历史观察入口集中在
+[`shared/native/snapshots.rs`](../crates/cordis-driver/src/shared/native/snapshots.rs)，
+与生命周期修改和回调派发分开审查。Native 历史快照保留真实来源身份；
+观察的接纳不赋予恢复或释放权限。合同及元数据成本见
+[历史快照审计](review-map.zh-CN.md#native-历史快照)。
 
 ## 构建、运行与验证的依赖
 
@@ -105,6 +119,14 @@ flowchart TD
 
 闭合驱动的 `Transition` 是按操作区分的枚举：`Step` 必须携带实际 `Outcome`，`Depart` 明确区分 `Divert` 与 `Leave`，actor 只保存一次。规则标签和 fresh child choice 从这些变体构造，避免独立字段组成没有语义的记录。宿主根 setup 也通过枚举保存阶段与 Future 的所有权；异步轮询的 panic 捕获共用内部辅助函数，调度、Pending 保留和清理次序仍由 runtime／事件派发各自控制。
 
+Node 面向插件的 publication 写入路径集中在
+[`cordis-driver/services.rs`](../crates/cordis-driver/src/services.rs)，归属／代次检查与
+实际 set、revoke、reclaim 组合在已验证的
+[`node_runtime/services.rs`](../crates/cordis-kernel/src/node_runtime/services.rs)。
+真实 JS 对象替换通过 Bridge 共用同一准入和写入实现；Driver 保留协议转换，未新增
+影子 publication 状态。具体修改入口、历史合同与宿主边界见
+[Node 服务审查](review-map.zh-CN.md#node-publication-命令的所有权)。
+
 ## 生命周期中的关键数据
 
 - **target** 是当前可用 provider 计算出的绑定；**committed** 是 Begin 时保存、贯穿本 episode 的 provider 身份。Active 中 target 暂时改变是允许的中间状态。
@@ -128,8 +150,27 @@ landing 位于 [`cleanup_queue/`](../crates/cordis-kernel/src/cleanup_queue/)。
 
 其余内核文件也已按既有模块身份组织，包括 `reversible_value/`、`node_runtime/`
 和 `mixed_driver/`；不再通过 `#[path]` 在平铺文件之间跳转。普通宿主另拆出
-`runtime/setup.rs`、`runtime/services.rs` 和 `runtime/poll.rs`。完整职责分类和
-删减处置见[审查地图](review-map.zh-CN.md)（[English](review-map.md)）。
+`runtime/setup.rs`、`runtime/services.rs` 和 `runtime/poll.rs`。Episode 与不可变关联
+由 `runtime/episode.rs` 管理，effect／service 状态和等待通知由
+`runtime/effect_handle.rs` 私有管理；实际语义仍调用验证内核的状态 owner。
+Child 准入／原始句柄在 `runtime/child.rs`，外部分配、退休／移除、失败保留和通知在
+`runtime/child/external.rs`；请求与逆操作共享实际控制器，Native 身份继续由受检
+`SharedChild` 拥有。外部图报告仍是宿主前提；可变 Episode guard 仍有后续收拢工作。
+Episode 的能力／通知字段已有私有修改入口，root Future 与票据由
+[`runtime/root.rs`](../crates/cordis/src/runtime/root.rs) 成对管理，静态 setup／cleanup
+交接状态位于 [`static_host/progress.rs`](../crates/cordis/src/runtime/static_host/progress.rs)。
+通知与返回的资源在锁外调用／析构；这些普通宿主边界没有改变内核合同。
+Native 控制对象由 [`runtime/control.rs`](../crates/cordis/src/runtime/control.rs) 私有
+保留，Begin／重试／释放／重启使用统一借出／归还入口；Driver 负责何时调用 Native
+可用性谓词，内核继续实施状态转换守卫。控制对象保留真实 Native 分配；其 Verus
+合同连接 Journal／key，Driver 在所有含控制对象的入口用 `Arc::ptr_eq` 检查同一分配。
+执行与配置现在也借用真实 Journal 身份，Driver 将其与本 Native 的 Journal 比较；
+root／清理和记录型执行入口同时检查当前 Episode。作用域持有实际队列分配，快照
+入口检查其来源与存活状态；配置快照对外来对象返回 `None`。Journal 身份借用不
+引入额外分配、计数器或锁，Scope 只克隆队列身份，不保留载荷／Journal。
+这些 getter、工厂和 clone 的含义由 Verus 验证；指针比较仍是普通 Rust／标准库
+边界。调用票据、配置 target 和原始合同 API 仍有独立前提，不能推广为全部宿主证明。
+完整职责分类和删减处置见[审查地图](review-map.zh-CN.md)（[English](review-map.md)）。
 
 以下按证明依赖导航；这些分组不是新的 crate 或隐式可信假设。
 

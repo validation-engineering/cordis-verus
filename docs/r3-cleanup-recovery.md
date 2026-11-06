@@ -10,8 +10,8 @@ production correspondence with Equation (55); **R3 remains in progress**.
 
 ## Actual execution and retained evidence
 
-The Rust host calls `Cleanups::pop`, which calls
-`Execution::dispatch_payload_cleanup`. The same verified queue implementation
+The Rust host dispatches through its owned `RecordedExecution::dispatch`,
+which retains the execution history around the checked payload cleanup path. The same verified queue implementation
 selects the actual action, performs the guarded restoration, acknowledges its
 actual result, and returns the completion. Ordinary callbacks and Child cleanup
 remain distinct branches.

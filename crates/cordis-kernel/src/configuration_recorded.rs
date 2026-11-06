@@ -31,6 +31,9 @@ impl<S,R,K,U,P:Ord,V> Recorded<S,R,K,U,P,V> {
     pub closed spec fn history(&self)->history::History<S,R,K,U> {self.ledger.history()}
     pub closed spec fn journal(&self)->joint::Journal {self.ledger.journal()}
     pub closed spec fn key(&self)->nat {self.ledger.key()}
+    /// Borrow the history owner actually used by configuration/source commits.
+    pub fn execution_domain(&self)->(out:&joint::Journal) ensures *out==self.journal(),
+    {self.ledger.domain_ref()}
     pub closed spec fn source(&self)->Source<P,V> {self.sources}
     pub closed spec fn source_key(&self)->nat {self.source_ledger.key()}
     closed spec fn configuration_wf(&self)->bool {self.core().wf() && self.ledger.wf() && self.ledger.current()==self.core()}

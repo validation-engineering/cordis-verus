@@ -6,8 +6,7 @@ use cordis_kernel::availability::admission::AdmissionError;
 use cordis_kernel::lifecycle_state::cleanup::CleanupCommand;
 use cordis_kernel::lifecycle_state::LifecycleState;
 use cordis_kernel::node_runtime::NodeRuntime;
-use cordis_kernel::publication::values::{PublicationStore, RejectedValue, ReleasedValue};
-use cordis_kernel::publication::PublicationId;
+use cordis_kernel::publication::values::{PublicationStore, ReleasedValue};
 use cordis_kernel::{Error, Kernel, Port};
 use std::ops::Deref;
 
@@ -133,15 +132,6 @@ impl NodeDriver {
             .cleanup(CleanupCommand::Retry { id })
             .map_err(shared::cleanup_control_error)
             .map(|t| shared::host_ticket(t.expect("cleanup retry issues a ticket")))
-    }
-    pub fn replace_value(
-        &mut self,
-        id: PublicationId,
-        owner: usize,
-        generation: u64,
-        value: u64,
-    ) -> Result<u64, RejectedValue<u64>> {
-        self.core.replace(id, owner, generation, value)
     }
     pub fn finish_reservation_values(
         &mut self,

@@ -971,6 +971,80 @@ fn cancellation_after_drain_keeps_late_allocated_child_until_actual_removal() {
 }
 
 #[test]
+fn child_allocation_reply_is_final_and_wakes_outside_its_identity_lock() {
+    struct ObserveChild {
+        handle: cordis::ChildHandle,
+        expected: Option<usize>,
+        wakes: Arc<AtomicUsize>,
+    }
+    impl std::task::Wake for ObserveChild {
+        fn wake(self: Arc<Self>) {
+            // This reads the original handle through the same control that
+            // delivers the notification; retaining its lock would deadlock.
+            assert_eq!(self.handle.id(), self.expected);
+            self.wakes.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    for allocation in [Ok(37), Err("host rejected allocation".to_owned())] {
+        let handle = Arc::new(Mutex::new(None));
+        let capture = handle.clone();
+        let mut plugin = StaticPlugin::new(Plugin::new("owner", move |setup| {
+            *capture.lock().unwrap() = Some(setup.mount(Plugin::new("child", |_| Ok(())))?);
+            Ok(())
+        }))
+        .unwrap();
+        let start = dynamic_begin(&mut plugin);
+        finish(start.setup).unwrap();
+        let handle = handle.lock().unwrap().take().unwrap();
+        let child = start.episode.drain_child_requests().unwrap().pop().unwrap();
+        assert_eq!(handle.id(), None);
+        assert_eq!(handle.error(), None);
+        assert!(child.control.removed().is_err());
+        assert!(child.control.mark_initialized().is_err());
+
+        let expected = allocation.as_ref().ok().copied();
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let waker = Waker::from(Arc::new(ObserveChild {
+            handle: handle.clone(),
+            expected,
+            wakes: wakes.clone(),
+        }));
+        let mut cx = TaskContext::from_waker(&waker);
+        let mut cleanup = start.episode.cleanup().unwrap();
+        assert!(cleanup.as_mut().poll(&mut cx).is_pending());
+        assert!(child.control.retirement_requested());
+        child.control.complete_mount(allocation.clone()).unwrap();
+        assert_eq!(wakes.load(Ordering::SeqCst), 1);
+
+        for duplicate in [Ok(99), Err("late rejection".to_owned())] {
+            assert_eq!(
+                child.control.complete_mount(duplicate),
+                Err("StaticChildAlreadyAssigned".into())
+            );
+        }
+        assert_eq!(wakes.load(Ordering::SeqCst), 1);
+        assert_eq!(child.control.id(), expected);
+        assert_eq!(handle.id(), expected);
+        assert_eq!(handle.error(), allocation.err());
+        assert_eq!(child.control.is_removed(), expected.is_none());
+        if expected.is_some() {
+            // Even an allocation received after retirement must wait for the
+            // graph's actual removal, never for a duplicate or error reply.
+            assert!(cleanup.as_mut().poll(&mut cx).is_pending());
+            child.control.removed().unwrap();
+            assert_eq!(wakes.load(Ordering::SeqCst), 2);
+        } else {
+            assert!(child.control.mark_initialized().is_err());
+            assert!(child.control.removed().is_err());
+        }
+        assert_eq!(cleanup.as_mut().poll(&mut cx), Poll::Ready(Ok(())));
+        assert!(start.episode.is_closed());
+        assert!(start.episode.child_controls().is_empty());
+    }
+}
+
+#[test]
 fn queued_cancelled_publication_never_allocates_or_leaves_join_pending() {
     let key = ServiceKey::<usize>::new("queued");
     let handle = Arc::new(Mutex::new(None));

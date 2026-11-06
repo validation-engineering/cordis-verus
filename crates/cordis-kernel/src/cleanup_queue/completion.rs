@@ -28,11 +28,6 @@ pub open spec fn retained<E,T>(result:Result<(),E>,retry:Option<T>)->Option<T> {
 }
 
 impl<T> CleanupQueue<T> {
-    fn reply_pending(&self,ticket:RestoreTicket)->(out:bool)
-        requires self.wf(),
-        ensures out==(self.issued() && self.protocol().selected()==Some(ticket) && !self.protocol().failed_spec()),
-    {self.in_flight && self.journal.current()==Some(ticket)}
-
     fn accept_result<E>(&mut self,ticket:RestoreTicket,result:Result<(),E>,retry:Option<T>,policy:CleanupPolicy)
         ->(out:CleanupReport<E,T>)
         requires old(self).wf(),old(self).issued(),old(self).protocol().selected()==Some(ticket),!old(self).protocol().failed_spec(),

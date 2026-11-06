@@ -15,15 +15,7 @@ impl Runtime {
             // Dynamic service disposal is a normal verified provider retirement.
             for id in self.kernel.ids() {
                 if let Some(service) = self.kernel.host(id).unwrap().service.clone() {
-                    let driver = cx.waker().clone();
-                    let (cancelled, previous) = {
-                        let mut status = lock(&service.status);
-                        (
-                            status.checked().observe().cancelled(),
-                            status.driver.replace(driver),
-                        )
-                    };
-                    drop(previous);
+                    let cancelled = service.poll_driver(cx, false);
                     if cancelled && !self.retired(id) {
                         if let Err(error) = self.dispose(id) {
                             return Poll::Ready(Err(error));
@@ -56,7 +48,7 @@ impl Runtime {
                     continue;
                 };
                 let driver = cx.waker().clone();
-                let previous = lock(&episode.state).driver.replace(driver);
+                let previous = lock(&episode.state).replace_driver(driver);
                 drop(previous);
                 let root_poll = self.kernel.host_mut(id).unwrap().root_setup.poll(
                     phase == Phase::Unloading,
@@ -87,10 +79,9 @@ impl Runtime {
                     // Do not restore any resource while any group has a setup
                     // poll outstanding: it may still rely on that resource.
                     let state = lock(&episode.state);
-                    if state.cleanups.protocol.is_idle() && !state.cleanups.protocol.has_pending() {
-                        if let Err(error) = self
-                            .kernel
-                            .settle_managed_execution(id, &state.cleanups.protocol)
+                    if state.execution.is_idle() && !state.execution.has_pending() {
+                        if let Err(error) =
+                            self.kernel.settle_managed_execution(id, &state.execution)
                         {
                             return Poll::Ready(Err(kernel_error(error)));
                         }
@@ -126,39 +117,42 @@ impl Runtime {
                     progress |= did;
                     pending |= waiting;
                     let mut state = lock(&episode.state);
-                    let retained_failure = state.cleanups.protocol.has_failed();
+                    let retained_failure = state.execution.has_failed();
                     let callbacks_idle = self.kernel.host(id).unwrap().root_running.is_none()
-                        && state.cleanups.protocol.effects().values().all(|group| {
+                        && state.execution.effects().values().all(|group| {
                             group.get().running.is_none() && group.get().iterator.is_none()
                         });
                     if retained_failure && callbacks_idle {
                         if self.kernel.pending_action(id).is_some() {
-                            if let Err(error) = self
-                                .kernel
-                                .fail_managed_execution(id, &state.cleanups.protocol)
+                            if let Err(error) =
+                                self.kernel.fail_managed_execution(id, &state.execution)
                             {
                                 return Poll::Ready(Err(kernel_error(error)));
                             }
                             progress = true;
                         }
                     } else if self.kernel.host(id).unwrap().root_running.is_none()
-                        && state.cleanups.protocol.effects().is_empty()
-                        && state.cleanups.protocol.is_idle()
-                        && state.cleanups.protocol.can_seal()
+                        && state.execution.effects().is_empty()
+                        && state.execution.is_idle()
+                        && state.execution.can_seal()
                     {
-                        let episode_values =
-                            match self.release_controlled(id, &mut state.cleanups.protocol) {
-                                Ok((_, released)) => released,
-                                Err(error) => return Poll::Ready(Err(kernel_error(error))),
-                            };
+                        let episode_values = match self.release_controlled(id, &mut state.execution)
+                        {
+                            Ok((_, released)) => released,
+                            Err(error) => return Poll::Ready(Err(kernel_error(error))),
+                        };
                         self.maintenance_changes += 1;
                         // Services commonly retain their setup context. Empty the
                         // closed episode to break value -> context -> value cycles,
                         // but only after all consumer inverses have completed.
+                        let previous_driver = state.take_driver();
                         drop(state);
                         let plugin = self.kernel.host_mut(id).unwrap();
                         plugin.episode = None;
-                        plugin.root_setup = RootSetup::Dormant;
+                        plugin.root_setup = RootSetup::dormant();
+                        // Escaped setup contexts must not retain a closed
+                        // episode's driver. User waker destruction is unlocked.
+                        drop(previous_driver);
                         drop(episode_values);
                         progress = true;
                     }
@@ -171,9 +165,7 @@ impl Runtime {
                     // Serialize the Loading -> Active boundary with registration
                     // through escaped contexts. Requests admitted during Loading
                     // are initialized before the service becomes observable.
-                    if state.cleanups.protocol.group_count() != 0
-                        || state.cleanups.protocol.child_count() != 0
-                    {
+                    if state.execution.group_count() != 0 || state.execution.child_count() != 0 {
                         progress = true;
                         continue;
                     }
@@ -192,8 +184,7 @@ impl Runtime {
                         continue;
                     }
                     let missing = state
-                        .cleanups
-                        .protocol
+                        .execution
                         .native()
                         .expect("native execution")
                         .missing();
@@ -207,14 +198,12 @@ impl Runtime {
                     } else {
                         let finished = self
                             .kernel
-                            .finish_recorded_execution(id, &mut state.cleanups.protocol);
+                            .finish_recorded_execution(id, &mut state.execution);
                         drop(state);
                         match finished {
                             Ok(()) => {
                                 if let Some(service) = &self.kernel.host(id).unwrap().service {
-                                    assert!(lock(&service.status)
-                                        .checked_mut()
-                                        .report_service_initialized());
+                                    service.initialize_service(false);
                                 }
                             }
                             Err(KernelError::Changed) => {
@@ -240,7 +229,7 @@ impl Runtime {
                     self.maintenance_changes += 1;
                     let (registration, host) = removed.into_parts();
                     if let Some(service) = &host.service {
-                        finish_service(service);
+                        service.finish_service();
                     }
                     drop((registration, host));
                     progress = true;

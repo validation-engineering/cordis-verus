@@ -12,6 +12,9 @@ use crate::refinement as r;
 use crate::reversible_value::joint;
 #[cfg(verus_keep_ghost)]
 use crate::reversible_value::joint::native;
+#[cfg(verus_keep_ghost)]
+use crate::reversible_value::service_composition::Address;
+use std::sync::Arc;
 use vstd::prelude::*;
 
 verus! {
@@ -242,24 +245,38 @@ impl<V> History<V> {
 /// An actual native checkpoint retains typed evidence only in erased fields.
 /// Rust keeps one shared Journal handle; it does not retain old Arc payloads.
 #[allow(dead_code)]
-pub struct Snapshot<V> {joint:joint::Snapshot,history:Ghost<History<V>>,positions:Ghost<Seq<nat>>,key:Ghost<nat>}
+/// A historical Native cut, retaining its actual Journal and Native allocation.
+/// Typed payload history is erased; provenance does not authorize restoration.
+pub struct Snapshot<V> {joint:joint::Snapshot,native:Arc<joint::identity::AllocationIdentity>,history:Ghost<History<V>>,positions:Ghost<Seq<nat>>,key:Ghost<nat>}
 impl<V> Snapshot<V> {
+    pub closed spec fn native_source(&self)->Arc<joint::identity::AllocationIdentity> {self.native}
+    pub open spec fn bound_to(&self,address:Address)->bool {
+        self.joint_spec().journal_spec()==address.journal && self.key()==address.key
+    }
+    pub fn native_identity(&self)->(out:&Arc<joint::identity::AllocationIdentity>)
+        requires self.certified(),
+        ensures *out==self.native_source(),out.wf(),
+            out.address()==(Address {journal:self.joint_spec().journal_spec(),key:self.key()}),
+    {&self.native}
     pub closed spec fn history(&self)->History<V> {self.history@}
     pub closed spec fn positions(&self)->Seq<nat> {self.positions@}
     pub closed spec fn key(&self)->nat {self.key@}
     pub closed spec fn joint_spec(&self)->joint::Snapshot {self.joint}
     pub closed spec fn certified(&self)->bool {
-        self.joint_spec().certified() && self.history().valid() && self.history().fresh_insertions()
+        self.native_source().wf()
+            && self.native_source().address()==(Address {journal:self.joint_spec().journal_spec(),key:self.key()})
+            && self.joint_spec().certified() && self.history().valid() && self.history().fresh_insertions()
             && self.history().indexed(self.positions(),self.joint_spec().events(),self.key())
             && self.joint_spec().last().contains_pair(self.key(),joint::Record::Native {
                 state:self.history().states.last().project(self.history().labels.len())})
     }
-    pub(crate) fn new(joint:joint::Snapshot,Ghost(history):Ghost<History<V>>,Ghost(positions):Ghost<Seq<nat>>,Ghost(key):Ghost<nat>)->(out:Self)
-        requires joint.certified(),history.valid(),history.fresh_insertions(),history.indexed(positions,joint.events(),key),
+    pub(crate) fn new(joint:joint::Snapshot,native:Arc<joint::identity::AllocationIdentity>,Ghost(history):Ghost<History<V>>,Ghost(positions):Ghost<Seq<nat>>,Ghost(key):Ghost<nat>)->(out:Self)
+        requires native.wf(),native.address()==(Address {journal:joint.journal_spec(),key}),
+            joint.certified(),history.valid(),history.fresh_insertions(),history.indexed(positions,joint.events(),key),
             joint.last().contains_pair(key,joint::Record::Native {state:history.states.last().project(history.labels.len())}),
-        ensures out.certified(),out.joint_spec()==joint,out.history()==history,out.positions()==positions,out.key()==key,
+        ensures out.certified(),out.native_source()==native,out.joint_spec()==joint,out.history()==history,out.positions()==positions,out.key()==key,
             super::production::interpreted(out.joint_spec().events(),out.key()),
-    {let out=Self {joint,history:Ghost(history),positions:Ghost(positions),key:Ghost(key)};proof {out.production_trace();}out}
+    {let out=Self {joint,native,history:Ghost(history),positions:Ghost(positions),key:Ghost(key)};proof {out.production_trace();}out}
     pub proof fn valid_history(&self)
         requires self.certified(),ensures self.joint_spec().certified(),self.history().valid(),self.history().fresh_insertions(),
             self.positions().len()==self.history().states.len(),

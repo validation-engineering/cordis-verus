@@ -2,6 +2,10 @@
 
 当前 R2 状态以[第 5 包统一验收](r2-acceptance.zh-CN.md)为准：managed-production/v1 范围已完成。下文保留各批次历史记录及其当时的验证范围。
 
+当前 Native 来源检查已覆盖另行传入的执行、配置和已接入作用域，见
+[来源与守卫审计](review-map.zh-CN.md#执行配置与作用域来源)。受验证的身份含义、
+普通 Rust 指针检查与剩余前提分别记录，不改变历史 R2 验收或关闭一般论文义务。
+
 ## 历史实施与验证记录
 
 [第 4 包生产组合](r2-production-composition.zh-CN.md)已接入真实原生／Node 轨迹、引用表修改历史及类型化配置／来源投影；第 5 包仍负责 R2 统一验收。
@@ -625,6 +629,23 @@ Begin、跨 Episode 的同编号 group scope，以及退休后的作用域失效
 元数据，并保证它与既有 `Capture` 完全对应；其中没有槽位或用户载荷引用。
 Episode 关闭时仍能释放槽位，逃逸的元数据继续描述旧 Begin，即使之后出现替代 provider。
 元数据不代表获取资源的权限，实际 Execution 仍检查自身阶段和来源 group 的准入状态。
+
+当前宿主所有权入口为 [`runtime/episode.rs`](../crates/cordis/src/runtime/episode.rs) 和
+[`runtime/effect_handle.rs`](../crates/cordis/src/runtime/effect_handle.rs)。
+[所有权审计](review-map.zh-CN.md#episode-与句柄所有权)记录 2026-10-26 的封装及
+保持的证明边界。Child 准入和外部完成现位于
+[`runtime/child.rs`](../crates/cordis/src/runtime/child.rs) 与
+[`child/external.rs`](../crates/cordis/src/runtime/child/external.rs)；
+[Child 审计](review-map.zh-CN.md#child-请求与完成所有权)区分 Native 受检身份与宿主报告。
+真实 root Future／票据现由 [`runtime/root.rs`](../crates/cordis/src/runtime/root.rs)
+管理，静态 setup／cleanup 交接位于
+[`static_host/progress.rs`](../crates/cordis/src/runtime/static_host/progress.rs)。
+[Episode／root 审计](review-map.zh-CN.md#episode-通知与-root-进度)记录通知／能力
+修改入口和两处宿主释放修复，内核合同不变。Native 控制绑定／重置及观察入口现经过
+[`runtime/control.rs`](../crates/cordis/src/runtime/control.rs) 和 Driver 的惰性可用性入口；
+[控制审计](review-map.zh-CN.md#native-决策与控制所有权)连接保留的 Native 身份、
+`bound(native)` 含义与 Driver 的可执行分配检查；指针相等仍属于普通 Rust 边界，
+其他执行／表示前提单独保留。下述历史验收段落仍对应原始源码范围。
 
 生产 `AsyncSetup` 持有 scope（此前为 group 编号）与 `Arc<SharedEpisode>`。同一分配里包含不可变
 宿主上下文和 mutex 保护的执行状态；克隆或创建效果作用域都共享该所有者，不再向

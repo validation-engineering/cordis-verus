@@ -169,18 +169,15 @@ impl LifecycleActions {
     pub fn pending(&self, id: usize) -> (out: Option<ActionTicket>)
         ensures out.is_some() ==> self.recorded(out.unwrap()) && out.unwrap().id == id,
             out.is_none() == !self.outstanding(id),
+            self.wf() ==> (forall|ticket:ActionTicket| (out == Some(ticket))
+                == (#[trigger] self.recorded(ticket) && ticket.id == id)),
     { self.ledger.pending(id) }
 
     /// Exact ticket membership, using the ledger's unique pending owner.
     pub fn pending_matches(&self,ticket:ActionTicket)->(out:bool)
         requires self.wf(),ensures out==self.recorded(ticket),
     {
-        let pending=self.ledger.pending(ticket.id);
-        proof {if self.recorded(ticket) {
-            assert(self.ledger.outstanding(ticket.id));
-            self.ledger.recorded_owner_unique(ticket,pending.unwrap());
-        }}
-        pending==Some(ticket)
+        self.ledger.pending(ticket.id)==Some(ticket)
     }
 
     fn cleanup_index(&self, id: usize) -> (out: Option<usize>)
@@ -492,108 +489,10 @@ impl LifecycleActions {
         Ok(ticket)
     }
 
-    fn remove_cleanup(&mut self, i: usize)
-        requires old(self).wf(), i < old(self).cleanups.len(),
-            old(self).cleanups[i as int].outcome.is_some(),
-        ensures final(self).wf(), final(self).ledger.unchanged(&old(self).ledger),
-            !final(self).has_cleanup(old(self).cleanups[i as int].ticket.id),
-            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
-    {
-        let ghost prior = *self;
-        self.cleanups.remove(i);
-        proof {
-            assert forall|a:int| 0 <= a < self.cleanups.len() implies {
-                let r = #[trigger] self.cleanups[a];
-                &&& r.ticket.kind == ActionKind::Cleanup
-                &&& r.ticket.domain == self.domain_id()
-                &&& 0 < r.ticket.action < self.next_id()
-                &&& if r.outcome.is_none() { self.recorded(r.ticket) }
-                    else { !self.outstanding(r.ticket.id) }
-            } by {
-                let b = if a < i { a } else { a + 1 };
-                assert(self.cleanups[a] == prior.cleanups[b]);
-            }
-            assert forall|a:int,b:int| 0 <= a < b < self.cleanups.len()
-                implies self.cleanups[a].ticket.id != self.cleanups[b].ticket.id by {
-                let pa = if a < i { a } else { a + 1 };
-                let pb = if b < i { b } else { b + 1 };
-                assert(self.cleanups[a] == prior.cleanups[pa]);
-                assert(self.cleanups[b] == prior.cleanups[pb]);
-            }
-            assert forall|a:int| 0 <= a < self.cleanups.len()
-                implies self.cleanups[a].ticket.id != prior.cleanups[i as int].ticket.id by {
-                let b = if a < i { a } else { a + 1 };
-                assert(self.cleanups[a] == prior.cleanups[b]);
-            }
-        }
-    }
 
-    /// The receipt gate and the actual commitment release occur in this same
-    /// verified function. Failure cannot change any kernel state or commitments.
-    pub fn finish_cleanup(&mut self, kernel: &mut Kernel, id: usize) -> (out: Result<(), Error>)
-        requires old(self).wf(), old(kernel).wf(),
-        ensures final(kernel).generations_preserved(old(kernel)), final(self).wf(), final(kernel).wf(),
-            out.is_ok() == old(self).finish_enabled(old(kernel), id),
-            out.is_err() ==> final(self).same(old(self)) && final(kernel).unchanged(old(kernel))
-                && final(kernel).same_bindings(old(kernel)),
-            out.is_ok() ==> final(kernel).phase_of(id) == Some(Phase::Inactive)
-                && final(kernel).no_committed(id) && !final(self).blocked_spec(id)
-                && crate::refinement::step(old(kernel).paper(), final(kernel).paper(), id, crate::refinement::Rule::Unload),
-            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
-            final(kernel).commitments_frame(old(kernel),id),
-    {
-        proof {reveal(Kernel::generations_preserved);reveal(Kernel::unchanged);}
-
-        proof {
-            reveal(Kernel::unchanged);
-            reveal(Kernel::same_bindings);
-            reveal(Kernel::registered);
-            reveal(Kernel::phase_of);
-            reveal(Kernel::is_retired);
-            reveal(Kernel::is_restoring);
-            reveal(Kernel::generation_of);
-        }
-        let i = match self.cleanup_index(id) { Some(i) => i, None => return Err(Error::InvalidState) };
-        let receipt = self.cleanups[i];
-        if receipt.outcome.is_none() || receipt.outcome == Some(CleanupOutcome::Failed) {
-            return Err(Error::InvalidState);
-        }
-        if kernel.episode_generation(id) != Some(receipt.ticket.generation) || !kernel.cleanup_started(id) {
-            return Err(Error::InvalidState);
-        }
-        kernel.finish_cleanup(id)?;
-        self.remove_cleanup(i);
-        Ok(())
-    }
-
-    pub fn finish_reservation_cleanup(&mut self, kernel: &Kernel, id: usize) -> (out: Result<(), Error>)
-        requires old(self).wf(), kernel.wf(),
-        ensures final(self).wf(),
-            out.is_ok() == old(self).reservation_finish_enabled(kernel, id),
-            out.is_err() ==> final(self).same(old(self)),
-            out.is_ok() ==> !final(self).blocked_spec(id),
-            final(self).history_preserved(old(self)),final(self).no_new_release(old(self)),
-    {
-        proof {
-            reveal(Kernel::unchanged);
-            reveal(Kernel::same_bindings);
-            reveal(Kernel::registered);
-            reveal(Kernel::phase_of);
-            reveal(Kernel::is_retired);
-            reveal(Kernel::is_restoring);
-            reveal(Kernel::generation_of);
-        }
-        let i = match self.cleanup_index(id) { Some(i) => i, None => return Err(Error::InvalidState) };
-        let receipt = self.cleanups[i];
-        if receipt.outcome.is_none() || receipt.outcome == Some(CleanupOutcome::Failed)
-            || receipt.ticket.generation != 0 { return Err(Error::InvalidState); }
-        if kernel.phase(id) != Some(Phase::Inactive) || !kernel.retired(id)
-            || kernel.episode_generation(id) != Some(0) { return Err(Error::InvalidState); }
-        self.remove_cleanup(i);
-        Ok(())
-    }
 }
 
 }
 
+mod finish;
 pub mod resources;

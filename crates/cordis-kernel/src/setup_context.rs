@@ -6,19 +6,45 @@ use crate::effect_work::EffectIdentity;
 use crate::effect_work::EffectRun;
 use crate::execution::Execution;
 use crate::lifecycle_state::services::NativeContext;
-#[cfg(verus_keep_ghost)]
 use crate::reversible_value::joint;
 use crate::Binding;
 use std::sync::Arc;
 use vstd::prelude::*;
 
 verus! {
-/// Issued from a real work owner and live cleanup queue. It carries no payload
-/// reference. Numeric identities are scoped to the host's execution domain;
-/// this is not an authenticity claim about arbitrary colliding host instances.
-#[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]
-pub struct SetupScope {origin:Option<ActionTicket>,work_domain:u64,group:usize,queue_domain:u64}
+/// Issued from a real work owner and live cleanup queue. Linked scopes retain
+/// that queue's allocation without retaining its payloads or the execution.
+/// `belongs` checks the numeric selector; adapters also authenticate the binding.
+pub struct SetupScope {
+    origin:Option<ActionTicket>,work_domain:u64,group:usize,queue_domain:u64,
+    binding:Option<Arc<joint::identity::AllocationIdentity>>,
+}
+impl Clone for SetupScope {
+    #[allow(clippy::manual_map)] // The explicit branch preserves the exact Arc clone contract.
+    fn clone(&self)->(out:Self) ensures out==*self,
+    {
+        let binding=match &self.binding {Some(identity)=>Some(identity.clone()),None=>None};
+        Self {origin:self.origin,work_domain:self.work_domain,group:self.group,queue_domain:self.queue_domain,binding}
+    }
+}
 impl SetupScope {
+    pub closed spec fn wf(&self)->bool {match self.binding {Some(identity)=>identity.wf(),None=>true}}
+    pub closed spec fn binding_address(&self)->Option<crate::reversible_value::service_composition::Address> {
+        match self.binding {Some(identity)=>Some(identity.address()),None=>None}
+    }
+    pub fn binding_identity(&self)->(out:Option<&Arc<joint::identity::AllocationIdentity>>)
+        requires self.wf(),
+        ensures out.is_some()==self.binding_address().is_some(),out.is_some() ==> out.unwrap().wf()
+            && out.unwrap().address()==self.binding_address().unwrap(),
+    {self.binding.as_ref()}
+    /// This is the queue's full Journal/key address, not its reusable number.
+    pub open spec fn linked_to<V,C,G,I>(&self,execution:&Execution<V,C,G,I>)->bool {
+        self.matches(execution) && execution.cleanup_state().queues()[self.group_id()].link().is_some()
+            && self.binding_address()==Some(crate::reversible_value::service_composition::Address {
+                journal:execution.cleanup_state().queues()[self.group_id()].link().unwrap().0,
+                key:execution.cleanup_state().queues()[self.group_id()].link().unwrap().1})
+    }
+
     pub closed spec fn origin(&self)->Option<ActionTicket> {self.origin}
     pub closed spec fn work_domain(&self)->u64 {self.work_domain}
     pub closed spec fn group_id(&self)->usize {self.group}
@@ -73,19 +99,23 @@ impl<V,C,G,I> Execution<V,C,G,I> {
                 && out.unwrap().domain_id()==self.work_state().domain_id(),
     {match self.native() {Some(values)=>Some(values.setup_context()),None=>None}}
 
+    #[allow(clippy::manual_map)] // Keep the allocation getter/clone contracts in the Some branch.
     fn scope_for_group(&self,group:usize)->(out:Option<SetupScope>)
         requires self.wf(),
         ensures out.is_some()==self.cleanup_state().live(group),
-            out.is_some() ==> out.unwrap().matches(self) && out.unwrap().group_id()==group,
+            out.is_some() ==> out.unwrap().wf() && out.unwrap().matches(self) && out.unwrap().group_id()==group
+                && (out.unwrap().linked_to(self)==self.execution_journal().is_some()),
     {
         proof {self.representation();}
         let queue=self.groups.get(group)?;
-        Some(SetupScope {origin:self.lifecycle_ticket(),work_domain:self.work.domain(),group,queue_domain:queue.domain()})
+        let binding=match queue.allocation_identity() {Some(identity)=>Some(identity.clone()),None=>None};
+        Some(SetupScope {origin:self.lifecycle_ticket(),work_domain:self.work.domain(),group,queue_domain:queue.domain(),binding})
     }
     pub fn root_scope(&self)->(out:Option<SetupScope>)
         requires self.wf(),
         ensures out.is_some()==self.cleanup_state().live(0),
-            out.is_some() ==> out.unwrap().matches(self) && out.unwrap().group_id()==0,
+            out.is_some() ==> out.unwrap().wf() && out.unwrap().matches(self) && out.unwrap().group_id()==0
+                && (out.unwrap().linked_to(self)==self.execution_journal().is_some()),
     {self.scope_for_group(0)}
 
     /// Admit the real iterator and issue its callback scope in one operation.
@@ -111,7 +141,8 @@ impl<V,C,G,I> Execution<V,C,G,I> {
                 && old(run).identity().matches(&old(self).cleanup_state())
                 && old(self).cleanup_state().poll_enabled(old(run).identity().group_id(),target)),
             out.is_none() ==> *final(run)==*old(run),
-            out.is_some() ==> out.unwrap().matches(final(self))
+            out.is_some() ==> out.unwrap().wf() && out.unwrap().matches(final(self))
+                && (out.unwrap().linked_to(final(self))==final(self).execution_journal().is_some())
                 && out.unwrap().group_id()==final(run).identity().group_id()
                 && out.unwrap().queue_domain()==final(run).identity().domain_id()
                 && final(run).current()==Some(old(run).next()) && !final(run).called()

@@ -202,7 +202,7 @@ Components, Child and lifting — R1, R2
 - execution: [run_inspected](../crates/cordis-kernel/src/mixed_driver/fresh/inspected.rs)
 - execution: [publish_checked](../crates/cordis-kernel/src/publication/values.rs)
 - proof: [appended_value](../crates/cordis-kernel/src/publication/values/projection.rs)
-- host: [publish](../crates/cordis-driver/src/lib.rs)
+- host: [publish](../crates/cordis-driver/src/services.rs)
 - execution: [run_native_value_program](../crates/cordis-kernel/src/reversible_value/function.rs)
 - proof: [production](../crates/cordis-kernel/src/reversible_value/function.rs)
 - proof: [component](../crates/cordis-kernel/src/reversible_value/services.rs)

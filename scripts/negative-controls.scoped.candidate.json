@@ -1078,8 +1078,8 @@
       "name": "r2-config-update-discards-identity",
       "mutation": {
         "file": "configuration_runtime.rs",
-        "old": "self.configuration_target(target.id)==Some(target)",
-        "new": "self.configuration_target(target.id).is_some()"
+        "old": "target.domain==self.lifecycle().domain() && target.generation==generation && target.revision==recipe.revision()",
+        "new": "true"
       },
       "targets": [
         {
@@ -1094,7 +1094,7 @@
           "module": "configuration_runtime",
           "file": "configuration_runtime.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "requires self.wf(),ensures out==self.configuration_matches(target),"
+          "uniqueSourceAnchor": "requires self.wf(),ensures out==self.configuration_matches(*target),"
         }
       ],
       "selectionRationale": "Mutate the actual configuration update gate, retained Future sequencing, inverse result or native target check used by Loader. Require a fresh matching positive, whole-mutant compilation and the exact named contract rejection. This verifies scoped safety/provenance contracts, not arbitrary callback inverses, liveness or whole-tree reconciliation."
@@ -5848,7 +5848,7 @@
           "module": "setup_context",
           "file": "setup_context.rs",
           "diagnosticKind": "postcondition not satisfied",
-          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().matches(final(self))"
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().wf() && out.unwrap().matches(final(self))"
         }
       ],
       "selectionRationale": "Registration and Begin must retain the actual realm/anchor; admitted callbacks must use their own live queue scope. Fresh positive verification, complete mutant compilation and exact contract rejection are required; numeric scopes do not prove arbitrary host pointer identity."
@@ -8913,6 +8913,280 @@
         }
       ],
       "selectionRationale": "Reject the exact production classification or provenance fault. Require a fresh matching positive, full mutant compilation and the named contract diagnostic; solver limits, frontend errors and unrelated failures are not evidence."
+    },
+    {
+      "name": "native-invocation-uses-recipe-allocation",
+      "mutation": {
+        "file": "lifecycle_state/native/runtime.rs",
+        "old": "Ok(invocation)=>Ok(invocation.bind_native(self.joint.identity())),",
+        "new": "Ok(invocation)=>Ok(invocation.bind_native(self.recipe_identity())),"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::admit_managed_root"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::admit_managed_root",
+          "module": "lifecycle_state::native::runtime",
+          "file": "lifecycle_state/native/runtime.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out->Ok_0.work().value()==argument && out->Ok_0.owner()==id"
+        }
+      ],
+      "selectionRationale": "Check the actual Native factory against its exact retained allocation contract. Require a fresh matching positive, whole mutant compilation and the named contract diagnostic; ordinary Driver pointer checks remain a separate runtime boundary."
+    },
+    {
+      "name": "native-target-uses-recipe-allocation",
+      "mutation": {
+        "file": "configuration_runtime.rs",
+        "old": "native:self.poll_control_identity().clone()",
+        "new": "native:self.recipe_identity()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "configuration_runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::configuration_target"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::configuration_target",
+          "module": "configuration_runtime",
+          "file": "configuration_runtime.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().owner()==id && self.configuration_matches(out.unwrap())"
+        }
+      ],
+      "selectionRationale": "Check the actual Native factory against its exact retained allocation contract. Require a fresh matching positive, whole mutant compilation and the named contract diagnostic; ordinary Driver pointer checks remain a separate runtime boundary."
+    },
+    {
+      "name": "shared-child-drops-work-journal",
+      "mutation": {
+        "file": "lifecycle_state/registration/shared_child.rs",
+        "old": "let execution=match work.execution_domain() {Some(journal)=>Some(journal.clone()),None=>None};",
+        "new": "let execution:Option<Journal>=None;"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::shared_child",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::registration::shared_child::SharedChild::from_work"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::registration::shared_child::SharedChild::from_work",
+          "module": "lifecycle_state::registration::shared_child",
+          "file": "lifecycle_state/registration/shared_child.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().wf()"
+        }
+      ],
+      "selectionRationale": "Check that the actual Child factory retains its creating work or Native registration Journal. Require a fresh matching positive, whole mutant compilation and the named contract diagnostic. Driver allocation comparisons and host cleanup registration remain separate runtime boundaries."
+    },
+    {
+      "name": "registered-child-drops-native-journal",
+      "mutation": {
+        "file": "lifecycle_state/registration/shared_child.rs",
+        "old": "ChildOrigin {domain:child.domain,parent:child.parent,generation:None},Some(self.execution_journal())))",
+        "new": "ChildOrigin {domain:child.domain,parent:child.parent,generation:None},None))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::registration::shared_child",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::registered_child"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::registered_child",
+          "module": "lifecycle_state::registration::shared_child",
+          "file": "lifecycle_state/registration/shared_child.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_some() ==> out.unwrap().0.wf()"
+        }
+      ],
+      "selectionRationale": "Check that the actual Child factory retains its creating work or Native registration Journal. Require a fresh matching positive, whole mutant compilation and the named contract diagnostic. Driver allocation comparisons and host cleanup registration remain separate runtime boundaries."
+    },
+    {
+      "name": "native-history-uses-recipe-allocation",
+      "mutation": {
+        "file": "lifecycle_state/native/runtime.rs",
+        "old": "        let joint=self.joint.observe();\n        proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}\n        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))",
+        "new": "        let joint=self.joint.observe();\n        proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}\n        history::Snapshot::new(joint,self.recipe_identity(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::publication_snapshot"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::publication_snapshot",
+          "module": "lifecycle_state::native::runtime",
+          "file": "lifecycle_state/native/runtime.rs",
+          "diagnosticKind": "precondition not satisfied",
+          "uniqueSourceAnchor": "history::Snapshot::new(joint,self.recipe_identity(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))"
+        }
+      ],
+      "selectionRationale": "Check the actual Native observation factory and typed recovery entry: retain the Native allocation and the caller's historical cut. Require a fresh matching positive, whole mutant compilation and the exact contract diagnostic. Driver pointer comparison remains an ordinary Rust boundary."
+    },
+    {
+      "name": "native-recovery-discards-earlier-cut",
+      "mutation": {
+        "file": "lifecycle_state/native/runtime.rs",
+        "old": "self.recovery_snapshot(earlier.joint())",
+        "new": "self.recovery_snapshot(self.publication_snapshot().joint())"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_state::native::runtime",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::recovery_snapshot_from"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_state::native::runtime::NativeRuntime::recovery_snapshot_from",
+          "module": "lifecycle_state::native::runtime",
+          "file": "lifecycle_state/native/runtime.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.describes(earlier.joint_spec(),self.joint_key()),"
+        }
+      ],
+      "selectionRationale": "Check the actual Native observation factory and typed recovery entry: retain the Native allocation and the caller's historical cut. Require a fresh matching positive, whole mutant compilation and the exact contract diagnostic. Driver pointer comparison remains an ordinary Rust boundary."
+    },
+    {
+      "name": "cleanup-release-accepts-failed-report",
+      "mutation": {
+        "file": "lifecycle_actions/finish.rs",
+        "old": "|| record.outcome==Some(CleanupOutcome::Failed) {return Err(Error::InvalidState);}",
+        "new": "|| false {return Err(Error::InvalidState);}"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_actions::finish",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_index"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_index",
+          "module": "lifecycle_actions::finish",
+          "file": "lifecycle_actions/finish.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok() == self.resource_finish_enabled(kernel, id, reservation),"
+        },
+        {
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_index",
+          "module": "lifecycle_actions::finish",
+          "file": "lifecycle_actions/finish.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out.unwrap()<self.cleanups.len()\n                && self.cleanups[out.unwrap() as int].ticket.id==id\n                && self.cleanups[out.unwrap() as int].outcome.is_some()\n                && self.cleanups[out.unwrap() as int].outcome!=Some(CleanupOutcome::Failed)\n                && kernel.generation_of(id)==Some(self.cleanups[out.unwrap() as int].ticket.generation),"
+        }
+      ],
+      "selectionRationale": "The single production receipt gate must reject Failed and stale-generation reports before every lifecycle/resource release. Require a fresh matching positive, whole-mutant compilation and exact failure of the gate contract; scoped evidence is separate from full negative and release acceptance."
+    },
+    {
+      "name": "cleanup-release-ignores-generation",
+      "mutation": {
+        "file": "lifecycle_actions/finish.rs",
+        "old": "if record.ticket.generation!=generation || record.outcome.is_none()",
+        "new": "if record.outcome.is_none()"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "lifecycle_actions::finish",
+          "descendants": false,
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_index"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_index",
+          "module": "lifecycle_actions::finish",
+          "file": "lifecycle_actions/finish.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out.is_ok() == self.resource_finish_enabled(kernel, id, reservation),"
+        },
+        {
+          "function": "cordis_negative::lifecycle_actions::LifecycleActions::finish_index",
+          "module": "lifecycle_actions::finish",
+          "file": "lifecycle_actions/finish.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "out.is_ok() ==> out.unwrap()<self.cleanups.len()\n                && self.cleanups[out.unwrap() as int].ticket.id==id\n                && self.cleanups[out.unwrap() as int].outcome.is_some()\n                && self.cleanups[out.unwrap() as int].outcome!=Some(CleanupOutcome::Failed)\n                && kernel.generation_of(id)==Some(self.cleanups[out.unwrap() as int].ticket.generation),"
+        }
+      ],
+      "selectionRationale": "The single production receipt gate must reject Failed and stale-generation reports before every lifecycle/resource release. Require a fresh matching positive, whole-mutant compilation and exact failure of the gate contract; scoped evidence is separate from full negative and release acceptance."
+    },
+    {
+      "name": "node-service-ignores-publication-owner",
+      "mutation": {
+        "file": "node_runtime/services.rs",
+        "old": "if p.owner!=owner || p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {",
+        "new": "if p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::services",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication",
+          "module": "node_runtime::services",
+          "file": "node_runtime/services.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==ownership(self.observation(),owner,generation,id),"
+        }
+      ],
+      "selectionRationale": "The actual Node service command path must reject a foreign owner and an old current episode before changing a publication. Require the current positive, complete mutant compilation, and exactly the ownership postcondition rejection. This does not prove JS object interiors or whole-paper recovery."
+    },
+    {
+      "name": "node-service-ignores-current-generation",
+      "mutation": {
+        "file": "node_runtime/services.rs",
+        "old": "if p.owner!=owner || p.generation!=generation || self.control.kernel().episode_generation(owner)!=Some(generation) {",
+        "new": "if p.owner!=owner || p.generation!=generation {"
+      },
+      "targets": [
+        {
+          "kind": "module",
+          "path": "node_runtime::services",
+          "descendants": false,
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication"
+        }
+      ],
+      "expectedFailures": [
+        {
+          "function": "cordis_negative::node_runtime::NodeRuntime::owned_publication",
+          "module": "node_runtime::services",
+          "file": "node_runtime/services.rs",
+          "diagnosticKind": "postcondition not satisfied",
+          "uniqueSourceAnchor": "ensures out==ownership(self.observation(),owner,generation,id),"
+        }
+      ],
+      "selectionRationale": "The actual Node service command path must reject a foreign owner and an old current episode before changing a publication. Require the current positive, complete mutant compilation, and exactly the ownership postcondition rejection. This does not prove JS object interiors or whole-paper recovery."
     }
   ]
 }

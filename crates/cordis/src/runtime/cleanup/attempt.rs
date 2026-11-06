@@ -5,7 +5,7 @@
 //! Keep the completed attempt alive until acknowledgement has left the Episode
 //! lock, because dropping its Future may execute user code.
 use super::super::{
-    panic_message, CallbackError, CallbackResult, CleanupAction, CleanupCallback, Cleanups,
+    panic_message, CallbackError, CallbackResult, CleanupAction, CleanupCallback, EpisodeExecution,
     RetryCleanup,
 };
 use crate::future_support::poll_catching_unwind;
@@ -107,21 +107,19 @@ impl RunningCleanup {
     }
 }
 
-impl Cleanups {
-    pub(in crate::runtime) fn complete_reply(
-        &mut self,
+impl CleanupCompletion {
+    pub(in crate::runtime) fn acknowledge(
+        self,
+        execution: &mut EpisodeExecution,
         group: usize,
-        completion: CleanupCompletion,
         policy: CleanupPolicy,
     ) -> Result<CleanupReport<CallbackError, CleanupAction>, RejectedCleanup> {
-        let retry = completion.retry.map(HostAction::Retryable);
-        match completion.reply {
-            CleanupReply::Awaited(completion) => self
-                .protocol
+        let retry = self.retry.map(HostAction::Retryable);
+        match self.reply {
+            CleanupReply::Awaited(completion) => execution
                 .complete_future(group, completion, retry, policy)
                 .map_err(|(completion, retry)| RejectedCleanup::Awaited(completion, retry)),
-            CleanupReply::Failed(ticket, error) => self
-                .protocol
+            CleanupReply::Failed(ticket, error) => execution
                 .complete_failure(group, ticket, error, retry, policy)
                 .map_err(|(ticket, error, retry)| RejectedCleanup::Failed(ticket, error, retry)),
         }

@@ -14,23 +14,43 @@ impl Runtime {
         message: CallbackError,
     ) {
         if let Some(handle) = group {
-            lock(&handle.status)
-                .checked_mut()
-                .push_error(message.clone());
+            handle.record_error(message.clone());
         }
         self.cleanup_errors.push(RuntimeError::Cleanup {
             plugin: id,
             error: message,
         });
     }
-    fn finish_callback(
+    // Both synchronous Child reports and paired callback completions arrive
+    // after acknowledgement has left the Episode lock. Only Failed blocks;
+    // Drained keeps the host's existing consumed-cleanup policy.
+    fn record_cleanup_report(
+        &mut self,
+        id: PluginId,
+        handle: Option<&EffectHandle>,
+        report: CleanupReport<CallbackError, CleanupAction>,
+    ) {
+        drop(report.discarded);
+        if let Err(message) = report.result {
+            if report.outcome == RestoreOutcome::Failed {
+                drop(
+                    self.kernel
+                        .host_mut(id)
+                        .unwrap()
+                        .control
+                        .record_cleanup_failure(message.clone()),
+                );
+            }
+            self.record_cleanup(id, handle, message);
+        }
+    }
+    fn finish_child_result(
         &mut self,
         id: PluginId,
         group: usize,
         handle: Option<&EffectHandle>,
         ticket: RestoreTicket,
         result: CallbackResult,
-        retry: Option<RetryCleanup>,
     ) {
         let episode = self
             .kernel
@@ -40,11 +60,11 @@ impl Runtime {
             .as_ref()
             .unwrap()
             .clone();
-        let completed = lock(&episode.state).cleanups.complete_result(
+        let completed = lock(&episode.state).execution.complete_result(
             group,
             ticket,
             result,
-            retry,
+            None,
             CleanupPolicy::DrainConsumed,
         );
         let report = match completed {
@@ -55,19 +75,7 @@ impl Runtime {
             }
         };
         // User factories leave the bookkeeping lock before they are dropped.
-        drop(report.discarded);
-        if let Err(message) = report.result {
-            if report.outcome == RestoreOutcome::Failed {
-                drop(
-                    self.kernel
-                        .host_mut(id)
-                        .unwrap()
-                        .control_mut()
-                        .record_cleanup_failure(message.clone()),
-                );
-            }
-            self.record_cleanup(id, handle, message);
-        }
+        self.record_cleanup_report(id, handle, report);
     }
     fn finish_reply(
         &mut self,
@@ -84,9 +92,9 @@ impl Runtime {
             .as_ref()
             .unwrap()
             .clone();
-        let completed = lock(&episode.state).cleanups.complete_reply(
+        let completed = completion.acknowledge(
+            &mut lock(&episode.state).execution,
             group,
-            completion,
             CleanupPolicy::DrainConsumed,
         );
         // Both discarded and rejected user payloads leave the bookkeeping lock.
@@ -97,25 +105,13 @@ impl Runtime {
                 panic!("exact issued restoration receipt");
             }
         };
-        drop(report.discarded);
-        if let Err(message) = report.result {
-            if report.outcome == RestoreOutcome::Failed {
-                drop(
-                    self.kernel
-                        .host_mut(id)
-                        .unwrap()
-                        .control_mut()
-                        .record_cleanup_failure(message.clone()),
-                );
-            }
-            self.record_cleanup(id, handle, message);
-        }
+        self.record_cleanup_report(id, handle, report);
     }
     fn finish_value(
         &mut self,
         id: PluginId,
         handle: Option<&EffectHandle>,
-        completion: ValueCleanupReport<CleanupCallback, ChildHandle>,
+        completion: ValueCleanupReport<CleanupCallback, child::StaticChildControl>,
     ) {
         if let Err(error) = completion.report.result {
             let message = value_error(error);
@@ -123,7 +119,7 @@ impl Runtime {
                 self.kernel
                     .host_mut(id)
                     .unwrap()
-                    .control_mut()
+                    .control
                     .record_cleanup_failure(message.clone()),
             );
             self.record_cleanup(id, handle, message);
@@ -145,7 +141,7 @@ impl Runtime {
                 self.kernel
                     .host_mut(id)
                     .unwrap()
-                    .control_mut()
+                    .control
                     .record_cleanup_failure(message.clone()),
             );
             self.record_cleanup(id, handle, message);
@@ -171,7 +167,10 @@ impl Runtime {
             .clone();
         let mut progress = false;
         if running.is_none() {
-            let action = lock(&episode.state).cleanups.pop(group);
+            let action = lock(&episode.state)
+                .execution
+                .dispatch(group)
+                .expect("live cleanup group and available attempt identity");
             if let Some(dispatch) = action {
                 progress = true;
                 let dispatch = match dispatch {
@@ -204,15 +203,14 @@ impl Runtime {
                             Ok(_) => Ok(()),
                             Err(error) => Err(error),
                         };
-                        self.finish_callback(id, group, handle, ticket, result, None);
+                        self.finish_child_result(id, group, handle, ticket, result);
                     }
-                    CleanupAction::External(_) => self.finish_callback(
+                    CleanupAction::External(_) => self.finish_child_result(
                         id,
                         group,
                         handle,
                         ticket,
                         Err("ExternalChildInNativeRuntime".into()),
-                        None,
                     ),
                     CleanupAction::Callback(cleanup) => {
                         match RunningCleanup::start(ticket, cleanup) {
@@ -256,8 +254,7 @@ impl Runtime {
             .unwrap()
             .clone();
         let keys: Vec<_> = lock(&episode.state)
-            .cleanups
-            .protocol
+            .execution
             .effects()
             .keys()
             .copied()
@@ -276,35 +273,17 @@ impl Runtime {
                     .control()
                     .cleanup_failure()
                     .is_none();
-            let mut group = lock(&episode.state)
-                .cleanups
-                .protocol
-                .take_effect(key)
-                .unwrap();
-            let associated = {
-                let state = lock(&episode.state);
-                let status = lock(&group.get().handle.status);
-                status.belongs_to(&episode.state)
-                    && status.checked().matches_episode(&state.cleanups.protocol)
-            };
+            let mut group = lock(&episode.state).execution.take_effect(key).unwrap();
+            let associated = group.get().handle.matches_episode(&episode.state);
             if !associated {
                 // Reject before polling, cancellation, error forwarding or any
                 // mutation of a handle belonging to another shared Episode.
-                let returned = lock(&episode.state).cleanups.protocol.put_effect(group);
+                let returned = lock(&episode.state).execution.put_effect(group);
                 assert!(returned.is_ok(), "retain the foreign-handle group");
                 self.latch(id, "effect handle belongs to another episode".into());
                 continue;
             }
-            let driver = cx.waker().clone();
-            let (cancelled, previous) = {
-                let mut status = lock(&group.get().handle.status);
-                let previous = status.driver.replace(driver);
-                if unloading || !can_start {
-                    status.checked_mut().cancel();
-                }
-                (status.checked().observe().cancelled(), previous)
-            };
-            drop(previous);
+            let cancelled = group.get().handle.poll_driver(cx, unloading || !can_start);
             if cancelled {
                 let mut state = lock(
                     &self
@@ -319,7 +298,7 @@ impl Runtime {
                 // Completed iterators also pass through abstract Leave before
                 // their accumulator is restored. In-flight cancellation still
                 // keeps the delayed abstract Reloading state until landing.
-                state.cleanups.protocol.cancel(group.id());
+                state.execution.cancel(group.id());
             }
             if group.get().iterator.is_some() {
                 let mut setup = self
@@ -338,8 +317,7 @@ impl Runtime {
                 let admitted = {
                     let mut state = lock(&setup.state);
                     state
-                        .cleanups
-                        .protocol
+                        .execution
                         .admit_scoped_effect(&mut group, target.as_deref())
                 };
                 if let Some(scope) = admitted {
@@ -363,10 +341,7 @@ impl Runtime {
                         Err(_) => panic!("one actual call per admitted poll"),
                     };
                     group = returned;
-                    let landed = lock(&setup.state)
-                        .cleanups
-                        .protocol
-                        .land_effect(&mut group, reply);
+                    let landed = lock(&setup.state).execution.land_effect(&mut group, reply);
                     let report = match landed {
                         Ok(report) => report,
                         Err(rejected) => {
@@ -377,9 +352,7 @@ impl Runtime {
                     if let Some(report) = report {
                         if let Some(message) = report.error {
                             if !(cancelled && message.is_cancelled()) {
-                                lock(&group.get().handle.status)
-                                    .checked_mut()
-                                    .push_error(message.clone());
+                                group.get().handle.record_error(message.clone());
                                 self.latch(id, message);
                             }
                         }
@@ -396,25 +369,10 @@ impl Runtime {
                 }
             }
             if group.get().iterator.is_none() {
-                let wakers = {
-                    // Episode -> status -> Journal. Never acquire Episode while
-                    // holding status, and release both before invoking a waker.
-                    let state = lock(&episode.state);
-                    let mut status = lock(&group.get().handle.status);
-                    if status.belongs_to(&episode.state)
-                        && !status.checked().observe().initialized()
-                        && state
-                            .cleanups
-                            .protocol
-                            .initialize_effect_status(group.id())
-                            .is_some()
-                    {
-                        std::mem::take(&mut status.wakers)
-                    } else {
-                        BTreeMap::new()
-                    }
-                };
-                wake_waiters(wakers);
+                group
+                    .get()
+                    .handle
+                    .initialize_effect(&episode.state, group.id());
             }
             if cancelled
                 && group.get().iterator.is_none()
@@ -440,32 +398,19 @@ impl Runtime {
                     .unwrap()
                     .clone();
                 if group.get().running.is_none() {
-                    let handle = group.get().handle.clone();
-                    let retired = {
-                        let mut state = lock(&episode.state);
-                        let status = lock(&handle.status);
-                        if status.belongs_to(&episode.state) {
-                            state.cleanups.protocol.retire_observed_effect(group)
-                        } else {
-                            Err(group)
-                        }
-                    };
-                    match retired {
-                        Ok((payload, _observation)) => {
-                            // Removal consumes the actual checkout under the same
-                            // lock as registration. Drop user payloads after unlocking.
-                            let mut status = lock(&payload.handle.status);
-                            let wakers = std::mem::take(&mut status.wakers);
-                            drop(status);
-                            wake_waiters(wakers);
+                    match EffectHandle::retire_effect(&episode.state, group) {
+                        effect_handle::Retirement::Finished(payload) => {
+                            // The checked removal returns the actual payload;
+                            // user destructors run after all bookkeeping locks.
+                            drop(payload);
                             progress = true;
                             continue;
                         }
-                        Err(retained) => group = retained,
+                        effect_handle::Retirement::Retained(retained) => group = retained,
                     }
                 }
             }
-            let returned = lock(&episode.state).cleanups.protocol.put_effect(group);
+            let returned = lock(&episode.state).execution.put_effect(group);
             assert!(
                 returned.is_ok(),
                 "return the checked-out effect to its live queue"

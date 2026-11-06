@@ -127,6 +127,13 @@ Unload dispatcher 分支另有清理守卫加 inverse 的精确域；真实源�
   `Runtime::poll_settle` 在执行宿主回调前后调用共享生命周期 Driver。
   这是实际的集成路径，不是对任意回调或 Future 行为的证明。
 
+Node 服务命令也使用同一份显式 publication 状态。
+[`NodeRuntime` 服务操作](../crates/cordis-kernel/src/node_runtime/services.rs)
+检查实际 owner／当前代次、保留活 lease，并在回收后协调动态声明。
+实际对象表的 Bridge 在同一次独占借用中共用准入与修改入口。
+下面最后三个测试覆盖外来／旧 owner、lease 释放后的声明转交及真实对象写入。
+合同、两项严格负控和 JS／FFI 边界见[所有权审查](review-map.zh-CN.md#node-publication-命令的所有权)。
+
 **执行检查：**
 
 ```sh
@@ -149,6 +156,9 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol repeated_failed_pr
 cargo test --offline -p cordis-kernel --test cleanup_protocol setup_reply_and_wrong_ticket_fields_cannot_authorize_cleanup -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol generation_zero_reservation_uses_its_own_release_guard_after_retry -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts_stay_rejected_after_real_episode_reactivation -- --exact
+cargo test --offline -p cordis-kernel --test node_services foreign_and_old_episode_commands_preserve_the_actual_publication -- --exact
+cargo test --offline -p cordis-kernel --test node_services reclaim_waits_for_real_lease_then_transfers_the_dynamic_declaration -- --exact
+cargo test --offline -p cordis-driver --test service_ownership metadata_and_object_replacement_share_ownership_and_error_precedence -- --exact
 ```
 
 第一个测试观察到：当前目标不可用时，consumer 原有的已提交绑定仍然保留，

@@ -448,3 +448,53 @@ fn checks_receive_inherited_config_and_snapshots_do_not_invoke_user_predicates()
     assert_eq!(*runtime.get(&context, key).unwrap(), 10);
     assert_eq!(checks.load(Ordering::SeqCst), before);
 }
+
+#[test]
+fn failed_and_retired_consumers_do_not_recheck_user_predicates() {
+    let mut runtime = Runtime::new();
+    let context = Context::new();
+    let key = ServiceKey::<usize>::new("observed availability");
+    let checks = Arc::new(AtomicUsize::new(0));
+    let count = checks.clone();
+    runtime
+        .mount(
+            &context,
+            None,
+            Plugin::new("provider", move |setup| {
+                let count = count.clone();
+                setup.provide_checked(key, 10, move |_, _, _| {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    true
+                })?;
+                Ok(())
+            })
+            .provides(key),
+        )
+        .unwrap();
+    let consumer = runtime
+        .mount(
+            &context,
+            None,
+            Plugin::new("failed consumer", |_| Err("setup failed".into())).requires(key),
+        )
+        .unwrap();
+    assert!(matches!(poll(&mut runtime), Poll::Ready(Err(_))));
+    assert_eq!(runtime.phase(consumer), Some(Phase::Inactive));
+    let failed = checks.load(Ordering::SeqCst);
+    assert!(failed > 0);
+    // A retained setup failure is idle. Diagnostics and another settle must
+    // not execute user predicates just to rediscover the same failure.
+    let _ = runtime.snapshot();
+    assert!(matches!(poll(&mut runtime), Poll::Ready(Err(_))));
+    assert_eq!(checks.load(Ordering::SeqCst), failed);
+    // Explicit restart resumes real observation, without using a cached result.
+    runtime.restart(consumer).unwrap();
+    assert!(matches!(poll(&mut runtime), Poll::Ready(Err(_))));
+    let restarted = checks.load(Ordering::SeqCst);
+    assert!(restarted > failed);
+    // Removal of this retired, inactive consumer needs no user callback.
+    runtime.dispose(consumer).unwrap();
+    assert_eq!(poll(&mut runtime), Poll::Ready(Ok(())));
+    assert!(!runtime.contains(consumer));
+    assert_eq!(checks.load(Ordering::SeqCst), restarted);
+}

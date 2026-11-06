@@ -154,6 +154,15 @@ consumer may temporarily disagree with its current target.
   host callback execution. This is an actual integration path, not a proof of
   arbitrary callback or Future behavior.
 
+The Node service command path also uses the same represented publication state.
+[`NodeRuntime` service operations](../crates/cordis-kernel/src/node_runtime/services.rs)
+check actual owner/current generation, preserve retained leases, and reconcile
+dynamic declarations after reclamation. The actual object-table Bridge shares
+admission and mutation under one exclusive borrow. The final three tests below
+exercise foreign/old owners, declaration transfer after lease release and actual
+object writes. See the [ownership review](review-map.md#node-publication-command-ownership)
+for its contracts, two strict controls and JS/FFI boundaries.
+
 **Executable review:**
 
 ```sh
@@ -176,6 +185,9 @@ cargo test --offline -p cordis-kernel --test cleanup_protocol repeated_failed_pr
 cargo test --offline -p cordis-kernel --test cleanup_protocol setup_reply_and_wrong_ticket_fields_cannot_authorize_cleanup -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol generation_zero_reservation_uses_its_own_release_guard_after_retry -- --exact
 cargo test --offline -p cordis-kernel --test cleanup_protocol completed_receipts_stay_rejected_after_real_episode_reactivation -- --exact
+cargo test --offline -p cordis-kernel --test node_services foreign_and_old_episode_commands_preserve_the_actual_publication -- --exact
+cargo test --offline -p cordis-kernel --test node_services reclaim_waits_for_real_lease_then_transfers_the_dynamic_declaration -- --exact
+cargo test --offline -p cordis-driver --test service_ownership metadata_and_object_replacement_share_ownership_and_error_precedence -- --exact
 ```
 
 The first test observes an unavailable current target while the consumer's old

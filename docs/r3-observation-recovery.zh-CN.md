@@ -2,9 +2,10 @@
 
 [English](r3-observation-recovery.md) · [值与 Child 最终恢复](r3-final-recovery.zh-CN.md) · [里程碑](paper-refinement-roadmap.zh-CN.md)
 
-本页对应 R3 剩余工作的第 2 包，完成 native 生产观察中的精确 typed publication、
-Episode owner，以及等待逆操作登记的受管写入。每个中间截面都来自真实共享 Journal，
-包括加载、清理失败和重试期间。**R3 整体仍在进行中。** [第 3 包](r3-host-recovery.zh-CN.md)现已完成普通 Rust 宿主所有权迁移；合法剩余生产执行仍属于后续工作。
+本页说明 native 生产观察中的精确 typed publication、Episode owner，以及等待
+逆操作登记的受管写入。中间截面来自真实共享 Journal，包含加载、失败清理和重试。
+[普通宿主所有权](r3-host-recovery.zh-CN.md)连接真实调用者；一般剩余执行与整篇论文恢复
+仍是独立义务。
 
 ## 保证是什么
 
@@ -62,13 +63,20 @@ Unload 和登记提交，随后推出来源闭合与三张表恢复；终点相�
 
 ## 生产边界与运行成本
 
-这些 API 面向验证使用。调用方建立较早快照的同 Journal／native 来源关系，实际
-读锁建立后续捕获的时间顺序。历史 typed 观察取自当前 native 所有者持续维护的完整
-历史，不比较两份由外部独立提供的 typed 历史。
+上面的原始 `NativeRuntime::recovery_snapshot` 面向证明调用者，需要建立早期截面
+的同 Journal／Native 记录前提；typed `recovery_snapshot_from` 从受认证 Native
+快照推导记录前提。普通 `NativeDriver::recovery_snapshot(&native_cut)` 检查保留的
+Native 分配并返回 `Option<Capture<V>>`；输入来自 `driver.publication_snapshot()`
+或配置的 `native_snapshot()`。`None` 拒绝外来截面，`Some` 不代表内部擦除查询的
+平衡结果；旧本地观察在后续生命周期变化后仍有效。详见[来源审查](review-map.zh-CN.md#native-历史快照)。
+
+实际读锁建立时间上的扩展关系；typed 观察来自当前所有者维护的完整历史，
+不比较外部独立提供的历史。`Capture::describes` 为原始和 typed 内核入口统一表达
+精确早期截面的观察合同。
 
 `interval`、`issue`、`observations` 和 `observation_issue` 都是会被擦除的 `Ghost`
-证据，普通 Rust 不能将它们作为运行时恢复状态读取。捕获读取既有 Journal 锁，不保存
-运行日志，也不增加用户 payload Arc。它观察执行，不执行回滚或调度清理。
+证据，普通 Rust 不能将它们作为运行时恢复状态读取。捕获读取既有 Journal 锁，保留
+Journal／Native 身份元数据，不保存运行日志或增加用户 payload Arc。它观察执行，不执行回滚或调度清理。
 
 本包恢复的投影是 native publication／owner 表和 Journal 的受管逆操作登记表，
 不宣称所有 control／heap／configuration 记录相等，不恢复任意回调内部状态，

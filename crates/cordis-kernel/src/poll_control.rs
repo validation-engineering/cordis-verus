@@ -12,6 +12,7 @@ use crate::reversible_value::joint::{self, Member};
 #[cfg(verus_keep_ghost)]
 use crate::Kernel;
 use crate::{Error, Phase};
+use std::sync::Arc;
 use vstd::prelude::*;
 verus! {
 #[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]
@@ -19,19 +20,33 @@ pub struct PollFlags {pub failed:bool,pub restart:bool}
 pub struct PollControl<E> {
     owner:usize,episode:Option<ActionTicket>,work_domain:u64,
     failed:Option<E>,cleanup_failure:Option<E>,restart:bool,
-    #[allow(dead_code)] native:Ghost<nat>,
+    native:Arc<joint::identity::AllocationIdentity>,
     #[allow(dead_code)] groups:Ghost<Option<nat>>,
     member:Member,
 }
 impl<E> PollControl<E> {
-    pub closed spec fn state(&self)->State {State {native:self.native@,owner:self.owner,episode:self.episode,
+    pub closed spec fn state(&self)->State {State {native:self.native.address().key,owner:self.owner,episode:self.episode,
         work_domain:self.work_domain,groups:self.groups@,failed:self.failed.is_some(),cleanup_failure:self.cleanup_failure.is_some(),restart:self.restart}}
     pub closed spec fn setup_error(&self)->Option<E> {self.failed}
     pub closed spec fn cleanup_error(&self)->Option<E> {self.cleanup_failure}
     pub closed spec fn journal(&self)->Journal {self.member.journal()}
     pub closed spec fn key(&self)->nat {self.member.key()}
     pub closed spec fn history(&self)->Seq<joint::Frame> {self.member.events()}
-    pub closed spec fn wf(&self)->bool {self.member.wf() && self.member.record()==(joint::Record::Control {state:self.state()})}
+    pub closed spec fn binding_address(&self)->crate::reversible_value::service_composition::Address {self.native.address()}
+    pub closed spec fn wf(&self)->bool {
+        self.native.wf() && self.binding_address().journal==self.journal()
+            && self.member.wf() && self.member.record()==(joint::Record::Control {state:self.state()})
+    }
+    /// Borrow the factory's Native allocation, not a caller-supplied numeric ID.
+    pub fn binding_identity(&self)->(out:&Arc<joint::identity::AllocationIdentity>)
+        requires self.wf(),ensures out.wf(),out.address()==self.binding_address(),
+    {&self.native}
+    /// The identity carried by the executable handle has exactly the meaning
+    /// of the checked transition's existing Native/Journal binding premise.
+    pub proof fn binding_correspondence<R,H,V>(&self,native:&NativeRuntime<R,H,V>)
+        requires self.wf(),
+        ensures self.bound(native)==(self.binding_address()==native.control_address()),
+    {}
     pub open spec fn bound<R,H,V>(&self,native:&NativeRuntime<R,H,V>)->bool {
         self.journal()==native.journal_spec() && self.state().native==native.joint_key()
     }
@@ -52,7 +67,8 @@ impl<E> PollControl<E> {
     {PollFlags {failed:self.failed.is_some() || self.cleanup_failure.is_some(),restart:self.restart}}
     pub fn restart_requested(&self)->(out:bool) ensures out==self.state().restart, {self.restart}
     fn commit(&mut self,view:joint::WriteView,Ghost(before):Ghost<State>,Ghost(event):Ghost<Event>)
-        requires old(self).member.wf(),old(self).member.record()==(joint::Record::Control {state:before}),
+        requires old(self).native.wf(),old(self).binding_address().journal==old(self).journal(),
+            old(self).member.wf(),old(self).member.record()==(joint::Record::Control {state:before}),
             view.wf(),view.journal_spec()==old(self).journal(),joint::control::step(before,old(self).state(),event),
             joint::control::guard(view.state(),before,event),
         ensures final(self).wf(),final(self).state()==old(self).state(),final(self).setup_error()==old(self).setup_error(),
@@ -105,10 +121,11 @@ impl<R,H,V> NativeRuntime<R,H,V> {
                 && out.unwrap().state().episode.is_none() && !out.unwrap().state().failed && !out.unwrap().state().cleanup_failure && !out.unwrap().state().restart,
     {
         if !self.kernel().contains(id) {return None;}
+        let native=self.poll_control_identity().clone();
         let journal=self.execution_journal();
         let ghost state=State {native:self.joint_key(),owner:id,episode:None,work_domain:0,groups:None,failed:false,cleanup_failure:false,restart:false};
         let member=journal.allocate(Ghost(joint::Record::Control {state}));
-        Some(PollControl {owner:id,episode:None,work_domain:0,failed:None,cleanup_failure:None,restart:false,native:Ghost(self.joint_key()),groups:Ghost(None),member})
+        Some(PollControl {owner:id,episode:None,work_domain:0,failed:None,cleanup_failure:None,restart:false,native,groups:Ghost(None),member})
     }
     /// Restart is only intent: it clears setup failure, never retained cleanup.
     pub fn request_restart<E>(&self,control:&mut PollControl<E>)->(out:Result<Option<E>,Error>)

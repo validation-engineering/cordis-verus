@@ -92,7 +92,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
                     && self.registry().entries()[changes@[j].target.owner()].recipe().version()<u64::MAX,
             decreases changes.len()-i,
         {
-            let target=changes[i].target;
+            let target=&changes[i].target;
             if !self.configuration_target_is_current(target) {
                 let failure=Failure {index:i,cause:Cause::Target};proof {rejected_not_ready(*self,changes@,failure);}return Err(failure);
             }
@@ -178,7 +178,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
             let ghost current=*self;let ghost index=previous.len();let ghost original=change;
             proof {assert(input[index as int]==original);unprocessed(initial,*self,input,previous@,callback);}
             let id=change.target.id();
-            let recipe=self.replace_configuration(change.target,change.recipe).ok().unwrap();
+            let recipe=self.replace_configuration(&change.target,change.recipe).ok().unwrap();
             let ghost installed=*self;
             assert(framed(current,installed));
             let host=self.host_mut(id).unwrap();

@@ -16,12 +16,12 @@ fn withdrawal_keeps_action_ownership_until_the_inflight_result_lands() {
     let id = driver.insert(None, vec![], vec![]).unwrap();
     assert_eq!(driver.decision(id, ready()), Some(Decision::Begin));
     driver.begin(id).unwrap();
-    let setup = driver.pending_action(id).unwrap().clone();
+    let setup = driver.pending_action(id).unwrap();
     driver.retire(id).unwrap();
     assert_eq!(driver.decision(id, ready()), Some(Decision::Withdraw));
     driver.leave(id).unwrap();
     assert_eq!(driver.begin_cleanup(id), Err(Error::Relied));
-    assert_eq!(driver.pending_action(id), Some(&setup));
+    assert_eq!(driver.pending_action(id).as_ref(), Some(&setup));
     let mut forged = setup.clone();
     forged.generation += 1;
     assert_eq!(
@@ -34,7 +34,7 @@ fn withdrawal_keeps_action_ownership_until_the_inflight_result_lands() {
         "StaleAction"
     );
     driver.begin_cleanup(id).unwrap();
-    let cleanup = driver.pending_action(id).unwrap().clone();
+    let cleanup = driver.pending_action(id).unwrap();
     assert_eq!(cleanup.kind, ActionKind::Cleanup);
     assert_eq!(cleanup.generation, setup.generation);
     assert!(cleanup.action > setup.action);
@@ -63,7 +63,7 @@ fn common_cleanup_arbitration_waits_for_consumer_setup_and_inverse() {
     driver.settle_setup(provider).unwrap();
     driver.finish(provider).unwrap();
     driver.begin(consumer).unwrap();
-    let setup = driver.pending_action(consumer).unwrap().clone();
+    let setup = driver.pending_action(consumer).unwrap();
     driver.retire(provider).unwrap();
     driver.leave(provider).unwrap();
     driver.leave(consumer).unwrap();
@@ -71,7 +71,7 @@ fn common_cleanup_arbitration_waits_for_consumer_setup_and_inverse() {
     assert_eq!(driver.begin_cleanup(consumer), Err(Error::Relied));
     driver.complete_action(&setup).unwrap();
     driver.begin_cleanup(consumer).unwrap();
-    let cleanup = driver.pending_action(consumer).unwrap().clone();
+    let cleanup = driver.pending_action(consumer).unwrap();
     assert_eq!(driver.begin_cleanup(provider), Err(Error::Relied));
     driver
         .complete_cleanup(&cleanup, CleanupOutcome::Succeeded)
@@ -88,7 +88,7 @@ fn action_domains_and_retry_attempts_cannot_acknowledge_each_other() {
     let other = second.insert(None, vec![], vec![]).unwrap();
     first.begin(id).unwrap();
     second.begin(other).unwrap();
-    let foreign = second.pending_action(other).unwrap().clone();
+    let foreign = second.pending_action(other).unwrap();
     assert_eq!(
         first.complete_action(&foreign).unwrap_err().code,
         "WrongDomain"
@@ -96,7 +96,7 @@ fn action_domains_and_retry_attempts_cannot_acknowledge_each_other() {
     first.settle_setup(id).unwrap();
     first.leave(id).unwrap();
     first.begin_cleanup(id).unwrap();
-    let failed = first.pending_action(id).unwrap().clone();
+    let failed = first.pending_action(id).unwrap();
     first
         .complete_cleanup(&failed, CleanupOutcome::Failed)
         .unwrap();
@@ -109,7 +109,7 @@ fn action_domains_and_retry_attempts_cannot_acknowledge_each_other() {
             .code,
         "StaleAction"
     );
-    assert_eq!(first.pending_action(id), Some(&retry));
+    assert_eq!(first.pending_action(id).as_ref(), Some(&retry));
 }
 
 #[test]

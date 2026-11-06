@@ -299,7 +299,8 @@ impl<C,G,A,R,T:?Sized,M,X> RecordedExecution<C,G,A,R,T,M,X> {
     pub fn admit_root<P,H,B>(&mut self,runtime:&crate::lifecycle_state::native::runtime::NativeRuntime<P,H,Slot<T,M>>,id:usize,argument:B)->(out:Result<crate::lifecycle_state::registration::RegisteredInvocation<B>,B>)
         requires old(self).wf(),runtime.wf(),
         ensures final(self).wf(),final(self).same_history(old(self)),final(self).source_order_extends(old(self)),
-            out.is_ok() ==> out->Ok_0.work().value()==argument && out->Ok_0.owner()==id,
+            out.is_ok() ==> out->Ok_0.work().value()==argument && out->Ok_0.owner()==id
+                && out->Ok_0.bound_to(runtime.control_address()),
     {
         proof {self.facts();}let out=runtime.admit_managed_root(id,&mut self.core,argument);
         proof {reveal(RecordedExecution::wf);reveal(RecordedExecution::source_order_extends);}out

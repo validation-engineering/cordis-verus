@@ -232,6 +232,24 @@ impl<T> Bridge<T> {
         if !self.contains(key) {return Err(BridgeError::Unknown);}
         Ok(node.replace(publication,owner,generation,key.id()))
     }
+    /// The real object replacement keeps Node admission/ownership validation
+    /// before domain/key errors, then writes under the same exclusive borrow.
+    pub fn replace_service(&self,node:&mut NodeRuntime,owner:usize,generation:u64,publication:PublicationId,key:ObjectKey)
+        ->(out:Result<Result<(),super::services::ServiceError>,BridgeError>)
+        requires self.wf(),old(node).wf(),
+        ensures final(node).wf(),
+            out.is_ok() ==> super::services::service_replaced(old(node).history(),final(node).history(),owner,generation,publication,key.id(),out->Ok_0),
+            out.is_ok() && super::services::replacement_guard(old(node).observation(),owner,generation,publication).is_ok() ==>
+                self.objects().contains_key(key.id()) && key.domain()==self.domain_id()
+                    && key.domain()==old(node).observation().control.protocol().domain_id(),
+            out.is_err() ==> *final(node)==*old(node),
+    {
+        proof {reveal(super::services::service_replaced);super::interfaces::prefix_reflexive(node.history());}
+        if let Err(e)=node.check_replacement(owner,generation,publication) {return Ok(Err(e));}
+        if self.domain!=node.state().domain() || key.domain()!=self.domain {return Err(BridgeError::Domain);}
+        if !self.contains(key) {return Err(BridgeError::Unknown);}
+        Ok(node.replace_admitted(owner,generation,publication,key.id()))
+    }
     pub fn resolve<'a>(&'a self,node:&mut NodeRuntime,port:Port,consumer:Option<usize>,generation:Option<u64>)->(out:Result<Option<(reads::Read,&'a T)>,BridgeError>)
         requires self.wf(),old(node).wf(),ensures final(node).wf(),
             out.is_ok() && out->Ok_0.is_some() ==> {

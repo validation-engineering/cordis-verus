@@ -127,6 +127,7 @@ impl<S,R,K,U> Ledger<S,R,K,U> {
             self.history=Ghost(prior.history().append(next,event));self.positions=Ghost(prior.positions().push((self.frames().len()-1) as nat));
         }
     }
+    pub(crate) fn domain_ref(&self)->(out:&joint::Journal) ensures *out==self.journal(), {self.member.domain_ref()}
     pub(crate) fn domain(&self)->(out:joint::Journal) ensures out==self.journal(), {self.member.domain()}
     pub(crate) fn certify_write(&self,view:&joint::WriteView)
         requires self.wf(),view.wf(),view.journal_spec()==self.journal(),

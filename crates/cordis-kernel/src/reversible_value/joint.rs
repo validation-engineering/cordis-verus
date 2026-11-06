@@ -69,7 +69,7 @@ impl Pending {
     pub closed spec fn journal(&self)->Journal {self.journal}
     pub closed spec fn at(&self)->nat {self.point.key()}
     pub closed spec fn object(&self)->nat {self.point.value()}
-    pub closed spec fn wf(&self)->bool {self.point.id()==self.journal.inner.pred().pending}
+    pub closed spec fn wf(&self)->bool {self.point.id()==self.journal.inner.lock.pred().pending}
 }
 pub open spec fn pending_index(p:Option<Pending>)->Option<nat> {match p {Some(p)=>Some(p.at()),None=>None}}
 pub open spec fn pending_matches(p:Option<Pending>,journal:Journal,key:nat,at:nat,enabled:bool)->bool {
@@ -275,7 +275,7 @@ impl Cell {
             && forall|key:nat| #[trigger] self.auth@@.contains_key(key) <==> key<self.next@
     }
     proof fn transfer(tracked &mut self,journal:Journal,event:Step,tracked pending:Option<Pending>)->(tracked out:Option<Pending>)
-        requires valid(old(self).history@.events()),old(self).pending@.id()==journal.inner.pred().pending,
+        requires valid(old(self).history@.events()),old(self).pending@.id()==journal.inner.lock.pred().pending,
             old(self).pending@@==pending_at(old(self).history@.events(),old(self).history@.events().len()),
             event.pending ==> forward(event) && pending.is_none(),
             event.settled==pending_index(pending),
@@ -330,7 +330,20 @@ impl RwLockPredicate<Cell> for Predicate {
 }
 /// Share this domain with native lifecycle and newly allocated values. No
 /// callback runs under this lock, and it never acquires a value or slot lock.
-pub struct Journal {inner:Arc<RwLock<Cell,Predicate>>}
+/// Opaque backing allocation. Borrowing its identity exposes neither the lock
+/// nor mutation authority; ordinary adapters may compare the retained Arcs.
+pub struct JournalIdentity {lock:RwLock<Cell,Predicate>}
+pub struct Journal {inner:Arc<JournalIdentity>}
+impl Journal {
+    pub closed spec fn identity_spec(&self)->Arc<JournalIdentity> {self.inner}
+    /// Borrow the existing allocation; no counter, new allocation or lock.
+    pub fn runtime_identity(&self)->(out:&Arc<JournalIdentity>)
+        ensures *out==self.identity_spec(),
+    {&self.inner}
+    pub proof fn identity_correspondence(&self,other:&Self)
+        ensures (*self==*other)==(self.identity_spec()==other.identity_spec()),
+    {}
+}
 impl Clone for Journal {
     fn clone(&self)->(out:Self) ensures out==*self, {Self {inner:self.inner.clone()}}
 }
@@ -342,9 +355,9 @@ impl<'a> ReadView<'a> {
     pub closed spec fn state(&self)->Map<nat,Record> {self.guard.view().auth@@}
     pub closed spec fn events(&self)->Seq<Frame> {self.guard.view().history@.events()}
     pub closed spec fn wf(&self)->bool {
-        self.guard.rwlock()==*self.journal.inner && self.guard.view().wf()
-            && self.guard.view().auth@.id()==self.journal.inner.pred().source
-            && self.guard.view().history@.source()==self.journal.inner.pred().history
+        self.guard.rwlock()==self.journal.inner.lock && self.guard.view().wf()
+            && self.guard.view().auth@.id()==self.journal.inner.lock.pred().source
+            && self.guard.view().history@.source()==self.journal.inner.lock.pred().history
     }
     pub(crate) fn certify_history(&self,_earlier:&Snapshot)
         requires self.wf(),_earlier.certified(),_earlier.journal_spec()==self.journal_spec(),
@@ -380,7 +393,7 @@ impl<'a> ReadView<'a> {
     }
 }
 proof fn receipts_included<K>(tracked authority:&Authority<Frame>,tracked receipts:&Map<K,Receipt>,keys:Set<K>,journal:Journal)
-    requires authority.wf(),authority.source()==journal.inner.pred().history,keys.subset_of(receipts.dom()),
+    requires authority.wf(),authority.source()==journal.inner.lock.pred().history,keys.subset_of(receipts.dom()),
         forall|k:K| receipts.contains_key(k) ==> #[trigger] receipts[k].wf(),
     ensures forall|k:K| keys.contains(k) && #[trigger] receipts[k].journal()==journal ==>
         receipts[k].events().len()<=authority.events().len()
@@ -415,7 +428,7 @@ proof fn certify_reference(tracked authority:&Authority<Frame>,record:Record,tra
     }
 }
 impl Journal {
-    pub closed spec fn identity_namespace(&self)->Loc {self.inner.pred().issuer}
+    pub closed spec fn identity_namespace(&self)->Loc {self.inner.lock.pred().issuer}
     /// Include all earlier instruction witnesses, even across A/B/A domain
     /// alternation. Only local histories enter this real read checkpoint.
     pub(crate) fn join_receipts<K>(&self,Tracked(receipts):Tracked<&Map<K,Receipt>>,Tracked(first):Tracked<Option<Receipt>>)->(out:Tracked<Option<Receipt>>)
@@ -424,7 +437,7 @@ impl Journal {
             first.is_some() && first.unwrap().journal()==*self ==> out@.is_some() && out@.unwrap().covers(&first.unwrap()),
             forall|k:K|receipts.contains_key(k) && #[trigger] receipts[k].journal()==*self ==> out@.is_some() && out@.unwrap().covers(&receipts[k]),
     {
-        let guard=self.inner.acquire_read();let _cell=guard.borrow();let tracked result;
+        let guard=self.inner.lock.acquire_read();let _cell=guard.borrow();let tracked result;
         proof {
             receipts_included(_cell.history.borrow(),receipts,receipts.dom(),*self);
             if let Some(ref receipt)=first {if receipt.journal()==*self {_cell.history.borrow().extends(&receipt.witness);}}
@@ -443,7 +456,7 @@ impl Journal {
             first.is_some() && first.unwrap().journal()==*self ==> out@.is_some() && out@.unwrap().covers(&first.unwrap()),
             second.is_some() && second.unwrap().journal()==*self ==> out@.is_some() && out@.unwrap().covers(&second.unwrap()),
     {
-        let guard=self.inner.acquire_read();let _cell=guard.borrow();
+        let guard=self.inner.lock.acquire_read();let _cell=guard.borrow();
         let tracked result;
         proof {
             if let Some(ref receipt)=first {if receipt.journal()==*self {_cell.history.borrow().extends(&receipt.witness);}}
@@ -462,7 +475,7 @@ pub tracked struct Receipt {ghost journal:Journal,witness:Witness<Frame>}
 impl Receipt {
     pub closed spec fn journal(&self)->Journal {self.journal}
     pub closed spec fn events(&self)->Seq<Frame> {self.witness.events()}
-    pub closed spec fn authentic(&self)->bool {self.witness.wf() && self.witness.source()==self.journal.inner.pred().history}
+    pub closed spec fn authentic(&self)->bool {self.witness.wf() && self.witness.source()==self.journal.inner.lock.pred().history}
     pub open spec fn wf(&self)->bool {self.authentic() && self.events().len()>0 && valid(self.events())}
     pub open spec fn same(&self,other:&Self)->bool {self.journal()==other.journal() && self.events()==other.events()}
     pub open spec fn forward(&self)->bool {forward(self.event())}
@@ -524,10 +537,14 @@ impl Receipt {
 pub(crate) struct Member {identity:Arc<identity::AllocationIdentity>,journal:Journal,point:Tracked<GhostPointsTo<nat,Record>>,latest:Tracked<Witness<Frame>>,head:Tracked<GhostPointsTo<nat,nat>>}
 impl Member {
     pub closed spec fn wf(&self)->bool {self.identity.wf() && self.identity.address()==(super::service_composition::Address {journal:self.journal(),key:self.key()})
-        && self.point@.id()==self.journal.inner.pred().source
-        && self.head@.id()==self.journal.inner.pred().heads && self.head@.key()==self.key() && self.head@.value()+1==self.events().len() && self.latest@.wf()
-        && self.latest@.source()==self.journal.inner.pred().history && self.events().len()>0 && valid(self.events())
+        && self.point@.id()==self.journal.inner.lock.pred().source
+        && self.head@.id()==self.journal.inner.lock.pred().heads && self.head@.key()==self.key() && self.head@.value()+1==self.events().len() && self.latest@.wf()
+        && self.latest@.source()==self.journal.inner.lock.pred().history && self.events().len()>0 && valid(self.events())
         && self.events().last().event.key==self.key() && self.events().last().event.after==self.record()}
+    /// Borrow the actual allocation owner without a refcount change.
+    pub(crate) fn identity_ref(&self)->(out:&Arc<identity::AllocationIdentity>)
+        requires self.wf(),ensures out.wf(),out.address()==(super::service_composition::Address {journal:self.journal(),key:self.key()}),
+    {&self.identity}
     pub(crate) fn identity(&self)->(out:Arc<identity::AllocationIdentity>)
         requires self.wf(),ensures out.wf(),out.address()==(super::service_composition::Address {journal:self.journal(),key:self.key()}),
     {self.identity.clone()}
@@ -609,6 +626,7 @@ impl Member {
         }
         WriteView {journal,cell,guard}
     }
+    pub(crate) fn domain_ref(&self)->(out:&Journal) ensures *out==self.journal(), {&self.journal}
     pub(crate) fn domain(&self)->(out:Journal) ensures out==self.journal(), {self.journal.clone()}
     pub(crate) fn observe(&self)->(out:Snapshot)
         requires self.wf(),
@@ -616,7 +634,7 @@ impl Member {
             self.events().len()<=out.events().len(),out.events().take(self.events().len() as int)==self.events(),
             ownership::quiet(out.events(),self.events().len(),out.events().len(),self.key()),
     {
-        let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
+        let guard=self.journal.inner.lock.acquire_read();let _cell=guard.borrow();
         proof {self.point.borrow().agree(_cell.auth.borrow());self.head.borrow().agree(_cell.heads.borrow());ownership::at(_cell.heads@@,_cell.history@.events(),self.key());_cell.history.borrow().extends(self.latest.borrow());}
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();Snapshot {journal:self.journal.clone(),witness:Tracked(witness)}
@@ -629,7 +647,7 @@ impl Member {
             self.events().len()<=out.events().len(),out.events().take(self.events().len() as int)==self.events(),
             ownership::quiet(out.events(),self.events().len(),out.events().len(),self.key()),
     {
-        let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
+        let guard=self.journal.inner.lock.acquire_read();let _cell=guard.borrow();
         proof {self.point.borrow().agree(_cell.auth.borrow());self.head.borrow().agree(_cell.heads.borrow());ownership::at(_cell.heads@@,_cell.history@.events(),self.key());_cell.history.borrow().extends(self.latest.borrow());
             if let Some(earlier)=earlier {if earlier.journal()==self.journal() {_cell.history.borrow().extends(&earlier.witness);}}}
         let tracked witness=_cell.history.borrow().snapshot();
@@ -644,7 +662,7 @@ impl Member {
             self.events().len()<=out.events().len(),out.events().take(self.events().len() as int)==self.events(),
             ownership::quiet(out.events(),self.events().len(),out.events().len(),self.key()),
     {
-        let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
+        let guard=self.journal.inner.lock.acquire_read();let _cell=guard.borrow();
         proof {self.point.borrow().agree(_cell.auth.borrow());self.head.borrow().agree(_cell.heads.borrow());ownership::at(_cell.heads@@,_cell.history@.events(),self.key());_cell.history.borrow().extends(_earlier.witness.borrow());_cell.history.borrow().extends(self.latest.borrow());}
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();Snapshot {journal:self.journal.clone(),witness:Tracked(witness)}
@@ -700,7 +718,7 @@ impl Member {
                 cause.unwrap().events().len()<final(self).events().len()
                 && final(self).events().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
     {
-        let (mut cell,guard)=self.journal.inner.acquire_write();
+        let (mut cell,guard)=self.journal.inner.lock.acquire_write();
         let tracked produced;
         proof {
             self.point.borrow().agree(cell.auth.borrow());
@@ -772,7 +790,7 @@ impl Snapshot {
     pub closed spec fn domain(&self)->Loc {self.journal.source()}
     pub closed spec fn events(&self)->Seq<Frame> {self.witness@.events()}
     pub closed spec fn certified(&self)->bool {self.witness@.wf() && valid(self.events()) && references::history(self.events(),self.domain())
-        && self.witness@.source()==self.journal.inner.pred().history}
+        && self.witness@.source()==self.journal.inner.lock.pred().history}
     pub open spec fn last(&self)->Map<nat,Record> {state_at(self.events(),self.events().len())}
     pub open spec fn pending(&self)->Map<nat,nat> {pending_at(self.events(),self.events().len())}
     pub open spec fn covers(&self,receipt:&Receipt)->bool {
@@ -829,7 +847,7 @@ impl Snapshot {
     pub fn refresh(&self)->(out:Self)
         requires self.certified(),ensures out.certified(),out.extends(self),
     {
-        let guard=self.journal.inner.acquire_read();let _cell=guard.borrow();
+        let guard=self.journal.inner.lock.acquire_read();let _cell=guard.borrow();
         proof {_cell.history.borrow().extends(self.witness.borrow());}
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();Snapshot {journal:self.journal.clone(),witness:Tracked(witness)}
@@ -843,13 +861,13 @@ impl<'a> WriteView<'a> {
     pub closed spec fn state(&self)->Map<nat,Record> {self.cell.auth@@}
     pub closed spec fn events(&self)->Seq<Frame> {self.cell.history@.events()}
     pub closed spec fn wf(&self)->bool {
-        self.guard.rwlock()==*self.journal.inner && self.cell.wf()
-            && self.cell.issuer.source()==self.journal.inner.pred().issuer
-            && self.cell.names@.id()==self.journal.inner.pred().names
-            && self.cell.auth@.id()==self.journal.inner.pred().source
-            && self.cell.history@.source()==self.journal.inner.pred().history
-            && self.cell.pending@.id()==self.journal.inner.pred().pending
-            && self.cell.heads@.id()==self.journal.inner.pred().heads
+        self.guard.rwlock()==self.journal.inner.lock && self.cell.wf()
+            && self.cell.issuer.source()==self.journal.inner.lock.pred().issuer
+            && self.cell.names@.id()==self.journal.inner.lock.pred().names
+            && self.cell.auth@.id()==self.journal.inner.lock.pred().source
+            && self.cell.history@.source()==self.journal.inner.lock.pred().history
+            && self.cell.pending@.id()==self.journal.inner.lock.pred().pending
+            && self.cell.heads@.id()==self.journal.inner.lock.pred().heads
     }
     /// Authenticate previously collected effect witnesses in this same write
     /// epoch. No value/slot lock or callback is entered while it is held.
@@ -866,12 +884,12 @@ impl<'a> WriteView<'a> {
 impl Journal {
     pub(crate) fn write(&self)->(out:WriteView<'_>)
         ensures out.wf(),out.journal_spec()==*self,
-    {let (cell,guard)=self.inner.acquire_write();WriteView {journal:self,cell,guard}}
+    {let (cell,guard)=self.inner.lock.acquire_write();WriteView {journal:self,cell,guard}}
     pub(crate) fn read(&self)->(out:ReadView<'_>)
         ensures out.wf(),out.journal_spec()==*self,
-    {ReadView {journal:self,guard:self.inner.acquire_read()}}
+    {ReadView {journal:self,guard:self.inner.lock.acquire_read()}}
     /// Stable identity of this domain's authoritative execution history.
-    pub closed spec fn source(&self)->Loc {self.inner.pred().history}
+    pub closed spec fn source(&self)->Loc {self.inner.lock.pred().history}
     pub fn new()->(out:Self) {
         let issuer=identity::issuer();
         let tracked (names,_)=GhostMapAuth::new(Map::empty());
@@ -881,7 +899,7 @@ impl Journal {
         let tracked (heads,_)=GhostMapAuth::new(Map::empty());
         proof {ownership::empty();}
         let ghost pred=Predicate {issuer:issuer.source(),names:names.id(),source:auth.id(),history:history.source(),pending:pending.id(),heads:heads.id()};
-        Self {inner:Arc::new(RwLock::new(Cell {issuer,names:Tracked(names),auth:Tracked(auth),history:Tracked(history),pending:Tracked(pending),heads:Tracked(heads),next:Ghost(0nat)},Ghost(pred)))}
+        Self {inner:Arc::new(JournalIdentity {lock:RwLock::new(Cell {issuer,names:Tracked(names),auth:Tracked(auth),history:Tracked(history),pending:Tracked(pending),heads:Tracked(heads),next:Ghost(0nat)},Ghost(pred))})}
     }
     #[verifier::rlimit(20)]
     pub(crate) fn allocate(&self,Ghost(record):Ghost<Record>)->(out:Member)
@@ -918,7 +936,7 @@ impl Journal {
             earlier.is_some() ==> earlier.unwrap().events().len()<out.events().len()
                 && out.events().take(earlier.unwrap().events().len() as int)==earlier.unwrap().events(),
     {
-        let (mut cell,guard)=self.inner.acquire_write();
+        let (mut cell,guard)=self.inner.lock.acquire_write();
         proof {if let Some(ref receipt)=earlier {cell.history.borrow().extends(&receipt.witness);}}
         let tracked point;let tracked head;
         let ghost key=cell.next@;
@@ -952,7 +970,7 @@ impl Journal {
         ensures out.certified(),out.journal_spec()==*self,out.domain()==self.source(),
             classification::history(out.events()),
     {
-        let guard=self.inner.acquire_read();
+        let guard=self.inner.lock.acquire_read();
         let _cell=guard.borrow();
         let tracked witness=_cell.history.borrow().snapshot();
         guard.release_read();let out=Snapshot {journal:self.clone(),witness:Tracked(witness)};

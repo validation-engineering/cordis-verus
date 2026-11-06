@@ -32,6 +32,7 @@ pub mod paths;
 pub mod reads;
 pub mod resources;
 pub mod scopes;
+pub mod services;
 #[cfg(verus_keep_ghost)]
 use history::{Event, Observation};
 

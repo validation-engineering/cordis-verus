@@ -630,7 +630,10 @@ impl Loader {
     /// checkpoints in one Journal read. Typed proof history is erased; this is
     /// not a serialized audit log or a proof of arbitrary plugin callbacks.
     pub fn execution_snapshot(&self) -> cordis_kernel::reversible_value::joint::Snapshot {
-        self.runtime.configuration_snapshot(&self.configuration)
+        // Both owners are private and runtime_mut cannot replace the Runtime.
+        self.runtime
+            .configuration_snapshot(&self.configuration)
+            .expect("Loader retains its configuration Journal")
     }
     pub fn registry(&self) -> &FactoryRegistry {
         &self.registry
@@ -1167,7 +1170,7 @@ impl Loader {
         loop {
             let done = poll_fn(|cx| {
                 configuration.poll_update(|key, plan| {
-                    if !runtime.configuration_target_is_current(key.target) {
+                    if !runtime.configuration_target_is_current(&key.target) {
                         return Poll::Ready(Err(LoaderError::Factory {
                             entry: key.path.clone(),
                             message: "configuration update owner changed activation or recipe"
@@ -1201,7 +1204,7 @@ impl Loader {
             .iter()
             .map(|action| {
                 let key = action.key();
-                (key.path.clone(), key.target)
+                (key.path.clone(), key.target.clone())
             })
             .collect();
         // Adoption is an owned phase after all actual updates. A failed
@@ -1217,7 +1220,7 @@ impl Loader {
                     .iter()
                     .map(|(path, target)| {
                         (
-                            *target,
+                            target.clone(),
                             plugins
                                 .remove(path)
                                 .expect("preconstructed retained configuration update recipe"),

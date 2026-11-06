@@ -95,6 +95,12 @@ impl<T> CleanupQueue<T> {
     pub closed spec fn link(&self)->Option<(Journal,nat)> {
         match self.joint {Some(member)=>Some((member.journal(),member.key())),None=>None}
     }
+    /// The allocation of this live queue, retained by a linked callback scope.
+    pub fn allocation_identity(&self)->(out:Option<&std::sync::Arc<joint::identity::AllocationIdentity>>)
+        requires self.wf(),
+        ensures out.is_some()==self.link().is_some(),out.is_some() ==> out.unwrap().wf()
+            && out.unwrap().address()==(crate::reversible_value::service_composition::Address {journal:self.link().unwrap().0,key:self.link().unwrap().1}),
+    {match &self.joint {Some(member)=>Some(member.identity_ref()),None=>None}}
     pub open spec fn observation(&self)->CleanupState {
         let p=self.protocol();let stage=p.stage();
         CleanupState {domain:p.domain_id(),next:p.next_attempt(),selected:p.selected(),failed:p.failed_spec(),
@@ -385,6 +391,13 @@ impl<T> CleanupQueue<T> {
         Ok(Some((ticket,payload)))
     }
 
+    // All completion paths validate the same live issued receipt before they
+    // consume a callback result, restore a value, or acknowledge the queue.
+    fn reply_pending(&self,ticket:RestoreTicket)->(out:bool)
+        requires self.wf(),
+        ensures out==(self.issued() && self.protocol().selected()==Some(ticket) && !self.protocol().failed_spec()),
+    {self.in_flight && self.journal.current()==Some(ticket)}
+
     /// A rejection preserves all queued work and returns the supplied payload.
     /// Only a Failed acknowledgement may place retry work in the selected slot.
     pub fn complete(&mut self,ticket:RestoreTicket,outcome:RestoreOutcome,retained:Option<T>)
@@ -414,7 +427,7 @@ impl<T> CleanupQueue<T> {
             out.is_ok() && cause.is_some() && final(self).link().is_some() && cause.unwrap().journal()==final(self).link().unwrap().0 ==>
                 cause.unwrap().events().len()<final(self).trace().len() && final(self).trace().take(cause.unwrap().events().len() as int)==cause.unwrap().events(),
     {
-        if !self.in_flight || self.journal.current()!=Some(ticket)
+        if !self.reply_pending(ticket)
             || (outcome!=RestoreOutcome::Failed && retained.is_some()) {return Err(retained);}
         let ghost before=self.observation();let ghost keep=retained.is_some();
         let _accepted=self.journal.complete(ticket,outcome);

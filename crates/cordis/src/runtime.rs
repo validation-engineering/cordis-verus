@@ -5,18 +5,27 @@
 //! of arbitrary effects. An in-flight setup stage is always allowed to land so
 //! its inverse can be collected; cancellation stops subsequent stages.
 mod access;
+mod child;
 mod cleanup;
+mod control;
+mod effect_handle;
+mod episode;
 mod poll;
+mod root;
 mod services;
 mod setup;
 pub use access::RuntimeAccess;
+pub use child::ChildHandle;
+pub use effect_handle::{EffectHandle, EffectJoin};
 pub mod static_host;
 
 use crate::diagnostics::{Blocker, Compaction, PluginSnapshot, RuntimeSnapshot, StorageStats};
 use crate::future_support::poll_catching_unwind;
 use crate::service_error::{ServiceReadError, ServiceReadFailure};
 use crate::CallbackError;
+use child::{ChildRequest, ExternalChildren};
 use cleanup::attempt::{CleanupCompletion, RunningCleanup};
+use control::Control;
 use cordis_driver::shared::native::NativeDriver;
 use cordis_driver::shared::Decision;
 use cordis_kernel::cleanup_journal::{RestoreOutcome, RestoreTicket};
@@ -41,7 +50,6 @@ pub use cordis_kernel::reversible_value::effect::{
 use cordis_kernel::reversible_value::function::{
     Body as CheckedRootBody, Error as ValueFunctionError, Function as ValueFunction,
 };
-use cordis_kernel::reversible_value::managed::interleaving::history::lifecycle::callbacks::HostAction;
 use cordis_kernel::reversible_value::payload::SharedPayload;
 pub use cordis_kernel::reversible_value::program::{
     Instruction as ValueInstruction, Program as ValueProgram,
@@ -58,6 +66,8 @@ pub use cordis_kernel::reversible_value::{
 use cordis_kernel::setup_context::SetupScope;
 use cordis_kernel::setup_work::{RootDispatch, RootOutput, WorkReceipt, WorkTicket};
 use cordis_kernel::{Binding, Error as KernelError, Phase, Port};
+use episode::{Episode, Feature, Notification, SetupServices, SharedEpisode};
+use root::{initialize_callback, initialize_reply, RootSetup};
 use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -65,7 +75,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::pin::Pin;
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
 use std::task::{Context as TaskContext, Poll, Waker};
 
 /// One operation in a finite native body that can access several services.
@@ -428,16 +438,16 @@ type PayloadDispatch = cordis_kernel::cleanup_groups::payload::Dispatch<
     RetryCleanup,
     Arc<ServiceSlot>,
     dyn Any + Send + Sync,
-    ChildHandle,
+    child::StaticChildControl,
 >;
 type PayloadCompletion = cordis_kernel::cleanup_groups::payload::Completion<
     Cleanup,
     RetryCleanup,
     Arc<ServiceSlot>,
     dyn Any + Send + Sync,
-    ChildHandle,
+    child::StaticChildControl,
 >;
-type CleanupAction = ChildCleanup<CleanupCallback, ChildHandle>;
+type CleanupAction = ChildCleanup<CleanupCallback, child::StaticChildControl>;
 type RawEpisodeExecution = Execution<ServiceSlot, ChildRequest, GroupState, CleanupAction>;
 type EpisodeExecution =
     cordis_kernel::reversible_value::managed::interleaving::history::lifecycle::RecordedExecution<
@@ -447,59 +457,8 @@ type EpisodeExecution =
         RetryCleanup,
         dyn Any + Send + Sync,
         ServiceMetadata,
-        ChildHandle,
+        child::StaticChildControl,
     >;
-struct Cleanups {
-    protocol: EpisodeExecution,
-}
-impl Cleanups {
-    fn new() -> Self {
-        Self {
-            protocol: EpisodeExecution::new(Execution::new(fresh(&NEXT_CLEANUP))),
-        }
-    }
-    fn contains(&self, group: usize) -> bool {
-        self.protocol.contains(group)
-    }
-    fn push(&mut self, group: usize, cleanup: CleanupAction) {
-        let accepted = self.protocol.register(group, cleanup);
-        assert!(
-            accepted.is_ok(),
-            "only live groups accept cleanup registration"
-        );
-    }
-    fn pop(&mut self, group: usize) -> Option<PayloadDispatch> {
-        self.protocol
-            .dispatch(group)
-            .expect("live cleanup group and available attempt identity")
-    }
-    #[allow(clippy::type_complexity)]
-    fn complete_result(
-        &mut self,
-        group: usize,
-        ticket: RestoreTicket,
-        result: CallbackResult,
-        retry: Option<RetryCleanup>,
-        policy: CleanupPolicy,
-    ) -> Result<
-        CleanupReport<CallbackError, CleanupAction>,
-        (RestoreTicket, CallbackResult, Option<CleanupAction>),
-    > {
-        self.protocol.complete_result(
-            group,
-            ticket,
-            result,
-            retry.map(HostAction::Retryable),
-            policy,
-        )
-    }
-    fn can_retry(&self, group: usize) -> bool {
-        self.protocol
-            .get(group)
-            .is_some_and(|queue| queue.can_retry())
-    }
-}
-
 /// An asynchronous effect iterator. `poll_next` is one stage: after it returns
 /// Pending the runtime retains it until that stage lands, even when cancelled.
 /// Each Ready(Some(inverse)) is collected before another stage can start.
@@ -557,198 +516,6 @@ impl EffectIterator for Effect {
                 Poll::Ready(Some(result))
             }
         }
-    }
-}
-
-#[derive(Default)]
-struct EffectStatus {
-    // None exists only while enqueueing under the Episode mutex; no handle
-    // escapes until the checked owner is bound to the actual allocated group.
-    checked: Option<cordis_kernel::host_status::HostStatus<CallbackError>>,
-    // Weak identity pins the allocation without retaining the Episode payload
-    // or creating Episode -> group -> handle -> Episode ownership cycles.
-    episode: Weak<SharedEpisode>,
-    next_waiter: u64,
-    wakers: BTreeMap<u64, Waker>,
-    driver: Option<Waker>,
-    notify: Option<Arc<dyn Fn() + Send + Sync>>,
-}
-impl EffectStatus {
-    fn belongs_to(&self, episode: &Arc<SharedEpisode>) -> bool {
-        self.episode.ptr_eq(&Arc::downgrade(episode))
-    }
-    fn checked(&self) -> &cordis_kernel::host_status::HostStatus<CallbackError> {
-        self.checked
-            .as_ref()
-            .expect("status bound before handle escapes")
-    }
-    fn checked_mut(&mut self) -> &mut cordis_kernel::host_status::HostStatus<CallbackError> {
-        self.checked
-            .as_mut()
-            .expect("status bound before handle escapes")
-    }
-}
-fn wake_waiters(wakers: BTreeMap<u64, Waker>) {
-    for waker in wakers.into_values() {
-        waker.wake();
-    }
-}
-fn finish_service(service: &EffectHandle) {
-    let (waiters, driver, notify) = {
-        let mut status = lock(&service.status);
-        assert!(
-            status.checked_mut().report_service_finished(),
-            "service completion report"
-        );
-        (
-            std::mem::take(&mut status.wakers),
-            status.driver.take(),
-            status.notify.take(),
-        )
-    };
-    drop(driver);
-    drop(notify);
-    wake_waiters(waiters);
-}
-/// A cancellation/join handle for one owner-bound effect group. Cancellation is
-/// idempotent; join completes after the in-flight stage and every inverse land.
-#[derive(Clone)]
-pub struct EffectHandle {
-    status: Arc<Mutex<EffectStatus>>,
-}
-impl EffectHandle {
-    pub fn cancel(&self) {
-        let mut status = lock(&self.status);
-        status.checked_mut().cancel();
-        let driver = status.driver.take();
-        let notify = status.notify.clone();
-        drop(status);
-        if let Some(notify) = notify {
-            notify();
-        }
-        if let Some(waker) = driver {
-            waker.wake();
-        }
-    }
-    pub fn dispose(&self) {
-        self.cancel();
-    }
-    pub fn initialized(&self) -> bool {
-        lock(&self.status).checked().observe().initialized()
-    }
-    pub fn finished(&self) -> bool {
-        lock(&self.status).checked().observe().finished()
-    }
-    pub fn errors(&self) -> Vec<CallbackError> {
-        lock(&self.status).checked().errors().clone()
-    }
-    /// A certified observation of the actual status in its execution domain.
-    /// Wakers and OS scheduling are outside this trajectory.
-    pub fn execution_snapshot(&self) -> cordis_kernel::reversible_value::joint::Snapshot {
-        lock(&self.status).checked().execution_snapshot()
-    }
-    pub fn join(&self) -> EffectJoin {
-        EffectJoin {
-            handle: self.clone(),
-            waiter: None,
-        }
-    }
-}
-/// Wait for an effect's stage and inverses to finish. Dropping this wait removes
-/// its waker registration; it does not cancel the effect itself.
-#[must_use = "poll or await join to wait for effect cleanup"]
-pub struct EffectJoin {
-    handle: EffectHandle,
-    waiter: Option<u64>,
-}
-impl Future for EffectJoin {
-    type Output = CallbackResult;
-    fn poll(self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        // A custom waker can reenter an effect handle from clone or Drop too.
-        let mut waker = Some(cx.waker().clone());
-        let (result, previous) = {
-            let mut status = lock(&this.handle.status);
-            if status.checked().observe().finished() || status.checked().terminal_error().is_some()
-            {
-                let result = if status.checked().errors().is_empty() {
-                    Ok(())
-                } else {
-                    Err(CallbackError::multiple(status.checked().errors().clone()))
-                };
-                let previous = this.waiter.take().and_then(|id| status.wakers.remove(&id));
-                (Poll::Ready(result), previous)
-            } else if status
-                .checked()
-                .external_child_id()
-                .is_some_and(static_host::child_join_blocked)
-            {
-                // A pending join cannot retain a provider whose removal it
-                // awaits. This rejects only this wait, not the child's cleanup.
-                let previous = this.waiter.take().and_then(|id| status.wakers.remove(&id));
-                (Poll::Ready(Err("ReentrantServiceJoin".into())), previous)
-            } else {
-                let id = *this.waiter.get_or_insert_with(|| {
-                    let id = status.next_waiter;
-                    status.next_waiter =
-                        id.checked_add(1).expect("effect join identities exhausted");
-                    id
-                });
-                (
-                    Poll::Pending,
-                    status.wakers.insert(id, waker.take().unwrap()),
-                )
-            }
-        };
-        drop(previous);
-        result
-    }
-}
-impl Drop for EffectJoin {
-    fn drop(&mut self) {
-        let previous = self
-            .waiter
-            .take()
-            .and_then(|id| lock(&self.handle.status).wakers.remove(&id));
-        drop(previous);
-    }
-}
-
-#[derive(Clone)]
-enum ChildState {
-    Native {
-        slot: SharedChild,
-        error: Arc<Mutex<Option<String>>>,
-    },
-    External(Arc<Mutex<Result<Option<PluginId>, String>>>),
-}
-impl ChildState {
-    fn id(&self) -> Option<PluginId> {
-        match self {
-            Self::Native { slot, .. } => slot.snapshot().identity().map(|child| child.id()),
-            Self::External(result) => lock(result).as_ref().ok().copied().flatten(),
-        }
-    }
-    fn error(&self) -> Option<String> {
-        match self {
-            Self::Native { error, .. } => lock(error).clone(),
-            Self::External(result) => lock(result).as_ref().err().cloned(),
-        }
-    }
-}
-
-/// A child request becomes an ID after the current callback's poll returns.
-#[derive(Clone)]
-pub struct ChildHandle {
-    state: ChildState,
-    external: Option<static_host::StaticChildControl>,
-}
-impl ChildHandle {
-    pub fn id(&self) -> Option<PluginId> {
-        self.state.id()
-    }
-    pub fn error(&self) -> Option<String> {
-        self.state.error()
     }
 }
 
@@ -1063,62 +830,6 @@ impl Plugin {
     }
 }
 
-type ChildRequest = ChildDispatch<NativeChildInput, ExternalChildRequest>;
-struct NativeChildInput {
-    context: Context,
-    plugin: Plugin,
-    service: Option<EffectHandle>,
-    error: Arc<Mutex<Option<String>>>,
-}
-struct ExternalChildRequest {
-    context: Context,
-    plugin: Plugin,
-    handle: ChildHandle,
-}
-struct Episode {
-    values: EpisodeValues,
-    cleanups: Cleanups,
-    driver: Option<Waker>,
-    static_only: bool,
-    dynamic_host: Option<Arc<dyn Fn() + Send + Sync>>,
-    external_children: Vec<static_host::StaticChildControl>,
-    service_updates: Option<Arc<dyn Fn() + Send + Sync>>,
-    unsupported: Option<String>,
-}
-impl Episode {
-    fn phase(&self) -> EpisodePhase {
-        self.cleanups.protocol.phase()
-    }
-    fn withdraw(&mut self) {
-        self.cleanups.protocol.withdraw_work();
-    }
-    fn seal(&mut self) -> bool {
-        self.cleanups.protocol.seal_external()
-    }
-    fn can_finish(&self, target: &[Binding]) -> bool {
-        self.cleanups.protocol.can_finish(target)
-    }
-    fn own(&self, owner: PluginId, port: Port) -> Option<&SharedSlot> {
-        match self.cleanups.protocol.native() {
-            Some(values) if values.ticket().id == owner => values.own(port),
-            Some(_) => None,
-            None => self.values.own(owner, port),
-        }
-    }
-    fn provide(
-        &mut self,
-        owner: PluginId,
-        provisions: &[Port],
-        port: Port,
-        value: SharedSlot,
-    ) -> Result<(), (NativeValueError, SharedSlot)> {
-        if self.cleanups.protocol.native().is_some() {
-            self.cleanups.protocol.provide(port, value)
-        } else {
-            self.values.provide(owner, provisions, port, value)
-        }
-    }
-}
 /// Owned setup context suitable for futures. Dependency slots belong to the
 /// episode's committed providers; cloning never changes those identities.
 /// Subsequent reads see payload updates within each committed provider slot.
@@ -1128,46 +839,6 @@ pub struct AsyncSetup {
     state: Arc<SharedEpisode>,
     scope: SetupScope,
 }
-// Keep immutable context and mutable execution in one allocation. Cloning or
-// scoping an AsyncSetup cannot pair a copied context with another Episode.
-struct SharedEpisode {
-    association: cordis_kernel::host_context::Association,
-    generation: u64,
-    context: Context,
-    services: SetupServices,
-    anchor: Port,
-    episode: Mutex<Episode>,
-}
-enum SetupServices {
-    Native(Arc<NativeContext>),
-    External(Arc<cordis_kernel::static_values::Context>),
-}
-impl SetupServices {
-    fn owner(&self) -> PluginId {
-        match self {
-            Self::Native(context) => context.owner(),
-            Self::External(context) => context.owner(),
-        }
-    }
-    fn provisions(&self) -> &[Port] {
-        match self {
-            Self::Native(context) => context.provision_ports(),
-            Self::External(context) => context.provision_ports(),
-        }
-    }
-}
-impl HostLock for SharedEpisode {
-    type State = Episode;
-    fn checked_lock(&self) -> MutexGuard<'_, Episode> {
-        let state = self.episode.checked_lock();
-        assert!(
-            self.association.matches(&state.cleanups.protocol),
-            "shared Episode execution identity changed"
-        );
-        state
-    }
-}
-
 /// A dynamically published service. Dropping a handle does not revoke it;
 /// owner cleanup or explicit `dispose` does. `join` observes cleanup and must be
 /// polled alongside the runtime driver, like an effect join.
@@ -1188,135 +859,6 @@ struct GroupState {
     handle: EffectHandle,
 }
 
-/// Only a queued future may be discarded on withdrawal. Once its first poll
-/// begins, the runtime owns it until it lands and can register its inverse.
-type RootFuture = Pin<Box<dyn Future<Output = WorkReceipt<CallbackResult>> + Send>>;
-enum RootSetup {
-    Dormant,
-    Queued(WorkTicket, RootFuture),
-    Running(WorkTicket, RootFuture),
-    Done,
-}
-impl RootSetup {
-    fn is_pending(&self) -> bool {
-        matches!(self, Self::Queued(..) | Self::Running(..))
-    }
-    fn is_done(&self) -> bool {
-        matches!(self, Self::Done)
-    }
-    fn poll(
-        &mut self,
-        withdrawing: bool,
-        episode: &AsyncSetup,
-        cx: &mut TaskContext<'_>,
-    ) -> Option<Poll<CallbackResult>> {
-        match std::mem::replace(self, Self::Done) {
-            Self::Queued(ticket, future) if withdrawing => {
-                {
-                    let mut state = lock(&episode.state);
-                    state.cleanups.protocol.withdraw_work();
-                    assert!(
-                        state.cleanups.protocol.cancel_queued_root(ticket),
-                        "only an unpolled root is discarded"
-                    );
-                }
-                drop(future);
-                None
-            }
-            Self::Queued(ticket, mut future) | Self::Running(ticket, mut future) => {
-                assert!(
-                    lock(&episode.state).cleanups.protocol.start_root(ticket),
-                    "exact admitted root"
-                );
-                Some(
-                    match normalize_poll(poll_catching_unwind(future.as_mut(), cx), |panic| {
-                        CallbackError::panic(panic_message(panic))
-                    }) {
-                        Poll::Pending => {
-                            *self = Self::Running(ticket, future);
-                            Poll::Pending
-                        }
-                        Poll::Ready(Ok(receipt)) => {
-                            let completed = lock(&episode.state)
-                                .cleanups
-                                .protocol
-                                .complete_root(receipt);
-                            Poll::Ready(completed.ok().expect("actual root completion"))
-                        }
-                        Poll::Ready(Err(error)) => {
-                            let failed = lock(&episode.state)
-                                .cleanups
-                                .protocol
-                                .fail_root(ticket, error);
-                            Poll::Ready(Err(failed.expect("exact failed root")))
-                        }
-                    },
-                )
-            }
-            state => {
-                *self = state;
-                None
-            }
-        }
-    }
-}
-fn initialize_callback(
-    callback: &mut RootBody,
-    episode: &AsyncSetup,
-) -> Result<RootSetup, CallbackError> {
-    let item = lock(&episode.state)
-        .cleanups
-        .protocol
-        .issue_root(episode.clone())
-        .ok()
-        .expect("one root invocation per episode");
-    let ticket = item.ticket();
-    let result = catch_unwind(AssertUnwindSafe(|| match callback {
-        CheckedRootBody::Callback(callback) => item.run(callback),
-        CheckedRootBody::Value(_) => item.run(|_| {
-            RootOutput::Ready(Err(
-                "native_value_program requires the native Runtime".into()
-            ))
-        }),
-        CheckedRootBody::Managed(_) => item
-            .run(|_| RootOutput::Ready(Err("native_function requires the native Runtime".into()))),
-        CheckedRootBody::Services(_) => item.run(|_| {
-            RootOutput::Ready(Err(
-                "native_service_program requires the native Runtime".into()
-            ))
-        }),
-    }));
-    initialize_reply(episode, ticket, result)
-}
-fn initialize_reply(
-    episode: &AsyncSetup,
-    ticket: WorkTicket,
-    result: std::thread::Result<WorkReceipt<RootReply>>,
-) -> Result<RootSetup, CallbackError> {
-    match result {
-        Ok(reply) => match reply.dispatch() {
-            RootDispatch::Ready(receipt) => {
-                let completed = lock(&episode.state)
-                    .cleanups
-                    .protocol
-                    .complete_root(receipt);
-                completed.ok().expect("actual synchronous root result")?;
-                Ok(RootSetup::Done)
-            }
-            RootDispatch::Pending(pending) => {
-                Ok(RootSetup::Queued(ticket, Box::pin(pending.complete())))
-            }
-        },
-        Err(panic) => {
-            let error = CallbackError::panic(panic_message(panic));
-            Err(lock(&episode.state)
-                .cleanups
-                .protocol
-                .fail_root(ticket, error)
-                .expect("issued factory failed"))
-        }
-    }
-}
 struct Mounted {
     next_config_update: Option<Option<ConfigUpdateCallback>>,
     service: Option<EffectHandle>,
@@ -1329,26 +871,20 @@ struct Mounted {
     episode: Option<AsyncSetup>,
     root_setup: RootSetup,
     root_running: Option<RunningCleanup>,
-    // Temporarily taken only while the checked owner performs a transition.
-    // No callback is invoked until it has been returned.
-    control: Option<PollControl<CallbackError>>,
-    // Children externally mounted while inactive become owner-bound on begin.
-    owned: Vec<ChildIdentity>,
+    control: Control,
+    // Bound cleanup objects wait here until the parent's first Begin.
+    owned: Vec<SharedChild>,
 }
 impl Mounted {
     fn control(&self) -> &PollControl<CallbackError> {
-        self.control.as_ref().expect("registered polling owner")
-    }
-    fn control_mut(&mut self) -> &mut PollControl<CallbackError> {
-        self.control.as_mut().expect("registered polling owner")
+        self.control.get()
     }
     fn pending_effects(&self) -> Vec<usize> {
         self.episode
             .as_ref()
             .map(|episode| {
                 lock(&episode.state)
-                    .cleanups
-                    .protocol
+                    .execution
                     .effects()
                     .iter()
                     .filter(|(_, group)| group.get().iterator.is_some())
@@ -1360,8 +896,7 @@ impl Mounted {
     fn running_effects(&self) -> bool {
         self.episode.as_ref().is_some_and(|episode| {
             lock(&episode.state)
-                .cleanups
-                .protocol
+                .execution
                 .effects()
                 .values()
                 .any(|group| group.get().running.is_some())
@@ -1370,8 +905,7 @@ impl Mounted {
     fn initialized_effects(&self) -> bool {
         self.episode.as_ref().is_none_or(|episode| {
             lock(&episode.state)
-                .cleanups
-                .protocol
+                .execution
                 .effects()
                 .values()
                 .all(|group| group.get().iterator.is_none())
@@ -1380,8 +914,7 @@ impl Mounted {
     fn idle_effects(&self) -> bool {
         self.episode.as_ref().is_none_or(|episode| {
             lock(&episode.state)
-                .cleanups
-                .protocol
+                .execution
                 .effects()
                 .values()
                 .all(|group| group.get().iterator.is_none() && group.get().running.is_none())
@@ -1390,17 +923,10 @@ impl Mounted {
     fn settled_effects(&self) -> bool {
         self.episode.as_ref().is_none_or(|episode| {
             lock(&episode.state)
-                .cleanups
-                .protocol
+                .execution
                 .effects()
                 .values()
-                .all(|group| {
-                    group.get().iterator.is_none()
-                        && !lock(&group.get().handle.status)
-                            .checked()
-                            .observe()
-                            .cancelled()
-                })
+                .all(|group| group.get().iterator.is_none() && !group.get().handle.cancelled())
         })
     }
 }
@@ -1500,35 +1026,6 @@ impl Default for Runtime {
     }
 }
 impl Runtime {
-    fn begin_controlled(&mut self, id: PluginId) -> Result<RawEpisodeExecution, KernelError> {
-        let mut control = self.kernel.host_mut(id).unwrap().control.take().unwrap();
-        let result = self
-            .kernel
-            .begin_controlled_execution(id, fresh(&NEXT_CLEANUP), &mut control);
-        self.kernel.host_mut(id).unwrap().control = Some(control);
-        result.map(|(execution, discarded)| {
-            drop(discarded);
-            execution
-        })
-    }
-    fn release_controlled(
-        &mut self,
-        id: PluginId,
-        execution: &mut EpisodeExecution,
-    ) -> Result<
-        (
-            cordis_kernel::lifecycle_actions::CleanupOutcome,
-            cordis_kernel::lifecycle_state::services::ReleasedNativeValues<ServiceSlot>,
-        ),
-        KernelError,
-    > {
-        let mut control = self.kernel.host_mut(id).unwrap().control.take().unwrap();
-        let result = self
-            .kernel
-            .release_recorded_controlled(id, execution, &mut control);
-        self.kernel.host_mut(id).unwrap().control = Some(control);
-        result
-    }
     pub fn new() -> Self {
         let kernel = NativeDriver::new().expect("lifecycle domain identity exhausted");
         Self {
@@ -1561,7 +1058,7 @@ impl Runtime {
         let state = lock(&episode.state);
         self.kernel.scoped_payload_service_episode_snapshot(
             id,
-            &state.cleanups.protocol,
+            &state.execution,
             owner.control(),
             &episode.scope,
         )
@@ -1691,10 +1188,10 @@ impl Runtime {
     pub(crate) fn configuration_snapshot<S, C, K, U, P: Ord, T>(
         &self,
         configuration: &cordis_kernel::configuration_recorded::Recorded<S, C, K, U, P, T>,
-    ) -> cordis_kernel::reversible_value::joint::Snapshot {
+    ) -> Option<cordis_kernel::reversible_value::joint::Snapshot> {
         self.kernel
             .configuration_snapshot(configuration)
-            .into_joint()
+            .map(|snapshot| snapshot.into_joint())
     }
     pub(crate) fn configuration_domain(&self) -> u64 {
         self.kernel.domain()
@@ -1760,9 +1257,9 @@ impl Runtime {
             name: plugin.name,
             context: context.clone(),
             episode: None,
-            root_setup: RootSetup::Dormant,
+            root_setup: RootSetup::dormant(),
             root_running: None,
-            control: None,
+            control: Control::unregistered(),
             owned: Vec::new(),
         };
         let registered = if let Some(shared) = child_slot {
@@ -1782,24 +1279,16 @@ impl Runtime {
                 .register_plugin(parent, context.realms.as_map(), anchor, definition, host)
         };
         let id = registered.map_err(|(error, _, _)| kernel_error(error))?;
-        let control = self
-            .kernel
-            .poll_control(id)
-            .expect("new registered polling owner");
-        self.kernel.host_mut(id).unwrap().control = Some(control);
+        self.bind_control(id);
         let child = self.kernel.registration(id).unwrap().child_identity();
         if register_inverse {
             if let Some(parent) = parent {
+                let cleanup = self.kernel.registered_child(id).expect("registered child");
                 let owner = self.kernel.host_mut(parent).unwrap();
                 if let Some(episode) = &owner.episode {
-                    lock(&episode.state).cleanups.push(
-                        0,
-                        CleanupAction::Native(
-                            SharedChild::from_identity(child.expect("registered child")).0,
-                        ),
-                    );
+                    lock(&episode.state).register_cleanup(0, CleanupAction::Native(cleanup));
                 } else {
-                    owner.owned.push(child.expect("registered child"));
+                    owner.owned.push(cleanup);
                 }
             }
         }
@@ -1840,56 +1329,13 @@ impl Runtime {
     pub fn cleanup_failure(&self, id: PluginId) -> Option<&str> {
         self.cleanup_error(id).map(CallbackError::message)
     }
-    /// Admit a fresh whole-episode attempt only after the previous callbacks
-    /// settle and its Failed receipt is recorded. No user callback runs here.
-    pub fn retry_cleanup(&mut self, id: PluginId) -> Result<(), RuntimeError> {
-        let owner = self
-            .kernel
-            .host(id)
-            .ok_or(RuntimeError::UnknownPlugin(id))?;
-        if owner.control().cleanup_failure().is_none()
-            || !owner.root_setup.is_done()
-            || owner.root_running.is_some()
-            || !owner.idle_effects()
-        {
-            return Err(RuntimeError::Cleanup {
-                plugin: id,
-                error: "cleanup attempt is still running or has no retained failure".into(),
-            });
-        }
-        let episode = owner
-            .episode
-            .as_ref()
-            .ok_or(RuntimeError::InactiveOwner(id))?
-            .clone();
-        let mut state = lock(&episode.state);
-        if !state.cleanups.protocol.can_retry_all() {
-            return Err(RuntimeError::Cleanup {
-                plugin: id,
-                error: "retained cleanup cannot be retried".into(),
-            });
-        }
-        let mut control = self.kernel.host_mut(id).unwrap().control.take().unwrap();
-        let retried =
-            self.kernel
-                .retry_recorded_controlled(id, &mut state.cleanups.protocol, &mut control);
-        self.kernel.host_mut(id).unwrap().control = Some(control);
-        let (_, discarded) = retried.map_err(kernel_error)?;
-        let wake = state.driver.take();
-        drop(state);
-        drop(discarded);
-        if let Some(wake) = wake {
-            wake.wake();
-        }
-        Ok(())
-    }
     /// Identity of the current activation, for rejecting stale update plans.
     pub fn episode_generation(&self, id: PluginId) -> Option<u64> {
         self.kernel
             .host(id)?
             .episode
             .as_ref()
-            .map(|episode| episode.state.generation)
+            .map(|episode| episode.state.generation())
     }
     pub fn cleanup_started(&self, id: PluginId) -> bool {
         self.kernel.cleanup_started(id)
@@ -2007,7 +1453,7 @@ impl Runtime {
         }
         if let Some(episode) = self.kernel.host(id).unwrap().episode.clone() {
             self.kernel
-                .withdraw_recorded_execution(id, &mut lock(&episode.state).cleanups.protocol, true)
+                .withdraw_recorded_execution(id, &mut lock(&episode.state).execution, true)
                 .map_err(kernel_error)?;
         } else {
             self.kernel.retire(id).map_err(kernel_error)?;
@@ -2016,7 +1462,7 @@ impl Runtime {
     }
     fn after_retirement(&mut self, id: PluginId) -> Result<(), RuntimeError> {
         if let Some(service) = &self.kernel.host(id).unwrap().service {
-            lock(&service.status).checked_mut().cancel();
+            service.mark_cancelled();
         }
         if let Some(episode) = &self.kernel.host(id).unwrap().episode {
             lock(&episode.state).withdraw();
@@ -2088,22 +1534,6 @@ impl Runtime {
                 setup,
             })
         }
-    }
-    pub fn restart(&mut self, id: PluginId) -> Result<(), RuntimeError> {
-        if self.kernel.retired(id) {
-            return Err(RuntimeError::Retired(id));
-        }
-        let mut control = self
-            .kernel
-            .host_mut(id)
-            .ok_or(RuntimeError::UnknownPlugin(id))?
-            .control
-            .take()
-            .unwrap();
-        let restarted = self.kernel.request_restart(&mut control);
-        self.kernel.host_mut(id).unwrap().control = Some(control);
-        drop(restarted.map_err(kernel_error)?);
-        Ok(())
     }
     pub fn update(
         &mut self,
@@ -2194,7 +1624,7 @@ impl Runtime {
     }
     pub(crate) fn configuration_target_is_current(
         &self,
-        target: cordis_kernel::configuration_runtime::Target,
+        target: &cordis_kernel::configuration_runtime::Target,
     ) -> bool {
         self.kernel.configuration_target_is_current(target)
     }
@@ -2227,7 +1657,7 @@ impl Runtime {
         use cordis_kernel::configuration_runtime::adoption::{Cause, Change};
         for (target, plugin) in &recipes {
             let id = target.id();
-            if !self.kernel.configuration_target_is_current(*target) {
+            if !self.kernel.configuration_target_is_current(target) {
                 return Err(RuntimeError::InactiveOwner(id));
             }
             self.owner_context(id)?;
@@ -2319,32 +1749,10 @@ impl Runtime {
                 })
         })
     }
-    fn coherent(&self, id: PluginId) -> bool {
-        self.kernel.coherent(
-            id,
-            self.kernel.host(id).unwrap().control().restart_requested(),
-        )
-    }
-    fn decision(&self, id: PluginId) -> Option<Decision> {
-        let plugin = &self.kernel.host(id).unwrap();
-        // Keep availability predicates at the executor's existing observation
-        // points: arbitrary checks must not run while removing retired nodes.
-        let available = match self.phase(id) {
-            Some(Phase::Loading | Phase::Active) if self.coherent(id) => {
-                self.services_available(id)
-            }
-            Some(Phase::Inactive) if !self.retired(id) && plugin.control().failed().is_none() => {
-                self.services_available(id)
-            }
-            _ => false,
-        };
-        self.kernel
-            .decision_with_control(id, plugin.control(), available)
-    }
     fn leave(&mut self, id: PluginId) -> Result<(), RuntimeError> {
         if let Some(episode) = self.kernel.host(id).unwrap().episode.clone() {
             self.kernel
-                .withdraw_recorded_execution(id, &mut lock(&episode.state).cleanups.protocol, false)
+                .withdraw_recorded_execution(id, &mut lock(&episode.state).execution, false)
                 .map_err(kernel_error)?;
         } else {
             self.kernel.leave(id).map_err(kernel_error)?;
@@ -2376,27 +1784,7 @@ impl Runtime {
         }
         false
     }
-    fn latch(&mut self, id: PluginId, message: CallbackError) {
-        if let Some(failures) = &mut self.shutdown_failures {
-            failures.entry(id).or_insert_with(|| message.clone());
-        }
-        let discarded = self
-            .kernel
-            .host_mut(id)
-            .unwrap()
-            .control_mut()
-            .record_setup_failure(message);
-        drop(discarded);
-    }
     fn start(&mut self, id: PluginId, cx: &mut TaskContext<'_>, mut protocol: RawEpisodeExecution) {
-        let (association, native_context) =
-            cordis_kernel::host_context::Association::native(&protocol)
-                .expect("native Begin carries its checked context");
-        let context = Context {
-            realms: native_context.realm_context(),
-        };
-        let anchor = native_context.anchor();
-        let services = SetupServices::Native(native_context);
         let scope = protocol
             .root_scope()
             .expect("native Begin has a root scope");
@@ -2406,10 +1794,7 @@ impl Runtime {
         }
         for child in plugin.owned.drain(..) {
             protocol
-                .register(
-                    0,
-                    CleanupAction::Native(SharedChild::from_identity(child).0),
-                )
+                .register(0, CleanupAction::Native(child))
                 .ok()
                 .expect("fresh root accepts owned Child inverses");
         }
@@ -2421,33 +1806,14 @@ impl Runtime {
         } else {
             (EpisodeExecution::new(protocol), None)
         };
-        let cleanups = Cleanups { protocol };
-        let state = Episode {
-            // Retain precisely the committed dependencies until restoration
-            // finishes; unrelated services must not gain implicit Arc owners.
-            values: EpisodeValues::default(),
-            cleanups,
-            driver: Some(cx.waker().clone()),
-            static_only: false,
-            dynamic_host: None,
-            external_children: Vec::new(),
-            service_updates: None,
-            unsupported: None,
-        };
+        let state = Episode::for_native(protocol, cx.waker().clone());
         let episode = AsyncSetup {
-            state: Arc::new(SharedEpisode {
-                association,
-                generation: fresh(&NEXT_EPISODE),
-                context,
-                services,
-                anchor,
-                episode: Mutex::new(state),
-            }),
+            state: SharedEpisode::native(state, fresh(&NEXT_EPISODE)),
             scope,
         };
         let plugin = self.kernel.host_mut(id).unwrap();
         plugin.episode = Some(episode.clone());
-        plugin.root_setup = RootSetup::Done;
+        plugin.root_setup = RootSetup::done();
         if let Some(result) = managed_report {
             let result = result
                 .map_err(|error| {
@@ -2473,7 +1839,7 @@ impl Runtime {
         if self.kernel.has_service_root(id) {
             let result = self
                 .kernel
-                .run_recorded_service_root(id, &mut lock(&episode.state).cleanups.protocol);
+                .run_recorded_service_root(id, &mut lock(&episode.state).execution);
             let result = result
                 .map_err(|error| {
                     CallbackError::from(format!("native service root admission: {error:?}"))
@@ -2498,7 +1864,7 @@ impl Runtime {
         if self.kernel.has_value_root(id) {
             let result = self
                 .kernel
-                .run_recorded_value_root(id, &mut lock(&episode.state).cleanups.protocol);
+                .run_recorded_value_root(id, &mut lock(&episode.state).execution);
             let result = match result {
                 Ok(report) => report
                     .result
@@ -2538,11 +1904,7 @@ impl Runtime {
         }
         let invocation = self
             .kernel
-            .admit_recorded_root(
-                id,
-                &mut lock(&episode.state).cleanups.protocol,
-                episode.clone(),
-            )
+            .admit_recorded_root(id, &mut lock(&episode.state).execution, episode.clone())
             .ok()
             .expect("registered recipe and admitted episode");
         let ticket = invocation.ticket();
@@ -2565,42 +1927,27 @@ impl Runtime {
         };
         let (children, groups) = {
             let state = lock(&episode.state);
-            (
-                state.cleanups.protocol.child_count(),
-                state.cleanups.protocol.group_count(),
-            )
+            (state.execution.child_count(), state.execution.group_count())
         };
         // Bound this dispatch to the actual queued prefix. Reentrant admission
         // remains visible to the next scheduler pass and prevents publication.
         for _ in 0..children {
             let item = lock(&episode.state)
-                .cleanups
-                .protocol
+                .execution
                 .take_child()
                 .expect("queued child");
             let receipt = item.run(|request| self.apply_child_request(id, request));
-            let completed = lock(&episode.state)
-                .cleanups
-                .protocol
-                .complete_request(receipt);
+            let completed = lock(&episode.state).execution.complete_request(receipt);
             assert!(completed.is_ok(), "actual child dispatch completion");
         }
         for _ in 0..groups {
             let item = lock(&episode.state)
-                .cleanups
-                .protocol
+                .execution
                 .take_group()
                 .expect("queued group");
-            let receipt = item.run(|request| {
-                lock(&episode.state)
-                    .cleanups
-                    .protocol
-                    .activate_effect(request)
-            });
-            let completed = lock(&episode.state)
-                .cleanups
-                .protocol
-                .complete_request(receipt);
+            let receipt =
+                item.run(|request| lock(&episode.state).execution.activate_effect(request));
+            let completed = lock(&episode.state).execution.complete_request(receipt);
             assert!(
                 completed
                     .ok()
@@ -2610,50 +1957,6 @@ impl Runtime {
             );
         }
         Ok(children != 0 || groups != 0)
-    }
-    fn apply_child_request(&mut self, id: PluginId, request: ChildRequest) {
-        let ChildDispatch::Native(request) = request else {
-            self.latch(id, "ExternalChildInNativeRuntime".into());
-            return;
-        };
-        let (request, child_slot) = request.into_parts();
-        if request
-            .service
-            .as_ref()
-            .is_some_and(|service| lock(&service.status).checked().observe().cancelled())
-        {
-            if let Some(service) = &request.service {
-                finish_service(service);
-            }
-            return;
-        }
-        let result = self.mount_inner(
-            &request.context,
-            Some(id),
-            request.plugin,
-            false,
-            Some(&child_slot),
-        );
-        match result {
-            Ok((child, _)) => {
-                self.kernel.host_mut(child).unwrap().service = request.service;
-            }
-            Err(error) => {
-                let message = CallbackError::new(error);
-                {
-                    let mut error = lock(&request.error);
-                    if child_slot.reject().result {
-                        *error = Some(message.to_string());
-                    }
-                }
-                if let Some(service) = &request.service {
-                    lock(&service.status).checked_mut().push_error(message);
-                    finish_service(service);
-                } else {
-                    self.latch(id, message);
-                }
-            }
-        }
     }
     pub(crate) fn settled_result(&self, id: PluginId) -> Option<Result<(), RuntimeError>> {
         let Some(owner) = self.kernel.host(id) else {
@@ -2667,7 +1970,7 @@ impl Runtime {
             && owner
                 .episode
                 .as_ref()
-                .is_none_or(|episode| lock(&episode.state).cleanups.protocol.group_count() == 0)
+                .is_none_or(|episode| lock(&episode.state).execution.group_count() == 0)
             && !self
                 .kernel
                 .children(id)
@@ -2837,99 +2140,6 @@ mod setup_cancellation_tests {
         ]));
         assert!(!root.runtime.contains(root.owner));
     }
-    fn mounted_effect() -> (Runtime, PluginId, AsyncSetup, EffectHandle) {
-        let mut runtime = Runtime::new();
-        let escaped = Arc::new(Mutex::new(None));
-        let out = escaped.clone();
-        let id = runtime
-            .mount(
-                &Context::new(),
-                None,
-                Plugin::new("binding", move |setup| {
-                    let context = setup.to_async();
-                    let handle = context.effect(Effect::new())?;
-                    *lock(&out) = Some((context, handle));
-                    Ok(())
-                }),
-            )
-            .unwrap();
-        assert_eq!(
-            Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop())),
-            Poll::Ready(Ok(()))
-        );
-        let (context, handle) = lock(&escaped).take().unwrap();
-        (runtime, id, context, handle)
-    }
-    #[test]
-    fn polling_a_crosswired_handle_retains_its_group_without_touching_the_foreign_owner() {
-        let (mut runtime, id, context, own) = mounted_effect();
-        let (_other, _other_id, foreign_context, foreign) = mounted_effect();
-        let group_id = *lock(&context.state)
-            .cleanups
-            .protocol
-            .effects()
-            .keys()
-            .next()
-            .unwrap();
-        let mut run = lock(&context.state)
-            .cleanups
-            .protocol
-            .take_effect(group_id)
-            .unwrap();
-        run.get_mut().handle = foreign.clone();
-        assert!(lock(&context.state)
-            .cleanups
-            .protocol
-            .put_effect(run)
-            .is_ok());
-        let _ = runtime.poll_groups(id, true, true, &mut TaskContext::from_waker(Waker::noop()));
-        assert!(!lock(&foreign.status).checked().observe().cancelled());
-        assert!(!foreign.finished());
-        assert!(lock(&context.state).cleanups.protocol.contains(group_id));
-        assert_eq!(
-            runtime.failure(id),
-            Some("effect handle belongs to another episode")
-        );
-        // Also corrupt only the shared allocation: numeric provenance remains
-        // the owner's exact Begin, so the Weak check is independently necessary.
-        let mut run = lock(&context.state)
-            .cleanups
-            .protocol
-            .take_effect(group_id)
-            .unwrap();
-        run.get_mut().handle = own.clone();
-        assert!(lock(&context.state)
-            .cleanups
-            .protocol
-            .put_effect(run)
-            .is_ok());
-        lock(&own.status).episode = Arc::downgrade(&foreign_context.state);
-        let _ = runtime.poll_groups(id, true, true, &mut TaskContext::from_waker(Waker::noop()));
-        assert!(!lock(&own.status).checked().observe().cancelled());
-        assert!(!own.finished());
-        lock(&own.status).episode = Arc::downgrade(&context.state);
-        runtime.dispose(id).unwrap();
-        let _ = Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop()));
-        assert!(own.finished());
-        assert!(!foreign.finished());
-    }
-    #[test]
-    fn escaped_handle_does_not_keep_episode_payload_alive_or_bind_a_new_allocation() {
-        let (mut runtime, id, context, handle) = mounted_effect();
-        let episode = Arc::downgrade(&context.state);
-        assert!(lock(&handle.status).belongs_to(&context.clone().state));
-        runtime.dispose(id).unwrap();
-        assert_eq!(
-            Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop())),
-            Poll::Ready(Ok(()))
-        );
-        drop(context);
-        drop(runtime);
-        assert!(episode.upgrade().is_none());
-        let (_next, _, new_context, _) = mounted_effect();
-        assert!(!lock(&handle.status).belongs_to(&new_context.state));
-        assert!(handle.finished());
-    }
     #[test]
     fn begin_context_uses_registration_instead_of_mutable_bookkeeping() {
         let key = ServiceKey::<usize>::new("registered context");
@@ -2957,7 +2167,7 @@ mod setup_cancellation_tests {
         );
         let setup = lock(&captured).take().unwrap();
         assert_eq!(setup.context().port(key), context.port(key));
-        assert_eq!(setup.state.anchor, anchor);
+        assert_eq!(setup.state.anchor(), anchor);
         assert!(runtime.plugin_execution_snapshot(id).is_some());
         assert_eq!(*runtime.get(&context, key).unwrap(), 7);
         assert!(runtime.get(&Context::new(), key).is_none());
@@ -2966,77 +2176,5 @@ mod setup_cancellation_tests {
             Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop())),
             Poll::Ready(Ok(()))
         );
-    }
-    #[test]
-    fn foreign_setup_scope_is_rejected_before_resource_registration() {
-        let (_runtime, _, own, _) = mounted_effect();
-        let (_foreign, _, foreign, _) = mounted_effect();
-        assert_eq!(own.scope.group(), foreign.scope.group());
-        let forged = AsyncSetup {
-            state: own.state.clone(),
-            scope: foreign.scope,
-        };
-        assert!(forged.ensure_active().is_err());
-        assert!(forged.is_cancelled());
-        assert!(forged
-            .on_cleanup(|| panic!("must not be registered"))
-            .is_err());
-        assert!(forged.effect(Effect::new()).is_err());
-        assert!(own.ensure_active().is_ok());
-    }
-    #[test]
-    fn nested_and_escaped_setup_share_context_and_execution_allocation() {
-        let (mut runtime, id, root, _) = mounted_effect();
-        let nested = Arc::new(Mutex::new(None));
-        let output = nested.clone();
-        root.effect(Effect::new().step(move |setup| {
-            *lock(&output) = Some(setup.clone());
-            async { Ok(Inverse::empty()) }
-        }))
-        .unwrap();
-        assert_eq!(
-            Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop())),
-            Poll::Ready(Ok(()))
-        );
-        let child = lock(&nested).take().unwrap();
-        assert_ne!(child.scope.group(), root.scope.group());
-        assert!(Arc::ptr_eq(&child.state, &root.state));
-        assert!(std::ptr::eq(child.context(), root.context()));
-        assert_eq!(child.owner(), id);
-        let SetupServices::Native(context) = &root.state.services else {
-            panic!("native context")
-        };
-        assert!(Arc::ptr_eq(
-            context,
-            &lock(&root.state)
-                .cleanups
-                .protocol
-                .native_context()
-                .unwrap()
-        ));
-        std::thread::scope(|scope| {
-            let escaped = child.clone();
-            scope
-                .spawn(move || {
-                    assert_eq!(escaped.owner(), id);
-                    assert!(std::ptr::eq(escaped.context(), child.context()));
-                })
-                .join()
-                .unwrap();
-        });
-        runtime.dispose(id).unwrap();
-        assert_eq!(
-            Pin::new(&mut runtime.settle()).poll(&mut TaskContext::from_waker(Waker::noop())),
-            Poll::Ready(Ok(()))
-        );
-        assert!(root.is_cancelled());
-        assert!(root.ensure_active().is_err());
-        assert_eq!(context.owner(), id);
-        assert!(lock(&root.state)
-            .cleanups
-            .protocol
-            .native()
-            .unwrap()
-            .is_closed());
     }
 }

@@ -4,12 +4,25 @@
 use crate::lifecycle_state::native::runtime::NativeRuntime;
 use crate::reversible_value::joint;
 use crate::{Error, Phase};
+use std::sync::Arc;
 use vstd::prelude::*;
 pub mod adoption;
 verus! {
-#[derive(Copy,Clone,Debug,PartialEq,Eq,Structural)]
-pub struct Target {domain:u64,id:usize,generation:u64,revision:u64}
+/// A retained Native allocation plus the captured activation and recipe version.
+/// Clone preserves that allocation; borrowing a target does not refresh it.
+pub struct Target {domain:u64,id:usize,generation:u64,revision:u64,native:Arc<joint::identity::AllocationIdentity>}
+impl Clone for Target {
+    fn clone(&self)->(out:Self) ensures out==*self,
+    {Self {domain:self.domain,id:self.id,generation:self.generation,revision:self.revision,native:self.native.clone()}}
+}
 impl Target {
+    pub closed spec fn binding(&self)->Arc<joint::identity::AllocationIdentity> {self.native}
+    pub open spec fn bound_to(&self,address:crate::reversible_value::service_composition::Address)->bool {
+        self.binding().wf() && self.binding().address()==address
+    }
+    pub fn native_identity(&self)->(out:&Arc<joint::identity::AllocationIdentity>)
+        ensures *out==self.binding(),
+    {&self.native}
     pub closed spec fn domain_id(&self)->u64 {self.domain}
     pub closed spec fn owner(&self)->usize {self.id}
     pub closed spec fn epoch(&self)->u64 {self.generation}
@@ -85,29 +98,36 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     pub fn configuration_target(&self,id:usize)->(out:Option<Target>)
         requires self.wf(),
         ensures out.is_some()==self.configuration_enabled(id),
-            out.is_some() ==> out.unwrap().owner()==id && self.configuration_matches(out.unwrap()),
+            out.is_some() ==> out.unwrap().owner()==id && self.configuration_matches(out.unwrap())
+                && out.unwrap().bound_to(self.control_address()),
     {
         if self.kernel().phase(id)!=Some(Phase::Active) || self.kernel().retired(id) {return None;}
         let generation=self.kernel().episode_generation(id)?;
         let recipe=self.registration(id)?;
-        Some(Target {domain:self.lifecycle().domain(),id,generation,revision:recipe.revision()})
+        Some(Target {domain:self.lifecycle().domain(),id,generation,revision:recipe.revision(),native:self.poll_control_identity().clone()})
     }
-    pub fn configuration_target_is_current(&self,target:Target)->(out:bool)
-        requires self.wf(),ensures out==self.configuration_matches(target),
-    {self.configuration_target(target.id)==Some(target)}
-    pub fn replace_configuration(&mut self,target:Target,payload:R)->(out:Result<R,(Error,R)>)
+    /// Numeric freshness only. NativeDriver also checks retained allocation identity.
+    pub fn configuration_target_is_current(&self,target:&Target)->(out:bool)
+        requires self.wf(),ensures out==self.configuration_matches(*target),
+    {
+        if self.kernel().phase(target.id)!=Some(Phase::Active) || self.kernel().retired(target.id) {return false;}
+        let generation=match self.kernel().episode_generation(target.id) {Some(value)=>value,None=>return false};
+        let recipe=match self.registration(target.id) {Some(value)=>value,None=>return false};
+        target.domain==self.lifecycle().domain() && target.generation==generation && target.revision==recipe.revision()
+    }
+    pub fn replace_configuration(&mut self,target:&Target,payload:R)->(out:Result<R,(Error,R)>)
         requires old(self).wf(),
         ensures final(self).wf(),final(self).journal_spec()==old(self).journal_spec(),final(self).joint_key()==old(self).joint_key(),
             final(self).state()==old(self).state(),final(self).publications()==old(self).publications(),final(self).episode_owners()==old(self).episode_owners(),
-            !old(self).configuration_matches(target) ==> *final(self)==*old(self) && out==Err((Error::InvalidState,payload)),
-            out.is_ok()==(old(self).configuration_matches(target) && old(self).registry().entries()[target.owner()].recipe().version()<u64::MAX),
+            !old(self).configuration_matches(*target) ==> *final(self)==*old(self) && out==Err((Error::InvalidState,payload)),
+            out.is_ok()==(old(self).configuration_matches(*target) && old(self).registry().entries()[target.owner()].recipe().version()<u64::MAX),
             final(self).registry().entries().dom()==old(self).registry().entries().dom(),
             forall|n:usize| #[trigger] old(self).registry().entries().contains_key(n) ==>
                 final(self).registry().entries()[n].bookkeeping()==old(self).registry().entries()[n].bookkeeping()
                 && (n!=target.owner() ==> final(self).registry().entries()[n]==old(self).registry().entries()[n]),
             out.is_err() ==> final(self).registry().entries()==old(self).registry().entries(),
             out.is_ok() ==> final(self).registry().entries()[target.owner()].recipe().same_identity(&old(self).registry().entries()[target.owner()].recipe()),
-            out.is_ok() ==> old(self).configuration_matches(target) && !final(self).configuration_matches(target)
+            out.is_ok() ==> old(self).configuration_matches(*target) && !final(self).configuration_matches(*target)
                 && final(self).registry().entries()[target.owner()].recipe().version()==target.version()+1
                 && final(self).registry().entries()[target.owner()].recipe().payload()==payload
                 && out->Ok_0==old(self).registry().entries()[target.owner()].recipe().payload(),

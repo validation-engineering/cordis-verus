@@ -2,6 +2,12 @@
 
 Current R2 status is defined by [package 5 acceptance](r2-acceptance.md): managed-production/v1 is complete. Earlier checkpoints below retain their original evidence and scope.
 
+Current Native provenance checks cover separately supplied executions,
+configurations and linked scopes: see the [source/guard audit](review-map.md#execution-configuration-and-scope-provenance).
+Their verified identity meaning, ordinary Rust pointer checks and remaining
+premises are distinct. These checks do not change historical R2 acceptance or
+close a general paper obligation.
+
 ## Historical implementation and verification checkpoints
 
 The [fourth production package](r2-production-composition.md) composes actual native/Node trajectories, bridge mutation histories and typed configuration/source projections. Package 5 retains the combined R2 acceptance gate.
@@ -822,6 +828,27 @@ Review: [`realm_context.rs`](../crates/cordis-kernel/src/realm_context.rs),
 [`runtime.rs`](../crates/cordis/src/runtime.rs).
 
 ## Shared Begin context and effect admission
+
+Current host ownership entry points are [`runtime/episode.rs`](../crates/cordis/src/runtime/episode.rs)
+and [`runtime/effect_handle.rs`](../crates/cordis/src/runtime/effect_handle.rs).
+The [ownership audit](review-map.md#episode-and-handle-ownership) records the
+2026-10-26 encapsulation and unchanged proof boundaries. Child admission and
+external completion now live in [`runtime/child.rs`](../crates/cordis/src/runtime/child.rs)
+and [`child/external.rs`](../crates/cordis/src/runtime/child/external.rs); the
+[Child audit](review-map.md#child-request-and-completion-ownership) distinguishes
+checked native identity from host reports. Actual root Future/ticket ownership
+now lives in [`runtime/root.rs`](../crates/cordis/src/runtime/root.rs), and the
+static setup/cleanup handshake in
+[`static_host/progress.rs`](../crates/cordis/src/runtime/static_host/progress.rs).
+The [Episode/root audit](review-map.md#episode-notifications-and-root-progress)
+records notification/capability writers and two host release fixes, with unchanged
+kernel contracts. Native control binding/reset and observation calls now pass
+through [`runtime/control.rs`](../crates/cordis/src/runtime/control.rs) and Driver's
+lazy availability entry. The [control audit](review-map.md#native-decisions-and-control-ownership)
+connects the kernel's retained Native identity to its `bound(native)` meaning and
+the Driver's executable allocation check. Pointer equality remains an ordinary
+Rust boundary; other execution/representation premises are separate. Acceptance
+paragraphs below retain their original source scope.
 
 `NativeEpisode` now owns an `Arc<NativeContext>` containing its actual Begin
 ticket, work domain, provision ports and committed bindings (with registered

@@ -98,7 +98,7 @@
           "kind": "fn"
         },
         {
-          "file": "crates/cordis-kernel/src/lifecycle_actions.rs",
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
           "symbol": "finish_cleanup",
           "kind": "fn"
         },
@@ -226,6 +226,71 @@
           "file": "crates/cordis-kernel/src/lifecycle_state/cleanup.rs",
           "symbol": "failed_prefix_retains_dependencies",
           "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+          "symbol": "finish_index",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+          "symbol": "check_resource_finish",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/lifecycle_actions/finish.rs",
+          "symbol": "remove_cleanup",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "reply_pending",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "complete_following",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/cleanup_queue.rs",
+          "symbol": "completion_condition",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "owned_publication",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "check_replacement",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "replace_admitted",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "replace_service",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "revoke_service",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/services.rs",
+          "symbol": "reclaim_service",
+          "kind": "fn"
+        },
+        {
+          "file": "crates/cordis-kernel/src/node_runtime/bridge.rs",
+          "symbol": "replace_service",
+          "kind": "fn"
         }
       ],
       "tests": [
@@ -326,6 +391,21 @@
           "package": "cordis-kernel",
           "target": "cleanup_protocol",
           "name": "completed_receipts_stay_rejected_after_real_episode_reactivation"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "node_services",
+          "name": "foreign_and_old_episode_commands_preserve_the_actual_publication"
+        },
+        {
+          "package": "cordis-kernel",
+          "target": "node_services",
+          "name": "reclaim_waits_for_real_lease_then_transfers_the_dynamic_declaration"
+        },
+        {
+          "package": "cordis-driver",
+          "target": "service_ownership",
+          "name": "metadata_and_object_replacement_share_ownership_and_error_precedence"
         }
       ],
       "negativeControl": {

@@ -5,7 +5,9 @@
 use super::child::{ChildSlot, ChildStatus};
 use super::{ChildIdentity, PluginDefinition};
 use crate::cleanup_groups::CleanupGroups;
+use crate::lifecycle_state::native::runtime::NativeRuntime;
 use crate::lifecycle_state::native::NativeHost;
+use crate::reversible_value::joint::Journal;
 use crate::setup_work::SetupWork;
 use crate::{Error, Port};
 use std::collections::BTreeMap;
@@ -147,42 +149,60 @@ impl ChildSnapshot {
     pub fn failed(&self)->(out:bool) ensures out==(self.state() is Failed), {matches!(self.state,ChildStatus::Failed(_))}
 }
 
-pub struct SharedChild {inner:Arc<RwLock<ChildCell,ChildPredicate>>,origin:ChildOrigin}
+/// One shared request/inverse decision. Linked work retains its actual Journal
+/// allocation; the binding does not retain Native registration payloads. Raw
+/// identities have no execution provenance and remain usable by raw host APIs.
+pub struct SharedChild {inner:Arc<RwLock<ChildCell,ChildPredicate>>,origin:ChildOrigin,execution:Option<Journal>}
 impl Clone for SharedChild {
+    #[allow(clippy::manual_map)] // Keep the exact Journal clone contract in the Some branch.
     fn clone(&self)->(out:Self)
         ensures out==*self,
-    {Self {inner:self.inner.clone(),origin:self.origin}}
+    {
+        let execution=match &self.execution {Some(journal)=>Some(journal.clone()),None=>None};
+        Self {inner:self.inner.clone(),origin:self.origin,execution}
+    }
 }
 impl SharedChild {
+    pub closed spec fn execution_journal(&self)->Option<Journal> {self.execution}
+    pub fn execution_domain(&self)->(out:Option<&Journal>)
+        ensures out.is_some()==self.execution_journal().is_some(),
+            out.is_some() ==> *out.unwrap()==self.execution_journal().unwrap(),
+    {self.execution.as_ref()}
     pub closed spec fn source(&self)->Loc {self.inner.pred().resource}
     pub closed spec fn domain_id(&self)->u64 {self.origin.domain}
     pub closed spec fn owner(&self)->usize {self.origin.parent}
     pub closed spec fn episode(&self)->Option<u64> {self.origin.generation}
     pub closed spec fn wf(&self)->bool {self.inner.pred().origin==self.origin}
-    fn new(slot:ChildSlot<()>,origin:ChildOrigin)->(out:(Self,ChildSnapshot))
+    fn new(slot:ChildSlot<()>,origin:ChildOrigin,execution:Option<Journal>)->(out:(Self,ChildSnapshot))
         requires slot.wf(),slot.domain_id()==origin.domain,slot.owner()==origin.parent,slot.episode()==origin.generation,
-        ensures out.0.wf(),out.0.origin==origin,out.1.wf(),out.1.source()==out.0.source(),out.1.state()==slot.state(),
+        ensures out.0.wf(),out.0.execution_journal()==execution,out.0.origin==origin,out.1.wf(),out.1.source()==out.0.source(),out.1.state()==slot.state(),
     {
         let cell=ChildCell::new(slot);
         let snapshot=cell.snapshot();
         let ghost predicate=ChildPredicate {origin,resource:cell.auth@.id()};
-        (Self {inner:Arc::new(RwLock::new(cell,Ghost(predicate))),origin},snapshot)
+        (Self {inner:Arc::new(RwLock::new(cell,Ghost(predicate))),origin,execution},snapshot)
     }
+    #[allow(clippy::manual_map)] // The borrowed work owner determines the retained Journal.
     fn from_work<C,G>(work:&SetupWork<C,G>)->(out:Option<Self>)
         requires work.wf(),
         ensures out.is_some()==work.origin().is_some(),out.is_some() ==> out.unwrap().wf()
             && out.unwrap().domain_id()==work.origin().unwrap().domain && out.unwrap().owner()==work.origin().unwrap().id
-            && out.unwrap().episode()==Some(work.origin().unwrap().generation),
+            && out.unwrap().episode()==Some(work.origin().unwrap().generation)
+            && out.unwrap().execution_journal()==match work.link() {Some(link)=>Some(link.0),None=>None},
     {
         match ChildSlot::from_work(work) {
-            Some(slot)=>{let ticket=work.lifecycle_ticket().unwrap();Some(Self::new(slot,ChildOrigin {domain:ticket.domain,parent:ticket.id,generation:Some(ticket.generation)}).0)},
+            Some(slot)=>{
+                let ticket=work.lifecycle_ticket().unwrap();
+                let execution=match work.execution_domain() {Some(journal)=>Some(journal.clone()),None=>None};
+                Some(Self::new(slot,ChildOrigin {domain:ticket.domain,parent:ticket.id,generation:Some(ticket.generation)},execution).0)
+            },
             None=>None,
         }
     }
     pub fn from_identity(child:ChildIdentity)->(out:(Self,ChildSnapshot))
-        ensures out.0.wf(),out.0.domain_id()==child.domain_id(),out.0.owner()==child.owner(),out.0.episode().is_none(),
+        ensures out.0.wf(),out.0.execution_journal().is_none(),out.0.domain_id()==child.domain_id(),out.0.owner()==child.owner(),out.0.episode().is_none(),
             out.1.wf(),out.1.source()==out.0.source(),out.1.state()==ChildStatus::<()>::Assigned(child),
-    {Self::new(ChildSlot::from_identity(child),ChildOrigin {domain:child.domain,parent:child.parent,generation:None})}
+    {Self::new(ChildSlot::from_identity(child),ChildOrigin {domain:child.domain,parent:child.parent,generation:None},None)}
     pub fn domain(&self)->(out:u64) ensures out==self.domain_id(), {self.origin.domain}
     pub fn generation(&self)->(out:Option<u64>) ensures out==self.episode(), {self.origin.generation}
     pub fn parent_id(&self)->(out:usize) ensures out==self.owner(), {self.origin.parent}
@@ -254,6 +274,7 @@ impl<P,X,G> SetupWork<ChildDispatch<P,X>,G> {
                 &&& child.wf() && old(self).origin().is_some()
                 &&& child.domain_id()==old(self).origin().unwrap().domain && child.owner()==old(self).origin().unwrap().id
                 &&& child.episode()==Some(old(self).origin().unwrap().generation)
+                &&& child.execution_journal()==match old(self).link() {Some(link)=>Some(link.0),None=>None}
                 &&& final(self).child_requests().len()==old(self).child_requests().len()+1
                 &&& final(self).child_requests().last().value() is Native
                 &&& final(self).child_requests().last().value()->Native_0.payload()==payload
@@ -269,6 +290,31 @@ impl<P,X,G> SetupWork<ChildDispatch<P,X>,G> {
             Ok(token)=>Ok((child,token)),
             Err((request,_inverse))=>match request {ChildDispatch::Native(request)=>Err(request.payload),ChildDispatch::External(_)=>{assert(false);panic!("native request");}},
         }
+    }
+}
+
+impl<R,H,V> NativeRuntime<R,H,V> {
+    /// Capture an already registered local Child and its terminal assignment.
+    /// This is provenance, not a claim that the Child is inactive or unloaded.
+    pub fn registered_child(&self,id:usize)->(out:Option<(SharedChild,ChildSnapshot)>)
+        requires self.wf(),
+        ensures out.is_some()==(self.registry().entries().contains_key(id)
+                && self.registry().entries()[id].recipe().parent_id().is_some()),
+            out.is_some() ==> out.unwrap().0.wf()
+                && out.unwrap().0.execution_journal()==Some(self.journal_spec())
+                && out.unwrap().0.domain_id()==self.state().protocol().domain_id()
+                && out.unwrap().0.owner()==self.registry().entries()[id].recipe().parent_id().unwrap()
+                && out.unwrap().0.episode().is_none()
+                && out.unwrap().1.wf() && out.unwrap().1.source()==out.unwrap().0.source()
+                && out.unwrap().1.state() is Assigned
+                && out.unwrap().1.state()->Assigned_0.child()==id
+                && out.unwrap().1.state()->Assigned_0.owner()==out.unwrap().0.owner()
+                && out.unwrap().1.state()->Assigned_0.domain_id()==out.unwrap().0.domain_id(),
+    {
+        let registration=self.registration(id)?;
+        let child=registration.child_identity()?;
+        Some(SharedChild::new(ChildSlot::from_identity(child),
+            ChildOrigin {domain:child.domain,parent:child.parent,generation:None},Some(self.execution_journal())))
     }
 }
 

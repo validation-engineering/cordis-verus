@@ -190,6 +190,11 @@ impl<C,G> SetupWork<C,G> {
     {
         match &self.joint {Some(member)=>Some(member.observe()),None=>None}
     }
+    /// Borrow the actual work Journal used by request admission and history.
+    #[allow(clippy::manual_map)]
+    pub fn execution_domain(&self)->(out:Option<&Journal>)
+        ensures out.is_some()==self.link().is_some(),out.is_some() ==> *out.unwrap()==self.link().unwrap().0,
+    {match &self.joint {Some(member)=>Some(member.domain_ref()),None=>None}}
     pub open spec fn queued_unchanged(&self,prior:&Self)->bool {
         self.child_requests()==prior.child_requests() && self.group_requests()==prior.group_requests()
             && self.next_id()==prior.next_id() && self.outstanding()==prior.outstanding()

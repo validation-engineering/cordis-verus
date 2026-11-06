@@ -474,3 +474,70 @@ uses allocation identity, with an explicit alias-closure premise for a stronger
 port-level frame. These managed calls do not prove the surrounding callback.
 `update_reversible_with` retains its existing unlocked computation/checked
 landing contract. See [declared-call contracts](r2-execution.md#declared-native-calls-and-production-function-steps).
+
+### Low-level Native provenance
+
+`NativeDriver::owns_execution` checks the actual Journal and current Episode;
+`owns_setup_scope` also checks the retained live queue allocation. Driver root,
+lifecycle and scoped-checkpoint entries use these checks before dispatch.
+`NativeDriver::configuration_snapshot` returns `Option`, rejecting foreign
+configuration Journals; `Loader::execution_snapshot` keeps its infallible API
+because Loader privately retains both owners. `SetupScope` is a clonable handle:
+use `clone()` when retaining it across a consuming call. Its `belongs` method
+checks numeric selection, while the Driver adds allocation authentication.
+See the [contracts and remaining boundaries](review-map.md#execution-configuration-and-scope-provenance).
+
+### Current action tickets
+
+`LifecycleDriver::pending_action` returns `Option<ActionTicket>` by value, as
+Native and Node Drivers do. Keep the returned value directly; `.cloned()` is no
+longer needed. Each query reads the authoritative ledger. An old value may be
+retained, but completion checks it against the current action. `None` means no
+outstanding reply, not permission to release a failed cleanup. See the
+[pending-ticket audit](review-map.md#pending-action-observations).
+
+### Invocation and configuration target handles
+
+Native root admission returns a `RegisteredInvocation` bound to its Native
+allocation. `call_root` and `call_opaque_root` reject foreign or standalone tokens
+before invoking the recipe and return the original token on rejection. Current
+owner, episode and recipe checks still apply to authentic tokens.
+
+Configuration `Target` now retains the same allocation and implements `Clone`,
+not `Copy`, `Debug` or equality traits. Pass `&target` to
+`configuration_target_is_current` and `replace_configuration`; use `clone()` to
+keep another handle across an owned batch. Cloning does not refresh a target.
+Batch rejection returns all original changes before any replacement or metadata
+callback. See the [ownership and proof boundary](review-map.md#invocation-and-configuration-target-provenance).
+
+### Child handles and cleanup provenance
+
+Use the `SharedChild` returned by actual Native/recorded `enqueue_native_child`,
+or `NativeDriver::registered_child(id)` for an already registered local Child.
+The latter returns `None` for a missing ID or a root. It captures the assignment,
+not permission to unload; retired registrations can still be observed.
+`Runtime::mount` with a parent uses this factory and retains the same cleanup
+object whether the parent has begun or is already active.
+
+`NativeDriver` rejects foreign or unbound Child handles before registration or
+retirement. `SharedChild::from_identity` intentionally creates an unbound raw
+wrapper: it remains usable by raw `NativeHost`, whose caller retains provenance
+premises. Equal numeric IDs do not bind that wrapper to a Driver.
+`owns_shared_child` only checks the Journal association; episode, phase and
+terminal-state guards still apply. Clones retain the same decision and Journal
+metadata until their last drop, without retaining Native recipe/host payloads
+through that association. See the [review route and boundaries](review-map.md#child-request-and-cleanup-provenance).
+
+### Historical Native observations
+
+The low-level Driver's `publication_snapshot()` returns a Native history snapshot.
+Pass `&snapshot` to `recovery_snapshot`; the result is `None` for another Native
+owner, even with identical numeric IDs. Local snapshots remain usable after
+updates, failed cleanup, retry, Unload and a new Episode. A configuration snapshot
+exposes its same-cut Native component through `native_snapshot()`.
+
+`Some(Capture)` accepts the observation source; it does not report that cleanup
+succeeded or perform rollback. Recovery diagnoses are erased proof evidence.
+Raw Journal projections cannot be passed to this typed Driver entry. They remain
+available to proof-facing kernel APIs under their stated premises. See the
+[snapshot ownership and cost audit](review-map.md#native-historical-snapshots).

@@ -7,9 +7,11 @@ use crate::action_ledger::{ActionKind, ActionTicket};
 use crate::distinct_ports;
 use crate::realm_context::RealmContext;
 use crate::reversible_value::function::Body;
+use crate::reversible_value::joint::identity::AllocationIdentity;
 use crate::setup_work::{SetupWork, WorkItem, WorkReceipt, WorkTicket};
 use crate::{Error, Kernel, Phase, Port};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use vstd::prelude::*;
 
 verus! {
@@ -178,8 +180,25 @@ impl ChildIdentity {
     pub closed spec fn child(&self)->usize {self.id}
     pub fn id(&self)->(out:usize) ensures out==self.child(), {self.id}
 }
-pub struct RegisteredInvocation<A> {domain:u64,id:usize,revision:u64,lifecycle:ActionTicket,item:WorkItem<A>}
+/// Native admission retains its actual allocation; raw LifecycleState admission
+/// remains unbound. Neither form retains the Native host or Journal payloads.
+pub struct RegisteredInvocation<A> {domain:u64,id:usize,revision:u64,lifecycle:ActionTicket,item:WorkItem<A>,native:Option<Arc<AllocationIdentity>>}
 impl<A> RegisteredInvocation<A> {
+    pub closed spec fn native_binding(&self)->Option<Arc<AllocationIdentity>> {self.native}
+    pub open spec fn bound_to(&self,address:crate::reversible_value::service_composition::Address)->bool {
+        self.native_binding().is_some() && self.native_binding().unwrap().wf()
+            && self.native_binding().unwrap().address()==address
+    }
+    pub fn native_identity(&self)->(out:Option<&Arc<AllocationIdentity>>)
+        ensures out.is_some()==self.native_binding().is_some(),
+            out.is_some() ==> *out.unwrap()==self.native_binding().unwrap(),
+    {self.native.as_ref()}
+    pub(crate) fn bind_native(self,binding:Arc<AllocationIdentity>)->(out:Self)
+        requires binding.wf(),
+        ensures out.bound_to(binding.address()),out.native_binding()==Some(binding),
+            out.domain_id()==self.domain_id(),out.owner()==self.owner(),out.version()==self.version(),
+            out.lifecycle()==self.lifecycle(),out.work()==self.work(),
+    {Self {domain:self.domain,id:self.id,revision:self.revision,lifecycle:self.lifecycle,item:self.item,native:Some(binding)}}
     pub closed spec fn domain_id(&self)->u64 {self.domain}
     pub closed spec fn owner(&self)->usize {self.id}
     pub closed spec fn version(&self)->u64 {self.revision}
@@ -415,7 +434,7 @@ impl LifecycleState {
         ensures out.is_ok()==self.registered_root_ready(plugin,old(work)),
             final(work).link()==old(work).link(),final(work).origin()==old(work).origin(), final(work).domain_id()==old(work).domain_id(), final(work).accepts()==old(work).accepts(), final(work).is_closed()==old(work).is_closed(), final(work).wf(),out.is_err() ==> *final(work)==*old(work) && out->Err_0==argument,
             out.is_ok() ==> out->Ok_0.domain_id()==plugin.domain_id() && out->Ok_0.owner()==plugin.owner()
-                && out->Ok_0.version()==plugin.version() && out->Ok_0.work().value()==argument
+                && out->Ok_0.version()==plugin.version() && out->Ok_0.work().value()==argument && out->Ok_0.native_binding().is_none()
                 && out->Ok_0.lifecycle()==old(work).origin().unwrap()
                 && self.root_invocation_enabled(out->Ok_0.lifecycle()) && old(work).accepts()
                 && old(work).origin().is_some() && old(work).origin().unwrap().id==plugin.owner()
@@ -431,7 +450,7 @@ impl LifecycleState {
             || ticket.kind!=ActionKind::Setup || self.kernel.episode_generation(plugin.id)!=Some(ticket.generation)
             || !self.accepts_root_invocation(ticket) || !work.accepting_now() {return Err(argument);}
         match work.issue_root(argument) {
-            Ok(item)=>Ok(RegisteredInvocation {domain:plugin.domain,id:plugin.id,revision:plugin.revision,lifecycle:ticket,item}),
+            Ok(item)=>Ok(RegisteredInvocation {domain:plugin.domain,id:plugin.id,revision:plugin.revision,lifecycle:ticket,item,native:None}),
             Err(argument)=>Err(argument),
         }
     }

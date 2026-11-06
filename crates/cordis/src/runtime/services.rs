@@ -30,41 +30,11 @@ impl<T: Any + Send + Sync> ServiceHandle<T> {
             .ok_or_else(|| "service value type mismatch".into())
     }
     pub fn set(&self, value: T) -> CallbackResult {
-        let mut status = lock(&self.status.status);
-        if status.checked().observe().cancelled() || status.checked().observe().finished() {
-            return Err(CANCELLED.into());
-        }
-        let previous = match self.slot.replace(Arc::new(value)) {
-            Ok(previous) => previous,
-            Err(rejected) => {
-                drop(status);
-                drop(rejected.value);
-                return Err(rejected.message.into());
-            }
-        };
-        let driver = status.driver.take();
-        let notify = status.notify.clone();
-        drop(status);
-        drop(previous);
-        if let Some(notify) = notify {
-            notify();
-        }
-        if let Some(driver) = driver {
-            driver.wake();
-        }
-        Ok(())
+        self.status
+            .replace_service_value(&self.slot, Arc::new(value))
     }
     pub fn refresh(&self) {
-        let (driver, notify) = {
-            let mut status = lock(&self.status.status);
-            (status.driver.take(), status.notify.clone())
-        };
-        if let Some(notify) = notify {
-            notify();
-        }
-        if let Some(driver) = driver {
-            driver.wake();
-        }
+        self.status.refresh_driver();
     }
     pub fn dispose(&self) {
         self.status.cancel();

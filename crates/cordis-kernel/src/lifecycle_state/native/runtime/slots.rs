@@ -21,7 +21,7 @@ impl<R,H,T,M> NativeRuntime<R,H,ServiceSlot<T,M>> {
         proof {self.services.slots_certified(evidence,view.journal_spec(),view.state());}
         let joint=view.finish();
         proof {self.services.project_observations(&joint);self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
+        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
     }
     /// Collect the actual owner imports and provisions as well as published
     /// services, then certify them with work/cleanup in one held read epoch.
@@ -47,7 +47,7 @@ impl<R,H,T,M> NativeRuntime<R,H,ServiceSlot<T,M>> {
         proof {self.services.slots_certified(evidence,view.journal_spec(),view.state());values.slots_certified(evidence,view.journal_spec(),view.state());}
         let joint=view.finish();
         proof {self.services.project_observations(&joint);values.project_observations(&joint);execution.context_correspondence(&joint);self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        Some(history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
+        Some(history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
     }
     /// The actual adapter's root/effect scope must select a live queue in the
     /// same checkpoint. This reuses one read epoch, adding no Journal lock.
@@ -92,7 +92,7 @@ impl<R,H,T,M> NativeRuntime<R,H,ServiceSlot<T,M>> {
         proof {self.services.slots_certified(evidence,view.journal_spec(),view.state());values.slots_certified(evidence,view.journal_spec(),view.state());}
         let joint=view.finish();
         proof {self.services.project_observations(&joint);values.project_observations(&joint);execution.context_correspondence(&joint);self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        Some(history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
+        Some(history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
     }
 }
 }

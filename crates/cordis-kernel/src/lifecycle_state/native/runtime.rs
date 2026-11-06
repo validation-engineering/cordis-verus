@@ -45,6 +45,10 @@ verus! {
 broadcast use vstd::seq_lib::group_seq_properties;
 /// The runtime result and erased evidence from the same actual release call.
 pub type ReleaseObservation<V,I> = (Result<(CleanupOutcome,ReleasedNativeValues<V>),Error>,Tracked<Option<episode::Unload>>,Ghost<Option<crate::cleanup_groups::CleanupGroups<I>>>);
+/// A rejected adapter call cannot carry an Unload receipt or drained queues.
+pub fn rejected_release<V,I>()->(out:ReleaseObservation<V,I>)
+    ensures out.0==Err(Error::InvalidState),out.1@.is_none(),out.2@.is_none(),
+{(Err(Error::InvalidState),Tracked(None),Ghost(None))}
 pub open spec fn released<V,I>(observation:ReleaseObservation<V,I>)->bool {
     &&& observation.0.is_ok() && observation.1@.is_some() && observation.2@.is_some()
     &&& observation.1@.unwrap().wf() && observation.2@.unwrap().wf() && observation.2@.unwrap().all_drained()
@@ -377,7 +381,18 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     pub fn execution_journal(&self)->(out:joint::Journal)
         ensures out==self.journal_spec(),
     {self.joint.domain()}
+    pub fn execution_domain(&self)->(out:&joint::Journal) ensures *out==self.journal_spec(),
+    {self.joint.domain_ref()}
     pub closed spec fn joint_key(&self)->nat {self.joint.key()}
+    pub open spec fn control_address(&self)->crate::reversible_value::service_composition::Address {
+        crate::reversible_value::service_composition::Address {journal:self.journal_spec(),key:self.joint_key()}
+    }
+    /// The immutable Native member identity, shared by controls, invocations and targets.
+    /// Pointer equality is checked by the ordinary adapter; this contract ties
+    /// the returned allocation to the actual Journal and Native record.
+    pub fn poll_control_identity(&self)->(out:&Arc<joint::identity::AllocationIdentity>)
+        requires self.wf(),ensures out.wf(),out.address()==self.control_address(),
+    {self.joint.identity_ref()}
     pub(crate) fn certify_poll_control(&self,view:&joint::WriteView)
         requires self.wf(),view.wf(),view.journal_spec()==self.journal_spec(),
         ensures view.state().contains_pair(self.joint_key(),joint::Record::Native {state:self.observation().project(self.execution_history().labels.len())}),
@@ -406,7 +421,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     {
         let joint=self.joint.observe();
         proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
+        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
     }
     /// Construct an erased native episode-deletion certificate from this real
     /// snapshot, or identify the source guard that prevents that construction.
@@ -433,7 +448,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     {
         let joint=self.joint.observe_caused(Tracked(Some(earlier)));
         proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
+        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
     }
     /// Capture after an actual earlier read from the same Journal. This derives
     /// chronological coverage from the retained witness under the real lock.
@@ -444,18 +459,14 @@ impl<R,H,V> NativeRuntime<R,H,V> {
     {
         let joint=self.joint.observe_after(_earlier);
         proof {self.child_records().extend_cut(self.joint_events(),joint.events());self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
+        history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key()))
     }
     /// Normalize real publication/owner changes and pending registrations since
     /// any earlier actual cut, even while an Episode is loading or cleaning up.
     pub fn recovery_snapshot(&self,_earlier:&joint::Snapshot)->(out:history::recovery::Capture<V>)
         requires self.wf(),_earlier.certified(),_earlier.journal_spec()==self.journal_spec(),
             _earlier.last().contains_key(self.joint_key()),_earlier.last()[self.joint_key()] is Native,
-        ensures out.cut.certified(),out.cut.key()==self.joint_key(),out.cut.joint_spec().extends(_earlier),
-            out.interval@.wf(),out.interval@.source==out.cut,out.interval@.start==_earlier.events().len(),out.interval@.normalized(),
-            out.issue@.is_none()==out.interval@.balanced(out.interval@.scope()),
-            out.issue@.is_none() ==> out.interval@.recovered_all(),
-            out.issue@.is_some() ==> out.interval@.diagnosed(out.interval@.scope(),out.issue@.unwrap()),
+        ensures out.describes(*_earlier,self.joint_key()),
             out.cut.history()==self.execution_history(),self.child_records().cut_source(&out.cut),
     {
         let cut=self.publication_snapshot_after(_earlier);
@@ -463,6 +474,16 @@ impl<R,H,V> NativeRuntime<R,H,V> {
         let ghost interval=cut.recovery_interval(_earlier.events().len());
         let ghost issue=interval.check_all();
         history::recovery::Capture {cut,interval:Ghost(interval),issue:Ghost(issue)}
+    }
+    /// A typed Native cut supplies the Native-record premise of the raw query.
+    /// The actual owner still supplies all subsequent history under its lock.
+    pub fn recovery_snapshot_from(&self,earlier:&history::Snapshot<V>)->(out:history::recovery::Capture<V>)
+        requires self.wf(),earlier.certified(),earlier.bound_to(self.control_address()),
+        ensures out.describes(earlier.joint_spec(),self.joint_key()),
+            out.cut.history()==self.execution_history(),self.child_records().cut_source(&out.cut),
+    {
+        proof {earlier.valid_history();}
+        self.recovery_snapshot(earlier.joint())
     }
     /// Observe the native owner and its actual episode in one held read epoch.
     /// The domain premise follows from native Begin and the managed API's frame
@@ -483,7 +504,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
         proof {assert(execution.observed_state(view.state()));}
         let joint=view.finish();
         proof {self.execution_history().extend_indexed(self.history_positions(),self.joint.events(),joint.events(),self.joint_key());}
-        Some(history::Snapshot::new(joint,Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
+        Some(history::Snapshot::new(joint,self.poll_control_identity().clone(),Ghost(self.execution_history()),Ghost(self.history_positions()),Ghost(self.joint_key())))
     }
     pub fn lifecycle(&self)->(out:&LifecycleState)
         requires self.wf(),ensures *out==self.state(),out.wf(),
@@ -851,6 +872,7 @@ impl<R,H,V> NativeRuntime<R,H,V> {
             final(execution).cleanup_state()==old(execution).cleanup_state(),final(execution).value_state()==old(execution).value_state(),
             final(execution).work_state().domain_id()==old(execution).work_state().domain_id(),out.is_err() ==> out->Err_0==argument && *final(execution)==*old(execution),
             out.is_ok() ==> out->Ok_0.work().value()==argument && out->Ok_0.owner()==id
+                && out->Ok_0.bound_to(self.control_address())
                 && self.owns_execution(id,old(execution)) && self.owns_execution(id,final(execution))
                 && self.episode_owners()[id].admits(&out->Ok_0)
                 && self.state().root_invocation_enabled(out->Ok_0.lifecycle())
@@ -858,7 +880,13 @@ impl<R,H,V> NativeRuntime<R,H,V> {
                 && final(execution).work_state().root_status()==crate::setup_work::RootStatus::Queued
                 && out->Ok_0.work().origin().request_id()==0 && out->Ok_0.work().origin().request_kind()==crate::setup_work::WorkKind::Root,
             final(execution).status_links()==old(execution).status_links(),
-    {if !self.matches_execution(id,execution) {return Err(argument);}self.host.admit_managed_root(id,execution,argument)}
+    {
+        if !self.matches_execution(id,execution) {return Err(argument);}
+        match self.host.admit_managed_root(id,execution,argument) {
+            Ok(invocation)=>Ok(invocation.bind_native(self.joint.identity())),
+            Err(argument)=>Err(argument),
+        }
+    }
 
     pub fn retire(&mut self,id:usize)->(out:Result<(),Error>)
         requires old(self).wf(),

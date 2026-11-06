@@ -22,6 +22,7 @@ def module(name, filename):
 
 
 PROFILES = {
+    'node-services': ['node-service-ignores-publication-owner', 'node-service-ignores-current-generation'],
     'update-recovery': ['cleanup-dispatch-promotes-failure', 'cleanup-dispatch-bypasses-receipt', 'cleanup-queue-discards-retained-payload', 'r2-value-ignores-inverse-depth', 'r2-shared-child-splits-request-inverse'],
     'r01-exclusive': ['r01-exclusive-source-ignores-input', 'r01-exclusive-source-ignores-allocation', 'r01-typed-seed-ignores-inverse-debt', 'r01-typed-seed-ignores-revision', 'r01-typed-call-ignores-source-history'],
     'episode': ['r3-replay-discards-foreign-history', 'r3-recovery-discards-stored-receipts'],
@@ -43,7 +44,7 @@ PROFILES = {
 def load_profile(profile):
     if profile not in PROFILES:
         raise ValueError('Unknown control profile: ' + profile)
-    stem = profile if profile in ('r01-exclusive', 'update-recovery') else f'r3-{profile}'
+    stem = profile if profile in ('r01-exclusive', 'update-recovery', 'node-services') else f'r3-{profile}'
     manifest_path = ROOT / f'scripts/negative-controls.{stem}.json'
     h = module('profile_scoped', 'check-negative-scoped.py')
     canonical = module('profile_canonical', 'check-negative.py')
